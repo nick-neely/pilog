@@ -9,6 +9,8 @@ export type Note = {
 export type IpcContract = {
   'note:create': { request: { content: string }; response: Note }
   'note:list': { request: void; response: Note[] }
+  'note:update': { request: { id: string; content: string }; response: Note | null }
+  'note:delete': { request: { id: string }; response: boolean }
 }
 
 export type IpcChannel = keyof IpcContract
