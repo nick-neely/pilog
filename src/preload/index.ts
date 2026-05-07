@@ -1,16 +1,18 @@
-import { contextBridge } from 'electron'
+import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
+import type { IpcChannel, IpcRequest, IpcResponse } from '../shared/ipc'
 
-// Custom APIs for renderer
-const api = {}
+const pilog = {
+  invoke: <C extends IpcChannel>(channel: C, request?: IpcRequest<C>): Promise<IpcResponse<C>> =>
+    ipcRenderer.invoke(channel, request)
+}
 
-// Use `contextBridge` APIs to expose Electron APIs to
-// renderer only if context isolation is enabled, otherwise
-// just add to the DOM global.
+export type PilogApi = typeof pilog
+
 if (process.contextIsolated) {
   try {
     contextBridge.exposeInMainWorld('electron', electronAPI)
-    contextBridge.exposeInMainWorld('api', api)
+    contextBridge.exposeInMainWorld('pilog', pilog)
   } catch (error) {
     console.error(error)
   }
@@ -18,5 +20,5 @@ if (process.contextIsolated) {
   // @ts-ignore (define in dts)
   window.electron = electronAPI
   // @ts-ignore (define in dts)
-  window.api = api
+  window.pilog = pilog
 }
