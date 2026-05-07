@@ -38,24 +38,17 @@ export function listNotes(db: PilogDatabase): Note[] {
 export function updateNote(db: PilogDatabase, input: { id: string; content: string }): Note | null {
   const now = new Date().toISOString()
 
-  const result = db
+  const row = db
     .update(notes)
     .set({ content: input.content, updatedAt: now })
     .where(eq(notes.id, input.id))
-    .run()
-
-  if (result.changes === 0) return null
-
-  const row = db
-    .select({
+    .returning({
       id: notes.id,
       content: notes.content,
       status: notes.status,
       createdAt: notes.createdAt,
       updatedAt: notes.updatedAt
     })
-    .from(notes)
-    .where(eq(notes.id, input.id))
     .get()
 
   return row ?? null

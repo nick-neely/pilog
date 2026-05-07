@@ -65,6 +65,7 @@ function NoteDetail({
         </div>
       </header>
       <textarea
+        aria-label="Note content"
         className="flex-1 resize-none border-none bg-background p-6 font-mono text-sm leading-relaxed text-foreground outline-none"
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
