@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Plus, Search, Sparkles, XCircle } from 'lucide-react'
 import { Button } from '@renderer/components/ui/button'
-import type { Note, NoteStatus } from '@shared/ipc'
+import type { ListNotesRequest, Note, NoteStatus } from '@shared/ipc'
 
 const STATUS_CHIPS: { value: NoteStatus; label: string }[] = [
   { value: 'unprocessed', label: 'Unprocessed' },
@@ -19,11 +19,8 @@ function useDebounce(value: string, ms: number): string {
   return debounced
 }
 
-function buildFilter(
-  status: NoteStatus | undefined,
-  search: string
-): { status?: NoteStatus; search?: string } | undefined {
-  const filter: { status?: NoteStatus; search?: string } = {}
+function buildFilter(status: NoteStatus | undefined, search: string): ListNotesRequest | undefined {
+  const filter: ListNotesRequest = {}
   if (status) filter.status = status
   if (search) filter.search = search
   return Object.keys(filter).length > 0 ? filter : undefined

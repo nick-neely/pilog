@@ -2,12 +2,7 @@ import { and, desc, eq, like, sql, type SQLWrapper } from 'drizzle-orm'
 import { v4 as uuidv4 } from 'uuid'
 import type { PilogDatabase } from '../client'
 import { notes } from '../schema'
-import type { Note, NoteStatus } from '@shared/ipc'
-
-export type ListNotesFilter = {
-  status?: NoteStatus
-  search?: string
-}
+import type { ListNotesRequest, Note, NoteStatus } from '@shared/ipc'
 
 const noteColumns = {
   id: notes.id,
@@ -34,7 +29,7 @@ export function createNote(db: PilogDatabase, input: { content: string }): Note 
   return { id, content: input.content, status: 'unprocessed', createdAt: now, updatedAt: now }
 }
 
-export function listNotes(db: PilogDatabase, filter?: ListNotesFilter): Note[] {
+export function listNotes(db: PilogDatabase, filter?: ListNotesRequest): Note[] {
   const conditions: SQLWrapper[] = []
 
   if (filter?.status) {
@@ -54,18 +49,11 @@ export function listNotes(db: PilogDatabase, filter?: ListNotesFilter): Note[] {
 export function updateNoteStatus(db: PilogDatabase, id: string, status: NoteStatus): Note {
   const now = new Date().toISOString()
 
-  db.update(notes).set({ status, updatedAt: now }).where(eq(notes.id, id)).run()
-
   const row = db
-    .select({
-      id: notes.id,
-      content: notes.content,
-      status: notes.status,
-      createdAt: notes.createdAt,
-      updatedAt: notes.updatedAt
-    })
-    .from(notes)
+    .update(notes)
+    .set({ status, updatedAt: now })
     .where(eq(notes.id, id))
+    .returning(noteColumns)
     .get()
 
   if (!row) throw new Error(`Note not found: ${id}`)
