@@ -1,4 +1,15 @@
 {
   "files": [],
-  "references": [{ "path": "./tsconfig.node.json" }, { "path": "./tsconfig.web.json" }]
+  "references": [{ "path": "./tsconfig.node.json" }, { "path": "./tsconfig.web.json" }],
+  // baseUrl/paths here are not used by the actual compilation (files:[] + references
+  // delegate everything to tsconfig.web.json / tsconfig.node.json). They exist so the
+  // shadcn CLI's path resolver (tsconfig-paths.loadConfig, which doesn't follow project
+  // references) can resolve the @renderer/@shared aliases that components.json points at.
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@renderer/*": ["src/renderer/src/*"],
+      "@shared/*": ["src/shared/*"]
+    }
+  }
 }

@@ -116,7 +116,7 @@ Best early use case:
 - **TypeScript** across app, agent bridge, and backend-like local services
 - **Tailwind CSS** for styling
 - **shadcn/ui** for base components
-- **Lucide React** for icons
+- **HugeIcons React** (`@hugeicons/react` + `@hugeicons/core-free-icons`) for icons
 - **CodeMirror 6** or **Milkdown** for markdown editing
 
 Rationale:

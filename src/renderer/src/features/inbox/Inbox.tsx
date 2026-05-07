@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Plus, Search, Sparkles, XCircle } from 'lucide-react'
+import { HugeiconsIcon } from '@hugeicons/react'
+import { Add01Icon, CancelCircleIcon, Search01Icon, SparklesIcon } from '@hugeicons/core-free-icons'
 import { Button } from '@renderer/components/ui/button'
 import {
   AlertDialog,
@@ -218,17 +219,17 @@ export function Inbox(): React.JSX.Element {
                     disabled
                     title="Generate Drafts activates in Phase 3"
                   >
-                    <Sparkles className="h-4 w-4" />
+                    <HugeiconsIcon icon={SparklesIcon} className="h-4 w-4" />
                     Generate Drafts
                   </Button>
                   <Button size="sm" variant="outline" disabled title="Dismiss activates in Phase 4">
-                    <XCircle className="h-4 w-4" />
+                    <HugeiconsIcon icon={CancelCircleIcon} className="h-4 w-4" />
                     Dismiss
                   </Button>
                 </>
               )}
               <Button onClick={handleNewNote} size="sm">
-                <Plus className="h-4 w-4" />
+                <HugeiconsIcon icon={Add01Icon} className="h-4 w-4" />
                 New note
               </Button>
             </div>
@@ -253,7 +254,10 @@ export function Inbox(): React.JSX.Element {
             </div>
 
             <div className="relative ml-auto">
-              <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+              <HugeiconsIcon
+                icon={Search01Icon}
+                className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground"
+              />
               <input
                 type="text"
                 data-testid="search-input"

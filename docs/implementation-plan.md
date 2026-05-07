@@ -26,7 +26,7 @@ Set up once; reused by every phase.
 ### 1.1 Tooling baseline (Phase 1, week 1)
 
 - Tailwind CSS + `shadcn/ui` (component pattern, not a runtime dep).
-- Lucide React for icons.
+- HugeIcons React (`@hugeicons/react` + `@hugeicons/core-free-icons`) for icons.
 - Path aliases: `@main/*`, `@preload/*`, `@renderer/*`, `@shared/*`.
 - ESLint + Prettier already present; extend rules for React/TS hygiene.
 
@@ -85,7 +85,7 @@ Order matters: 1A → 1B → 1C. Each can be a standalone PR.
 - ☑ **Tooling**
   - Add Tailwind + PostCSS config for `electron-vite`'s renderer.
   - `pnpm dlx shadcn@latest init` → write components into `src/renderer/src/components/ui/`.
-  - Lucide React.
+  - HugeIcons React.
   - Add path aliases in `tsconfig.*` and `electron.vite.config.ts`.
 - ☑ **Project structure** — refactor `src/main/index.ts` from the boilerplate single-file form into the layout in PRD §7:
   ```

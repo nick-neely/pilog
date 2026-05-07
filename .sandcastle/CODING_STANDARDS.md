@@ -143,7 +143,7 @@ Each test responds to what you learned from the previous cycle. Never refactor w
 
 - Tailwind CSS for styling. No inline `style` attributes except for genuinely dynamic values (computed dimensions, transforms).
 - Use shadcn/ui primitives from `components/ui/` before reaching for a new dependency. If a primitive doesn't exist, generate it via the shadcn CLI rather than writing one from scratch.
-- Lucide React for icons. No mixing icon libraries.
+- HugeIcons React for icons (`import { HugeiconsIcon } from '@hugeicons/react'` + named icons from `@hugeicons/core-free-icons`). No mixing icon libraries.
 - Accessibility: every interactive element has a discernible label (text, `aria-label`, or `aria-labelledby`). Forms have associated `<label>` elements. Keyboard navigation works without a mouse.
 - React: function components only. Hooks at the top of the component. No business logic in components — extract to hooks (`use*`) or to main-process services.
 - State: local state via `useState`/`useReducer`. Cross-component server state via TanStack Query (added when needed) calling the IPC layer. No Redux in MVP.
