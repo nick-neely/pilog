@@ -1,17 +1,19 @@
-import { app, shell, BrowserWindow } from 'electron'
+import { app, shell, BrowserWindow, Menu, ipcMain } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { createDatabase } from './db/client'
 import { runMigrations } from './db/migrations'
 import { registerIpcHandlers } from './ipc/handlers'
+import { openScratchpad, hideScratchpad } from './window/create-scratchpad-window'
+import { buildAppMenu } from './menu/app-menu'
 
-function createWindow(): void {
+function createWindow(): BrowserWindow {
   const mainWindow = new BrowserWindow({
     width: 900,
     height: 670,
     show: false,
-    autoHideMenuBar: true,
+    autoHideMenuBar: false,
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
@@ -33,6 +35,8 @@ function createWindow(): void {
   } else {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
   }
+
+  return mainWindow
 }
 
 if (process.env.PILOG_USER_DATA) {
@@ -49,7 +53,21 @@ app.whenReady().then(() => {
   const dbPath = join(app.getPath('userData'), 'pilog.sqlite')
   const db = createDatabase(dbPath)
   runMigrations(db)
-  registerIpcHandlers(db)
+
+  function broadcastNoteCreated(): void {
+    for (const win of BrowserWindow.getAllWindows()) {
+      win.webContents.send('note:created')
+    }
+  }
+
+  registerIpcHandlers(db, { onNoteCreated: broadcastNoteCreated })
+
+  ipcMain.on('scratchpad:hide', () => {
+    hideScratchpad()
+  })
+
+  const menu = buildAppMenu(openScratchpad)
+  Menu.setApplicationMenu(menu)
 
   createWindow()
 

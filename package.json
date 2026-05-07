@@ -24,9 +24,15 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
+    "@codemirror/lang-markdown": "^6.5.0",
+    "@codemirror/language": "^6.12.3",
+    "@codemirror/language-data": "^6.5.2",
+    "@codemirror/state": "^6.6.0",
+    "@codemirror/view": "^6.42.1",
     "@electron-toolkit/preload": "^3.0.2",
     "@electron-toolkit/utils": "^4.0.0",
     "better-sqlite3": "^12.9.0",
+    "codemirror": "^6.0.2",
     "drizzle-orm": "^0.45.2",
     "electron-updater": "^6.3.9",
     "uuid": "^14.0.0"

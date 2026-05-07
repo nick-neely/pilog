@@ -14,3 +14,7 @@ export type IpcContract = {
 export type IpcChannel = keyof IpcContract
 export type IpcRequest<C extends IpcChannel> = IpcContract[C]['request']
 export type IpcResponse<C extends IpcChannel> = IpcContract[C]['response']
+
+export type IpcEvent = 'note:created' | 'scratchpad:reset'
+
+export type IpcAction = 'scratchpad:hide'

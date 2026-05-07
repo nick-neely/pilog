@@ -10,11 +10,16 @@ const handlers: { [C in IpcChannel]: Handler<C> } = {
   'note:list': (db) => listNotes(db)
 }
 
-export function registerIpcHandlers(db: PilogDatabase): void {
+export function registerIpcHandlers(
+  db: PilogDatabase,
+  options?: { onNoteCreated?: () => void }
+): void {
   for (const channel of Object.keys(handlers) as IpcChannel[]) {
     ipcMain.handle(channel, (_event, request) => {
       const handler = handlers[channel] as Handler<typeof channel>
-      return handler(db, request)
+      const result = handler(db, request)
+      if (channel === 'note:create') options?.onNoteCreated?.()
+      return result
     })
   }
 }

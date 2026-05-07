@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Plus } from 'lucide-react'
 import { Button } from '@renderer/components/ui/button'
 import type { Note } from '@shared/ipc'
@@ -6,15 +6,17 @@ import type { Note } from '@shared/ipc'
 export function Inbox(): React.JSX.Element {
   const [notes, setNotes] = useState<Note[]>([])
 
-  useEffect(() => {
-    let cancelled = false
-    window.pilog.invoke('note:list').then((result) => {
-      if (!cancelled) setNotes(result)
-    })
-    return () => {
-      cancelled = true
-    }
+  const refreshNotes = useCallback((): void => {
+    window.pilog.invoke('note:list').then(setNotes)
   }, [])
+
+  useEffect(() => {
+    refreshNotes()
+  }, [refreshNotes])
+
+  useEffect(() => {
+    return window.pilog.on('note:created', refreshNotes)
+  }, [refreshNotes])
 
   const handleNewNote = async (): Promise<void> => {
     await window.pilog.invoke('note:create', {

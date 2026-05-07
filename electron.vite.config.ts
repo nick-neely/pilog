@@ -27,6 +27,14 @@ export default defineConfig({
         '@shared': resolve('src/shared')
       }
     },
-    plugins: [tailwindcss(), react()]
+    plugins: [tailwindcss(), react()],
+    build: {
+      rollupOptions: {
+        input: {
+          index: resolve('src/renderer/index.html'),
+          scratchpad: resolve('src/renderer/scratchpad.html')
+        }
+      }
+    }
   }
 })
