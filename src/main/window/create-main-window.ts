@@ -5,6 +5,7 @@ import type { IpcEvent } from '@shared/ipc'
 
 let mainWindow: BrowserWindow | null = null
 let windowReady = false
+let pendingRoute: IpcEvent | null = null
 
 function getOrCreateWindow(icon: string): BrowserWindow {
   if (mainWindow && !mainWindow.isDestroyed()) {
@@ -12,6 +13,7 @@ function getOrCreateWindow(icon: string): BrowserWindow {
   }
 
   windowReady = false
+  pendingRoute = null
 
   mainWindow = new BrowserWindow({
     width: 900,
@@ -29,13 +31,15 @@ function getOrCreateWindow(icon: string): BrowserWindow {
     windowReady = true
     mainWindow?.show()
     mainWindow?.focus()
+    if (pendingRoute) {
+      mainWindow?.webContents.send(pendingRoute)
+      pendingRoute = null
+    }
   })
 
   mainWindow.on('close', (e) => {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      e.preventDefault()
-      mainWindow.hide()
-    }
+    e.preventDefault()
+    mainWindow?.hide()
   })
 
   mainWindow.on('closed', () => {
@@ -70,13 +74,10 @@ export function showMainWindowOnRoute(icon: string, route: IpcEvent): void {
   if (windowReady) {
     win.show()
     win.focus()
+    win.webContents.send(route)
+  } else {
+    pendingRoute = route
   }
-  win.webContents.send(route)
-}
-
-export function getMainWindow(): BrowserWindow | null {
-  if (mainWindow && !mainWindow.isDestroyed()) return mainWindow
-  return null
 }
 
 export function destroyMainWindow(): void {
