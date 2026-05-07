@@ -1,14 +1,21 @@
+export type NoteStatus = 'unprocessed' | 'drafted' | 'published' | 'dismissed'
+
 export type Note = {
   id: string
   content: string
-  status: 'unprocessed' | 'drafted' | 'published' | 'dismissed'
+  status: NoteStatus
   createdAt: string
   updatedAt: string
 }
 
+export type ListNotesRequest = {
+  status?: NoteStatus
+  search?: string
+}
+
 export type IpcContract = {
   'note:create': { request: { content: string }; response: Note }
-  'note:list': { request: void; response: Note[] }
+  'note:list': { request: ListNotesRequest | void; response: Note[] }
 }
 
 export type IpcChannel = keyof IpcContract
