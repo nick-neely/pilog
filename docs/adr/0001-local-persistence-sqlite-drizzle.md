@@ -29,5 +29,5 @@ Use **better-sqlite3** as the SQLite driver and **Drizzle ORM** for schema defin
 
 - All persistence logic stays in the Electron main process; the renderer never touches the DB directly.
 - Drizzle provides compile-time type safety for queries.
-- better-sqlite3 requires a native rebuild for Electron (`electron-builder install-app-deps`).
+- better-sqlite3 requires a native rebuild for Electron. Runtime native dependencies live under `app/` so Electron rebuilds do not mutate the root Node dependency tree used by Vitest and other tooling.
 - Migration to Turso/libSQL later is straightforward since Drizzle abstracts the driver.

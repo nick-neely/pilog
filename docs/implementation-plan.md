@@ -1,6 +1,6 @@
 # PiLog Implementation Plan
 
-This document is the **source of truth for sequencing PiLog MVP work**. It complements `docs/pilog_prd.md` (the *what*) by making the *how* and *in what order* explicit. As phases land, each completed item should be checked off here and reflected in `CONTEXT.md` / `docs/adr/`.
+This document is the **source of truth for sequencing PiLog MVP work**. It complements `docs/pilog_prd.md` (the _what_) by making the _how_ and _in what order_ explicit. As phases land, each completed item should be checked off here and reflected in `CONTEXT.md` / `docs/adr/`.
 
 > **Status legend:** ☐ not started · ◐ in progress · ☑ done
 
@@ -59,16 +59,16 @@ Set up once; reused by every phase.
 
 ## 2. Phase Roadmap (at a glance)
 
-| Phase | Theme | User-visible outcome | Status |
-|-------|-------|----------------------|:------:|
-| 1 | Desktop shell + local notes | Hotkey → scratchpad → inbox; persists across restarts | ☐ |
-| 2 | GitHub + repo setup | Connect GitHub, link a local repo, manually create a test issue | ☐ |
-| 3 | Pi agent runtime | Selected notes + repo path → structured `IssueDraft` JSON stored locally | ☐ |
-| 4 | Review mode | Draft cards: edit, split, merge, dismiss, publish to GitHub | ☐ |
-| 5 | Auto-publish mode | One click: generate + publish, with safety rails and a publish report | ☐ |
-| 6 | Polish | Issue templates, label matching, prompt tuning, error states, packaging | ☐ |
+| Phase | Theme                       | User-visible outcome                                                     | Status |
+| ----- | --------------------------- | ------------------------------------------------------------------------ | :----: |
+| 1     | Desktop shell + local notes | Hotkey → scratchpad → inbox; persists across restarts                    |   ☑    |
+| 2     | GitHub + repo setup         | Connect GitHub, link a local repo, manually create a test issue          |   ☐    |
+| 3     | Pi agent runtime            | Selected notes + repo path → structured `IssueDraft` JSON stored locally |   ☐    |
+| 4     | Review mode                 | Draft cards: edit, split, merge, dismiss, publish to GitHub              |   ☐    |
+| 5     | Auto-publish mode           | One click: generate + publish, with safety rails and a publish report    |   ☐    |
+| 6     | Polish                      | Issue templates, label matching, prompt tuning, error states, packaging  |   ☐    |
 
-Phase boundaries are *demoable*. Each ends with something a user could touch.
+Phase boundaries are _demoable_. Each ends with something a user could touch.
 
 ---
 
@@ -82,12 +82,12 @@ This is the most plumbing-heavy phase. We resist the urge to also wire GitHub or
 
 Order matters: 1A → 1B → 1C. Each can be a standalone PR.
 
-- ☐ **Tooling**
+- ☑ **Tooling**
   - Add Tailwind + PostCSS config for `electron-vite`'s renderer.
   - `pnpm dlx shadcn@latest init` → write components into `src/renderer/src/components/ui/`.
   - Lucide React.
   - Add path aliases in `tsconfig.*` and `electron.vite.config.ts`.
-- ☐ **Project structure** — refactor `src/main/index.ts` from the boilerplate single-file form into the layout in PRD §7:
+- ☑ **Project structure** — refactor `src/main/index.ts` from the boilerplate single-file form into the layout in PRD §7:
   ```
   src/
     main/{window,hotkeys,db,ipc,lib,security}/
@@ -96,7 +96,7 @@ Order matters: 1A → 1B → 1C. Each can be a standalone PR.
     shared/{ipc.ts,types.ts}
   ```
   Keep the file moves mechanical; no behavior change.
-- ☐ **DB layer**
+- ☑ **DB layer**
   - Add `better-sqlite3`, `drizzle-orm`, `drizzle-kit`.
   - `drizzle.config.ts` pointing migrations at `drizzle/migrations/`.
   - Schema (define everything we'll need through Phase 4 — cheap now, painful to migrate later):
@@ -107,49 +107,49 @@ Order matters: 1A → 1B → 1C. Each can be a standalone PR.
     - `publish_log` (id, draftId, githubIssueUrl, publishedAt, repoId)
   - Database lives at `app.getPath('userData')/pilog.sqlite`. Run pending migrations on app start.
   - Note repository module: `createNote`, `updateNote`, `deleteNote`, `listNotes({status, repoId, search})`.
-- ☐ **IPC contract**
+- ☑ **IPC contract**
   - `src/shared/ipc.ts` exports a `Channels` const and request/response types per channel.
   - `src/main/ipc/registry.ts` registers handlers and enforces typing.
   - `src/preload/api.ts` exposes a single `window.pilog` object — no raw `ipcRenderer`.
   - Update `src/preload/index.d.ts` so renderer gets autocomplete on `window.pilog`.
-- ☐ **Window manager** — `src/main/window/` with `createMainWindow`, `createScratchpadWindow`, plus a small `WindowRegistry` so we can show/focus instead of recreating.
-- ☐ **Tray** — system tray with: *Open Inbox*, *New Note* (focuses scratchpad), *Settings*, *Quit*. (Hybrid mode per ADR-0002.)
-- ☐ **Domain docs** — write `CONTEXT.md` + ADR-0001/0002/0003.
-- ☐ **Tests (foundation)** — Vitest config; unit tests for note repository CRUD against an in-memory better-sqlite3 instance.
+- ☑ **Window manager** — `src/main/window/` with `createMainWindow`, `createScratchpadWindow`, plus a small `WindowRegistry` so we can show/focus instead of recreating.
+- ☑ **Tray** — system tray with: _Open Inbox_, _New Note_ (focuses scratchpad), _Settings_, _Quit_. (Hybrid mode per ADR-0002.)
+- ☑ **Domain docs** — write `CONTEXT.md` + ADR-0001/0002/0003.
+- ☑ **Tests (foundation)** — Vitest config; unit tests for note repository CRUD against an in-memory better-sqlite3 instance.
 
 ### 3.2 Sub-phase 1B — Capture (the scratchpad)
 
-- ☐ **Global hotkey** — register `CommandOrControl+Alt+N` on app ready; deregister on quit. Read user override from a new `settings` row (key/value table).
-- ☐ **Scratchpad window**
+- ☑ **Global hotkey** — register `CommandOrControl+Alt+N` on app ready; deregister on quit. Read user override from a new `settings` row (key/value table).
+- ☑ **Scratchpad window**
   - Frameless, always-on-top, 480×360, centered to active screen.
   - Single CodeMirror 6 instance configured for markdown. No menus, no chrome.
   - `Esc` → save and hide; `Cmd/Ctrl+Enter` → save and hide; `Cmd/Ctrl+S` → save and stay open.
   - Save logic: if the buffer is non-empty and changed, INSERT a new note with `status = 'unprocessed'`. Closing without changes is a no-op.
-  - On reopen, the scratchpad starts empty (it's a *capture* surface, not a doc editor).
-- ☐ **Tests (1B)** — Playwright: launch → trigger hotkey via app menu (Playwright can't synthesize global hotkeys, so wire a debug menu item that calls the same code path) → type → close → assert DB row exists.
+  - On reopen, the scratchpad starts empty (it's a _capture_ surface, not a doc editor).
+- ☑ **Tests (1B)** — Playwright: launch → trigger hotkey via app menu (Playwright can't synthesize global hotkeys, so wire a debug menu item that calls the same code path) → type → close → assert DB row exists.
 
 ### 3.3 Sub-phase 1C — Triage surface (the inbox)
 
-- ☐ **Inbox screen** in the main window:
+- ☑ **Inbox screen** in the main window:
   - Virtualized list of notes (most recent first).
-  - Status filter chips: *Unprocessed / Drafted / Published / Dismissed*.
+  - Status filter chips: _Unprocessed / Drafted / Published / Dismissed_.
   - Free-text search (SQLite `LIKE` on content for MVP; FTS later if needed).
-  - Multi-select with Shift/Cmd; bulk actions stub buttons (*Generate Drafts*, *Dismiss*) wired but disabled until Phase 3/4.
+  - Multi-select with Shift/Cmd; bulk actions stub buttons (_Generate Drafts_, _Dismiss_) wired but disabled until Phase 3/4.
   - Detail pane: edit raw markdown of a note (CodeMirror again), save, delete.
-- ☐ **Settings screen (skeleton)** — just the hotkey input and "Open inbox at login" toggle for now. Wire `app.setLoginItemSettings`.
-- ☐ **Tests (1C)** — Playwright e2e: launch → open scratchpad via menu → type two notes → close scratchpad → see both notes in inbox → restart app → still there.
+- ☑ **Settings screen (skeleton)** — just the hotkey input and "Open inbox at login" toggle for now. Wire `app.setLoginItemSettings`.
+- ☑ **Tests (1C)** — Playwright e2e: launch → open scratchpad via menu → type two notes → close scratchpad → see both notes in inbox → restart app → still there.
 
 ### 3.4 Phase 1 acceptance criteria
 
 A reviewer can verify each of:
 
-1. Cold start to inbox visible: < 1.5 s on a typical laptop.
-2. Hotkey press to scratchpad focused & ready to type: < 200 ms after first invocation.
-3. Notes survive a hard kill (`pkill electron`) and a clean quit.
-4. `pnpm typecheck`, `pnpm lint`, `pnpm test`, and `pnpm test:e2e` all green.
-5. `CONTEXT.md` defines every term used in Phase 1 code.
-6. ADR-0001/0002/0003 exist and reflect the implementation.
-7. No GitHub or Pi code committed (those come in Phase 2/3 — keep boundaries clean).
+1. ☑ Cold start to inbox visible: < 1.5 s on a typical laptop.
+2. ☑ Hotkey press to scratchpad focused & ready to type: < 200 ms after first invocation.
+3. ☑ Notes survive a hard kill (`pkill electron`) and a clean quit.
+4. ☑ `pnpm typecheck`, `pnpm lint`, `pnpm test`, and `pnpm test:e2e` all green.
+5. ☑ `CONTEXT.md` defines every term used in Phase 1 code.
+6. ☑ ADR-0001/0002/0003 exist and reflect the implementation.
+7. ☑ No GitHub or Pi code committed (those come in Phase 2/3 — keep boundaries clean).
 
 ### 3.5 Phase 1 explicit non-goals
 
@@ -165,7 +165,7 @@ A reviewer can verify each of:
 
 **Goal:** Connect a GitHub account, register a local repo, and create a hand-written test issue from inside PiLog. Notes can now be tagged with a repo.
 
-- ☐ **Auth** — GitHub OAuth via local-loopback callback (preferred over device flow for desktop UX). Token stored via `safeStorage`. Rotation/sign-out flow. *ADR-0004.*
+- ☐ **Auth** — GitHub OAuth via local-loopback callback (preferred over device flow for desktop UX). Token stored via `safeStorage`. Rotation/sign-out flow. _ADR-0004._
 - ☐ **GitHub client** — Octokit wrapper with retry + rate-limit awareness; thin functions: `listRepos`, `listLabels(repo)`, `getIssueTemplates(repo)`, `createIssue(repo, payload)`.
 - ☐ **Repo registration** — UI to pick a local directory; detect git via `simple-git` (read `.git/config` remote, default branch, current HEAD). Match to a GitHub repo. Persist to `repos`.
 - ☐ **Scratchpad repo selector** — inline picker that defaults to last-used or detected-from-CWD.
@@ -188,7 +188,7 @@ User can connect GitHub, link a real repo, type a title/body, and see the issue 
 - ☐ **Pi config UX** — `Settings → Provider & Model`. Surfaces Pi's BYOK flow inside PiLog (PRD §7 BYOK). "Open advanced config" escape hatch.
 - ☐ **Issue generation** — `src/main/pi/issue-generation.ts` constructs the prompt per PRD §15, supplies repo path + selected notes, validates output against the `GeneratedIssueDraft` Zod schema (PRD §10), persists to `issue_drafts`.
 - ☐ **Agent runs view** — minimal list of past runs with input/output/error, useful for debugging prompts.
-- ☐ **Inbox button wires up** — *Generate Draft Issues* now does something for selected notes.
+- ☐ **Inbox button wires up** — _Generate Draft Issues_ now does something for selected notes.
 - ☐ **Tests** — unit tests for prompt assembly and JSON validation (using fixture LLM responses); integration test runs the agent against a tiny fixture repo.
 
 ### Phase 3 acceptance
@@ -227,7 +227,7 @@ Full happy path of PRD Flow 2 works end-to-end against a real GitHub repo.
 
 ### Phase 5 acceptance
 
-PRD §13 success criterion *"Auto-publish works but is clearly controlled and auditable"* is demonstrably true.
+PRD §13 success criterion _"Auto-publish works but is clearly controlled and auditable"_ is demonstrably true.
 
 ---
 
@@ -254,7 +254,7 @@ Hand the app to someone who hasn't seen it. They reach a published issue without
 Once Phase 1 is shaped to your satisfaction:
 
 1. Run `triage` / `to-issues` skill against §3 of this doc to push Phase 1 tickets to `nick-neely/pilog` with the right labels (per `docs/agents/triage-labels.md`).
-2. Each issue references this doc by anchor (e.g. *"see Phase 1 §3.1"*).
+2. Each issue references this doc by anchor (e.g. _"see Phase 1 §3.1"_).
 3. Subsequent phases get decomposed into issues only when their start is imminent — premature decomposition hides decisions that the prior phase will surface.
 
 ---

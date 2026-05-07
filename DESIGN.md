@@ -1,7 +1,8 @@
-<!-- SEED: re-run $impeccable document once there's code to capture the actual tokens and components. -->
----
+## <!-- SEED: re-run $impeccable document once there's code to capture the actual tokens and components. -->
+
 name: PiLog
 description: A developer's bedside journal — paper-warm, type-led, moss-accented.
+
 ---
 
 # Design System: PiLog
@@ -15,6 +16,7 @@ PiLog's surface is a quiet annotated page in a sunlit reading room. The neutrals
 The system explicitly rejects three patterns named in PRODUCT.md: **the generic AI-tool aesthetic** (purple/teal gradients, glassmorphism, gradient text, "✨ AI" garnish), **the SaaS-cliché dashboard** (hero-metric tiles, identical icon-heading-text card grids, side-stripe colored borders, friendly-rounded illustrations), and **the stock shadcn dashboard demo look** (default theme, Inter, zinc neutrals, blue accent — the path of least resistance). PiLog uses shadcn as a primitive layer; the visual identity is committed and recognizable on its own.
 
 **Key Characteristics:**
+
 - Paper-warm tinted neutrals; never `#fff`, never `#000`.
 - Single moss-green accent, used on ≤10% of any given screen.
 - Serif display + humanist sans body + monospace for code, paths, and note metadata.
@@ -29,13 +31,13 @@ A paper-warm neutral field with a single moss accent. All values are committed a
 
 ### Primary
 
-- **Reading-Room Moss** (`oklch(48% 0.08 145°)` *[exact value to be resolved during implementation]*): the system's only saturated accent. Reserved for primary actions (Generate Drafts, Publish), focus rings, and active state on the rare element where state must read at a glance. **Not** used for decoration, not used on body text, not used to "add color" to empty surfaces.
+- **Reading-Room Moss** (`oklch(48% 0.08 145°)` _[exact value to be resolved during implementation]_): the system's only saturated accent. Reserved for primary actions (Generate Drafts, Publish), focus rings, and active state on the rare element where state must read at a glance. **Not** used for decoration, not used on body text, not used to "add color" to empty surfaces.
 
 ### Neutral
 
 The neutral ramp is the project's main visual surface. All steps are tinted toward warm yellow (~60° hue), low chroma (~0.005), so the page reads as paper rather than sterile gray.
 
-- **Parchment** (lightest, `oklch(~96% 0.005 60°)` *[TBD at implementation]*): the default page surface and scratchpad canvas.
+- **Parchment** (lightest, `oklch(~96% 0.005 60°)` _[TBD at implementation]_): the default page surface and scratchpad canvas.
 - **Ash** (one step darker): subtle surface separation — inbox row separators, settings group dividers, the "second card under the first" surface where unavoidable.
 - **Pencil** (mid-range): supporting body text, metadata, file paths in mono.
 - **Ink** (near-black, `oklch(~22% 0.02 60°)` warm-tinted): primary body text and headings. Never `#000`. The warm tint matters; it's what stops the system from reading clinical.
@@ -50,15 +52,15 @@ The neutral ramp is the project's main visual surface. All steps are tinted towa
 
 ## 3. Typography
 
-**Display Font:** literary serif *[pairing to be chosen at implementation; candidates: Source Serif 4, Tiempos Text, Mercury, Spectral]*
-**Body Font:** humanist sans *[pairing to be chosen at implementation; candidates: Söhne, Inter, IBM Plex Sans, Untitled Sans]*
-**Code/Mono Font:** developer monospace *[pairing to be chosen at implementation; candidates: Berkeley Mono, JetBrains Mono, IBM Plex Mono, MD IO]*
+**Display Font:** literary serif _[pairing to be chosen at implementation; candidates: Source Serif 4, Tiempos Text, Mercury, Spectral]_
+**Body Font:** humanist sans _[pairing to be chosen at implementation; candidates: Söhne, Inter, IBM Plex Sans, Untitled Sans]_
+**Code/Mono Font:** developer monospace _[pairing to be chosen at implementation; candidates: Berkeley Mono, JetBrains Mono, IBM Plex Mono, MD IO]_
 
 **Character.** A literary serif gives PiLog the gravity of a thoughtful publication. The humanist sans keeps every list, label, and microcopy line legible at any size without going clinical. The monospace is editor-grade — chosen so reading code in note bodies, file paths in draft cards, and content in the CodeMirror/Milkdown editor all feel intentional rather than incidental.
 
 ### Hierarchy
 
-*Exact sizes/weights resolved at implementation; ratios committed now.*
+_Exact sizes/weights resolved at implementation; ratios committed now._
 
 - **Display** (serif, weight ~400, large clamp): inbox section titles, settings page headers, the rare scratchpad title. Sparingly used.
 - **Headline** (serif, weight ~500, ~24–28px): draft card titles, modal/dialog headers.
@@ -83,7 +85,7 @@ Shadow exists only as a state response, never as a baseline. The scratchpad wind
 
 ### Shadow Vocabulary
 
-*To be resolved at implementation. Three roles only:*
+_To be resolved at implementation. Three roles only:_
 
 - **Hover lift** (very light, short offset): used on draft cards on hover only, signal that the card is interactive. Remove from `prefers-reduced-motion`.
 - **Focus ring** (moss accent, 2px outline, 2px offset): keyboard focus on every interactive element. Always visible, never suppressed for aesthetics.
@@ -97,7 +99,7 @@ Shadow exists only as a state response, never as a baseline. The scratchpad wind
 
 ## 5. Components
 
-*No components implemented yet. Component primitives (Buttons, Inputs, Cards, Navigation, Scratchpad Editor, Draft Card, Source-Note Attribution, Inbox Row) will be documented on the next `$impeccable document` pass once shadcn primitives are themed and feature surfaces exist.*
+_No components implemented yet. Component primitives (Buttons, Inputs, Cards, Navigation, Scratchpad Editor, Draft Card, Source-Note Attribution, Inbox Row) will be documented on the next `$impeccable document` pass once shadcn primitives are themed and feature surfaces exist._
 
 When component work begins, the scaffolds below are the first to capture in DESIGN.md, in this priority:
 
@@ -114,7 +116,7 @@ When component work begins, the scaffolds below are the first to capture in DESI
 
 - **Do** anchor color tokens in OKLCH so neutrals stay even and the moss reads true across displays.
 - **Do** use Reading-Room Moss only for primary actions, focus rings, and necessary at-a-glance state. ≤10% of any screen.
-- **Do** convey status, priority, and confidence with a label, glyph, *or* shape alongside any color cue. The Color-Independence Rule is non-negotiable.
+- **Do** convey status, priority, and confidence with a label, glyph, _or_ shape alongside any color cue. The Color-Independence Rule is non-negotiable.
 - **Do** lean on type, weight, and tonal neutrals for hierarchy. Headers earn their weight; backgrounds don't.
 - **Do** respect `prefers-reduced-motion`. Reduced-motion users get instant transitions, never broken interactions.
 - **Do** keep focus rings visible and on-brand. Use the moss accent at 2px outline + 2px offset.

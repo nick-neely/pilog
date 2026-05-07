@@ -10,6 +10,9 @@ export default defineConfig({
         '@main': resolve('src/main'),
         '@shared': resolve('src/shared')
       }
+    },
+    build: {
+      outDir: 'app/out/main'
     }
   },
   preload: {
@@ -18,6 +21,9 @@ export default defineConfig({
         '@preload': resolve('src/preload'),
         '@shared': resolve('src/shared')
       }
+    },
+    build: {
+      outDir: 'app/out/preload'
     }
   },
   renderer: {
@@ -29,6 +35,7 @@ export default defineConfig({
     },
     plugins: [tailwindcss(), react()],
     build: {
+      outDir: 'app/out/renderer',
       rollupOptions: {
         input: {
           index: resolve('src/renderer/index.html'),

@@ -21,8 +21,8 @@
 // Or add to package.json:
 //   "scripts": { "sandcastle": "npx tsx .sandcastle/main.mts" }
 
-import * as sandcastle from "@ai-hero/sandcastle";
-import { docker } from "@ai-hero/sandcastle/sandboxes/docker";
+import * as sandcastle from '@ai-hero/sandcastle'
+import { docker } from '@ai-hero/sandcastle/sandboxes/docker'
 
 // ---------------------------------------------------------------------------
 // Configuration
@@ -30,27 +30,27 @@ import { docker } from "@ai-hero/sandcastle/sandboxes/docker";
 
 // Maximum number of plan→execute→merge cycles before stopping.
 // Raise this if your backlog is large; lower it for a quick smoke-test run.
-const MAX_ITERATIONS = 10;
+const MAX_ITERATIONS = 10
 
 // Hooks run inside the sandbox before the agent starts each iteration.
 // CI=true: pnpm refuses to alter node_modules without a TTY unless CI is set
 // (Sandcastle uses `docker exec … sh -c`, which is non-interactive).
 const hooks = {
-  sandbox: { onSandboxReady: [{ command: "CI=true pnpm install" }] },
-};
+  sandbox: { onSandboxReady: [{ command: 'CI=true pnpm install' }] }
+}
 
 // Copy node_modules from the host into the worktree before each sandbox
 // starts. With pnpm, packages and the virtual store live under node_modules
 // (including node_modules/.pnpm). Avoids a cold install; the hook above is
 // the safety net for platform-specific binaries.
-const copyToWorktree = ["node_modules"];
+const copyToWorktree = ['node_modules']
 
 // ---------------------------------------------------------------------------
 // Main loop
 // ---------------------------------------------------------------------------
 
 for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
-  console.log(`\n=== Iteration ${iteration}/${MAX_ITERATIONS} ===\n`);
+  console.log(`\n=== Iteration ${iteration}/${MAX_ITERATIONS} ===\n`)
 
   // -------------------------------------------------------------------------
   // Phase 1: Plan
@@ -64,39 +64,35 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
   const plan = await sandcastle.run({
     hooks,
     sandbox: docker(),
-    name: "planner",
+    name: 'planner',
     // One iteration is enough: the planner just needs to read and reason,
     // not write code.
     maxIterations: 1,
     // Opus for planning: dependency analysis benefits from deeper reasoning.
-    agent: sandcastle.claudeCode("claude-opus-4-6"),
-    promptFile: "./.sandcastle/plan-prompt.md",
-  });
+    agent: sandcastle.claudeCode('claude-opus-4-6'),
+    promptFile: './.sandcastle/plan-prompt.md'
+  })
 
   // Extract the <plan>…</plan> block from the agent's stdout.
-  const planMatch = plan.stdout.match(/<plan>([\s\S]*?)<\/plan>/);
+  const planMatch = plan.stdout.match(/<plan>([\s\S]*?)<\/plan>/)
   if (!planMatch) {
-    throw new Error(
-      "Planning agent did not produce a <plan> tag.\n\n" + plan.stdout,
-    );
+    throw new Error('Planning agent did not produce a <plan> tag.\n\n' + plan.stdout)
   }
 
   // The plan JSON contains an array of issues, each with id, title, branch.
   const { issues } = JSON.parse(planMatch[1]!) as {
-    issues: { id: string; title: string; branch: string }[];
-  };
+    issues: { id: string; title: string; branch: string }[]
+  }
 
   if (issues.length === 0) {
     // No unblocked work — either everything is done or everything is blocked.
-    console.log("No unblocked issues to work on. Exiting.");
-    break;
+    console.log('No unblocked issues to work on. Exiting.')
+    break
   }
 
-  console.log(
-    `Planning complete. ${issues.length} issue(s) to work in parallel:`,
-  );
+  console.log(`Planning complete. ${issues.length} issue(s) to work in parallel:`)
   for (const issue of issues) {
-    console.log(`  ${issue.id}: ${issue.title} → ${issue.branch}`);
+    console.log(`  ${issue.id}: ${issue.title} → ${issue.branch}`)
   }
 
   // -------------------------------------------------------------------------
@@ -115,56 +111,54 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
         branch: issue.branch,
         sandbox: docker(),
         hooks,
-        copyToWorktree,
-      });
+        copyToWorktree
+      })
 
       try {
         // Run the implementer
         const implement = await sandbox.run({
-          name: "implementer",
+          name: 'implementer',
           maxIterations: 100,
-          agent: sandcastle.claudeCode("claude-opus-4-6"),
-          promptFile: "./.sandcastle/implement-prompt.md",
+          agent: sandcastle.claudeCode('claude-opus-4-6'),
+          promptFile: './.sandcastle/implement-prompt.md',
           promptArgs: {
             TASK_ID: issue.id,
             ISSUE_TITLE: issue.title,
-            BRANCH: issue.branch,
-          },
-        });
+            BRANCH: issue.branch
+          }
+        })
 
         // Only review if the implementer produced commits
         if (implement.commits.length > 0) {
           const review = await sandbox.run({
-            name: "reviewer",
+            name: 'reviewer',
             maxIterations: 1,
-            agent: sandcastle.claudeCode("claude-opus-4-6"),
-            promptFile: "./.sandcastle/review-prompt.md",
+            agent: sandcastle.claudeCode('claude-opus-4-6'),
+            promptFile: './.sandcastle/review-prompt.md',
             promptArgs: {
-              BRANCH: issue.branch,
-            },
-          });
+              BRANCH: issue.branch
+            }
+          })
 
           // Merge commits from both runs so the merge phase sees all of them.
           // Each sandbox.run() only returns commits from its own run.
           return {
             ...review,
-            commits: [...implement.commits, ...review.commits],
-          };
+            commits: [...implement.commits, ...review.commits]
+          }
         }
 
-        return implement;
+        return implement
       } finally {
-        await sandbox.close();
+        await sandbox.close()
       }
-    }),
-  );
+    })
+  )
 
   // Log any agents that threw (network error, sandbox crash, etc.).
   for (const [i, outcome] of settled.entries()) {
-    if (outcome.status === "rejected") {
-      console.error(
-        `  ✗ ${issues[i]!.id} (${issues[i]!.branch}) failed: ${outcome.reason}`,
-      );
+    if (outcome.status === 'rejected') {
+      console.error(`  ✗ ${issues[i]!.id} (${issues[i]!.branch}) failed: ${outcome.reason}`)
     }
   }
 
@@ -173,25 +167,21 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
   const completedIssues = settled
     .map((outcome, i) => ({ outcome, issue: issues[i]! }))
     .filter(
-      (entry) =>
-        entry.outcome.status === "fulfilled" &&
-        entry.outcome.value.commits.length > 0,
+      (entry) => entry.outcome.status === 'fulfilled' && entry.outcome.value.commits.length > 0
     )
-    .map((entry) => entry.issue);
+    .map((entry) => entry.issue)
 
-  const completedBranches = completedIssues.map((i) => i.branch);
+  const completedBranches = completedIssues.map((i) => i.branch)
 
-  console.log(
-    `\nExecution complete. ${completedBranches.length} branch(es) with commits:`,
-  );
+  console.log(`\nExecution complete. ${completedBranches.length} branch(es) with commits:`)
   for (const branch of completedBranches) {
-    console.log(`  ${branch}`);
+    console.log(`  ${branch}`)
   }
 
   if (completedBranches.length === 0) {
     // All agents ran but none made commits — nothing to merge this cycle.
-    console.log("No commits produced. Nothing to merge.");
-    continue;
+    console.log('No commits produced. Nothing to merge.')
+    continue
   }
 
   // -------------------------------------------------------------------------
@@ -206,21 +196,19 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
   await sandcastle.run({
     hooks,
     sandbox: docker(),
-    name: "merger",
+    name: 'merger',
     maxIterations: 1,
-    agent: sandcastle.claudeCode("claude-opus-4-6"),
-    promptFile: "./.sandcastle/merge-prompt.md",
+    agent: sandcastle.claudeCode('claude-opus-4-6'),
+    promptFile: './.sandcastle/merge-prompt.md',
     promptArgs: {
       // A markdown list of branch names, one per line.
-      BRANCHES: completedBranches.map((b) => `- ${b}`).join("\n"),
+      BRANCHES: completedBranches.map((b) => `- ${b}`).join('\n'),
       // A markdown list of issue IDs and titles, one per line.
-      ISSUES: completedIssues
-        .map((i) => `- ${i.id}: ${i.title}`)
-        .join("\n"),
-    },
-  });
+      ISSUES: completedIssues.map((i) => `- ${i.id}: ${i.title}`).join('\n')
+    }
+  })
 
-  console.log("\nBranches merged.");
+  console.log('\nBranches merged.')
 }
 
-console.log("\nAll done.");
+console.log('\nAll done.')

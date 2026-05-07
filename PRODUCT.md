@@ -27,7 +27,8 @@ The product is local-first by default — notes, drafts, repo metadata, and agen
 Voice: precise, plainspoken, never cute. Never ships an em dash. Never says "magic" or "✨". Doesn't over-explain. Microcopy reads like a thoughtful collaborator who has worked on a real codebase.
 
 Emotional goals:
-- **At capture time:** unobtrusive, reassuring, fast. The user should feel the window is *waiting for them*, not demanding attention.
+
+- **At capture time:** unobtrusive, reassuring, fast. The user should feel the window is _waiting for them_, not demanding attention.
 - **At triage time:** confident, transparent, controllable. The user should feel they understand what the agent saw and why it grouped what it grouped.
 - **At publish time:** deliberate, auditable. Never a surprise.
 

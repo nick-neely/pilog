@@ -33,12 +33,12 @@ The app now boots into the system tray by default. The tray is the primary entry
 
 ### Tray menu
 
-| Item | Action |
-|------|--------|
-| Open Inbox | Show/focus the main window on the inbox route |
-| New Note | Open/focus the scratchpad (same code path as hotkey) |
-| Settings | Show/focus the main window on the settings route |
-| Quit | `app.quit()` — the only way to terminate the process |
+| Item       | Action                                               |
+| ---------- | ---------------------------------------------------- |
+| Open Inbox | Show/focus the main window on the inbox route        |
+| New Note   | Open/focus the scratchpad (same code path as hotkey) |
+| Settings   | Show/focus the main window on the settings route     |
+| Quit       | `app.quit()` — the only way to terminate the process |
 
 ### Window lifecycle
 

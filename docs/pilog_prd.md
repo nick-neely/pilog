@@ -13,6 +13,7 @@ The core goal is to turn messy developer notes into useful GitHub issues with al
 **Recommended name: PiLog**
 
 Rationale:
+
 - Directly references Pi, the agent harness.
 - Suggests logging thoughts, bugs, and dev notes.
 - Short, memorable, developer-friendly.
@@ -20,6 +21,7 @@ Rationale:
 - Better than `ComPile`, which is clever but visually ambiguous and may be harder to search or say out loud.
 
 Domain note:
+
 - Public search shows an existing `PiLog Group` enterprise data-governance company, so trademark/domain checks are still required before serious launch.
 - `Dispatch` has stronger conflict risk because `withdispatch.dev` is already an AI coding-agent product.
 - Recommended domain patterns to check manually: `pilog.dev`, `usepilog.dev`, `pilogapp.com`, `pilog.ai`, `getpilog.dev`, `trypilog.dev`.
@@ -27,6 +29,7 @@ Domain note:
 ## 3. Problem
 
 Developers constantly notice small issues while working:
+
 - “This spacing is broken on mobile.”
 - “This save button needs a loading state.”
 - “This auth redirect bug probably lives in middleware.”
@@ -35,6 +38,7 @@ Developers constantly notice small issues while working:
 The pain is not writing notes. The pain is stopping current work, opening GitHub, choosing the right repository, deciding scope, writing a proper issue, adding acceptance criteria, labeling it, and then getting back into flow.
 
 Most developers either:
+
 - ignore the thought,
 - leave a vague TODO,
 - dump it in a notes app,
@@ -46,6 +50,7 @@ PiLog solves this by separating **capture** from **triage**.
 ## 4. Target Users
 
 Primary MVP users:
+
 - Solo developers
 - Indie hackers
 - Freelancers
@@ -54,6 +59,7 @@ Primary MVP users:
 - Open-source maintainers
 
 Best early use case:
+
 - A developer working in a local repo who wants to quickly capture product/dev thoughts and later convert them into clean GitHub issues.
 
 ## 5. Core Product Principles
@@ -114,6 +120,7 @@ Best early use case:
 - **CodeMirror 6** or **Milkdown** for markdown editing
 
 Rationale:
+
 - `electron-vite` gives the MVP a fast React/Vite development loop while preserving a clean Electron split between main, preload, and renderer code.
 - `pnpm` keeps dependency management consistent and avoids mixing Bun package management with Node/Electron runtime assumptions.
 - Avoid `bun:sqlite` in MVP because the app runs inside Electron/Node, not Bun.
@@ -121,17 +128,20 @@ Rationale:
 ### Local Data
 
 Recommended MVP storage:
+
 - **SQLite-compatible local database** for persistence
 - **Drizzle ORM** for schema and queries
 - **better-sqlite3** as the MVP SQLite driver
 
 Product guidance:
+
 - Use local SQLite for MVP. Do not require Turso Cloud, cloud sync, or a hosted database.
 - Use `better-sqlite3` instead of `bun:sqlite` because the Electron main process runs on Node/Electron, not Bun.
 - Turso/local libSQL can be considered later if multi-device sync becomes a requirement.
 - GitHub tokens and other secrets must not be stored in the database. Use OS credential storage.
 
 Store locally:
+
 - notes
 - generated issue drafts
 - linked repositories
@@ -148,28 +158,31 @@ Store locally:
 - Fallback approach: if direct embedding is blocked by Pi packaging constraints, PiLog may manage the Pi binary/CLI internally, including installation, updates, and health checks, without requiring the user to leave the app.
 
 Use Pi to:
-  - inspect repository files
-  - summarize relevant code areas
-  - generate issue drafts
-  - group notes into issues
-  - split complex notes into multiple issues
-  - propose affected files and labels
+
+- inspect repository files
+- summarize relevant code areas
+- generate issue drafts
+- group notes into issues
+- split complex notes into multiple issues
+- propose affected files and labels
 
 The Electron app owns the UX, local data, GitHub publishing flow, and session lifecycle. Pi is the internal agent runtime behind the app, not an external prerequisite the user has to understand before using PiLog.
 
 ### GitHub Integration
 
 MVP approach:
+
 - GitHub OAuth device flow or local browser OAuth callback
 - Store tokens securely using Electron-safe credential storage
 - Do not use Better Auth in MVP. It is reserved for a future hosted account layer, cloud sync, billing, or team features.
 
 Use GitHub REST or GraphQL API to:
-  - list repositories
-  - list labels
-  - read existing issue templates if available
-  - create issues
-  - optionally create task lists in issue bodies
+
+- list repositories
+- list labels
+- read existing issue templates if available
+- create issues
+- optionally create task lists in issue bodies
 
 ### Recommended Initial Project Structure
 
@@ -236,6 +249,7 @@ pilog/
 ```
 
 Structure guidance:
+
 - Keep GitHub, database, Pi runtime, file-system, and token handling in the Electron main process.
 - Expose only narrow, typed IPC methods through the preload layer.
 - Keep the renderer focused on UI state, forms, review workflows, and issue draft editing.
@@ -255,6 +269,7 @@ Structure guidance:
 PiLog is BYOK by design. AI provider configuration is delegated to Pi, but exposed through PiLog's own onboarding/settings UX.
 
 Requirements:
+
 - Users configure provider credentials and model choices through Pi-native configuration surfaced inside PiLog.
 - PiLog should not require users to install Pi separately, open a terminal, or manually edit config files for the normal setup path.
 - PiLog should not own a separate model-provider abstraction in MVP. Pi remains the authority for model/provider support.
@@ -302,6 +317,7 @@ Review mode is the default mode.
 6. App shows a publish report with links to created issues.
 
 Auto-publish requirements:
+
 - Must be explicitly enabled.
 - Must be repo-specific.
 - Should support a “dry run first” setting.
@@ -313,6 +329,7 @@ Auto-publish requirements:
 ### 9.1 Global Scratchpad
 
 Requirements:
+
 - Configurable global hotkey
 - Small floating window
 - Fast open/close behavior
@@ -323,12 +340,14 @@ Requirements:
 - Optional note tags
 
 Nice-to-have:
+
 - Detect active repo based on current working directory or last selected repo
 - Detect current git branch if opened from a repo context
 
 ### 9.2 Note Inbox
 
 Requirements:
+
 - List captured notes
 - Search notes
 - Filter by repo/status/date
@@ -343,6 +362,7 @@ Requirements:
 ### 9.3 Issue Draft Generation
 
 Generated issue fields:
+
 - Title
 - Body/description
 - Source notes
@@ -378,6 +398,7 @@ avatar upload error is silent
 ```
 
 Output:
+
 - Issue 1: Polish settings page UX
   - mobile spacing
   - save loading state
@@ -390,6 +411,7 @@ session expires and redirect breaks, probably middleware. also token refresh cha
 ```
 
 Output:
+
 - Issue 1: Fix expired-session redirect handling
 - Issue 2: Review token refresh/session persistence flow
 - Optional parent issue if the repo appears to use GitHub task lists heavily
@@ -397,6 +419,7 @@ Output:
 ### 9.5 Review Screen
 
 Each issue draft card should support:
+
 - Edit title/body
 - Edit labels
 - Edit acceptance criteria
@@ -410,6 +433,7 @@ Each issue draft card should support:
 ### 9.6 GitHub Publishing
 
 Requirements:
+
 - Select GitHub account
 - Select repo
 - Pull available labels
@@ -453,6 +477,7 @@ MVP issue body template:
 ### 9.7 Settings
 
 Settings should include:
+
 - Global hotkey
 - Default mode: Review or Auto-publish
 - Default repository
@@ -463,6 +488,7 @@ Settings should include:
 - Data/privacy controls
 
 Auto-publish settings:
+
 - Enable/disable per repo
 - Require confirmation before publish
 - Limit max issues per run
@@ -487,63 +513,63 @@ The agent should follow this workflow:
 
 ```ts
 type GeneratedIssueDraft = {
-  title: string;
-  summary: string;
-  context: string;
-  sourceNoteIds: string[];
-  suggestedLabels: string[];
-  priority?: "low" | "medium" | "high";
+  title: string
+  summary: string
+  context: string
+  sourceNoteIds: string[]
+  suggestedLabels: string[]
+  priority?: 'low' | 'medium' | 'high'
   affectedFiles: Array<{
-    path: string;
-    reason: string;
-  }>;
-  acceptanceCriteria: string[];
-  implementationNotes: string[];
-  confidence: "low" | "medium" | "high";
-  groupingReason: string;
-  publishReady: boolean;
-  needsClarification?: string[];
-};
+    path: string
+    reason: string
+  }>
+  acceptanceCriteria: string[]
+  implementationNotes: string[]
+  confidence: 'low' | 'medium' | 'high'
+  groupingReason: string
+  publishReady: boolean
+  needsClarification?: string[]
+}
 ```
 
 ## 11. Data Model Draft
 
 ```ts
 type Note = {
-  id: string;
-  repoId?: string;
-  content: string;
-  status: "unprocessed" | "drafted" | "published" | "dismissed";
-  createdAt: string;
-  updatedAt: string;
-};
+  id: string
+  repoId?: string
+  content: string
+  status: 'unprocessed' | 'drafted' | 'published' | 'dismissed'
+  createdAt: string
+  updatedAt: string
+}
 
 type Repo = {
-  id: string;
-  name: string;
-  owner: string;
-  localPath: string;
-  githubUrl?: string;
-  defaultBranch?: string;
-  autoPublishEnabled: boolean;
-  createdAt: string;
-  updatedAt: string;
-};
+  id: string
+  name: string
+  owner: string
+  localPath: string
+  githubUrl?: string
+  defaultBranch?: string
+  autoPublishEnabled: boolean
+  createdAt: string
+  updatedAt: string
+}
 
 type IssueDraft = {
-  id: string;
-  repoId: string;
-  title: string;
-  body: string;
-  labels: string[];
-  sourceNoteIds: string[];
-  affectedFilesJson: string;
-  confidence: "low" | "medium" | "high";
-  status: "draft" | "published" | "dismissed";
-  githubIssueUrl?: string;
-  createdAt: string;
-  updatedAt: string;
-};
+  id: string
+  repoId: string
+  title: string
+  body: string
+  labels: string[]
+  sourceNoteIds: string[]
+  affectedFilesJson: string
+  confidence: 'low' | 'medium' | 'high'
+  status: 'draft' | 'published' | 'dismissed'
+  githubIssueUrl?: string
+  createdAt: string
+  updatedAt: string
+}
 ```
 
 ## 12. UI Structure

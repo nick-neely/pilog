@@ -21,7 +21,7 @@ Define a single `IpcContract` type in `src/shared/ipc.ts`:
 ```ts
 export type IpcContract = {
   'note:create': { request: { content: string }; response: Note }
-  'note:list':   { request: void; response: Note[] }
+  'note:list': { request: void; response: Note[] }
 }
 ```
 

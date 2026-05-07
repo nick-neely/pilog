@@ -1,8 +1,10 @@
-import Database from 'better-sqlite3'
 import { drizzle } from 'drizzle-orm/better-sqlite3'
 import * as schema from './schema'
+import { loadBetterSqlite3 } from './load-better-sqlite3'
 
 export type PilogDatabase = ReturnType<typeof drizzle<typeof schema>>
+
+const Database = loadBetterSqlite3()
 
 export function createDatabase(sqlitePath: string): PilogDatabase {
   const sqlite = new Database(sqlitePath)

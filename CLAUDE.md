@@ -22,7 +22,7 @@ Before any UI work, read `PRODUCT.md` and `DESIGN.md` at the repo root. They def
 
 - **Register:** `product`. App UI serves the capture/triage workflow; no marketing surface in MVP.
 - **Personality:** warm, crafted, calm — a developer's bedside journal. References: iA Writer, Things 3, Bear.
-- **North Star:** *The Reading-Room Journal* — paper-warm tinted neutrals + a single Reading-Room Moss accent (`oklch(48% 0.08 145°)`) used on ≤10% of any screen.
+- **North Star:** _The Reading-Room Journal_ — paper-warm tinted neutrals + a single Reading-Room Moss accent (`oklch(48% 0.08 145°)`) used on ≤10% of any screen.
 - **Type:** literary serif display + humanist sans body + developer monospace for code, paths, and editor body.
 - **Motion:** responsive (feedback only, no choreography); `prefers-reduced-motion` respected strictly.
 - **Elevation:** flat by default; depth via tonal contrast on the warm-neutral ramp.

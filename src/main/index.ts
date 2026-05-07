@@ -1,20 +1,20 @@
-import { app, BrowserWindow, Menu, ipcMain } from 'electron'
+import { electronApp, is, optimizer } from '@electron-toolkit/utils'
+import { app, BrowserWindow, ipcMain, Menu } from 'electron'
 import { join } from 'path'
-import { electronApp, optimizer } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { createDatabase } from './db/client'
 import { runMigrations } from './db/migrations'
-import { registerIpcHandlers } from './ipc/handlers'
-import { openScratchpad, hideScratchpad } from './window/create-scratchpad-window'
-import {
-  showMainWindow,
-  showMainWindowOnRoute,
-  destroyMainWindow
-} from './window/create-main-window'
-import { buildAppMenu } from './menu/app-menu'
+import { getSetting, setSetting } from './db/repositories/settings'
 import { registerGlobalHotkeys, unregisterGlobalHotkeys } from './hotkeys/register-global-hotkeys'
+import { registerIpcHandlers } from './ipc/handlers'
+import { buildAppMenu } from './menu/app-menu'
 import { createTray, destroyTray } from './tray/create-tray'
-import { getSetting } from './db/repositories/settings'
+import {
+  destroyMainWindow,
+  showMainWindow,
+  showMainWindowOnRoute
+} from './window/create-main-window'
+import { hideScratchpad, openScratchpad } from './window/create-scratchpad-window'
 
 if (process.env.PILOG_USER_DATA) {
   app.setPath('userData', process.env.PILOG_USER_DATA)
@@ -30,6 +30,11 @@ app.whenReady().then(() => {
   const dbPath = join(app.getPath('userData'), 'pilog.sqlite')
   const db = createDatabase(dbPath)
   runMigrations(db)
+
+  // So the app opens to the inbox by default in development
+  if (is.dev) {
+    setSetting(db, 'openInboxAtLogin', 'true')
+  }
 
   function broadcastNoteCreated(): void {
     for (const win of BrowserWindow.getAllWindows()) {
