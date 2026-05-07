@@ -14,10 +14,12 @@ test.afterEach(() => {
 })
 
 async function launchApp(): Promise<ElectronApplication> {
-  return electron.launch({
+  const app = await electron.launch({
     args: [join(__dirname, '../out/main/index.js')],
     env: { ...process.env, PILOG_USER_DATA: userDataDir }
   })
+  await app.evaluate(({ ipcMain }) => ipcMain.emit('tray:open-inbox'))
+  return app
 }
 
 test('note round-trip: create note, restart, note persists', async () => {
