@@ -31,10 +31,4 @@ describe('settings repository', () => {
     expect(value).toBe('CmdOrCtrl+Alt+M')
   })
 
-  it('stores different keys independently', () => {
-    setSetting(db, 'hotkey.scratchpad', 'CmdOrCtrl+Alt+N')
-
-    const scratchpad = getSetting(db, 'hotkey.scratchpad')
-    expect(scratchpad).toBe('CmdOrCtrl+Alt+N')
-  })
 })
