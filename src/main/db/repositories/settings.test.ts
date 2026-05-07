@@ -30,5 +30,4 @@ describe('settings repository', () => {
     const value = getSetting(db, 'hotkey.scratchpad')
     expect(value).toBe('CmdOrCtrl+Alt+M')
   })
-
 })
