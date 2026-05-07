@@ -1,8 +1,7 @@
 import { eq } from 'drizzle-orm'
 import type { PilogDatabase } from '../client'
 import { settings } from '../schema'
-
-export type SettingKey = 'hotkey.scratchpad'
+import type { SettingKey } from '@shared/ipc'
 
 export function getSetting(db: PilogDatabase, key: SettingKey): string | null {
   const row = db.select({ value: settings.value }).from(settings).where(eq(settings.key, key)).get()

@@ -1,44 +1,20 @@
-import { app, shell, BrowserWindow, Menu, ipcMain } from 'electron'
+import { app, BrowserWindow, Menu, ipcMain } from 'electron'
 import { join } from 'path'
-import { electronApp, optimizer, is } from '@electron-toolkit/utils'
+import { electronApp, optimizer } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { createDatabase } from './db/client'
 import { runMigrations } from './db/migrations'
 import { registerIpcHandlers } from './ipc/handlers'
 import { openScratchpad, hideScratchpad } from './window/create-scratchpad-window'
+import {
+  showMainWindow,
+  showMainWindowOnRoute,
+  destroyMainWindow
+} from './window/create-main-window'
 import { buildAppMenu } from './menu/app-menu'
 import { registerGlobalHotkeys, unregisterGlobalHotkeys } from './hotkeys/register-global-hotkeys'
-
-function createWindow(): BrowserWindow {
-  const mainWindow = new BrowserWindow({
-    width: 900,
-    height: 670,
-    show: false,
-    autoHideMenuBar: false,
-    ...(process.platform === 'linux' ? { icon } : {}),
-    webPreferences: {
-      preload: join(__dirname, '../preload/index.js'),
-      sandbox: false
-    }
-  })
-
-  mainWindow.on('ready-to-show', () => {
-    mainWindow.show()
-  })
-
-  mainWindow.webContents.setWindowOpenHandler((details) => {
-    shell.openExternal(details.url)
-    return { action: 'deny' }
-  })
-
-  if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
-    mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
-  } else {
-    mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
-  }
-
-  return mainWindow
-}
+import { createTray, destroyTray } from './tray/create-tray'
+import { getSetting } from './db/repositories/settings'
 
 if (process.env.PILOG_USER_DATA) {
   app.setPath('userData', process.env.PILOG_USER_DATA)
@@ -67,16 +43,34 @@ app.whenReady().then(() => {
     hideScratchpad()
   })
 
+  ipcMain.on('tray:open-inbox', () => {
+    showMainWindow(icon)
+  })
+
   registerGlobalHotkeys(db, openScratchpad)
 
   const menu = buildAppMenu(openScratchpad)
   Menu.setApplicationMenu(menu)
 
-  createWindow()
-
-  app.on('activate', function () {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow()
+  createTray(icon, {
+    onOpenInbox: () => showMainWindow(icon),
+    onNewNote: () => openScratchpad(),
+    onOpenSettings: () => showMainWindowOnRoute(icon, 'navigate:settings')
   })
+
+  const openAtLogin = getSetting(db, 'openInboxAtLogin') === 'true'
+  if (openAtLogin) {
+    showMainWindow(icon)
+  }
+
+  app.on('activate', () => {
+    showMainWindow(icon)
+  })
+})
+
+app.on('before-quit', () => {
+  destroyMainWindow()
+  destroyTray()
 })
 
 app.on('will-quit', () => {
@@ -84,7 +78,5 @@ app.on('will-quit', () => {
 })
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit()
-  }
+  // Tray keeps the app alive — don't quit when windows close
 })

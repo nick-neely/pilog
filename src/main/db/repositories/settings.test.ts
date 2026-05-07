@@ -30,4 +30,12 @@ describe('settings repository', () => {
     const value = getSetting(db, 'hotkey.scratchpad')
     expect(value).toBe('CmdOrCtrl+Alt+M')
   })
+
+  it('stores different keys independently', () => {
+    setSetting(db, 'hotkey.scratchpad', 'CmdOrCtrl+Shift+N')
+    setSetting(db, 'openInboxAtLogin', 'true')
+
+    expect(getSetting(db, 'hotkey.scratchpad')).toBe('CmdOrCtrl+Shift+N')
+    expect(getSetting(db, 'openInboxAtLogin')).toBe('true')
+  })
 })

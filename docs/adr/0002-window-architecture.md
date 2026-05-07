@@ -27,8 +27,28 @@ PiLog needs at least two distinct surfaces: the **inbox** (a full main window fo
 - A `scratchpad:hide` one-way IPC action lets the scratchpad renderer request the main process to hide its own window.
 - A `note:created` push event from main to all windows allows the inbox to refresh when the scratchpad creates a note.
 
+## Amendment: Tray-Driven Lifecycle (Issue #4)
+
+The app now boots into the system tray by default. The tray is the primary entry point; the main window is no longer shown automatically on launch unless `settings.openInboxAtLogin` is `'true'`.
+
+### Tray menu
+
+| Item | Action |
+|------|--------|
+| Open Inbox | Show/focus the main window on the inbox route |
+| New Note | Open/focus the scratchpad (same code path as hotkey) |
+| Settings | Show/focus the main window on the settings route |
+| Quit | `app.quit()` — the only way to terminate the process |
+
+### Window lifecycle
+
+- **Main window** hides on close (`close` event is intercepted with `preventDefault()` + `hide()`). This keeps the process alive and makes re-open instant.
+- **`window-all-closed`** is a no-op — the tray keeps the app alive on all platforms.
+- **`before-quit`** force-destroys all windows so the process can exit cleanly.
+- **Navigation** between inbox and settings happens via `navigate:inbox` / `navigate:settings` IPC events sent from main to renderer. The renderer uses simple state-based routing (no external router library).
+
 ## Consequences
 
 - Each new window surface requires an HTML entry point and a React root, adding a small build-config cost.
 - Cross-window communication goes through the main process (IPC), not direct window-to-window messaging. This is consistent with ADR-0003's "main process owns the truth" principle.
-- When the tray lands (Phase 1A, future slice), it will call the same `openScratchpad()` / `hideScratchpad()` functions, so no window-management changes are needed.
+- The tray calls the same `openScratchpad()` / `showMainWindow()` functions as the menu and hotkeys.
