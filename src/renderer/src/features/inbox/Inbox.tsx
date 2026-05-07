@@ -12,9 +12,6 @@ export function Inbox(): React.JSX.Element {
 
   useEffect(() => {
     refreshNotes()
-  }, [refreshNotes])
-
-  useEffect(() => {
     return window.pilog.on('note:created', refreshNotes)
   }, [refreshNotes])
 
@@ -22,8 +19,6 @@ export function Inbox(): React.JSX.Element {
     await window.pilog.invoke('note:create', {
       content: `New note – ${new Date().toLocaleString()}`
     })
-    const result = await window.pilog.invoke('note:list')
-    setNotes(result)
   }
 
   return (
