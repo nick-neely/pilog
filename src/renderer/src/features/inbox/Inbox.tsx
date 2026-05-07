@@ -219,9 +219,11 @@ export function Inbox(): React.JSX.Element {
                     title="Generate Drafts activates in Phase 3"
                   >
                     <Sparkles className="h-4 w-4" />
+                    Generate Drafts
                   </Button>
                   <Button size="sm" variant="outline" disabled title="Dismiss activates in Phase 4">
                     <XCircle className="h-4 w-4" />
+                    Dismiss
                   </Button>
                 </>
               )}
