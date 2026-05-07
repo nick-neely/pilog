@@ -11,7 +11,7 @@ export function Inbox(): React.JSX.Element {
     window.pilog.invoke('note:list').then((result) => {
       if (!cancelled) setNotes(result)
     })
-    return (): void => {
+    return () => {
       cancelled = true
     }
   }, [])

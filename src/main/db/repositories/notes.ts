@@ -22,16 +22,15 @@ export function createNote(db: PilogDatabase, input: { content: string }): Note 
 }
 
 export function listNotes(db: PilogDatabase): Note[] {
-  const rows = db
-    .select()
+  return db
+    .select({
+      id: notes.id,
+      content: notes.content,
+      status: notes.status,
+      createdAt: notes.createdAt,
+      updatedAt: notes.updatedAt
+    })
     .from(notes)
     .orderBy(desc(notes.createdAt), desc(sql`rowid`))
     .all()
-  return rows.map((row) => ({
-    id: row.id,
-    content: row.content,
-    status: row.status,
-    createdAt: row.createdAt,
-    updatedAt: row.updatedAt
-  }))
 }
