@@ -7,6 +7,7 @@ import { runMigrations } from './db/migrations'
 import { registerIpcHandlers } from './ipc/handlers'
 import { openScratchpad, hideScratchpad } from './window/create-scratchpad-window'
 import { buildAppMenu } from './menu/app-menu'
+import { registerGlobalHotkeys, unregisterGlobalHotkeys } from './hotkeys/register-global-hotkeys'
 
 function createWindow(): BrowserWindow {
   const mainWindow = new BrowserWindow({
@@ -66,6 +67,8 @@ app.whenReady().then(() => {
     hideScratchpad()
   })
 
+  registerGlobalHotkeys(db, openScratchpad)
+
   const menu = buildAppMenu(openScratchpad)
   Menu.setApplicationMenu(menu)
 
@@ -74,6 +77,10 @@ app.whenReady().then(() => {
   app.on('activate', function () {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
+})
+
+app.on('will-quit', () => {
+  unregisterGlobalHotkeys()
 })
 
 app.on('window-all-closed', () => {
