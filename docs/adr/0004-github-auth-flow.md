@@ -23,7 +23,7 @@ For token storage, options considered:
 
 - The loopback flow is preferred for desktop UX: the user clicks one button, authorises in their default browser, and returns to PiLog already connected. No code to copy.
 - `safeStorage.encryptString()` encrypts the token; the resulting buffer is base64-encoded and written to `{userData}/secrets.json`. On read, the buffer is decrypted with `safeStorage.decryptString()`.
-- If `safeStorage.isEncryptionAvailable()` returns false (rare — headless Linux without a keyring), the module logs a warning and refuses to persist. The user stays disconnected.
+- If `safeStorage.isEncryptionAvailable()` returns false in a packaged app (rare — headless Linux without a keyring), the module logs a warning and refuses to persist. During development only, PiLog falls back to a plaintext `secrets.dev.json` file under Electron `userData` so WSL2/dev environments can exercise the full GitHub flow.
 - OAuth client ID and client secret are supplied via build-time environment variables (`GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`). Neither appears in the renderer or preload bundle — they're only read in the main process at runtime.
 - The token never touches `pilog.sqlite`.
 

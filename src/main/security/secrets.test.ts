@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 
 let encryptionAvailable = true
+let isPackaged = false
 
 vi.mock('electron', () => ({
   safeStorage: {
@@ -16,7 +17,10 @@ vi.mock('electron', () => ({
     }
   },
   app: {
-    getPath: vi.fn()
+    getPath: vi.fn(),
+    get isPackaged() {
+      return isPackaged
+    }
   }
 }))
 
@@ -33,6 +37,7 @@ beforeEach(async () => {
   const electron = await import('electron')
   vi.mocked(electron.app.getPath).mockReturnValue(testDir)
   encryptionAvailable = true
+  isPackaged = false
 
   vi.resetModules()
   secrets = await import('./secrets')
@@ -81,9 +86,43 @@ describe('secrets', () => {
     expect(raw.github_token).not.toContain('gho_abc123')
   })
 
-  describe('when encryption is unavailable', () => {
+  describe('when encryption is unavailable in development', () => {
     beforeEach(() => {
       encryptionAvailable = false
+    })
+
+    it('persists to a dev-only plaintext file and logs a warning', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      secrets.setSecret('github_token', 'gho_abc123')
+
+      expect(warnSpy).toHaveBeenCalled()
+      const secretsPath = join(testDir, 'secrets.dev.json')
+      expect(existsSync(secretsPath)).toBe(true)
+
+      const raw = JSON.parse(readFileSync(secretsPath, 'utf-8'))
+      expect(raw.github_token).toBe('gho_abc123')
+    })
+
+    it('reads from the dev-only plaintext file', () => {
+      secrets.setSecret('github_token', 'gho_abc123')
+
+      expect(secrets.getSecret('github_token')).toBe('gho_abc123')
+    })
+
+    it('deletes from the dev-only plaintext file', () => {
+      secrets.setSecret('github_token', 'gho_abc123')
+      secrets.deleteSecret('github_token')
+
+      expect(secrets.getSecret('github_token')).toBeNull()
+    })
+  })
+
+  describe('when encryption is unavailable in a packaged app', () => {
+    beforeEach(async () => {
+      encryptionAvailable = false
+      isPackaged = true
+      vi.resetModules()
+      secrets = await import('./secrets')
     })
 
     it('refuses to persist and logs a warning', () => {
@@ -91,8 +130,8 @@ describe('secrets', () => {
       secrets.setSecret('github_token', 'gho_abc123')
 
       expect(warnSpy).toHaveBeenCalled()
-      const secretsPath = join(testDir, 'secrets.json')
-      expect(existsSync(secretsPath)).toBe(false)
+      expect(existsSync(join(testDir, 'secrets.json'))).toBe(false)
+      expect(existsSync(join(testDir, 'secrets.dev.json'))).toBe(false)
     })
 
     it('returns null on get', () => {

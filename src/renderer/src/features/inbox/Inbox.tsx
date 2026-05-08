@@ -485,7 +485,7 @@ export function Inbox({
             <Button
               type="button"
               variant="outline"
-              size="icon-xs"
+              size="icon-sm"
               data-testid="open-settings"
               onClick={() => onNavigateToSettings()}
               aria-label="Settings"

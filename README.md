@@ -30,6 +30,8 @@ Put a `.env` file in the repo root ([electron-vite](https://electron-vite.org/gu
 
 **GitHub:** Create an [OAuth App](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/creating-an-oauth-app). Authorization callback URL: `http://127.0.0.1/callback`. Add the client ID and client secret to `.env` as `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET`.
 
+In development, if Electron `safeStorage` is unavailable (common in WSL2 without a Linux keyring), PiLog falls back to a plaintext `secrets.dev.json` file in Electron `userData` so GitHub sign-in still works. Packaged builds never use this fallback.
+
 **Optional:** `PILOG_USER_DATA` — custom Electron `userData` directory (used in e2e tests).
 
 ## Development
