@@ -15,6 +15,8 @@ export type ListNotesRequest = {
 
 export type SettingKey = 'hotkey.scratchpad' | 'openInboxAtLogin'
 
+export type GitHubStatus = { connected: boolean; login?: string }
+
 export type IpcContract = {
   'note:create': { request: { content: string }; response: Note }
   'note:list': { request: ListNotesRequest | void; response: Note[] }
@@ -22,6 +24,9 @@ export type IpcContract = {
   'note:delete': { request: { id: string }; response: boolean }
   'setting:get': { request: { key: SettingKey }; response: string | null }
   'setting:set': { request: { key: SettingKey; value: string }; response: void }
+  'github:connect': { request: void; response: GitHubStatus }
+  'github:signOut': { request: void; response: void }
+  'github:status': { request: void; response: GitHubStatus }
 }
 
 export type IpcChannel = keyof IpcContract
