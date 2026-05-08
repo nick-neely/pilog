@@ -1,10 +1,13 @@
 import { ipcMain, app } from 'electron'
 import type { IpcRequest, IpcResponse } from '@shared/ipc'
 import type { PilogDatabase } from '../db/client'
+import { getRunById, listRuns } from '../db/repositories/agent-runs'
 import { createNote, listNotes, updateNote, deleteNote } from '../db/repositories/notes'
 import { getSetting, setSetting } from '../db/repositories/settings'
 
 type DbChannel =
+  | 'agent-runs:get'
+  | 'agent-runs:list'
   | 'note:create'
   | 'note:list'
   | 'note:update'
@@ -15,6 +18,8 @@ type DbChannel =
 type Handler<C extends DbChannel> = (db: PilogDatabase, request: IpcRequest<C>) => IpcResponse<C>
 
 const handlers: { [C in DbChannel]: Handler<C> } = {
+  'agent-runs:get': (db, request) => getRunById(db, request.id),
+  'agent-runs:list': (db, request) => listRuns(db, request ?? undefined),
   'note:create': (db, request) => createNote(db, request),
   'note:list': (db, request) => listNotes(db, request ?? undefined),
   'note:update': (db, request) => updateNote(db, request),

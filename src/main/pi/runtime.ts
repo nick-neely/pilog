@@ -1,5 +1,6 @@
 import type { AgentEvent as PiAgentEvent } from '@earendil-works/pi-agent-core'
 import type { getModel as getModelType } from '@earendil-works/pi-ai'
+import { setTimeout as delay } from 'node:timers/promises'
 import { createModelRegistry, createSafeStorageAuthStorage } from './auth-storage'
 import {
   buildIssueGenerationPrompt,
@@ -138,7 +139,11 @@ export async function* runAgent(input: IssueGenerationInput): AsyncIterable<Agen
 
 async function* runFixtureAgent(input: IssueGenerationInput): AsyncIterable<AgentEvent> {
   yield { type: 'progress', phase: 'agent_start' }
-  yield { type: 'partial', text: 'Generating issue drafts from selected notes.' }
+  await delay(150, undefined, { signal: input.signal }).catch(() => undefined)
+  if (input.signal?.aborted) return
+  yield { type: 'partial', text: 'Generating one issue draft from selected notes.' }
+  await delay(50, undefined, { signal: input.signal }).catch(() => undefined)
+  if (input.signal?.aborted) return
   yield {
     type: 'final',
     drafts: [

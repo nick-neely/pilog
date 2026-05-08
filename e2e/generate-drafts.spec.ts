@@ -108,3 +108,47 @@ test('Pi config setup persists across restart and unblocks Generate Drafts', asy
 
   await app.close()
 })
+
+test('Agent Runs shows live generation, detail transcript, and source note navigation', async () => {
+  const app = await launchApp()
+  const page = await app.firstWindow()
+
+  await page.evaluate(
+    async ({ repoPath }) => {
+      await window.pilog.invoke('debug:seedIssueGenerationFixture', {
+        repoPath,
+        notes: ['save button needs loading state', 'settings spacing is odd on mobile']
+      })
+    },
+    { repoPath: repoDir }
+  )
+  await page.reload()
+
+  const noteRows = page.locator('[data-testid="note-row"]')
+  await expect(noteRows).toHaveCount(2)
+  await noteRows.first().click()
+  const modifier = process.platform === 'darwin' ? 'Meta' : 'Control'
+  await noteRows.nth(1).click({ modifiers: [modifier] })
+
+  await page.locator('button:has-text("Generate Drafts")').click()
+  await page.locator('[data-testid="open-agent-runs"]').click()
+
+  const runRows = page.locator('[data-testid="agent-run-row"]')
+  await expect(runRows.first()).toContainText('running')
+  await expect(runRows.first()).toContainText('succeeded')
+  await expect(runRows.first()).toContainText('1 drafts')
+
+  await runRows.first().click()
+  await expect(page.locator('[data-testid="run-output-draft"]')).toContainText(
+    'Triage selected PiLog notes'
+  )
+  await expect(page.locator('[data-testid="run-event-transcript"]')).toContainText('agent_start')
+
+  await page.locator('[data-testid="run-source-note"]').first().click()
+  await expect(page.locator('h1')).toHaveText('Inbox')
+  await expect(page.locator('textarea[aria-label="Note content"]')).toHaveValue(
+    'settings spacing is odd on mobile'
+  )
+
+  await app.close()
+})

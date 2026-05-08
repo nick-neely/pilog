@@ -4,6 +4,7 @@ import {
   Add01Icon,
   Cancel01Icon,
   CancelCircleIcon,
+  MoreHorizontalCircle01Icon,
   Search01Icon,
   Settings02Icon,
   SparklesIcon
@@ -264,9 +265,15 @@ function NoteDetail({
 }
 
 export function Inbox({
+  focusNoteId,
+  onFocusNoteHandled,
+  onNavigateToAgentRuns,
   onNavigateToRepositories,
   onNavigateToSettings
 }: {
+  focusNoteId?: string | null
+  onFocusNoteHandled?: () => void
+  onNavigateToAgentRuns: () => void
   onNavigateToRepositories: () => void
   onNavigateToSettings: () => void
 }): React.JSX.Element {
@@ -314,6 +321,18 @@ export function Inbox({
   useEffect(() => {
     fetchNotes()
   }, [fetchNotes])
+
+  useEffect(() => {
+    if (!focusNoteId) return
+    queueMicrotask(() => {
+      setStatusFilter(undefined)
+      setRepoFilter(undefined)
+      setPaletteQuery('')
+      setSelectedIds(new Set([focusNoteId]))
+      lastClickedIndex.current = null
+      onFocusNoteHandled?.()
+    })
+  }, [focusNoteId, onFocusNoteHandled])
 
   useEffect(() => {
     return window.pilog.on('note:created', () => {
@@ -540,6 +559,17 @@ export function Inbox({
             )}
           </div>
           <div className="flex shrink-0 items-center gap-1">
+            <Button
+              type="button"
+              variant="outline"
+              size="icon-sm"
+              data-testid="open-agent-runs"
+              onClick={() => onNavigateToAgentRuns()}
+              aria-label="Agent Runs"
+              title="Agent Runs"
+            >
+              <HugeiconsIcon icon={MoreHorizontalCircle01Icon} aria-hidden />
+            </Button>
             <Button
               type="button"
               variant="outline"
@@ -794,6 +824,13 @@ export function Inbox({
           <CommandSeparator />
 
           <CommandGroup heading="Navigate">
+            <CommandItem
+              data-testid="cmd-agent-runs"
+              onSelect={() => runCommand(onNavigateToAgentRuns)}
+            >
+              <HugeiconsIcon icon={MoreHorizontalCircle01Icon} aria-hidden />
+              <span>Agent Runs</span>
+            </CommandItem>
             <CommandItem
               data-testid="cmd-settings"
               onSelect={() => runCommand(onNavigateToSettings)}
