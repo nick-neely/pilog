@@ -8,6 +8,7 @@ import { getSetting, setSetting } from './db/repositories/settings'
 import { registerGlobalHotkeys, unregisterGlobalHotkeys } from './hotkeys/register-global-hotkeys'
 import { registerIpcHandlers } from './ipc/handlers'
 import { registerGitHubIpcHandlers } from './ipc/github-handlers'
+import { registerRepoIpcHandlers } from './ipc/repo-handlers'
 import { buildAppMenu } from './menu/app-menu'
 import { createTray, destroyTray } from './tray/create-tray'
 import {
@@ -49,6 +50,8 @@ app.whenReady().then(() => {
     clientId: process.env.GITHUB_CLIENT_ID ?? '',
     clientSecret: process.env.GITHUB_CLIENT_SECRET ?? ''
   })
+
+  registerRepoIpcHandlers(db)
 
   ipcMain.on('scratchpad:hide', () => {
     hideScratchpad()

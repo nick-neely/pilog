@@ -1,8 +1,10 @@
 import { Octokit } from '@octokit/rest'
 import { getStoredToken } from './auth'
+import type { GitHubRepo } from '@shared/ipc'
 
 let cachedClient: Octokit | null = null
 let cachedToken: string | null = null
+let cachedRepos: GitHubRepo[] | null = null
 
 export function getOctokitClient(): Octokit | null {
   const token = getStoredToken()
@@ -14,12 +16,14 @@ export function getOctokitClient(): Octokit | null {
 
   cachedClient = new Octokit({ auth: token })
   cachedToken = token
+  cachedRepos = null
   return cachedClient
 }
 
 export function resetClient(): void {
   cachedClient = null
   cachedToken = null
+  cachedRepos = null
 }
 
 export async function getAuthenticatedUser(): Promise<{
@@ -34,4 +38,31 @@ export async function getAuthenticatedUser(): Promise<{
     login: data.login,
     avatarUrl: data.avatar_url
   }
+}
+
+export async function listRepos(): Promise<GitHubRepo[]> {
+  if (cachedRepos) return cachedRepos
+
+  const client = getOctokitClient()
+  if (!client) return []
+
+  const repos: GitHubRepo[] = []
+  for await (const response of client.paginate.iterator(
+    client.rest.repos.listForAuthenticatedUser,
+    { per_page: 100, affiliation: 'owner,collaborator,organization_member' }
+  )) {
+    for (const repo of response.data) {
+      repos.push({
+        id: repo.id,
+        name: repo.name,
+        owner: repo.owner.login,
+        fullName: repo.full_name,
+        url: repo.html_url,
+        defaultBranch: repo.default_branch
+      })
+    }
+  }
+
+  cachedRepos = repos
+  return repos
 }

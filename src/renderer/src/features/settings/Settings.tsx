@@ -57,7 +57,13 @@ function useGitHubStatus(): {
   return { status, connecting, connect, signOut }
 }
 
-export function Settings({ onBack }: { onBack: () => void }): React.JSX.Element {
+export function Settings({
+  onBack,
+  onNavigateRepositories
+}: {
+  onBack: () => void
+  onNavigateRepositories?: () => void
+}): React.JSX.Element {
   const [hotkey, setHotkey] = useSetting('hotkey.scratchpad')
   const [openAtLogin, setOpenAtLogin] = useSetting('openInboxAtLogin')
   const [hotkeyDraft, setHotkeyDraft] = useState<string | null>(null)
@@ -122,6 +128,16 @@ export function Settings({ onBack }: { onBack: () => void }): React.JSX.Element 
                 {github.connecting ? 'Connecting…' : 'Connect GitHub'}
               </Button>
             )}
+          </section>
+
+          <section className="space-y-3">
+            <h2 className="text-sm font-medium text-foreground">Repositories</h2>
+            <p className="text-xs text-muted-foreground">
+              Link local Git repositories to your GitHub account.
+            </p>
+            <Button size="sm" variant="ghost" onClick={onNavigateRepositories} className="px-0">
+              Manage repositories &rarr;
+            </Button>
           </section>
 
           <section className="space-y-3">

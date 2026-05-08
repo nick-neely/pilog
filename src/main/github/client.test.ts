@@ -19,6 +19,17 @@ vi.mock('../security/secrets', () => {
   }
 })
 
+const mockRepoPage = [
+  {
+    id: 1,
+    name: 'pilog',
+    owner: { login: 'nick-neely' },
+    full_name: 'nick-neely/pilog',
+    html_url: 'https://github.com/nick-neely/pilog',
+    default_branch: 'main'
+  }
+]
+
 vi.mock('@octokit/rest', () => {
   class MockOctokit {
     rest = {
@@ -26,7 +37,17 @@ vi.mock('@octokit/rest', () => {
         getAuthenticated: vi.fn().mockResolvedValue({
           data: { login: 'testuser', avatar_url: 'https://avatars.githubusercontent.com/u/1' }
         })
+      },
+      repos: {
+        listForAuthenticatedUser: vi.fn()
       }
+    }
+    paginate = {
+      iterator: vi.fn().mockReturnValue(
+        (async function* () {
+          yield { data: mockRepoPage }
+        })()
+      )
     }
   }
   return { Octokit: MockOctokit }
@@ -90,5 +111,24 @@ describe('github client', () => {
   it('getAuthenticatedUser returns null when not connected', async () => {
     const user = await client.getAuthenticatedUser()
     expect(user).toBeNull()
+  })
+
+  it('listRepos returns empty array when not connected', async () => {
+    const repos = await client.listRepos()
+    expect(repos).toEqual([])
+  })
+
+  it('listRepos returns repos when connected', async () => {
+    secretsStore.set('github_token', 'gho_abc')
+    const repos = await client.listRepos()
+    expect(repos).toHaveLength(1)
+    expect(repos[0]).toEqual({
+      id: 1,
+      name: 'pilog',
+      owner: 'nick-neely',
+      fullName: 'nick-neely/pilog',
+      url: 'https://github.com/nick-neely/pilog',
+      defaultBranch: 'main'
+    })
   })
 })

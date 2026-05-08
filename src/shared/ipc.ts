@@ -17,6 +17,39 @@ export type SettingKey = 'hotkey.scratchpad' | 'openInboxAtLogin'
 
 export type GitHubStatus = { connected: boolean; login?: string }
 
+export type GitHubRepo = {
+  id: number
+  name: string
+  owner: string
+  fullName: string
+  url: string
+  defaultBranch: string
+}
+
+export type Repo = {
+  id: string
+  name: string
+  owner: string
+  localPath: string
+  githubUrl: string | null
+  defaultBranch: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export type DetectLocalRepoResult =
+  | { state: 'unauthenticated' }
+  | { state: 'not-git' }
+  | { state: 'no-remote' }
+  | { state: 'unmatched'; remoteUrl: string }
+  | { state: 'matched'; remoteUrl: string; defaultBranch: string; headSha: string; githubRepo: GitHubRepo }
+
+export type LinkRepoRequest = {
+  localPath: string
+  githubRepo: GitHubRepo
+  defaultBranch: string
+}
+
 export type IpcContract = {
   'note:create': { request: { content: string }; response: Note }
   'note:list': { request: ListNotesRequest | void; response: Note[] }
@@ -27,6 +60,11 @@ export type IpcContract = {
   'github:connect': { request: void; response: GitHubStatus }
   'github:signOut': { request: void; response: void }
   'github:status': { request: void; response: GitHubStatus }
+  'repos:list': { request: void; response: Repo[] }
+  'repos:detectLocal': { request: { localPath: string }; response: DetectLocalRepoResult }
+  'repos:link': { request: LinkRepoRequest; response: Repo }
+  'repos:unlink': { request: { id: string }; response: boolean }
+  'dialog:openDirectory': { request: void; response: string | null }
 }
 
 export type IpcChannel = keyof IpcContract

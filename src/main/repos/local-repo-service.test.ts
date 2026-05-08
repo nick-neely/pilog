@@ -1,0 +1,162 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { createInMemoryDatabase, type PilogDatabase } from '../db/client'
+import { runMigrations } from '../db/migrations'
+import { listRepos as listDbRepos } from '../db/repositories/repos'
+import type { GitHubRepo } from '@shared/ipc'
+
+vi.mock('./git', () => ({
+  isGitRepo: vi.fn(),
+  readLocalGitMetadata: vi.fn(),
+  parseGitHubOwnerRepo: vi.fn()
+}))
+
+vi.mock('../github/client', () => ({
+  getOctokitClient: vi.fn(),
+  listRepos: vi.fn()
+}))
+
+const mockGitHubRepo: GitHubRepo = {
+  id: 1,
+  name: 'pilog',
+  owner: 'nick-neely',
+  fullName: 'nick-neely/pilog',
+  url: 'https://github.com/nick-neely/pilog',
+  defaultBranch: 'main'
+}
+
+describe('local-repo-service', () => {
+  let db: PilogDatabase
+  let gitMock: { isGitRepo: ReturnType<typeof vi.fn>; readLocalGitMetadata: ReturnType<typeof vi.fn>; parseGitHubOwnerRepo: ReturnType<typeof vi.fn> }
+  let clientMock: { getOctokitClient: ReturnType<typeof vi.fn>; listRepos: ReturnType<typeof vi.fn> }
+  let service: typeof import('./local-repo-service')
+
+  beforeEach(async () => {
+    vi.resetModules()
+    db = createInMemoryDatabase()
+    runMigrations(db)
+
+    gitMock = await import('./git') as unknown as typeof gitMock
+    clientMock = await import('../github/client') as unknown as typeof clientMock
+    service = await import('./local-repo-service')
+  })
+
+  describe('detectLocalRepo', () => {
+    it('returns unauthenticated when no GitHub client', async () => {
+      clientMock.getOctokitClient.mockReturnValue(null)
+
+      const result = await service.detectLocalRepo('/some/path')
+      expect(result).toEqual({ state: 'unauthenticated' })
+    })
+
+    it('returns not-git for a non-git directory', async () => {
+      clientMock.getOctokitClient.mockReturnValue({})
+      gitMock.isGitRepo.mockResolvedValue(false)
+
+      const result = await service.detectLocalRepo('/not/a/git/dir')
+      expect(result).toEqual({ state: 'not-git' })
+    })
+
+    it('returns no-remote when git repo has no origin', async () => {
+      clientMock.getOctokitClient.mockReturnValue({})
+      gitMock.isGitRepo.mockResolvedValue(true)
+      gitMock.readLocalGitMetadata.mockResolvedValue(null)
+
+      const result = await service.detectLocalRepo('/git/repo/no/remote')
+      expect(result).toEqual({ state: 'no-remote' })
+    })
+
+    it('returns unmatched when remote does not match any GitHub repo', async () => {
+      clientMock.getOctokitClient.mockReturnValue({})
+      gitMock.isGitRepo.mockResolvedValue(true)
+      gitMock.readLocalGitMetadata.mockResolvedValue({
+        remoteUrl: 'https://github.com/other/project.git',
+        defaultBranch: 'main',
+        headSha: 'abc123'
+      })
+      gitMock.parseGitHubOwnerRepo.mockReturnValue({ owner: 'other', name: 'project' })
+      clientMock.listRepos.mockResolvedValue([mockGitHubRepo])
+
+      const result = await service.detectLocalRepo('/some/path')
+      expect(result).toEqual({ state: 'unmatched', remoteUrl: 'https://github.com/other/project.git' })
+    })
+
+    it('returns unmatched for a non-GitHub remote URL', async () => {
+      clientMock.getOctokitClient.mockReturnValue({})
+      gitMock.isGitRepo.mockResolvedValue(true)
+      gitMock.readLocalGitMetadata.mockResolvedValue({
+        remoteUrl: 'https://bitbucket.org/owner/repo.git',
+        defaultBranch: 'main',
+        headSha: 'abc123'
+      })
+      gitMock.parseGitHubOwnerRepo.mockReturnValue(null)
+      clientMock.listRepos.mockResolvedValue([mockGitHubRepo])
+
+      const result = await service.detectLocalRepo('/some/path')
+      expect(result).toEqual({ state: 'unmatched', remoteUrl: 'https://bitbucket.org/owner/repo.git' })
+    })
+
+    it('returns matched when remote matches a GitHub repo', async () => {
+      clientMock.getOctokitClient.mockReturnValue({})
+      gitMock.isGitRepo.mockResolvedValue(true)
+      gitMock.readLocalGitMetadata.mockResolvedValue({
+        remoteUrl: 'https://github.com/nick-neely/pilog.git',
+        defaultBranch: 'main',
+        headSha: 'deadbeef1234'
+      })
+      gitMock.parseGitHubOwnerRepo.mockReturnValue({ owner: 'nick-neely', name: 'pilog' })
+      clientMock.listRepos.mockResolvedValue([mockGitHubRepo])
+
+      const result = await service.detectLocalRepo('/projects/pilog')
+      expect(result).toEqual({
+        state: 'matched',
+        remoteUrl: 'https://github.com/nick-neely/pilog.git',
+        defaultBranch: 'main',
+        headSha: 'deadbeef1234',
+        githubRepo: mockGitHubRepo
+      })
+    })
+
+    it('matches case-insensitively', async () => {
+      clientMock.getOctokitClient.mockReturnValue({})
+      gitMock.isGitRepo.mockResolvedValue(true)
+      gitMock.readLocalGitMetadata.mockResolvedValue({
+        remoteUrl: 'https://github.com/NICK-NEELY/PILOG.git',
+        defaultBranch: 'main',
+        headSha: 'abc'
+      })
+      gitMock.parseGitHubOwnerRepo.mockReturnValue({ owner: 'NICK-NEELY', name: 'PILOG' })
+      clientMock.listRepos.mockResolvedValue([mockGitHubRepo])
+
+      const result = await service.detectLocalRepo('/projects/pilog')
+      expect(result.state).toBe('matched')
+    })
+  })
+
+  describe('linkRepo', () => {
+    it('persists a repo row and returns the Repo', () => {
+      const repo = service.linkRepo(db, {
+        localPath: '/projects/pilog',
+        githubRepo: mockGitHubRepo,
+        defaultBranch: 'main'
+      })
+
+      expect(repo.id).toBeDefined()
+      expect(repo.name).toBe('pilog')
+      expect(repo.owner).toBe('nick-neely')
+      expect(repo.localPath).toBe('/projects/pilog')
+      expect(repo.githubUrl).toBe('https://github.com/nick-neely/pilog')
+      expect(repo.defaultBranch).toBe('main')
+    })
+
+    it('is the only path that writes to the repos table', () => {
+      service.linkRepo(db, {
+        localPath: '/projects/pilog',
+        githubRepo: mockGitHubRepo,
+        defaultBranch: 'main'
+      })
+
+      const rows = listDbRepos(db)
+      expect(rows).toHaveLength(1)
+    })
+  })
+})
