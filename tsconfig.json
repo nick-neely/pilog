@@ -7,6 +7,8 @@
   // references) can resolve the @renderer/@shared aliases that components.json points at.
   "compilerOptions": {
     "baseUrl": ".",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
     "paths": {
       "@renderer/*": ["src/renderer/src/*"],
       "@shared/*": ["src/shared/*"]
