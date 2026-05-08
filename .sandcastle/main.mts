@@ -28,8 +28,8 @@ import type { AgentProvider, SandboxProvider } from '@ai-hero/sandcastle'
 import * as sandcastle from '@ai-hero/sandcastle'
 import { docker } from '@ai-hero/sandcastle/sandboxes/docker'
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, mkdtempSync, rmSync } from 'node:fs'
+import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 // ---------------------------------------------------------------------------
@@ -59,7 +59,34 @@ function agent(model: ClaudeModelRole = 'sonnet'): AgentProvider {
   return useCodex ? sandcastle.codex(CODEX_MODEL) : sandcastle.claudeCode(CLAUDE_MODELS[model])
 }
 
+function skillMounts() {
+  const mounts: Array<{ hostPath: string; sandboxPath: string; readonly: true }> = []
+  const hostHome = homedir()
+
+  // Claude Code skills.
+  if (existsSync(join(hostHome, '.claude/skills'))) {
+    mounts.push({
+      hostPath: '~/.claude/skills',
+      sandboxPath: '/home/agent/.claude/skills',
+      readonly: true
+    })
+  }
+
+  // Codex/agents skills.
+  if (existsSync(join(hostHome, '.agents/skills'))) {
+    mounts.push({
+      hostPath: '~/.agents/skills',
+      sandboxPath: '/home/agent/.agents/skills',
+      readonly: true
+    })
+  }
+
+  return mounts
+}
+
 function sandboxProvider(): SandboxProvider {
+  const sharedMounts = skillMounts()
+
   if (useCodex) {
     return docker({
       mounts: [
@@ -67,22 +94,16 @@ function sandboxProvider(): SandboxProvider {
           hostPath: '~/.codex',
           sandboxPath: '/home/agent/.codex-host',
           readonly: true
-        }
+        },
+        ...sharedMounts
       ]
     })
   }
 
-  // Expose host Claude Code skills (`~/.claude/skills`) so agents can invoke
-  // slash skills like `/impeccable` and `/shadcn` inside the container.
-  // Ensure that directory exists on the host before running Sandcastle.
+  // Expose host skills for both Claude Code and Codex/agents paths. Any
+  // missing host directory is skipped to avoid failing sandbox startup.
   return docker({
-    mounts: [
-      {
-        hostPath: '~/.claude/skills',
-        sandboxPath: '/home/agent/.claude/skills',
-        readonly: true
-      }
-    ]
+    mounts: sharedMounts
   })
 }
 
