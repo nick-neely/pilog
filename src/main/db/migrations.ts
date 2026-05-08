@@ -69,9 +69,10 @@ export function runMigrations(db: PilogDatabase): void {
 
   // If draft_id was previously NOT NULL, recreate the table to allow null
   // (needed for hand-written issues that have no parent issue_draft)
-  const cols = db.all(
-    sql`PRAGMA table_info(publish_log)`
-  ) as Array<{ name: string; notnull: number }>
+  const cols = db.all(sql`PRAGMA table_info(publish_log)`) as Array<{
+    name: string
+    notnull: number
+  }>
   const draftIdCol = cols.find((c) => c.name === 'draft_id')
   if (draftIdCol && draftIdCol.notnull === 1) {
     db.run(sql`ALTER TABLE publish_log RENAME TO publish_log_old`)

@@ -5,7 +5,13 @@ import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
 import { markdown } from '@codemirror/lang-markdown'
 import { syntaxHighlighting, defaultHighlightStyle } from '@codemirror/language'
 import { Button } from '@renderer/components/ui/button'
-import type { CreateIssueRequest, DetectLocalRepoResult, GitHubLabel, GitHubRepo, Repo } from '@shared/ipc'
+import type {
+  CreateIssueRequest,
+  DetectLocalRepoResult,
+  GitHubLabel,
+  GitHubRepo,
+  Repo
+} from '@shared/ipc'
 
 function useRepos(): {
   repos: Repo[]
@@ -161,7 +167,6 @@ function AddRepoFlow({ onLinked }: { onLinked: () => void }): React.JSX.Element 
 }
 
 type NewIssueState =
-  | { step: 'idle' }
   | { step: 'open'; labels: GitHubLabel[]; labelsLoading: boolean }
   | { step: 'submitting'; labels: GitHubLabel[] }
   | { step: 'success'; issueUrl: string }
@@ -177,7 +182,9 @@ function MarkdownEditor({
   const editorRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
   const onChangeRef = useRef(onChange)
-  onChangeRef.current = onChange
+  useEffect(() => {
+    onChangeRef.current = onChange
+  }, [onChange])
 
   useEffect(() => {
     if (!editorRef.current) return
@@ -226,30 +233,33 @@ function MarkdownEditor({
   )
 }
 
-function NewIssueModal({
-  repo,
-  onClose
-}: {
-  repo: Repo
-  onClose: () => void
-}): React.JSX.Element {
-  const [state, setState] = useState<NewIssueState>({ step: 'idle' })
+function NewIssueModal({ repo, onClose }: { repo: Repo; onClose: () => void }): React.JSX.Element {
+  const [state, setState] = useState<NewIssueState>({
+    step: 'open',
+    labels: [],
+    labelsLoading: true
+  })
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
   const [selectedLabels, setSelectedLabels] = useState<string[]>([])
 
-  const open = async (): Promise<void> => {
-    setState({ step: 'open', labels: [], labelsLoading: true })
-    try {
-      const labels = await window.pilog.invoke('github:listLabels', {
+  useEffect(() => {
+    let cancelled = false
+    window.pilog
+      .invoke('github:listLabels', {
         owner: repo.owner,
         repo: repo.name
       })
-      setState({ step: 'open', labels, labelsLoading: false })
-    } catch {
-      setState({ step: 'open', labels: [], labelsLoading: false })
+      .then((labels) => {
+        if (!cancelled) setState({ step: 'open', labels, labelsLoading: false })
+      })
+      .catch(() => {
+        if (!cancelled) setState({ step: 'open', labels: [], labelsLoading: false })
+      })
+    return (): void => {
+      cancelled = true
     }
-  }
+  }, [repo.owner, repo.name])
 
   const handleSubmit = async (): Promise<void> => {
     if (state.step !== 'open' && state.step !== 'error') return
@@ -285,16 +295,7 @@ function NewIssueModal({
     )
   }
 
-  if (state.step === 'idle') {
-    return (
-      <Button size="sm" variant="outline" onClick={open}>
-        New Issue
-      </Button>
-    )
-  }
-
   const isSubmitting = state.step === 'submitting'
-  // After the idle early-return above, state.step is 'open' | 'submitting' | 'success' | 'error'
   const labels = state.step !== 'success' ? state.labels : []
 
   return (
@@ -368,7 +369,9 @@ function NewIssueModal({
                         title={label.description ?? undefined}
                         className={[
                           'rounded-full px-2.5 py-0.5 text-xs font-medium transition-opacity',
-                          selected ? 'ring-2 ring-ring ring-offset-1' : 'opacity-60 hover:opacity-90',
+                          selected
+                            ? 'ring-2 ring-ring ring-offset-1'
+                            : 'opacity-60 hover:opacity-90',
                           'disabled:cursor-not-allowed'
                         ].join(' ')}
                         style={{
@@ -392,11 +395,7 @@ function NewIssueModal({
               <Button variant="ghost" size="sm" onClick={onClose} disabled={isSubmitting}>
                 Cancel
               </Button>
-              <Button
-                size="sm"
-                onClick={handleSubmit}
-                disabled={isSubmitting || !title.trim()}
-              >
+              <Button size="sm" onClick={handleSubmit} disabled={isSubmitting || !title.trim()}>
                 {isSubmitting ? 'Publishing…' : 'Publish issue'}
               </Button>
             </div>
@@ -423,7 +422,9 @@ function RepoRow({
           <p className="text-sm font-medium">
             {repo.owner}/{repo.name}
           </p>
-          <p className="mt-0.5 truncate font-mono text-xs text-muted-foreground">{repo.localPath}</p>
+          <p className="mt-0.5 truncate font-mono text-xs text-muted-foreground">
+            {repo.localPath}
+          </p>
           {repo.defaultBranch && (
             <p className="text-xs text-muted-foreground">
               Branch: <span className="font-mono">{repo.defaultBranch}</span>
@@ -439,9 +440,7 @@ function RepoRow({
           </Button>
         </div>
       </div>
-      {showNewIssue && (
-        <NewIssueModal repo={repo} onClose={() => setShowNewIssue(false)} />
-      )}
+      {showNewIssue && <NewIssueModal repo={repo} onClose={() => setShowNewIssue(false)} />}
     </>
   )
 }

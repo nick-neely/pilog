@@ -38,10 +38,7 @@ export function recordPublish(
   }
 }
 
-export function listPublishLog(
-  db: PilogDatabase,
-  filter: { repoId: string }
-): PublishLogEntry[] {
+export function listPublishLog(db: PilogDatabase, filter: { repoId: string }): PublishLogEntry[] {
   return db
     .select(publishLogColumns)
     .from(publishLog)

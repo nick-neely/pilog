@@ -22,12 +22,9 @@ export function registerGitHubIpcHandlers(
     return getGitHubStatus()
   })
 
-  ipcMain.handle(
-    'github:listLabels',
-    (_event, request: { owner: string; repo: string }) => {
-      return listLabels(request.owner, request.repo)
-    }
-  )
+  ipcMain.handle('github:listLabels', (_event, request: { owner: string; repo: string }) => {
+    return listLabels(request.owner, request.repo)
+  })
 
   ipcMain.handle('github:createIssue', async (_event, request: CreateIssueRequest) => {
     const result = await createIssue(request.owner, request.repo, {
@@ -42,7 +39,10 @@ export function registerGitHubIpcHandlers(
       githubIssueUrl: result.url
     })
 
-    await shell.openExternal(result.url)
+    const scheme = new URL(result.url).protocol
+    if (scheme === 'https:' || scheme === 'http:') {
+      await shell.openExternal(result.url)
+    }
 
     return result
   })

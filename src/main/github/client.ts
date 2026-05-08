@@ -1,7 +1,7 @@
 import { Octokit } from '@octokit/rest'
 import { getStoredToken } from './auth'
 import type { GitHubRepo, GitHubLabel } from '@shared/ipc'
-import log from '../lib/log'
+import { log } from '../lib/log'
 
 let cachedClient: Octokit | null = null
 let cachedToken: string | null = null
@@ -101,11 +101,7 @@ export async function createIssue(
   })
 }
 
-async function withRetry<T>(
-  fn: () => Promise<T>,
-  maxRetries = 3,
-  delayMs = 100
-): Promise<T> {
+async function withRetry<T>(fn: () => Promise<T>, maxRetries = 3, delayMs = 100): Promise<T> {
   let lastError: unknown
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
