@@ -117,12 +117,19 @@ type PlannedIssue = {
   id: string
   title: string
   branch: string
-  implementationModel?: ClaudeModelRole
+  implementationModel?: string
   implementationModelReason?: string
 }
 
 function implementationModelFor(issue: PlannedIssue): ClaudeModelRole {
   return issue.implementationModel === 'opus' ? 'opus' : 'sonnet'
+}
+
+function executionModelLabel(issue: PlannedIssue): string {
+  if (useCodex) {
+    return CODEX_MODEL
+  }
+  return implementationModelFor(issue)
 }
 
 function needsOpusForMerge(branches: string[]): boolean {
@@ -150,14 +157,24 @@ function needsOpusForMerge(branches: string[]): boolean {
           stdio: 'pipe'
         })
       } catch {
-        console.log(`Merge preflight found conflicts while checking ${branch}; using Opus.`)
+        if (useCodex) {
+          console.log(
+            `Merge preflight found conflicts while checking ${branch}; continuing with ${CODEX_MODEL}.`
+          )
+        } else {
+          console.log(`Merge preflight found conflicts while checking ${branch}; using Opus.`)
+        }
         return true
       }
     }
 
     return false
   } catch {
-    console.log('Merge preflight could not complete cleanly; using Opus.')
+    if (useCodex) {
+      console.log(`Merge preflight could not complete cleanly; continuing with ${CODEX_MODEL}.`)
+    } else {
+      console.log('Merge preflight could not complete cleanly; using Opus.')
+    }
     return true
   } finally {
     try {
@@ -192,7 +209,15 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
     // not write code.
     maxIterations: 1,
     agent: agent('sonnet'),
-    promptFile: './.sandcastle/plan-prompt.md'
+    promptFile: './.sandcastle/plan-prompt.md',
+    promptArgs: {
+      IMPLEMENTATION_SELECTION_POLICY: useCodex
+        ? `Set "implementationModel" to "${CODEX_MODEL}" for every issue (single-model Codex mode).`
+        : 'Use "sonnet" by default. Use "opus" only when the issue is architecturally risky, cross-cutting, security-sensitive, likely to touch unfamiliar core abstractions, likely to require a data migration, or explicitly asks for deeper implementation reasoning.',
+      PLAN_OUTPUT_EXAMPLE: useCodex
+        ? `{"issues": [{"id": "42", "title": "Fix auth bug", "branch": "sandcastle/issue-42-fix-auth-bug", "implementationModel": "${CODEX_MODEL}", "implementationModelReason": "Codex single-model mode for this run."}]}`
+        : '{"issues": [{"id": "42", "title": "Fix auth bug", "branch": "sandcastle/issue-42-fix-auth-bug", "implementationModel": "sonnet", "implementationModelReason": "Small localized bug fix."}]}'
+    }
   })
 
   // Extract the <plan>…</plan> block from the agent's stdout.
@@ -212,8 +237,8 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
 
   console.log(`Planning complete. ${issues.length} issue(s) to work in parallel:`)
   for (const issue of issues) {
-    const implementationModel = implementationModelFor(issue)
-    console.log(`  ${issue.id}: ${issue.title} → ${issue.branch} (${implementationModel})`)
+    const modelLabel = executionModelLabel(issue)
+    console.log(`  ${issue.id}: ${issue.title} → ${issue.branch} (${modelLabel})`)
   }
 
   // -------------------------------------------------------------------------
@@ -238,6 +263,10 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
       try {
         // Run the implementer
         const implementationModel = implementationModelFor(issue)
+        const implementationModelLabel = executionModelLabel(issue)
+        const implementationModelReason = useCodex
+          ? `Codex mode uses a single model (${CODEX_MODEL}) for implementation and review.`
+          : issue.implementationModelReason ?? 'Default implementation model.'
         const implement = await sandbox.run({
           name: 'implementer',
           maxIterations: 100,
@@ -247,9 +276,8 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
             TASK_ID: issue.id,
             ISSUE_TITLE: issue.title,
             BRANCH: issue.branch,
-            IMPLEMENTATION_MODEL: implementationModel,
-            IMPLEMENTATION_MODEL_REASON:
-              issue.implementationModelReason ?? 'Default implementation model.'
+            IMPLEMENTATION_MODEL: implementationModelLabel,
+            IMPLEMENTATION_MODEL_REASON: implementationModelReason
           }
         })
 

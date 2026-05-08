@@ -26,8 +26,7 @@ For each unblocked issue, assign a branch name using the format `sandcastle/issu
 
 For each unblocked issue, choose an implementation model:
 
-- Use `"sonnet"` by default.
-- Use `"opus"` only when the issue is architecturally risky, cross-cutting, security-sensitive, likely to touch unfamiliar core abstractions, likely to require a data migration, or explicitly asks for deeper implementation reasoning.
+- {{IMPLEMENTATION_SELECTION_POLICY}}
 
 Include a short `implementationModelReason` explaining the choice.
 
@@ -36,7 +35,7 @@ Include a short `implementationModelReason` explaining the choice.
 Output your plan as a JSON object wrapped in `<plan>` tags:
 
 <plan>
-{"issues": [{"id": "42", "title": "Fix auth bug", "branch": "sandcastle/issue-42-fix-auth-bug", "implementationModel": "sonnet", "implementationModelReason": "Small localized bug fix."}]}
+{{PLAN_OUTPUT_EXAMPLE}}
 </plan>
 
 Include only unblocked issues. If every issue is blocked, include the single highest-priority candidate (the one with the fewest or weakest dependencies).
