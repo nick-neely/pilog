@@ -43,7 +43,7 @@ export async function readLocalGitMetadata(localPath: string): Promise<LocalGitM
 export function parseGitHubOwnerRepo(remoteUrl: string): { owner: string; name: string } | null {
   // HTTPS: https://github.com/owner/repo.git  or  https://github.com/owner/repo
   // SSH:   git@github.com:owner/repo.git      or  git@github.com:owner/repo
-  const httpsMatch = remoteUrl.match(/github\.com[/:]([\w.-]+)\/([\w.-]+?)(?:\.git)?$/)
-  if (!httpsMatch) return null
-  return { owner: httpsMatch[1], name: httpsMatch[2] }
+  const match = remoteUrl.match(/github\.com[/:]([\w.-]+)\/([\w.-]+?)(?:\.git)?$/)
+  if (!match) return null
+  return { owner: match[1], name: match[2] }
 }

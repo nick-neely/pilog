@@ -1,5 +1,6 @@
 import { ipcMain, dialog, BrowserWindow } from 'electron'
 import type { PilogDatabase } from '../db/client'
+import type { LinkRepoRequest } from '@shared/ipc'
 import { listRepos, deleteRepo } from '../db/repositories/repos'
 import { detectLocalRepo, linkRepo } from '../repos/local-repo-service'
 
@@ -12,7 +13,7 @@ export function registerRepoIpcHandlers(db: PilogDatabase): void {
     return detectLocalRepo(request.localPath)
   })
 
-  ipcMain.handle('repos:link', (_event, request) => {
+  ipcMain.handle('repos:link', (_event, request: LinkRepoRequest) => {
     return linkRepo(db, request)
   })
 
@@ -21,10 +22,11 @@ export function registerRepoIpcHandlers(db: PilogDatabase): void {
   })
 
   ipcMain.handle('dialog:openDirectory', async (event) => {
-    const win = BrowserWindow.fromWebContents(event.sender) ?? undefined
-    const result = await dialog.showOpenDialog(win!, {
-      properties: ['openDirectory']
-    })
+    const win = BrowserWindow.fromWebContents(event.sender)
+    const options = { properties: ['openDirectory'] as const }
+    const result = win
+      ? await dialog.showOpenDialog(win, options)
+      : await dialog.showOpenDialog(options)
     if (result.canceled || result.filePaths.length === 0) return null
     return result.filePaths[0]
   })

@@ -42,7 +42,13 @@ export type DetectLocalRepoResult =
   | { state: 'not-git' }
   | { state: 'no-remote' }
   | { state: 'unmatched'; remoteUrl: string }
-  | { state: 'matched'; remoteUrl: string; defaultBranch: string; headSha: string; githubRepo: GitHubRepo }
+  | {
+      state: 'matched'
+      remoteUrl: string
+      defaultBranch: string
+      headSha: string
+      githubRepo: GitHubRepo
+    }
 
 export type LinkRepoRequest = {
   localPath: string

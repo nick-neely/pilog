@@ -14,8 +14,8 @@ function useRepos(): {
   }, [])
 
   useEffect(() => {
-    reload()
-  }, [reload])
+    window.pilog.invoke('repos:list').then(setRepos)
+  }, [])
 
   return { repos, reload }
 }
@@ -24,7 +24,6 @@ type AddRepoState =
   | { step: 'idle' }
   | { step: 'detecting'; localPath: string }
   | { step: 'result'; localPath: string; result: DetectLocalRepoResult }
-  | { step: 'confirming'; localPath: string; githubRepo: GitHubRepo; defaultBranch: string }
   | { step: 'linking' }
 
 function DetectResultInline({
@@ -133,8 +132,7 @@ function AddRepoFlow({ onLinked }: { onLinked: () => void }): React.JSX.Element 
 
       {state.step === 'detecting' && (
         <p className="text-sm text-muted-foreground">
-          Detecting{' '}
-          <span className="font-mono text-xs">{state.localPath}</span>…
+          Detecting <span className="font-mono text-xs">{state.localPath}</span>…
         </p>
       )}
 
@@ -157,7 +155,13 @@ function AddRepoFlow({ onLinked }: { onLinked: () => void }): React.JSX.Element 
   )
 }
 
-function RepoRow({ repo, onUnlink }: { repo: Repo; onUnlink: (id: string) => void }): React.JSX.Element {
+function RepoRow({
+  repo,
+  onUnlink
+}: {
+  repo: Repo
+  onUnlink: (id: string) => void
+}): React.JSX.Element {
   return (
     <div className="flex items-center justify-between rounded-md border px-4 py-3">
       <div className="min-w-0 flex-1">

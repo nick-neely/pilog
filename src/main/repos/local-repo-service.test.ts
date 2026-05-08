@@ -26,8 +26,15 @@ const mockGitHubRepo: GitHubRepo = {
 
 describe('local-repo-service', () => {
   let db: PilogDatabase
-  let gitMock: { isGitRepo: ReturnType<typeof vi.fn>; readLocalGitMetadata: ReturnType<typeof vi.fn>; parseGitHubOwnerRepo: ReturnType<typeof vi.fn> }
-  let clientMock: { getOctokitClient: ReturnType<typeof vi.fn>; listRepos: ReturnType<typeof vi.fn> }
+  let gitMock: {
+    isGitRepo: ReturnType<typeof vi.fn>
+    readLocalGitMetadata: ReturnType<typeof vi.fn>
+    parseGitHubOwnerRepo: ReturnType<typeof vi.fn>
+  }
+  let clientMock: {
+    getOctokitClient: ReturnType<typeof vi.fn>
+    listRepos: ReturnType<typeof vi.fn>
+  }
   let service: typeof import('./local-repo-service')
 
   beforeEach(async () => {
@@ -35,8 +42,8 @@ describe('local-repo-service', () => {
     db = createInMemoryDatabase()
     runMigrations(db)
 
-    gitMock = await import('./git') as unknown as typeof gitMock
-    clientMock = await import('../github/client') as unknown as typeof clientMock
+    gitMock = (await import('./git')) as unknown as typeof gitMock
+    clientMock = (await import('../github/client')) as unknown as typeof clientMock
     service = await import('./local-repo-service')
   })
 
@@ -77,7 +84,10 @@ describe('local-repo-service', () => {
       clientMock.listRepos.mockResolvedValue([mockGitHubRepo])
 
       const result = await service.detectLocalRepo('/some/path')
-      expect(result).toEqual({ state: 'unmatched', remoteUrl: 'https://github.com/other/project.git' })
+      expect(result).toEqual({
+        state: 'unmatched',
+        remoteUrl: 'https://github.com/other/project.git'
+      })
     })
 
     it('returns unmatched for a non-GitHub remote URL', async () => {
@@ -92,7 +102,10 @@ describe('local-repo-service', () => {
       clientMock.listRepos.mockResolvedValue([mockGitHubRepo])
 
       const result = await service.detectLocalRepo('/some/path')
-      expect(result).toEqual({ state: 'unmatched', remoteUrl: 'https://bitbucket.org/owner/repo.git' })
+      expect(result).toEqual({
+        state: 'unmatched',
+        remoteUrl: 'https://bitbucket.org/owner/repo.git'
+      })
     })
 
     it('returns matched when remote matches a GitHub repo', async () => {

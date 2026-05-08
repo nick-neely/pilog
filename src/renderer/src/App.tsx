@@ -18,7 +18,12 @@ function App(): React.JSX.Element {
   }, [])
 
   if (route === 'settings') {
-    return <Settings onBack={() => setRoute('inbox')} onNavigateRepositories={() => setRoute('repositories')} />
+    return (
+      <Settings
+        onBack={() => setRoute('inbox')}
+        onNavigateRepositories={() => setRoute('repositories')}
+      />
+    )
   }
 
   if (route === 'repositories') {
