@@ -4,6 +4,7 @@ export type Note = {
   id: string
   content: string
   status: NoteStatus
+  repoId: string | null
   createdAt: string
   updatedAt: string
 }
@@ -11,9 +12,10 @@ export type Note = {
 export type ListNotesRequest = {
   status?: NoteStatus
   search?: string
+  repoId?: string | null
 }
 
-export type SettingKey = 'hotkey.scratchpad' | 'openInboxAtLogin'
+export type SettingKey = 'hotkey.scratchpad' | 'openInboxAtLogin' | 'scratchpad.lastRepoId'
 
 export type GitHubStatus = { connected: boolean; login?: string }
 
@@ -57,9 +59,9 @@ export type LinkRepoRequest = {
 }
 
 export type IpcContract = {
-  'note:create': { request: { content: string }; response: Note }
+  'note:create': { request: { content: string; repoId?: string | null }; response: Note }
   'note:list': { request: ListNotesRequest | void; response: Note[] }
-  'note:update': { request: { id: string; content: string }; response: Note | null }
+  'note:update': { request: { id: string; content: string; repoId?: string | null }; response: Note | null }
   'note:delete': { request: { id: string }; response: boolean }
   'setting:get': { request: { key: SettingKey }; response: string | null }
   'setting:set': { request: { key: SettingKey; value: string }; response: void }

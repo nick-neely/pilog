@@ -30,7 +30,7 @@ function App(): React.JSX.Element {
     return <Repositories onBack={() => setRoute('settings')} />
   }
 
-  return <Inbox />
+  return <Inbox onNavigateToRepositories={() => setRoute('repositories')} />
 }
 
 export default App

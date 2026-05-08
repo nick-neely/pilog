@@ -167,4 +167,85 @@ describe('notes repository', () => {
       expect(() => updateNoteStatus(db, 'nonexistent-id', 'drafted')).toThrow()
     })
   })
+
+  describe('repoId support', () => {
+    it('createNote stores repoId when provided', () => {
+      const note = createNote(db, { content: 'repo note', repoId: 'repo-123' })
+      expect(note.repoId).toBe('repo-123')
+    })
+
+    it('createNote stores null repoId when not provided', () => {
+      const note = createNote(db, { content: 'no repo note' })
+      expect(note.repoId).toBeNull()
+    })
+
+    it('createNote stores null repoId when explicitly null', () => {
+      const note = createNote(db, { content: 'null repo', repoId: null })
+      expect(note.repoId).toBeNull()
+    })
+
+    it('listNotes returns repoId on each note', () => {
+      createNote(db, { content: 'with repo', repoId: 'repo-abc' })
+      createNote(db, { content: 'without repo' })
+      const result = listNotes(db)
+      expect(result).toHaveLength(2)
+      const withRepo = result.find((n) => n.content === 'with repo')
+      const withoutRepo = result.find((n) => n.content === 'without repo')
+      expect(withRepo?.repoId).toBe('repo-abc')
+      expect(withoutRepo?.repoId).toBeNull()
+    })
+
+    it('listNotes filters by specific repoId', () => {
+      createNote(db, { content: 'repo A note', repoId: 'repo-A' })
+      createNote(db, { content: 'repo B note', repoId: 'repo-B' })
+      createNote(db, { content: 'unassigned note' })
+
+      const result = listNotes(db, { repoId: 'repo-A' })
+      expect(result).toHaveLength(1)
+      expect(result[0].content).toBe('repo A note')
+    })
+
+    it('listNotes with repoId: null returns only unassigned notes', () => {
+      createNote(db, { content: 'has repo', repoId: 'repo-X' })
+      createNote(db, { content: 'unassigned 1' })
+      createNote(db, { content: 'unassigned 2' })
+
+      const result = listNotes(db, { repoId: null })
+      expect(result).toHaveLength(2)
+      expect(result.every((n) => n.repoId === null)).toBe(true)
+    })
+
+    it('listNotes combines repoId filter with status filter', () => {
+      const a = createNote(db, { content: 'A drafted repo-1', repoId: 'repo-1' })
+      createNote(db, { content: 'B unprocessed repo-1', repoId: 'repo-1' })
+      createNote(db, { content: 'C drafted repo-2', repoId: 'repo-2' })
+      updateNoteStatus(db, a.id, 'drafted')
+
+      const result = listNotes(db, { repoId: 'repo-1', status: 'drafted' })
+      expect(result).toHaveLength(1)
+      expect(result[0].content).toBe('A drafted repo-1')
+    })
+
+    it('updateNote can set a repoId', () => {
+      const note = createNote(db, { content: 'to update' })
+      expect(note.repoId).toBeNull()
+
+      const updated = updateNote(db, { id: note.id, content: 'to update', repoId: 'repo-set' })
+      expect(updated?.repoId).toBe('repo-set')
+    })
+
+    it('updateNote can clear a repoId to null', () => {
+      const note = createNote(db, { content: 'clear repo', repoId: 'repo-old' })
+
+      const updated = updateNote(db, { id: note.id, content: 'clear repo', repoId: null })
+      expect(updated?.repoId).toBeNull()
+    })
+
+    it('updateNote without repoId does not change existing repoId', () => {
+      const note = createNote(db, { content: 'keep repo', repoId: 'repo-keep' })
+
+      const updated = updateNote(db, { id: note.id, content: 'keep repo updated' })
+      expect(updated?.repoId).toBe('repo-keep')
+    })
+  })
 })

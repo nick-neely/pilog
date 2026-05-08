@@ -1,4 +1,4 @@
-import { and, desc, eq, like, sql, type SQLWrapper } from 'drizzle-orm'
+import { and, desc, eq, isNull, like, sql, type SQLWrapper } from 'drizzle-orm'
 import { v4 as uuidv4 } from 'uuid'
 import type { PilogDatabase } from '../client'
 import { notes } from '../schema'
@@ -8,25 +8,31 @@ const noteColumns = {
   id: notes.id,
   content: notes.content,
   status: notes.status,
+  repoId: notes.repoId,
   createdAt: notes.createdAt,
   updatedAt: notes.updatedAt
 } as const
 
-export function createNote(db: PilogDatabase, input: { content: string }): Note {
+export function createNote(
+  db: PilogDatabase,
+  input: { content: string; repoId?: string | null }
+): Note {
   const now = new Date().toISOString()
   const id = uuidv4()
+  const repoId = input.repoId ?? null
 
   db.insert(notes)
     .values({
       id,
       content: input.content,
       status: 'unprocessed',
+      repoId,
       createdAt: now,
       updatedAt: now
     })
     .run()
 
-  return { id, content: input.content, status: 'unprocessed', createdAt: now, updatedAt: now }
+  return { id, content: input.content, status: 'unprocessed', repoId, createdAt: now, updatedAt: now }
 }
 
 export function listNotes(db: PilogDatabase, filter?: ListNotesRequest): Note[] {
@@ -38,6 +44,15 @@ export function listNotes(db: PilogDatabase, filter?: ListNotesRequest): Note[] 
 
   if (filter?.search) {
     conditions.push(like(notes.content, `%${filter.search}%`))
+  }
+
+  // repoId: null → only unassigned; repoId: string → specific repo; undefined → all
+  if (filter !== undefined && 'repoId' in filter) {
+    if (filter.repoId === null) {
+      conditions.push(isNull(notes.repoId))
+    } else if (filter.repoId !== undefined) {
+      conditions.push(eq(notes.repoId, filter.repoId))
+    }
   }
 
   const query = db.select(noteColumns).from(notes)
@@ -60,20 +75,24 @@ export function updateNoteStatus(db: PilogDatabase, id: string, status: NoteStat
   return row
 }
 
-export function updateNote(db: PilogDatabase, input: { id: string; content: string }): Note | null {
+export function updateNote(
+  db: PilogDatabase,
+  input: { id: string; content: string; repoId?: string | null }
+): Note | null {
   const now = new Date().toISOString()
+
+  const patch: Partial<typeof notes.$inferInsert> = { content: input.content, updatedAt: now }
+
+  // Only update repoId when caller explicitly passes it (undefined = leave unchanged)
+  if ('repoId' in input) {
+    patch.repoId = input.repoId ?? null
+  }
 
   const row = db
     .update(notes)
-    .set({ content: input.content, updatedAt: now })
+    .set(patch)
     .where(eq(notes.id, input.id))
-    .returning({
-      id: notes.id,
-      content: notes.content,
-      status: notes.status,
-      createdAt: notes.createdAt,
-      updatedAt: notes.updatedAt
-    })
+    .returning(noteColumns)
     .get()
 
   return row ?? null

@@ -29,7 +29,7 @@ import {
   CommandSeparator,
   CommandShortcut
 } from '@renderer/components/ui/command'
-import type { ListNotesRequest, Note, NoteStatus } from '@shared/ipc'
+import type { ListNotesRequest, Note, NoteStatus, Repo } from '@shared/ipc'
 
 const STATUS_CHIPS: { value: NoteStatus; label: string }[] = [
   { value: 'unprocessed', label: 'Unprocessed' },
@@ -73,21 +73,50 @@ function useDebounce(value: string, ms: number): string {
   return debounced
 }
 
-function buildFilter(status: NoteStatus | undefined, search: string): ListNotesRequest | undefined {
+// repoFilter encoding for <select> values:
+//   ''            → undefined (All repos — no filter)
+//   '$unassigned' → null      (only notes with no repo)
+//   repo.id       → repo.id   (specific repo)
+const UNASSIGNED_KEY = '$unassigned'
+
+function encodeRepoFilter(f: string | null | undefined): string {
+  if (f === undefined) return ''
+  if (f === null) return UNASSIGNED_KEY
+  return f
+}
+
+function decodeRepoFilter(v: string): string | null | undefined {
+  if (v === '') return undefined
+  if (v === UNASSIGNED_KEY) return null
+  return v
+}
+
+function buildFilter(
+  status: NoteStatus | undefined,
+  search: string,
+  repoFilter: string | null | undefined
+): ListNotesRequest | undefined {
   const filter: ListNotesRequest = {}
   if (status) filter.status = status
   if (search) filter.search = search
+  if (repoFilter !== undefined) filter.repoId = repoFilter
   return Object.keys(filter).length > 0 ? filter : undefined
 }
 
 function NoteDetail({
   note,
+  repos,
   onSave,
-  onDelete
+  onDelete,
+  onRepoChange,
+  onNavigateToRepositories
 }: {
   note: Note
+  repos: Repo[]
   onSave: (id: string, content: string) => Promise<void>
   onDelete: (id: string) => Promise<void>
+  onRepoChange: (id: string, repoId: string | null) => Promise<void>
+  onNavigateToRepositories: () => void
 }): React.JSX.Element {
   const [draft, setDraft] = useState(note.content)
   const dirty = draft !== note.content
@@ -155,13 +184,51 @@ function NoteDetail({
           autoFocus
         />
       </div>
+      {/* Repo association — below the content area */}
+      <footer className="border-t px-6 py-3">
+        <div className="flex items-center gap-3">
+          <span className="text-xs font-medium text-muted-foreground">Repo</span>
+          {repos.length === 0 ? (
+            <span className="text-xs text-muted-foreground">
+              No repos linked —{' '}
+              <button
+                type="button"
+                onClick={onNavigateToRepositories}
+                className="text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30 rounded"
+              >
+                link one in Repositories
+              </button>
+            </span>
+          ) : (
+            <select
+              aria-label="Repository"
+              value={note.repoId ?? ''}
+              onChange={(e) => void onRepoChange(note.id, e.target.value || null)}
+              className="rounded border border-border bg-background px-2 py-1 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-ring/30"
+            >
+              <option value="">Unassigned</option>
+              {repos.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.owner}/{r.name}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
+      </footer>
     </article>
   )
 }
 
-export function Inbox(): React.JSX.Element {
+export function Inbox({
+  onNavigateToRepositories
+}: {
+  onNavigateToRepositories: () => void
+}): React.JSX.Element {
   const [notes, setNotes] = useState<Note[]>([])
+  const [repos, setRepos] = useState<Repo[]>([])
   const [statusFilter, setStatusFilter] = useState<NoteStatus | undefined>()
+  const [repoFilter, setRepoFilter] = useState<string | null | undefined>(undefined)
   const [commandOpen, setCommandOpen] = useState(false)
   const [paletteQuery, setPaletteQuery] = useState('')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -174,11 +241,18 @@ export function Inbox(): React.JSX.Element {
   // palette's job is jump-to-result and command-running.
   const debouncedPaletteQuery = useDebounce(paletteQuery, 200)
 
+  // Lookup map for note rows to show repo name without a linear search
+  const reposById = useMemo(() => new Map(repos.map((r) => [r.id, r])), [repos])
+
+  useEffect(() => {
+    window.pilog.invoke('repos:list').then(setRepos)
+  }, [])
+
   const fetchNotes = useCallback(async (): Promise<void> => {
     const id = ++fetchIdRef.current
     const result = await window.pilog.invoke(
       'note:list',
-      buildFilter(statusFilter, debouncedPaletteQuery)
+      buildFilter(statusFilter, debouncedPaletteQuery, repoFilter)
     )
     if (id !== fetchIdRef.current) return
     setNotes(result)
@@ -187,7 +261,7 @@ export function Inbox(): React.JSX.Element {
       const next = new Set([...prev].filter((rid) => validIds.has(rid)))
       return next.size === prev.size ? prev : next
     })
-  }, [statusFilter, debouncedPaletteQuery])
+  }, [statusFilter, debouncedPaletteQuery, repoFilter])
 
   useEffect(() => {
     fetchNotes()
@@ -219,6 +293,13 @@ export function Inbox(): React.JSX.Element {
       next.delete(id)
       return next
     })
+    await fetchNotes()
+  }
+
+  const handleRepoChange = async (id: string, repoId: string | null): Promise<void> => {
+    const note = notes.find((n) => n.id === id)
+    if (!note) return
+    await window.pilog.invoke('note:update', { id, content: note.content, repoId })
     await fetchNotes()
   }
 
@@ -309,11 +390,11 @@ export function Inbox(): React.JSX.Element {
   }, [commandOpen, setPaletteOpen, selectedIds.size, clearSelection])
 
   const emptyMessage = useMemo(() => {
-    const filtered = Boolean(statusFilter || debouncedPaletteQuery)
+    const filtered = Boolean(statusFilter || debouncedPaletteQuery || repoFilter !== undefined)
     return filtered
       ? 'No notes match the current filters.'
       : 'No notes yet. Capture a thought from the footer below.'
-  }, [statusFilter, debouncedPaletteQuery])
+  }, [statusFilter, debouncedPaletteQuery, repoFilter])
 
   const runCommand = (action: () => void): void => {
     setPaletteOpen(false)
@@ -330,7 +411,7 @@ export function Inbox(): React.JSX.Element {
         contained instead of bleeding into the detail pane (the bug from the
         first polish pass). The sidebar is structured as four regions:
           (1) title strip with capture-mode count or triage-mode badge
-          (2) filter rail (single-row tab-like chips)
+          (2) filter rail (single-row tab-like chips + repo dropdown)
           (3) scrolling list (the only region that grows)
           (4) mode footer that swaps capture <-> triage
         The Cmd+K palette absorbs search and discovery so the chrome above
@@ -383,7 +464,7 @@ export function Inbox(): React.JSX.Element {
           </button>
         </header>
 
-        {/* (2) Filter rail — single row, wraps if needed */}
+        {/* (2) Filter rail — status chips + repo dropdown */}
         <div className="flex flex-wrap items-center gap-1.5 border-b px-6 py-2.5">
           {STATUS_CHIPS.map((chip) => {
             const active = statusFilter === chip.value
@@ -414,6 +495,27 @@ export function Inbox(): React.JSX.Element {
               </button>
             )
           })}
+          {/* Repo filter — right-aligned, complements the status chips */}
+          <select
+            aria-label="Filter by repository"
+            data-testid="filter-repo"
+            value={encodeRepoFilter(repoFilter)}
+            onChange={(e) => {
+              setRepoFilter(decodeRepoFilter(e.target.value))
+              setSelectedIds(new Set())
+              lastClickedIndex.current = null
+            }}
+            disabled={repos.length === 0}
+            className="ml-auto rounded border border-border bg-transparent px-2 py-0.5 text-xs text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/30 disabled:opacity-40"
+          >
+            <option value="">All repos</option>
+            <option value={UNASSIGNED_KEY}>Unassigned</option>
+            {repos.map((r) => (
+              <option key={r.id} value={r.id}>
+                {r.owner}/{r.name}
+              </option>
+            ))}
+          </select>
         </div>
 
         {/* (3) Scrolling list */}
@@ -425,6 +527,7 @@ export function Inbox(): React.JSX.Element {
               {notes.map((note, index) => {
                 const isSelected = selectedIds.has(note.id)
                 const preview = note.content.trim() || 'Untitled note'
+                const repo = note.repoId ? reposById.get(note.repoId) : undefined
                 return (
                   <li
                     key={note.id}
@@ -443,6 +546,11 @@ export function Inbox(): React.JSX.Element {
                         <span className="rounded-md bg-secondary px-1.5 py-0.5 text-xs font-medium text-foreground/80">
                           {STATUS_LABEL[note.status]}
                         </span>
+                        {repo && (
+                          <span className="truncate font-mono text-xs text-muted-foreground/70">
+                            {repo.owner}/{repo.name}
+                          </span>
+                        )}
                         <span className="tabular text-muted-foreground">
                           {formatNoteTimestamp(note.createdAt)}
                         </span>
@@ -507,8 +615,11 @@ export function Inbox(): React.JSX.Element {
           <NoteDetail
             key={selectedNote.id}
             note={selectedNote}
+            repos={repos}
             onSave={handleSave}
             onDelete={handleDelete}
+            onRepoChange={handleRepoChange}
+            onNavigateToRepositories={onNavigateToRepositories}
           />
         ) : (
           <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
