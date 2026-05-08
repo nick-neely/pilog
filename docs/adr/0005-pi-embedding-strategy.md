@@ -27,6 +27,7 @@ The decision has eight components.
 Pi's `Agent` is constructed and driven inside `src/main/pi/runtime.ts`, in the same Node context as DB writes and IPC handlers. No child process, no JSON-RPC over stdio.
 
 Rationale:
+
 - `pi-agent-core` is pure JavaScript, HTTP-bound, and has no native dependencies that would force an Electron native rebuild. The classic "different runtime" reason for child-process isolation does not apply.
 - Issue #12's contract `runAgent(input): AsyncIterable<AgentEvent>` maps 1:1 onto Pi's `agent.subscribe(callback)`. Going through stdio JSON-RPC would add a serialize/parse layer for no behavioral gain.
 - BYOK secret hygiene is _easier_ in-process: the API key lives in main's heap and is handed to Pi as a function return. Out-of-process means env vars (visible in `/proc/<pid>/environ`), a config file (a new credential-on-disk problem), or a credential-request RPC (more complexity).
@@ -43,6 +44,7 @@ PiLog imports `Agent` and `AgentLoopConfig` from `@earendil-works/pi-agent-core`
 Structured output uses the **exit-tool pattern**: PiLog registers a tool named `submit_issue_drafts` whose parameters carry the `GeneratedIssueDraft[]` schema from PRD §10 verbatim. Pi enforces the parameter schema (TypeBox) at call time, so the agent literally cannot emit off-schema output that reaches persistence. The first call to `submit_issue_drafts` is the run's result; the agent loop terminates after that turn.
 
 Rationale:
+
 - The exit-tool contract collapses validation: Pi's parameter check and PiLog's persistence-side Zod check are the same schema, applied once.
 - The agent is **read-only by construction** — it has no write/edit/exec/network tools, so prompt-injected note content cannot escape the curated tool set. This is a real security property, not prompt discipline. The coding-agent SDK ships `edit`/`write`/`bash` and a system prompt assuming they exist; we would be working against its grain.
 - PRD §15's prompt is a triage prompt, not a coding-agent prompt. Writing it fresh on `pi-agent-core` is straightforward; adapting it on top of the coding-agent's session prompt is a guessing game about residual coding-agent behavior.
@@ -53,6 +55,7 @@ The first implementation pass must verify that calling the exit tool actually te
 ### 3. BYOK: reuse Pi's `AuthStorage` interface, supply a `safeStorage` backend
 
 PiLog reuses Pi's credential-and-catalog primitives:
+
 - `AuthStorage` (interface) — exposed by `@earendil-works/pi-coding-agent`; PiLog supplies its own implementation
 - `ModelRegistry` (`getApiKeyAndHeaders`, `getAll`, `find`) — used as-is
 - `getOAuthApiKey` from `@earendil-works/pi-ai/oauth` — used as-is, never reimplemented
@@ -64,6 +67,7 @@ PiLog **never** reads or writes `~/.pi/agent/auth.json`. A one-time **import-fro
 OAuth is deferred to post-MVP — only API-key flows are surfaced in MVP Settings UI. The `AuthStorage` interface still requires `setOAuthCredential`/`getOAuthCredential` methods, which are implemented from day one. Adding OAuth post-MVP is therefore a Settings-flow slice (browser launch + loopback + `setOAuthCredential` call), not a credential-layer rewrite.
 
 Rationale:
+
 - PRD §7 requires OS credential storage. Pi's default `~/.pi/agent/auth.json` is 0600 plaintext — better than the DB but worse than `safeStorage`. Adopting `safeStorage` aligns Pi credentials with the GitHub token that already lives there per ADR-0004.
 - Sharing `auth.json` with a user's standalone `pi` install introduces two writers on one file and a UX confound ("why did my token disappear?"). PiLog owns its own credential lifecycle.
 - The reinvention surface is small: ~60 lines of storage-method bodies. Provider catalog, model catalog, OAuth refresh, and `getApiKeyAndHeaders` semantics all stay in Pi.
@@ -82,15 +86,16 @@ PiLog uses two distinct IPC primitives.
 
 ```ts
 type AgentEvent =
-  | { type: 'progress'; phase: string }                  // collapses turn_start, tool_execution_start, etc.
-  | { type: 'partial'; text: string }                    // optional message_update text deltas
-  | { type: 'final'; drafts: GeneratedIssueDraft[] }     // emitted on submit_issue_drafts tool call
+  | { type: 'progress'; phase: string } // collapses turn_start, tool_execution_start, etc.
+  | { type: 'partial'; text: string } // optional message_update text deltas
+  | { type: 'final'; drafts: GeneratedIssueDraft[] } // emitted on submit_issue_drafts tool call
   | { type: 'error'; message: string; cause: ErrorCause }
 ```
 
 `AgentEvent` is the renderer-facing contract; Pi's full stream is the persistence-facing one. They are distinct on purpose.
 
 Rationale:
+
 - `MessagePortMain` provides per-run lifecycle natively (port close = run done) and maps cleanly onto AsyncIterable. The alternative (`webContents.send` channels keyed by `runId`) requires manual subscription bookkeeping in main and `runId` demultiplexing in renderer.
 - For one-bit cross-window broadcast (#15's list refresh), `webContents.send` is the right primitive. Using `MessagePortMain` for that case forces a per-subscriber broker.
 - Two primitives sounds inconsistent but each is used for what it is good at; ADR-0003's request/response contract is unchanged and `IpcContract` only grows by `pi:generateDrafts:start` and `pi:generateDrafts:cancel`.
@@ -101,21 +106,22 @@ The first implementation pass must verify the preload glue: receiving a `Message
 
 PiLog registers exactly the following tools against `pi-agent-core`'s `Agent`:
 
-| Tool | Parameters | Backend |
-| --- | --- | --- |
-| `read_file` | `{ path, maxBytes? }` | `fs.readFileSync` with size cap (default 256 KB) |
-| `list_dir` | `{ path, depth? }` | `fs.readdirSync` returning typed entries; entry-count cap (default 500) |
-| `glob` | `{ pattern }` | `tinyglobby` or `fast-glob`, honoring `.gitignore`; result cap |
-| `grep` | `{ pattern, path?, isRegex? }` | `@vscode/ripgrep` (`rg --json`); per-file and total match caps |
-| `git_status` | `{}` | `simple-git` |
-| `git_diff` | `{ path?, staged? }` | `simple-git` |
-| `git_log` | `{ path?, limit? }` | `simple-git`; commit-message truncation; default cap 50 |
-| `git_blame` | `{ path, lineRange? }` | `simple-git` (raw `blame`); bounded output |
-| `submit_issue_drafts` | `{ drafts: GeneratedIssueDraft[] }` | exit tool — payload is the run result |
+| Tool                  | Parameters                          | Backend                                                                 |
+| --------------------- | ----------------------------------- | ----------------------------------------------------------------------- |
+| `read_file`           | `{ path, maxBytes? }`               | `fs.readFileSync` with size cap (default 256 KB)                        |
+| `list_dir`            | `{ path, depth? }`                  | `fs.readdirSync` returning typed entries; entry-count cap (default 500) |
+| `glob`                | `{ pattern }`                       | `tinyglobby` or `fast-glob`, honoring `.gitignore`; result cap          |
+| `grep`                | `{ pattern, path?, isRegex? }`      | `@vscode/ripgrep` (`rg --json`); per-file and total match caps          |
+| `git_status`          | `{}`                                | `simple-git`                                                            |
+| `git_diff`            | `{ path?, staged? }`                | `simple-git`                                                            |
+| `git_log`             | `{ path?, limit? }`                 | `simple-git`; commit-message truncation; default cap 50                 |
+| `git_blame`           | `{ path, lineRange? }`              | `simple-git` (raw `blame`); bounded output                              |
+| `submit_issue_drafts` | `{ drafts: GeneratedIssueDraft[] }` | exit tool — payload is the run result                                   |
 
 **Opt-in only, default off:** `web_search({ query, limit? })`. Registers when the user has enabled web search in Settings and configured a search-provider API key (Brave, Tavily, Google CSE, etc., stored via `safeStorage`). Returns URL + title + snippet structured results — never full page content.
 
 **Explicitly excluded:**
+
 - `bash`, `exec`, `shell` — eliminates an arbitrary-code-execution surface and removes the prompt-injection-via-note vector
 - `web_fetch` (arbitrary URL retrieval) — pulls untrusted HTML/JSON into the agent's context
 - `write_file`, `edit_file`, `apply_patch` — agent must not mutate the repo
@@ -134,6 +140,7 @@ This is enforced **inside each tool's `execute` body**, not in the prompt. Promp
 **Tool execution mode:** `parallel` for read tools (stateless reads, no shared mutable state, parallel I/O speeds the run); the exit tool is a singleton terminator.
 
 Rationale:
+
 - This trades model output quality (models bench higher with `bash` available) for a real read-only-by-construction security property. We accept this trade for MVP and revisit if Phase 4–6 integration testing shows the agent hitting tool-shape limitations.
 - Most legitimate triage uses of `bash` are representable as the named tools above (`git_log`, `git_blame`, `glob`, `grep`, etc.). The remaining bash uses (running tests, modifying files, reaching the network) are explicitly not what triage should do.
 - `web_search` (bounded, structured results) and `web_fetch` (arbitrary HTML/JSON) have very different trust profiles. `web_search` opens a small, predictable surface controlled by a configured provider; `web_fetch` opens an unbounded one. They are not a single decision.
@@ -141,12 +148,12 @@ Rationale:
 
 ### 6. Packaging
 
-| Artifact | Disposition |
-| --- | --- |
-| `@earendil-works/pi-agent-core`, `@earendil-works/pi-ai`, `@earendil-works/pi-coding-agent` | `dependencies` → asar (pure JS) |
-| `@vscode/ripgrep` | `dependencies` → **`asarUnpack`** (binary must be on disk to spawn) |
-| `simple-git` | `dependencies` → asar (calls system `git`) |
-| System `git` | runtime requirement; Phase 6 onboarding detects + surfaces clearly |
+| Artifact                                                                                    | Disposition                                                         |
+| ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| `@earendil-works/pi-agent-core`, `@earendil-works/pi-ai`, `@earendil-works/pi-coding-agent` | `dependencies` → asar (pure JS)                                     |
+| `@vscode/ripgrep`                                                                           | `dependencies` → **`asarUnpack`** (binary must be on disk to spawn) |
+| `simple-git`                                                                                | `dependencies` → asar (calls system `git`)                          |
+| System `git`                                                                                | runtime requirement; Phase 6 onboarding detects + surfaces clearly  |
 
 `electron-builder.yml` adds `asarUnpack: ["**/node_modules/@vscode/ripgrep/bin/**"]`. The `rg` binary participates in code-signing on macOS and Windows as part of the existing app-signing pipeline (`@vscode/ripgrep` is well-known and the ecosystem has worked this out). Pi's pure-JS files inherit the app's signature naturally — they live inside asar.
 
@@ -159,6 +166,7 @@ Pi's version is **pinned to an exact version** in `package.json` (no caret range
 A boot-time runtime sanity check in `src/main/pi/runtime.ts` asserts `pi-agent-core` and `pi-ai` imported successfully; a failed assertion surfaces a non-dismissible banner ("PiLog's agent runtime didn't load — reinstall or check logs") and disables **Generate Drafts**.
 
 Rationale:
+
 - Exact-pinning makes Pi's version part of PiLog's changelog. A transient ranged update under our feet could change tool-call semantics or LLM-API request shape between user installs of the "same" PiLog release.
 - Boot-time assertion catches a corrupted install at app start instead of at first **Generate Drafts** click.
 - Co-shipping eliminates the "incompatible Pi version" failure mode from runtime concerns: it can only happen in pathologically corrupted installs, which the boot-time assertion catches anyway.
@@ -168,14 +176,17 @@ Rationale:
 ADR-0005 commits to handling the following classes of failure with the listed surfaces. `agent_runs.status` is `running` | `succeeded` | `failed` | `cancelled` — the four-state enum lands from issue #12 onward; `cancelled` is a deliberate distinct terminal state, not a flavor of `failed`.
 
 **Pre-run (no `agent_runs` row written):**
+
 - Pi runtime didn't import → boot-time banner; **Generate Drafts** disabled.
 - No active provider/model selected, or no credential for it → inline "Configure Pi to generate drafts" link deep-linking to Settings (per #13).
 - Selected notes don't share a single `repoId` → bulk-action button disabled with explanatory tooltip.
 
 **Pre-run (row written as `failed`):**
+
 - `Repo.localPath` no longer exists at run time → `error` AgentEvent with `cause: 'repo_missing'`; UX action linking to Repositories settings.
 
 **Mid-run (`failed`):**
+
 - LLM API error / network outage / rate limit → `error` with classified `cause`: `auth_invalid` | `rate_limited` | `network` | `provider_error` | `unknown`.
 - Pi internal crash (unhandledRejection in agent loop) → `error` with `cause: 'pi_internal'`.
 - Turn-budget exceeded → `error` with `cause: 'turn_budget_exceeded'`. Default budget **20 turns**, persisted in the `settings` k/v table under `pi.turnBudget`, surfaced in **Settings → Advanced** from MVP. Tunable per user.
@@ -184,10 +195,12 @@ ADR-0005 commits to handling the following classes of failure with the listed su
 - Tool sandbox violation (path escape, denylist hit) → tool returns `{ isError: true }` to the agent (run continues); cascading sandbox errors lead to the turn-budget path.
 
 **Mid-run (`cancelled`):**
+
 - User clicks Cancel on the in-flight run → `pi:generateDrafts:cancel` IPC; main calls `agent.abort()`; port closes; row is `cancelled`.
 - Renderer window closes mid-run → main detects `webContents.destroyed` and treats as cancel.
 
 **Post-run:**
+
 - DB transaction (drafts insert + notes status flip + agent_runs update) fails → emit `error` with `cause: 'persistence'`; row is `failed`. UX explicitly says "drafts were generated but couldn't be saved; please retry."
 - Partial persistence is impossible — single `db.transaction()` per ADR-0001.
 

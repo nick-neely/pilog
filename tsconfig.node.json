@@ -3,6 +3,8 @@
   "include": ["electron.vite.config.*", "src/main/**/*", "src/preload/**/*", "src/shared/**/*"],
   "compilerOptions": {
     "composite": true,
+    "outDir": "out/tsc-node",
+    "tsBuildInfoFile": "out/tsconfig.node.tsbuildinfo",
     "types": ["electron-vite/node"],
     "baseUrl": ".",
     "paths": {

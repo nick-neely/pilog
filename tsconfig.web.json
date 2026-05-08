@@ -9,6 +9,8 @@
   ],
   "compilerOptions": {
     "composite": true,
+    "outDir": "out/tsc-web",
+    "tsBuildInfoFile": "out/tsconfig.web.tsbuildinfo",
     "jsx": "react-jsx",
     "baseUrl": ".",
     "paths": {
