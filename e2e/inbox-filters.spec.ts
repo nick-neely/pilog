@@ -49,8 +49,14 @@ test('inbox filters, search, and multi-select', async () => {
   await page.click('[data-testid="filter-drafted"]')
   await expect(noteRows).toHaveCount(3)
 
-  // Search — all notes contain "New note"
+  // Search via the Cmd+K command palette. The visible inline search input
+  // was retired in favour of a single discovery surface; the data-testid
+  // followed it. The palette query also feeds the server-side search
+  // filter, so the underlying inbox list narrows as the side-effect tested
+  // here (the palette's primary job is jump-to-note + commands).
+  await page.click('[data-testid="open-command"]')
   const searchInput = page.locator('[data-testid="search-input"]')
+  await expect(searchInput).toBeVisible()
   await searchInput.fill('New note')
   await expect(noteRows).toHaveCount(3)
 
@@ -58,8 +64,9 @@ test('inbox filters, search, and multi-select', async () => {
   await searchInput.fill('nonexistent')
   await expect(noteRows).toHaveCount(0)
 
-  // Clear search
+  // Clear search and close palette
   await searchInput.fill('')
+  await page.keyboard.press('Escape')
   await expect(noteRows).toHaveCount(3)
 
   // Multi-select: click first note
