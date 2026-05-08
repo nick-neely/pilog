@@ -18,11 +18,62 @@
 //
 // Usage:
 //   npx tsx .sandcastle/main.mts
+//     Claude Code via ANTHROPIC_API_KEY (default).
+//   npx tsx .sandcastle/main.mts --codex
+//     OpenAI Codex CLI with subscription auth from host ~/.codex (see .env.example).
 // Or add to package.json:
 //   "scripts": { "sandcastle": "npx tsx .sandcastle/main.mts" }
 
+import type { AgentProvider, SandboxProvider } from '@ai-hero/sandcastle'
 import * as sandcastle from '@ai-hero/sandcastle'
 import { docker } from '@ai-hero/sandcastle/sandboxes/docker'
+
+// ---------------------------------------------------------------------------
+// Agent mode: Claude Code (API key) vs Codex (host ~/.codex subscription auth)
+// ---------------------------------------------------------------------------
+
+const useCodex = process.argv.includes('--codex')
+
+/** Codex model string passed to sandcastle.codex(); adjust if you prefer another tier. */
+const CODEX_MODEL = 'gpt-5.5'
+
+/** Copy mounted host ~/.codex into the path Codex expects inside the sandbox (subscription login workaround). */
+const CODEX_AUTH_HOOK =
+  'rm -rf /home/agent/.codex && mkdir -p /home/agent/.codex && ' +
+  'for item in auth.json config.toml AGENTS.md rules; do ' +
+  'if [ -e "/home/agent/.codex-host/$item" ]; then cp -R "/home/agent/.codex-host/$item" /home/agent/.codex/; fi; done && ' +
+  'chmod -R u+rwX /home/agent/.codex'
+
+function agent(): AgentProvider {
+  return useCodex ? sandcastle.codex(CODEX_MODEL) : sandcastle.claudeCode('claude-opus-4-6')
+}
+
+function sandboxProvider(): SandboxProvider {
+  return useCodex
+    ? docker({
+        mounts: [
+          {
+            hostPath: '~/.codex',
+            sandboxPath: '/home/agent/.codex-host',
+            readonly: true
+          }
+        ]
+      })
+    : docker()
+}
+
+// Hooks run inside the sandbox before the agent starts each iteration.
+// CI=true: pnpm refuses to alter node_modules without a TTY unless CI is set
+// (Sandcastle uses `docker exec … sh -c`, which is non-interactive).
+// Codex: copy subscription auth from read-only mount before install.
+const hooks = {
+  sandbox: {
+    onSandboxReady: [
+      ...(useCodex ? [{ command: CODEX_AUTH_HOOK }] : []),
+      { command: 'CI=true pnpm install' }
+    ]
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Configuration
@@ -31,13 +82,6 @@ import { docker } from '@ai-hero/sandcastle/sandboxes/docker'
 // Maximum number of plan→execute→merge cycles before stopping.
 // Raise this if your backlog is large; lower it for a quick smoke-test run.
 const MAX_ITERATIONS = 10
-
-// Hooks run inside the sandbox before the agent starts each iteration.
-// CI=true: pnpm refuses to alter node_modules without a TTY unless CI is set
-// (Sandcastle uses `docker exec … sh -c`, which is non-interactive).
-const hooks = {
-  sandbox: { onSandboxReady: [{ command: 'CI=true pnpm install' }] }
-}
 
 // Copy node_modules from the host into the worktree before each sandbox
 // starts. With pnpm, packages and the virtual store live under node_modules
@@ -63,13 +107,13 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
   // -------------------------------------------------------------------------
   const plan = await sandcastle.run({
     hooks,
-    sandbox: docker(),
+    sandbox: sandboxProvider(),
     name: 'planner',
     // One iteration is enough: the planner just needs to read and reason,
     // not write code.
     maxIterations: 1,
     // Opus for planning: dependency analysis benefits from deeper reasoning.
-    agent: sandcastle.claudeCode('claude-opus-4-6'),
+    agent: agent(),
     promptFile: './.sandcastle/plan-prompt.md'
   })
 
@@ -109,7 +153,7 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
     issues.map(async (issue) => {
       const sandbox = await sandcastle.createSandbox({
         branch: issue.branch,
-        sandbox: docker(),
+        sandbox: sandboxProvider(),
         hooks,
         copyToWorktree
       })
@@ -119,7 +163,7 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
         const implement = await sandbox.run({
           name: 'implementer',
           maxIterations: 100,
-          agent: sandcastle.claudeCode('claude-opus-4-6'),
+          agent: agent(),
           promptFile: './.sandcastle/implement-prompt.md',
           promptArgs: {
             TASK_ID: issue.id,
@@ -133,7 +177,7 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
           const review = await sandbox.run({
             name: 'reviewer',
             maxIterations: 1,
-            agent: sandcastle.claudeCode('claude-opus-4-6'),
+            agent: agent(),
             promptFile: './.sandcastle/review-prompt.md',
             promptArgs: {
               BRANCH: issue.branch
@@ -195,10 +239,10 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
   // -------------------------------------------------------------------------
   await sandcastle.run({
     hooks,
-    sandbox: docker(),
+    sandbox: sandboxProvider(),
     name: 'merger',
     maxIterations: 1,
-    agent: sandcastle.claudeCode('claude-opus-4-6'),
+    agent: agent(),
     promptFile: './.sandcastle/merge-prompt.md',
     promptArgs: {
       // A markdown list of branch names, one per line.

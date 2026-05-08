@@ -24,6 +24,9 @@ RUN usermod -d /home/agent -m -l agent node
 # keep version aligned with root package.json "packageManager".
 RUN npm install -g pnpm@10.30.3
 
+# Codex CLI (used when running Sandcastle with --codex). Install as root before USER agent.
+RUN npm install -g @openai/codex
+
 USER agent
 
 # Install Claude Code CLI
