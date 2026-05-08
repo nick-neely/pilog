@@ -62,7 +62,7 @@ Set up once; reused by every phase.
 | Phase | Theme                       | User-visible outcome                                                     | Status |
 | ----- | --------------------------- | ------------------------------------------------------------------------ | :----: |
 | 1     | Desktop shell + local notes | Hotkey → scratchpad → inbox; persists across restarts                    |   ☑    |
-| 2     | GitHub + repo setup         | Connect GitHub, link a local repo, manually create a test issue          |   ☐    |
+| 2     | GitHub + repo setup         | Connect GitHub, link a local repo, manually create a test issue          |   ☑    |
 | 3     | Pi agent runtime            | Selected notes + repo path → structured `IssueDraft` JSON stored locally |   ☐    |
 | 4     | Review mode                 | Draft cards: edit, split, merge, dismiss, publish to GitHub              |   ☐    |
 | 5     | Auto-publish mode           | One click: generate + publish, with safety rails and a publish report    |   ☐    |
@@ -165,13 +165,13 @@ A reviewer can verify each of:
 
 **Goal:** Connect a GitHub account, register a local repo, and create a hand-written test issue from inside PiLog. Notes can now be tagged with a repo.
 
-- ☐ **Auth** — GitHub OAuth via local-loopback callback (preferred over device flow for desktop UX). Token stored via `safeStorage`. Rotation/sign-out flow. _ADR-0004._
-- ☐ **GitHub client** — Octokit wrapper with retry + rate-limit awareness; thin functions: `listRepos`, `listLabels(repo)`, `getIssueTemplates(repo)`, `createIssue(repo, payload)`.
-- ☐ **Repo registration** — UI to pick a local directory; detect git via `simple-git` (read `.git/config` remote, default branch, current HEAD). Match to a GitHub repo. Persist to `repos`.
-- ☐ **Scratchpad repo selector** — inline picker that defaults to last-used or detected-from-CWD.
-- ☐ **Notes ↔ repo association** — column already exists; surface filter and edit affordance in inbox.
-- ☐ **Manual issue compose** — a "New Issue" button on a repo that opens a form (title/body/labels), posts via the GitHub client, writes a `publish_log` row, opens the issue URL.
-- ☐ **Tests** — mocked Octokit unit tests; Playwright e2e against a sandbox repo (skipped in CI without a token; documented).
+- ☑ **Auth** — GitHub OAuth via local-loopback callback (preferred over device flow for desktop UX). Token stored via `safeStorage`. Rotation/sign-out flow. _ADR-0004._ (#7)
+- ☑ **GitHub client** — Octokit wrapper with retry + rate-limit awareness; thin functions: `listRepos`, `listLabels(repo)`, `getIssueTemplates(repo)`, `createIssue(repo, payload)`.
+- ☑ **Repo registration** — UI to pick a local directory; detect git via `simple-git` (read `.git/config` remote, default branch, current HEAD). Match to a GitHub repo. Persist to `repos`. (#8)
+- ☑ **Scratchpad repo selector** — inline picker that defaults to last-used or detected-from-CWD. (#9)
+- ☑ **Notes ↔ repo association** — column already exists; surface filter and edit affordance in inbox. (#9)
+- ☑ **Manual issue compose** — a "New Issue" button on a repo that opens a form (title/body/labels), posts via the GitHub client, writes a `publish_log` row, opens the issue URL. (#10)
+- ☑ **Tests** — mocked Octokit unit tests; Playwright e2e against a sandbox repo (skipped in CI without a token; documented).
 
 ### Phase 2 acceptance
 
@@ -183,8 +183,8 @@ User can connect GitHub, link a real repo, type a title/body, and see the issue 
 
 **Goal:** Select notes + a linked repo → click a button → get structured `IssueDraft` JSON written to `issue_drafts`. No publishing yet; review UI is Phase 4.
 
-- ☐ **Embedding research spike** (timeboxed, 1–2 days) — answer PRD §16 Q1: package/runtime embedding vs. managed binary. Output: ADR-0005.
-- ☐ **Pi runtime bridge** — `src/main/pi/runtime.ts` abstracts the chosen approach behind a `runAgent(input): AsyncIterable<AgentEvent>` interface. Renderer subscribes via streamed IPC.
+- ☑ **Embedding strategy** — resolved in [ADR-0005](./adr/0005-pi-embedding-strategy.md): in-process `pi-agent-core` + `pi-ai`, exit-tool pattern, `safeStorage`-backed `AuthStorage`, `MessagePortMain` streaming, curated read-only tool set.
+- ☐ **Pi runtime bridge** — `src/main/pi/runtime.ts` implements `runAgent(input): AsyncIterable<AgentEvent>` per ADR-0005 §1–4. Renderer subscribes via the `MessagePortMain` channel exposed by `window.pilog.runAgent`.
 - ☐ **Pi config UX** — `Settings → Provider & Model`. Surfaces Pi's BYOK flow inside PiLog (PRD §7 BYOK). "Open advanced config" escape hatch.
 - ☐ **Issue generation** — `src/main/pi/issue-generation.ts` constructs the prompt per PRD §15, supplies repo path + selected notes, validates output against the `GeneratedIssueDraft` Zod schema (PRD §10), persists to `issue_drafts`.
 - ☐ **Agent runs view** — minimal list of past runs with input/output/error, useful for debugging prompts.
@@ -263,7 +263,7 @@ Once Phase 1 is shaped to your satisfaction:
 
 Carried from PRD §16, with assigned phase:
 
-- **Pi embedding strategy** — decide in Phase 3 spike → ADR-0005.
+- ☑ **Pi embedding strategy** — resolved in [ADR-0005](./adr/0005-pi-embedding-strategy.md). PiLog embeds Pi in-process via `pi-agent-core` + `pi-ai`, with a `safeStorage`-backed `AuthStorage`, `MessagePortMain` streaming, and a curated read-only tool set. No spike branch — the architecture was decided through documentation review and grilling against the existing domain model; empirical guards land as first-pass acceptance criteria on #12.
 - **Repo indexing: persistent vs. per-run** — defer until Phase 3 reveals latency reality.
 - **Issue-template parsing in MVP** — Phase 6 by default; pull forward to Phase 4 if drafts feel generic.
 - **Auto-publish behind "advanced" toggle** — Phase 5 design call.
