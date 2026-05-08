@@ -89,7 +89,7 @@ function mapIssueDraft(row: typeof issueDrafts.$inferSelect): IssueDraft {
   }
 }
 
-function formatIssueDraftBody(draft: GeneratedIssueDraft): string {
+export function formatIssueDraftBody(draft: GeneratedIssueDraft): string {
   const lines = [
     draft.summary,
     '',

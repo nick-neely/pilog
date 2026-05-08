@@ -2,6 +2,7 @@ import { and, eq, inArray } from 'drizzle-orm'
 import type { AgentTool } from '@earendil-works/pi-agent-core'
 import type { PilogDatabase } from '../db/client'
 import { agentRuns, issueDrafts, notes, settings } from '../db/schema'
+import { formatIssueDraftBody } from '../db/repositories/issue-drafts'
 import { getRepoById } from '../db/repositories/repos'
 import {
   GeneratedIssueDraftsSchema,
@@ -183,19 +184,4 @@ export function persistGeneratedIssueDrafts(
 
     return draftIds
   })
-}
-
-function formatIssueDraftBody(draft: GeneratedIssueDraft): string {
-  return [
-    draft.summary,
-    '',
-    '## Context',
-    draft.context,
-    '',
-    '## Acceptance Criteria',
-    ...draft.acceptanceCriteria.map((item) => `- ${item}`),
-    '',
-    '## Implementation Notes',
-    ...draft.implementationNotes.map((item) => `- ${item}`)
-  ].join('\n')
 }

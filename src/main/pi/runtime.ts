@@ -6,6 +6,7 @@ import {
   createSubmitIssueDraftsTool,
   type IssueGenerationInput
 } from './issue-generation'
+import { createAsyncQueue } from '@shared/async-queue'
 import type { AgentEvent, GeneratedIssueDraft } from '@shared/types'
 
 export type ProcessSnapshot = {
@@ -46,6 +47,7 @@ export async function* runAgent(input: IssueGenerationInput): AsyncIterable<Agen
   }
 
   const before = snapshotProcessState()
+  const prompt = buildIssueGenerationPrompt({ repo: input.repo, notes: input.notes })
   const authStorage = createSafeStorageAuthStorage()
   const registry = createModelRegistry(authStorage)
   const model =
@@ -68,7 +70,7 @@ export async function* runAgent(input: IssueGenerationInput): AsyncIterable<Agen
 
   const agent = new Agent({
     initialState: {
-      systemPrompt: buildIssueGenerationPrompt({ repo: input.repo, notes: input.notes }),
+      systemPrompt: prompt,
       model,
       tools: [
         createSubmitIssueDraftsTool((drafts) => {
@@ -108,16 +110,14 @@ export async function* runAgent(input: IssueGenerationInput): AsyncIterable<Agen
     }
   })
 
-  void agent
-    .prompt(buildIssueGenerationPrompt({ repo: input.repo, notes: input.notes }))
-    .catch((error) => {
-      queue.push({
-        type: 'error',
-        message: error instanceof Error ? error.message : String(error),
-        cause: input.signal?.aborted ? 'cancelled' : 'pi_internal'
-      })
-      queue.close()
+  void agent.prompt(prompt).catch((error) => {
+    queue.push({
+      type: 'error',
+      message: error instanceof Error ? error.message : String(error),
+      cause: input.signal?.aborted ? 'cancelled' : 'pi_internal'
     })
+    queue.close()
+  })
 
   for await (const event of queue) {
     yield event
@@ -153,33 +153,5 @@ async function* runFixtureAgent(input: IssueGenerationInput): AsyncIterable<Agen
         publishReady: true
       }
     ]
-  }
-}
-
-function createAsyncQueue<T>(): AsyncIterable<T> & { push: (value: T) => void; close: () => void } {
-  const values: T[] = []
-  const resolvers: Array<(result: IteratorResult<T>) => void> = []
-  let closed = false
-
-  return {
-    push(value: T): void {
-      const resolve = resolvers.shift()
-      if (resolve) resolve({ value, done: false })
-      else values.push(value)
-    },
-    close(): void {
-      closed = true
-      for (const resolve of resolvers.splice(0)) resolve({ value: undefined, done: true })
-    },
-    [Symbol.asyncIterator](): AsyncIterator<T> {
-      return {
-        next(): Promise<IteratorResult<T>> {
-          const value = values.shift()
-          if (value !== undefined) return Promise.resolve({ value, done: false })
-          if (closed) return Promise.resolve({ value: undefined, done: true })
-          return new Promise((resolve) => resolvers.push(resolve))
-        }
-      }
-    }
   }
 }
