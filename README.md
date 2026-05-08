@@ -8,8 +8,15 @@ PiLog is a **local-first Electron desktop app** for developers who want to **cap
 
 ## Requirements
 
-- [Node.js](https://nodejs.org/) 22.12 or newer
-- [pnpm](https://pnpm.io/) — the repo pins the package manager in `package.json`
+- [Volta](https://volta.sh/) for pinned Node.js and pnpm versions
+- Node.js 22.21.1 and pnpm 10.30.3 are pinned in `package.json`
+
+After installing Volta, open a new WSL shell in the repo and verify:
+
+```bash
+node --version
+pnpm --version
+```
 
 ## Install
 
