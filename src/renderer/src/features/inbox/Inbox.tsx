@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
+  Activity01Icon,
   Add01Icon,
   Cancel01Icon,
   CancelCircleIcon,
-  MoreHorizontalCircle01Icon,
-  Search01Icon,
   Settings02Icon,
   SparklesIcon
 } from '@hugeicons/core-free-icons'
@@ -269,13 +268,18 @@ export function Inbox({
   onFocusNoteHandled,
   onNavigateToAgentRuns,
   onNavigateToRepositories,
-  onNavigateToSettings
+  onNavigateToSettings,
+  paletteOpen,
+  onPaletteOpenChange
 }: {
   focusNoteId?: string | null
   onFocusNoteHandled?: () => void
   onNavigateToAgentRuns: () => void
   onNavigateToRepositories: () => void
   onNavigateToSettings: () => void
+  /** Controlled by App so the global Cmd-K trigger in AppShell can open the palette. */
+  paletteOpen: boolean
+  onPaletteOpenChange: (open: boolean) => void
 }): React.JSX.Element {
   const [notes, setNotes] = useState<Note[]>([])
   const [repos, setRepos] = useState<Repo[]>([])
@@ -283,7 +287,6 @@ export function Inbox({
   const [generating, setGenerating] = useState(false)
   const [statusFilter, setStatusFilter] = useState<NoteStatus | undefined>()
   const [repoFilter, setRepoFilter] = useState<string | null | undefined>(undefined)
-  const [commandOpen, setCommandOpen] = useState(false)
   const [paletteQuery, setPaletteQuery] = useState('')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const lastClickedIndex = useRef<number | null>(null)
@@ -440,13 +443,17 @@ export function Inbox({
     generating
   })
 
-  // Single open/close path so the query reset, focus restoration, and any
-  // future side-effects all live together. Avoids a setState-in-effect
-  // dependency cycle on commandOpen.
-  const setPaletteOpen = useCallback((open: boolean): void => {
-    setCommandOpen(open)
-    if (!open) setPaletteQuery('')
-  }, [])
+  // Single open/close path so the query reset and any future side-effects
+  // live together. The dialog is controlled by App so the global Cmd-K
+  // trigger in AppShell can drive it; this wrapper just adds the local
+  // concern of clearing the query when the palette closes.
+  const setPaletteOpen = useCallback(
+    (open: boolean): void => {
+      onPaletteOpenChange(open)
+      if (!open) setPaletteQuery('')
+    },
+    [onPaletteOpenChange]
+  )
 
   // Cmd/Ctrl+K toggles the command palette globally on the inbox surface.
   // Esc clears any active selection, but only when the user isn't typing in
@@ -458,10 +465,10 @@ export function Inbox({
     const onKey = (e: KeyboardEvent): void => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault()
-        setPaletteOpen(!commandOpen)
+        setPaletteOpen(!paletteOpen)
         return
       }
-      if (e.key === 'Escape' && selectedIds.size > 0 && !commandOpen) {
+      if (e.key === 'Escape' && selectedIds.size > 0 && !paletteOpen) {
         const active = document.activeElement as HTMLElement | null
         const tag = active?.tagName.toLowerCase()
         const editable = tag === 'input' || tag === 'textarea' || active?.isContentEditable === true
@@ -472,7 +479,7 @@ export function Inbox({
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [commandOpen, setPaletteOpen, selectedIds.size, clearSelection])
+  }, [paletteOpen, setPaletteOpen, selectedIds.size, clearSelection])
 
   const emptyMessage = useMemo(() => {
     const filtered = Boolean(statusFilter || debouncedPaletteQuery || repoFilter !== undefined)
@@ -509,123 +516,83 @@ export function Inbox({
   }
 
   return (
-    <div className="flex h-screen bg-background text-foreground">
+    <div className="flex h-full bg-background text-foreground">
       {/*
         Sidebar — overflow-hidden + min-w-0 keep any future toolbar overflow
-        contained instead of bleeding into the detail pane (the bug from the
-        first polish pass). The sidebar is structured as four regions:
-          (1) title strip with capture-mode count or triage-mode badge
-          (2) filter rail (status chips + full-width repo row)
-          (3) scrolling list (the only region that grows)
-          (4) mode footer that swaps capture <-> triage
-        The Cmd+K palette absorbs search and discovery so the chrome above
-        no longer competes for vertical space.
+        contained instead of bleeding into the detail pane. The sidebar
+        is structured as three regions:
+          (1) filter rail (status chips, repo row, count + selection chip)
+          (2) scrolling list (the only region that grows)
+          (3) mode footer that swaps capture <-> triage
+        View nav and global chrome (Settings, Cmd+K) live in AppShell's
+        top bar, not here, so the sidebar never has to fight a tab strip
+        for 320px of width.
       */}
       <div className="flex w-80 min-w-0 shrink-0 flex-col overflow-hidden border-r">
-        {/* (1) Title strip — single line, never grows */}
-        <header className="flex min-h-14 shrink-0 items-center justify-between gap-3 border-b px-6 py-3">
-          <div className="flex min-w-0 items-baseline gap-2">
-            <h1 className="font-heading text-xl font-medium tracking-tight">Inbox</h1>
+        {/* (1) Filter rail — status row, then repo, then count/selection
+            chip. The chip swaps between a quiet count and a moss-tinted
+            "× N selected" pill; both live in the same right-edge slot so
+            the status chips never reflow. */}
+        <div className="flex shrink-0 flex-col gap-2 border-b px-6 py-2.5">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex flex-wrap gap-x-1.5 gap-y-1">
+              {STATUS_CHIPS.map((chip) => {
+                const active = statusFilter === chip.value
+                return (
+                  <Button
+                    key={chip.value}
+                    type="button"
+                    variant={active ? 'secondary' : 'ghost'}
+                    size="xs"
+                    data-testid={`filter-${chip.value}`}
+                    onClick={() => toggleStatus(chip.value)}
+                    aria-pressed={active}
+                    className="rounded-full gap-1.5 font-medium"
+                  >
+                    {/* Moss leading dot only on the active filter — type-led
+                      emphasis with a small on-brand accent, not a fill. */}
+                    <span
+                      aria-hidden
+                      className={
+                        'h-1.5 w-1.5 rounded-full transition-colors ' +
+                        (active ? 'bg-primary' : 'bg-transparent')
+                      }
+                    />
+                    {chip.label}
+                  </Button>
+                )
+              })}
+            </div>
+            {/* Count / selection chip lives at the right edge of the
+                status row. The slot swaps between a tabular count and
+                a moss-tinted "× N selected" button, but never causes
+                surrounding chips to reflow. */}
             {hasSelection ? (
-              // The selection-count chip is also the clear-selection control.
-              // Co-locating "you have a selection" with "exit the selection"
-              // means the user never has to look elsewhere to find the
-              // escape hatch. Esc and the palette's "Clear selection" command
-              // do the same job for keyboard users.
               <Button
                 type="button"
                 variant="ghost"
                 size="xs"
                 data-testid="selected-count"
                 onClick={clearSelection}
-                title="Clear selection (Esc)"
+                title={`Clear ${selectionCount} selected (Esc)`}
                 aria-label={`Clear ${selectionCount} selected ${
                   selectionCount === 1 ? 'note' : 'notes'
                 }`}
-                className="tabular rounded-full px-1.5 py-0.5 text-muted-foreground"
+                className="tabular h-6 shrink-0 gap-1 rounded-full bg-primary/10 px-2 py-0 text-xs text-foreground hover:bg-primary/15"
               >
                 <HugeiconsIcon
                   icon={Cancel01Icon}
-                  data-icon="inline-start"
                   aria-hidden
                   strokeWidth={2}
+                  className="size-3 text-primary"
                 />
                 {selectionCount} selected
               </Button>
-            ) : (
-              notes.length > 0 && (
-                <span className="tabular text-xs text-muted-foreground">{notes.length}</span>
-              )
-            )}
-          </div>
-          <div className="flex shrink-0 items-center gap-1">
-            <Button
-              type="button"
-              variant="outline"
-              size="icon-sm"
-              data-testid="open-agent-runs"
-              onClick={() => onNavigateToAgentRuns()}
-              aria-label="Agent Runs"
-              title="Agent Runs"
-            >
-              <HugeiconsIcon icon={MoreHorizontalCircle01Icon} aria-hidden />
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="icon-sm"
-              data-testid="open-settings"
-              onClick={() => onNavigateToSettings()}
-              aria-label="Settings"
-              title="Settings"
-            >
-              <HugeiconsIcon icon={Settings02Icon} aria-hidden />
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              data-testid="open-command"
-              onClick={() => setPaletteOpen(true)}
-              aria-label="Open command palette"
-              title="Search and commands"
-              className="gap-1.5 px-2 text-xs text-muted-foreground"
-            >
-              <HugeiconsIcon icon={Search01Icon} aria-hidden />
-              <kbd className="pointer-events-none font-mono">{META_KEY}K</kbd>
-            </Button>
-          </div>
-        </header>
-
-        {/* (2) Filter rail — status row, then repo (avoids wrapped chip + orphaned select) */}
-        <div className="flex shrink-0 flex-col gap-2 border-b px-6 py-2.5">
-          <div className="flex flex-wrap gap-x-1.5 gap-y-1">
-            {STATUS_CHIPS.map((chip) => {
-              const active = statusFilter === chip.value
-              return (
-                <Button
-                  key={chip.value}
-                  type="button"
-                  variant={active ? 'secondary' : 'ghost'}
-                  size="xs"
-                  data-testid={`filter-${chip.value}`}
-                  onClick={() => toggleStatus(chip.value)}
-                  aria-pressed={active}
-                  className="rounded-full gap-1.5 font-medium"
-                >
-                  {/* Moss leading dot only on the active filter — type-led
-                      emphasis with a small on-brand accent, not a fill. */}
-                  <span
-                    aria-hidden
-                    className={
-                      'h-1.5 w-1.5 rounded-full transition-colors ' +
-                      (active ? 'bg-primary' : 'bg-transparent')
-                    }
-                  />
-                  {chip.label}
-                </Button>
-              )
-            })}
+            ) : notes.length > 0 ? (
+              <span className="tabular shrink-0 self-center text-xs text-muted-foreground">
+                {notes.length}
+              </span>
+            ) : null}
           </div>
           <Select
             value={encodeRepoFilter(repoFilter)}
@@ -800,7 +767,7 @@ export function Inbox({
         jump-to-note in one place. The visible search input from the previous
         polish pass moved here; the test data-testid follows it.
       */}
-      <CommandDialog open={commandOpen} onOpenChange={setPaletteOpen}>
+      <CommandDialog open={paletteOpen} onOpenChange={setPaletteOpen}>
         <CommandInput
           data-testid="search-input"
           placeholder="Search notes, run a command…"
@@ -828,7 +795,7 @@ export function Inbox({
               data-testid="cmd-agent-runs"
               onSelect={() => runCommand(onNavigateToAgentRuns)}
             >
-              <HugeiconsIcon icon={MoreHorizontalCircle01Icon} aria-hidden />
+              <HugeiconsIcon icon={Activity01Icon} aria-hidden />
               <span>Agent Runs</span>
             </CommandItem>
             <CommandItem

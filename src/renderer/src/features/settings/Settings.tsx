@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
+  ArrowDown01Icon,
   CheckmarkCircle01Icon,
   DatabaseImportIcon,
   Delete02Icon,
@@ -22,6 +23,19 @@ import {
 } from '@renderer/components/ui/alert-dialog'
 import { Button } from '@renderer/components/ui/button'
 import { Card, CardContent } from '@renderer/components/ui/card'
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger
+} from '@renderer/components/ui/collapsible'
+import {
+  Combobox,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxList
+} from '@renderer/components/ui/combobox'
 import { Input } from '@renderer/components/ui/input'
 import { Label } from '@renderer/components/ui/label'
 import {
@@ -32,6 +46,7 @@ import {
   SelectTrigger,
   SelectValue
 } from '@renderer/components/ui/select'
+import { Separator } from '@renderer/components/ui/separator'
 import { Switch } from '@renderer/components/ui/switch'
 import type {
   GitHubStatus,
@@ -349,6 +364,12 @@ function getPiSaveLabel(pi: Pick<PiConfigState, 'active' | 'saving'>): string {
   return 'Configure Pi'
 }
 
+type ComboItem = { value: string; label: string }
+
+function comboItemsEqual(a: ComboItem, b: ComboItem): boolean {
+  return a.value === b.value
+}
+
 export function Settings({
   onBack,
   onNavigateRepositories
@@ -377,6 +398,26 @@ export function Settings({
   const searchKeyPlaceholder = advancedSettings?.webSearchHasApiKey
     ? 'API key stored. Paste a new key to replace it.'
     : 'Paste search API key'
+
+  const providerItems = useMemo<ComboItem[]>(
+    () => pi.providers.map((provider) => ({ value: provider.id, label: provider.name })),
+    [pi.providers]
+  )
+  const modelItems = useMemo<ComboItem[]>(
+    () => pi.models.map((model) => ({ value: model.id, label: model.name })),
+    [pi.models]
+  )
+  const selectedProviderItem =
+    providerItems.find((item) => item.value === pi.selectedProvider) ?? null
+  const selectedModelItem = modelItems.find((item) => item.value === pi.selectedModel) ?? null
+
+  const advancedSummary = advancedSettings
+    ? `Turn budget ${advancedSettings.turnBudget} · Web search ${
+        advancedSettings.webSearchEnabled
+          ? `on (${SEARCH_PROVIDER_LABELS[advancedSettings.webSearchProvider]})`
+          : 'off'
+      }`
+    : 'Loading…'
 
   const handleHotkeyChange = (value: string): void => {
     setUserEdited(true)
@@ -445,81 +486,87 @@ export function Settings({
             </Button>
           </section>
 
-          <section className="flex flex-col gap-3" data-testid="pi-config-panel">
+          <section className="flex flex-col gap-4" data-testid="pi-config-panel">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h2 className="text-sm font-medium text-foreground">Provider &amp; Model</h2>
                 <p className="mt-1 max-w-[68ch] text-xs text-muted-foreground">
-                  Choose the Pi model used for draft generation. Provider credentials are stored in
-                  OS-backed safe storage, separate from PiLog settings.
+                  Choose the Pi model used for draft generation. Credentials are stored in OS-backed
+                  safe storage, separate from PiLog settings.
                 </p>
               </div>
               {pi.active?.valid && (
-                <span className="inline-flex items-center gap-1.5 rounded-md bg-muted px-2 py-1 text-xs text-foreground">
+                <span className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-muted px-2 py-1 text-xs text-foreground">
                   <HugeiconsIcon icon={CheckmarkCircle01Icon} aria-hidden className="size-3.5" />
                   Configured
                 </span>
               )}
             </div>
 
-            {!pi.active?.valid && (
-              <div className="rounded-md border bg-muted/45 p-3">
-                <p className="text-sm font-medium">Configure Pi</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Select a provider, choose a model, then paste an API key to enable Generate
-                  Drafts.
-                </p>
-              </div>
-            )}
-
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor="pi-provider">Active Provider</Label>
-                <Select
-                  value={pi.selectedProvider}
-                  onValueChange={pi.setSelectedProvider}
-                  disabled={pi.providers.length === 0}
+                <Label htmlFor="pi-provider">Active provider</Label>
+                <Combobox
+                  items={providerItems}
+                  value={selectedProviderItem}
+                  onValueChange={(item) =>
+                    pi.setSelectedProvider((item as ComboItem | null)?.value ?? '')
+                  }
+                  isItemEqualToValue={comboItemsEqual}
                 >
-                  <SelectTrigger id="pi-provider" data-testid="pi-provider-select">
-                    <SelectValue placeholder="Choose provider" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      {pi.providers.map((provider) => (
-                        <SelectItem key={provider.id} value={provider.id}>
-                          {provider.name}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
+                  <ComboboxInput
+                    id="pi-provider"
+                    data-testid="pi-provider-select"
+                    placeholder={
+                      pi.providers.length === 0 ? 'Loading providers…' : 'Choose provider'
+                    }
+                    disabled={pi.providers.length === 0}
+                  />
+                  <ComboboxContent>
+                    <ComboboxList>
+                      {(item: ComboItem) => (
+                        <ComboboxItem key={item.value} value={item}>
+                          {item.label}
+                        </ComboboxItem>
+                      )}
+                    </ComboboxList>
+                    <ComboboxEmpty>No matching providers</ComboboxEmpty>
+                  </ComboboxContent>
+                </Combobox>
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor="pi-model">Active Model</Label>
-                <Select
-                  value={pi.selectedModel}
-                  onValueChange={pi.setSelectedModel}
-                  disabled={pi.models.length === 0}
+                <Label htmlFor="pi-model">Active model</Label>
+                <Combobox
+                  items={modelItems}
+                  value={selectedModelItem}
+                  onValueChange={(item) =>
+                    pi.setSelectedModel((item as ComboItem | null)?.value ?? '')
+                  }
+                  isItemEqualToValue={comboItemsEqual}
                 >
-                  <SelectTrigger id="pi-model" data-testid="pi-model-select">
-                    <SelectValue placeholder="Choose model" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      {pi.models.map((model) => (
-                        <SelectItem key={`${model.provider}:${model.id}`} value={model.id}>
-                          {model.name}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
+                  <ComboboxInput
+                    id="pi-model"
+                    data-testid="pi-model-select"
+                    placeholder={pi.models.length === 0 ? 'Loading models…' : 'Search models…'}
+                    disabled={pi.models.length === 0}
+                  />
+                  <ComboboxContent>
+                    <ComboboxList>
+                      {(item: ComboItem) => (
+                        <ComboboxItem key={item.value} value={item}>
+                          {item.label}
+                        </ComboboxItem>
+                      )}
+                    </ComboboxList>
+                    <ComboboxEmpty>No matching models</ComboboxEmpty>
+                  </ComboboxContent>
+                </Combobox>
               </div>
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="pi-api-key">Credential</Label>
+              <Label htmlFor="pi-api-key">API key</Label>
               <div className="flex items-center gap-3">
                 <Input
                   id="pi-api-key"
@@ -546,7 +593,9 @@ export function Settings({
               </p>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 pt-1">
+            <Separator />
+
+            <div className="flex flex-wrap items-center gap-2">
               <Button variant="outline" size="sm" onClick={() => void pi.importExisting()}>
                 <HugeiconsIcon icon={DatabaseImportIcon} data-icon="inline-start" aria-hidden />
                 Import existing Pi config
@@ -586,7 +635,7 @@ export function Settings({
 
               <AlertDialog>
                 <AlertDialogTrigger asChild>
-                  <Button variant="destructive" size="sm">
+                  <Button variant="destructive" size="sm" className="ml-auto">
                     <HugeiconsIcon icon={Delete02Icon} data-icon="inline-start" aria-hidden />
                     Reset Pi config
                   </Button>
@@ -610,130 +659,151 @@ export function Settings({
             </div>
           </section>
 
-          <section className="flex flex-col gap-3" data-testid="advanced-settings-panel">
-            <div>
-              <h2 className="text-sm font-medium text-foreground">Advanced</h2>
-              <p className="mt-1 max-w-[68ch] text-xs text-muted-foreground">
-                Tune draft-generation limits and opt into bounded provider search. Search keys are
-                stored in OS-backed safe storage, separate from model credentials.
-              </p>
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="turn-budget">Turn Budget</Label>
-              <div className="flex items-center gap-3">
-                <Input
-                  id="turn-budget"
-                  data-testid="turn-budget-input"
-                  inputMode="numeric"
-                  type="number"
-                  min={MIN_TURN_BUDGET}
-                  max={MAX_TURN_BUDGET}
-                  step={1}
-                  value={advanced.turnBudgetDraft}
-                  onChange={(event) => advanced.setTurnBudgetDraft(event.target.value)}
-                  onBlur={() => void advanced.saveTurnBudget()}
-                  aria-invalid={Boolean(advanced.turnBudgetError)}
-                  aria-describedby={
-                    advanced.turnBudgetError ? 'turn-budget-error' : 'turn-budget-help'
-                  }
-                  className="max-w-28 font-mono"
-                />
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => void advanced.saveTurnBudget()}
-                  disabled={!turnBudgetDirty}
-                >
-                  Save
-                </Button>
-              </div>
-              {advanced.turnBudgetError ? (
-                <p id="turn-budget-error" className="text-xs text-destructive">
-                  {advanced.turnBudgetError}
-                </p>
-              ) : (
-                <p id="turn-budget-help" className="text-xs text-muted-foreground">
-                  {TURN_BUDGET_HELP}
-                </p>
-              )}
-            </div>
-
-            <div className="flex items-start justify-between gap-4 rounded-md border bg-muted/35 p-3">
-              <div>
-                <Label htmlFor="web-search-enabled" className="text-sm font-medium">
-                  Web Search
-                </Label>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Registers a bounded search-results tool only when enabled and keyed.
-                </p>
-              </div>
-              <Switch
-                id="web-search-enabled"
-                data-testid="web-search-toggle"
-                checked={advancedSettings?.webSearchEnabled ?? false}
-                onCheckedChange={(enabled) => void advanced.setWebSearchEnabled(enabled)}
-                aria-label="Enable Web Search"
-              />
-            </div>
-
-            {advancedSettings?.webSearchEnabled && (
-              <div className="grid gap-3 rounded-md border bg-muted/20 p-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)]">
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="web-search-provider">Search Provider</Label>
-                  <Select
-                    value={advancedSettings.webSearchProvider}
-                    onValueChange={(provider) => {
-                      if (isSearchProvider(provider)) {
-                        void advanced.setWebSearchProvider(provider)
-                      }
-                    }}
-                  >
-                    <SelectTrigger id="web-search-provider" data-testid="web-search-provider">
-                      <SelectValue placeholder="Choose provider" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        {SEARCH_PROVIDERS.map((provider) => (
-                          <SelectItem key={provider} value={provider}>
-                            {SEARCH_PROVIDER_LABELS[provider]}
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
+          <Collapsible asChild data-testid="advanced-settings-panel">
+            <section className="flex flex-col gap-3">
+              <CollapsibleTrigger className="group -mx-2 flex w-[calc(100%+1rem)] items-start justify-between gap-3 rounded-md px-2 py-1 text-left transition-colors hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/30">
+                <div className="min-w-0">
+                  <h2 className="text-sm font-medium text-foreground">Advanced</h2>
+                  <p className="mt-1 truncate text-xs text-muted-foreground">{advancedSummary}</p>
                 </div>
+                <HugeiconsIcon
+                  icon={ArrowDown01Icon}
+                  aria-hidden
+                  className="mt-1 size-4 shrink-0 text-muted-foreground transition-transform duration-200 group-data-[state=open]:rotate-180"
+                />
+              </CollapsibleTrigger>
+
+              <CollapsibleContent className="flex flex-col gap-4 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0">
+                <p className="max-w-[68ch] text-xs text-muted-foreground">
+                  Tune draft-generation limits and opt into bounded provider search. Search keys are
+                  stored in OS-backed safe storage, separate from model credentials.
+                </p>
 
                 <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="web-search-api-key">Search Credential</Label>
+                  <Label htmlFor="turn-budget">Turn budget</Label>
                   <div className="flex items-center gap-3">
                     <Input
-                      id="web-search-api-key"
-                      data-testid="web-search-api-key"
-                      type="password"
-                      value={advanced.webSearchApiKey}
-                      onChange={(event) => advanced.setWebSearchApiKey(event.target.value)}
-                      placeholder={searchKeyPlaceholder}
-                      className="flex-1 font-mono"
+                      id="turn-budget"
+                      data-testid="turn-budget-input"
+                      inputMode="numeric"
+                      type="number"
+                      min={MIN_TURN_BUDGET}
+                      max={MAX_TURN_BUDGET}
+                      step={1}
+                      value={advanced.turnBudgetDraft}
+                      onChange={(event) => advanced.setTurnBudgetDraft(event.target.value)}
+                      onBlur={() => void advanced.saveTurnBudget()}
+                      aria-invalid={Boolean(advanced.turnBudgetError)}
+                      aria-describedby={
+                        advanced.turnBudgetError ? 'turn-budget-error' : 'turn-budget-help'
+                      }
+                      className="max-w-28 font-mono"
                     />
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => void advanced.saveWebSearchApiKey()}
-                      disabled={!advanced.webSearchApiKey.trim() || advanced.savingKey}
+                      onClick={() => void advanced.saveTurnBudget()}
+                      disabled={!turnBudgetDirty}
                     >
-                      <HugeiconsIcon icon={Search01Icon} data-icon="inline-start" aria-hidden />
-                      {advanced.savingKey ? 'Saving' : 'Save'}
+                      Save
                     </Button>
                   </div>
-                  <p className="text-[11px] text-muted-foreground">
-                    Current: {advancedSettings.webSearchProvider} · key{' '}
-                    {advancedSettings.webSearchHasApiKey ? 'stored' : 'not stored'}
-                  </p>
+                  {advanced.turnBudgetError ? (
+                    <p id="turn-budget-error" className="text-xs text-destructive">
+                      {advanced.turnBudgetError}
+                    </p>
+                  ) : (
+                    <p id="turn-budget-help" className="text-xs text-muted-foreground">
+                      {TURN_BUDGET_HELP}
+                    </p>
+                  )}
                 </div>
-              </div>
-            )}
-          </section>
+
+                <Separator />
+
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0">
+                      <Label htmlFor="web-search-enabled" className="text-sm font-medium">
+                        Web search
+                      </Label>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Registers a bounded search-results tool only when enabled and keyed.
+                      </p>
+                    </div>
+                    <Switch
+                      id="web-search-enabled"
+                      data-testid="web-search-toggle"
+                      checked={advancedSettings?.webSearchEnabled ?? false}
+                      onCheckedChange={(enabled) => void advanced.setWebSearchEnabled(enabled)}
+                      aria-label="Enable Web search"
+                    />
+                  </div>
+
+                  {advancedSettings?.webSearchEnabled && (
+                    <div className="grid gap-3 rounded-md bg-muted/35 p-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)]">
+                      <div className="flex flex-col gap-1.5">
+                        <Label htmlFor="web-search-provider">Search provider</Label>
+                        <Select
+                          value={advancedSettings.webSearchProvider}
+                          onValueChange={(provider) => {
+                            if (isSearchProvider(provider)) {
+                              void advanced.setWebSearchProvider(provider)
+                            }
+                          }}
+                        >
+                          <SelectTrigger id="web-search-provider" data-testid="web-search-provider">
+                            <SelectValue placeholder="Choose provider" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectGroup>
+                              {SEARCH_PROVIDERS.map((provider) => (
+                                <SelectItem key={provider} value={provider}>
+                                  {SEARCH_PROVIDER_LABELS[provider]}
+                                </SelectItem>
+                              ))}
+                            </SelectGroup>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="flex flex-col gap-1.5">
+                        <Label htmlFor="web-search-api-key">Search API key</Label>
+                        <div className="flex items-center gap-3">
+                          <Input
+                            id="web-search-api-key"
+                            data-testid="web-search-api-key"
+                            type="password"
+                            value={advanced.webSearchApiKey}
+                            onChange={(event) => advanced.setWebSearchApiKey(event.target.value)}
+                            placeholder={searchKeyPlaceholder}
+                            className="flex-1 font-mono"
+                          />
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => void advanced.saveWebSearchApiKey()}
+                            disabled={!advanced.webSearchApiKey.trim() || advanced.savingKey}
+                          >
+                            <HugeiconsIcon
+                              icon={Search01Icon}
+                              data-icon="inline-start"
+                              aria-hidden
+                            />
+                            {advanced.savingKey ? 'Saving' : 'Save'}
+                          </Button>
+                        </div>
+                        <p className="text-[11px] text-muted-foreground">
+                          Current: {SEARCH_PROVIDER_LABELS[advancedSettings.webSearchProvider]} ·
+                          key {advancedSettings.webSearchHasApiKey ? 'stored' : 'not stored'}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </CollapsibleContent>
+            </section>
+          </Collapsible>
 
           <section className="flex flex-col gap-3">
             <h2 className="text-sm font-medium text-foreground">Global Hotkey</h2>

@@ -11,6 +11,21 @@ type LockResult<T> = { result: T; next?: string }
 type PiCodingAgentModule = typeof import('@earendil-works/pi-coding-agent')
 
 let piCodingAgentModule: Promise<PiCodingAgentModule> | null = null
+let warnedAboutDevFallback = false
+
+const DEV_AUTH_FILENAME = 'auth.dev.json'
+
+function canUseInsecureDevFallback(): boolean {
+  return !app.isPackaged
+}
+
+function warnAboutDevFallback(): void {
+  if (warnedAboutDevFallback) return
+  warnedAboutDevFallback = true
+  console.warn(
+    'safeStorage encryption unavailable — using plaintext dev-only Pi auth storage in Electron userData'
+  )
+}
 
 export class SafeStorageAuthStorageBackend implements AuthStorageBackend {
   constructor(private readonly dir = join(app.getPath('userData'), 'pi-auth')) {}
@@ -28,6 +43,12 @@ export class SafeStorageAuthStorageBackend implements AuthStorageBackend {
   }
 
   private readAll(): string | undefined {
+    if (!safeStorage.isEncryptionAvailable()) {
+      if (!canUseInsecureDevFallback()) return undefined
+      warnAboutDevFallback()
+      return this.readDevAuth()
+    }
+
     if (!existsSync(this.dir)) return undefined
 
     const data: Record<string, unknown> = {}
@@ -44,6 +65,12 @@ export class SafeStorageAuthStorageBackend implements AuthStorageBackend {
 
   private writeAll(next: string): void {
     if (!safeStorage.isEncryptionAvailable()) {
+      if (canUseInsecureDevFallback()) {
+        warnAboutDevFallback()
+        this.writeDevAuth(next)
+        return
+      }
+
       throw new Error('safeStorage encryption is unavailable.')
     }
 
@@ -58,6 +85,21 @@ export class SafeStorageAuthStorageBackend implements AuthStorageBackend {
       const encrypted = safeStorage.encryptString(JSON.stringify(credential))
       writeFileSync(join(this.dir, `${provider}.bin`), encrypted)
     }
+  }
+
+  private getDevAuthPath(): string {
+    return join(this.dir, DEV_AUTH_FILENAME)
+  }
+
+  private readDevAuth(): string | undefined {
+    const path = this.getDevAuthPath()
+    if (!existsSync(path)) return undefined
+    return readFileSync(path, 'utf-8')
+  }
+
+  private writeDevAuth(next: string): void {
+    mkdirSync(this.dir, { recursive: true })
+    writeFileSync(this.getDevAuthPath(), next)
   }
 }
 

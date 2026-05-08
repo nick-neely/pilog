@@ -83,10 +83,8 @@ function outputDraftClassName(selected: boolean): string {
 }
 
 export function AgentRuns({
-  onBack,
   onOpenSourceNote
 }: {
-  onBack: () => void
   onOpenSourceNote: (noteId: string) => void
 }): React.JSX.Element {
   const [runs, setRuns] = useState<AgentRunListItem[]>([])
@@ -161,45 +159,47 @@ export function AgentRuns({
   const selectedDraft = detail?.outputDrafts.find((draft) => draft.id === selectedDraftId) ?? null
 
   return (
-    <div className="flex h-screen bg-background text-foreground">
+    <div className="flex h-full bg-background text-foreground">
+      {/* View nav lives in AppShell's top bar; this surface is just the
+          run list + detail. The visible-count caption that used to sit
+          in the title strip moves into the status filter row, where it
+          reads as "scope of what's listed below" without needing chrome
+          of its own. */}
       <aside className="flex w-[27rem] min-w-0 shrink-0 flex-col overflow-hidden border-r">
-        <header className="flex min-h-14 shrink-0 items-center justify-between gap-3 border-b px-6 py-3">
-          <div className="min-w-0">
-            <h1 className="font-heading text-xl font-medium tracking-tight">Agent Runs</h1>
-            <p className="tabular text-xs text-muted-foreground">{runs.length} visible</p>
+        <div className="flex shrink-0 items-center justify-between gap-3 border-b px-6 py-2.5">
+          <div className="flex flex-wrap gap-x-1.5 gap-y-1">
+            {STATUS_FILTERS.map((chip) => {
+              const active = statusFilter === chip.value
+              return (
+                <Button
+                  key={chip.value}
+                  type="button"
+                  variant={active ? 'secondary' : 'ghost'}
+                  size="xs"
+                  data-testid={`run-filter-${chip.value}`}
+                  onClick={() => {
+                    setStatusFilter((prev) => (prev === chip.value ? undefined : chip.value))
+                    setSelectedRunId(null)
+                  }}
+                  aria-pressed={active}
+                  className="rounded-full gap-1.5 font-medium"
+                >
+                  <span
+                    aria-hidden
+                    className={
+                      'h-1.5 w-1.5 rounded-full ' + (active ? 'bg-primary' : 'bg-transparent')
+                    }
+                  />
+                  {chip.label}
+                </Button>
+              )
+            })}
           </div>
-          <Button variant="outline" size="sm" onClick={onBack}>
-            Inbox
-          </Button>
-        </header>
-
-        <div className="flex shrink-0 flex-wrap gap-x-1.5 gap-y-1 border-b px-6 py-2.5">
-          {STATUS_FILTERS.map((chip) => {
-            const active = statusFilter === chip.value
-            return (
-              <Button
-                key={chip.value}
-                type="button"
-                variant={active ? 'secondary' : 'ghost'}
-                size="xs"
-                data-testid={`run-filter-${chip.value}`}
-                onClick={() => {
-                  setStatusFilter((prev) => (prev === chip.value ? undefined : chip.value))
-                  setSelectedRunId(null)
-                }}
-                aria-pressed={active}
-                className="rounded-full gap-1.5 font-medium"
-              >
-                <span
-                  aria-hidden
-                  className={
-                    'h-1.5 w-1.5 rounded-full ' + (active ? 'bg-primary' : 'bg-transparent')
-                  }
-                />
-                {chip.label}
-              </Button>
-            )
-          })}
+          {runs.length > 0 ? (
+            <span className="tabular shrink-0 self-center text-xs text-muted-foreground">
+              {runs.length}
+            </span>
+          ) : null}
         </div>
 
         <div

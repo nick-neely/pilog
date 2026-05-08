@@ -1,13 +1,15 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { existsSync, mkdirSync, readFileSync, readdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 let userDataDir: string
+let encryptionAvailable = true
+let isPackaged = false
 
 vi.mock('electron', () => ({
   safeStorage: {
-    isEncryptionAvailable: () => true,
+    isEncryptionAvailable: () => encryptionAvailable,
     encryptString: (text: string) =>
       Buffer.from(`encrypted:${Buffer.from(text, 'utf-8').toString('base64')}`),
     decryptString: (buffer: Buffer) => {
@@ -17,7 +19,10 @@ vi.mock('electron', () => ({
     }
   },
   app: {
-    getPath: vi.fn(() => userDataDir)
+    getPath: vi.fn(() => userDataDir),
+    get isPackaged() {
+      return isPackaged
+    }
   }
 }))
 
@@ -25,7 +30,13 @@ describe('SafeStorageAuthStorage', () => {
   beforeEach(() => {
     userDataDir = join(tmpdir(), `pilog-pi-auth-test-${Date.now()}-${Math.random()}`)
     mkdirSync(userDataDir, { recursive: true })
+    encryptionAvailable = true
+    isPackaged = false
     vi.resetModules()
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
   })
 
   it('round-trips provider API keys through safeStorage encrypted blobs', async () => {
@@ -55,5 +66,23 @@ describe('SafeStorageAuthStorage', () => {
     clearSafeStorageAuthStorage()
 
     expect(existsSync(join(userDataDir, 'pi-auth'))).toBe(false)
+  })
+
+  it('uses plaintext dev-only storage when safeStorage encryption is unavailable', async () => {
+    encryptionAvailable = false
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const { createSafeStorageAuthStorage } = await import('./auth-storage')
+    const authStorage = await createSafeStorageAuthStorage()
+
+    authStorage.set('google-gemini', { type: 'api_key', key: 'gemini-test-secret' })
+
+    expect(warnSpy).toHaveBeenCalled()
+    expect((await createSafeStorageAuthStorage()).get('google-gemini')).toEqual({
+      type: 'api_key',
+      key: 'gemini-test-secret'
+    })
+
+    const raw = JSON.parse(readFileSync(join(userDataDir, 'pi-auth', 'auth.dev.json'), 'utf-8'))
+    expect(raw['google-gemini']).toEqual({ type: 'api_key', key: 'gemini-test-secret' })
   })
 })
