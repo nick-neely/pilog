@@ -6,6 +6,17 @@ import { markdown } from '@codemirror/lang-markdown'
 import { syntaxHighlighting, defaultHighlightStyle } from '@codemirror/language'
 import { shouldSave } from '@shared/scratchpad'
 import type { Repo } from '@shared/ipc'
+import { Badge } from '@renderer/components/ui/badge'
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '@renderer/components/ui/select'
+
+const NOTE_REPO_NONE = '__none__'
 
 export function Scratchpad(): React.JSX.Element {
   const editorRef = useRef<HTMLDivElement>(null)
@@ -128,9 +139,8 @@ export function Scratchpad(): React.JSX.Element {
     return window.pilog.on('scratchpad:reset', resetEditor)
   }, [resetEditor])
 
-  const handleRepoChange = (e: React.ChangeEvent<HTMLSelectElement>): void => {
-    const value = e.target.value
-    setSelectedRepoId(value || null)
+  const handleRepoChange = (value: string): void => {
+    setSelectedRepoId(value === NOTE_REPO_NONE ? null : value)
   }
 
   return (
@@ -139,27 +149,34 @@ export function Scratchpad(): React.JSX.Element {
       {/* Inline repo selector — top-right, compact, keyboard-reachable */}
       <div className="absolute top-2 right-2 z-10">
         {repos.length === 0 ? (
-          <span
+          <Badge
+            variant="outline"
+            className="cursor-default font-normal opacity-50"
             aria-label="Link a repo first in Settings"
             title="Link a repo first in Settings → Repositories"
-            className="cursor-default select-none rounded border border-border bg-background px-2 py-1 text-xs text-muted-foreground opacity-50"
           >
             Link a repo first
-          </span>
+          </Badge>
         ) : (
-          <select
-            aria-label="Repository for this note"
-            value={selectedRepoId ?? ''}
-            onChange={handleRepoChange}
-            className="rounded border border-border bg-background px-2 py-1 text-xs text-muted-foreground hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring/30"
-          >
-            <option value="">No repo</option>
-            {repos.map((r) => (
-              <option key={r.id} value={r.id}>
-                {r.owner}/{r.name}
-              </option>
-            ))}
-          </select>
+          <Select value={selectedRepoId ?? NOTE_REPO_NONE} onValueChange={handleRepoChange}>
+            <SelectTrigger
+              aria-label="Repository for this note"
+              size="sm"
+              className="max-w-[min(100vw-2rem,16rem)] text-xs text-muted-foreground"
+            >
+              <SelectValue placeholder="No repo" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                <SelectItem value={NOTE_REPO_NONE}>No repo</SelectItem>
+                {repos.map((r) => (
+                  <SelectItem key={r.id} value={r.id}>
+                    {r.owner}/{r.name}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
         )}
       </div>
     </div>

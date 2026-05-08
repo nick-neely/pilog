@@ -30,6 +30,17 @@ import {
   CommandSeparator,
   CommandShortcut
 } from '@renderer/components/ui/command'
+import { Badge } from '@renderer/components/ui/badge'
+import { Empty, EmptyDescription } from '@renderer/components/ui/empty'
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '@renderer/components/ui/select'
+import { Textarea } from '@renderer/components/ui/textarea'
 import type { ListNotesRequest, Note, NoteStatus, Repo } from '@shared/ipc'
 
 const STATUS_CHIPS: { value: NoteStatus; label: string }[] = [
@@ -74,20 +85,23 @@ function useDebounce(value: string, ms: number): string {
   return debounced
 }
 
-// repoFilter encoding for <select> values:
-//   ''            → undefined (All repos — no filter)
+// repoFilter encoding for Select values (non-empty strings for Radix Select items).
+//   '__all__'     → undefined (All repos — no filter)
 //   '$unassigned' → null      (only notes with no repo)
 //   repo.id       → repo.id   (specific repo)
+const FILTER_ALL_REPOS = '__all__'
 const UNASSIGNED_KEY = '$unassigned'
+/** Note/scratchpad: no repo assigned */
+const NOTE_REPO_NONE = '__none__'
 
 function encodeRepoFilter(f: string | null | undefined): string {
-  if (f === undefined) return ''
+  if (f === undefined) return FILTER_ALL_REPOS
   if (f === null) return UNASSIGNED_KEY
   return f
 }
 
 function decodeRepoFilter(v: string): string | null | undefined {
-  if (v === '') return undefined
+  if (v === FILTER_ALL_REPOS) return undefined
   if (v === UNASSIGNED_KEY) return null
   return v
 }
@@ -174,11 +188,11 @@ function NoteDetail({
         </div>
       </header>
       <div className="flex-1 overflow-y-auto">
-        <textarea
+        <Textarea
           aria-label="Note content"
           // Body line length capped at 72ch per DESIGN.md; mono editor body
           // pairs with the rest of the system (file paths, code blocks).
-          className="block min-h-full w-full max-w-[72ch] mx-auto resize-none border-none bg-background px-6 py-6 font-mono text-sm leading-relaxed text-foreground outline-none"
+          className="block min-h-full w-full max-w-[72ch] mx-auto rounded-none border-0 bg-transparent px-6 py-6 font-mono text-sm leading-relaxed text-foreground shadow-none field-sizing-content focus-visible:ring-0"
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           placeholder="Capture a thought…"
@@ -192,28 +206,38 @@ function NoteDetail({
           {repos.length === 0 ? (
             <span className="text-xs text-muted-foreground">
               No repos linked —{' '}
-              <button
+              <Button
                 type="button"
+                variant="link"
+                className="h-auto p-0 text-xs"
                 onClick={onNavigateToRepositories}
-                className="text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30 rounded"
               >
                 link one in Repositories
-              </button>
+              </Button>
             </span>
           ) : (
-            <select
-              aria-label="Repository"
-              value={note.repoId ?? ''}
-              onChange={(e) => void onRepoChange(note.id, e.target.value || null)}
-              className="rounded border border-border bg-background px-2 py-1 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-ring/30"
+            <Select
+              value={note.repoId ?? NOTE_REPO_NONE}
+              onValueChange={(v) => void onRepoChange(note.id, v === NOTE_REPO_NONE ? null : v)}
             >
-              <option value="">Unassigned</option>
-              {repos.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {r.owner}/{r.name}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger
+                aria-label="Repository"
+                size="sm"
+                className="max-w-[min(100%,14rem)] text-xs"
+              >
+                <SelectValue placeholder="Unassigned" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectItem value={NOTE_REPO_NONE}>Unassigned</SelectItem>
+                  {repos.map((r) => (
+                    <SelectItem key={r.id} value={r.id}>
+                      {r.owner}/{r.name}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
           )}
         </div>
       </footer>
@@ -431,24 +455,26 @@ export function Inbox({
               // means the user never has to look elsewhere to find the
               // escape hatch. Esc and the palette's "Clear selection" command
               // do the same job for keyboard users.
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="xs"
                 data-testid="selected-count"
                 onClick={clearSelection}
                 title="Clear selection (Esc)"
                 aria-label={`Clear ${selectionCount} selected ${
                   selectionCount === 1 ? 'note' : 'notes'
                 }`}
-                className="tabular inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/30 focus-visible:bg-muted focus-visible:text-foreground"
+                className="tabular rounded-full px-1.5 py-0.5 text-muted-foreground"
               >
                 <HugeiconsIcon
                   icon={Cancel01Icon}
-                  className="h-3 w-3"
+                  data-icon="inline-start"
                   aria-hidden
                   strokeWidth={2}
                 />
                 {selectionCount} selected
-              </button>
+              </Button>
             ) : (
               notes.length > 0 && (
                 <span className="tabular text-xs text-muted-foreground">{notes.length}</span>
@@ -456,90 +482,102 @@ export function Inbox({
             )}
           </div>
           <div className="flex shrink-0 items-center gap-1">
-            <button
+            <Button
               type="button"
+              variant="outline"
+              size="icon-xs"
               data-testid="open-settings"
               onClick={() => onNavigateToSettings()}
               aria-label="Settings"
               title="Settings"
-              className="inline-flex shrink-0 items-center justify-center rounded-md border border-border bg-transparent px-2 py-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/30 focus-visible:border-ring"
             >
-              <HugeiconsIcon icon={Settings02Icon} className="h-3.5 w-3.5" aria-hidden />
-            </button>
-            <button
+              <HugeiconsIcon icon={Settings02Icon} aria-hidden />
+            </Button>
+            <Button
               type="button"
+              variant="outline"
+              size="sm"
               data-testid="open-command"
               onClick={() => setPaletteOpen(true)}
               aria-label="Open command palette"
               title="Search and commands"
-              className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-border bg-transparent px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/30 focus-visible:border-ring"
+              className="gap-1.5 px-2 text-xs text-muted-foreground"
             >
-              <HugeiconsIcon icon={Search01Icon} className="h-3.5 w-3.5" aria-hidden />
-              <kbd className="font-mono">{META_KEY}K</kbd>
-            </button>
+              <HugeiconsIcon icon={Search01Icon} aria-hidden />
+              <kbd className="pointer-events-none font-mono">{META_KEY}K</kbd>
+            </Button>
           </div>
         </header>
 
         {/* (2) Filter rail — status row, then repo (avoids wrapped chip + orphaned select) */}
-        <div className="shrink-0 space-y-2 border-b px-6 py-2.5">
-          <div className="flex flex-wrap gap-x-1.5 gap-y-1">{STATUS_CHIPS.map((chip) => {
-            const active = statusFilter === chip.value
-            return (
-              <button
-                key={chip.value}
-                type="button"
-                data-testid={`filter-${chip.value}`}
-                onClick={() => toggleStatus(chip.value)}
-                aria-pressed={active}
-                className={
-                  'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs transition-colors focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/30 focus-visible:border-ring ' +
-                  (active
-                    ? 'border-border bg-muted font-semibold text-foreground'
-                    : 'border-transparent bg-transparent font-medium text-muted-foreground hover:text-foreground')
-                }
-              >
-                {/* Moss leading dot only on the active filter — type-led
-                    emphasis with a small on-brand accent, not a fill. */}
-                <span
-                  aria-hidden
-                  className={
-                    'h-1.5 w-1.5 rounded-full transition-colors ' +
-                    (active ? 'bg-primary' : 'bg-transparent')
-                  }
-                />
-                {chip.label}
-              </button>
-            )
-          })}
+        <div className="flex shrink-0 flex-col gap-2 border-b px-6 py-2.5">
+          <div className="flex flex-wrap gap-x-1.5 gap-y-1">
+            {STATUS_CHIPS.map((chip) => {
+              const active = statusFilter === chip.value
+              return (
+                <Button
+                  key={chip.value}
+                  type="button"
+                  variant={active ? 'secondary' : 'ghost'}
+                  size="xs"
+                  data-testid={`filter-${chip.value}`}
+                  onClick={() => toggleStatus(chip.value)}
+                  aria-pressed={active}
+                  className="rounded-full gap-1.5 font-medium"
+                >
+                  {/* Moss leading dot only on the active filter — type-led
+                      emphasis with a small on-brand accent, not a fill. */}
+                  <span
+                    aria-hidden
+                    className={
+                      'h-1.5 w-1.5 rounded-full transition-colors ' +
+                      (active ? 'bg-primary' : 'bg-transparent')
+                    }
+                  />
+                  {chip.label}
+                </Button>
+              )
+            })}
           </div>
-          <select
-            aria-label="Filter by repository"
-            data-testid="filter-repo"
+          <Select
             value={encodeRepoFilter(repoFilter)}
-            onChange={(e) => {
-              setRepoFilter(decodeRepoFilter(e.target.value))
+            onValueChange={(v) => {
+              setRepoFilter(decodeRepoFilter(v))
               setSelectedIds(new Set())
               lastClickedIndex.current = null
             }}
             disabled={repos.length === 0}
-            className="h-8 w-full max-w-full rounded border border-border bg-background px-2 text-xs text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/30 disabled:opacity-40"
           >
-            <option value="">All repos</option>
-            <option value={UNASSIGNED_KEY}>Unassigned</option>
-            {repos.map((r) => (
-              <option key={r.id} value={r.id}>
-                {r.owner}/{r.name}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger
+              aria-label="Filter by repository"
+              data-testid="filter-repo"
+              size="sm"
+              className="h-8 w-full max-w-full text-xs text-muted-foreground disabled:opacity-40"
+            >
+              <SelectValue placeholder="All repos" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                <SelectItem value={FILTER_ALL_REPOS}>All repos</SelectItem>
+                <SelectItem value={UNASSIGNED_KEY}>Unassigned</SelectItem>
+                {repos.map((r) => (
+                  <SelectItem key={r.id} value={r.id}>
+                    {r.owner}/{r.name}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
         </div>
 
         {/* (3) Scrolling list */}
         <main className="flex-1 overflow-y-auto p-3">
           {notes.length === 0 ? (
-            <p className="mt-12 text-center text-sm text-muted-foreground">{emptyMessage}</p>
+            <Empty className="mt-12 border-none bg-transparent p-8 shadow-none">
+              <EmptyDescription>{emptyMessage}</EmptyDescription>
+            </Empty>
           ) : (
-            <ul className="space-y-1">
+            <ul className="flex flex-col gap-1">
               {notes.map((note, index) => {
                 const isSelected = selectedIds.has(note.id)
                 const preview = note.content.trim() || 'Untitled note'
@@ -559,9 +597,9 @@ export function Inbox({
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm leading-snug">{preview}</p>
                       <div className="mt-1 flex items-center gap-2 text-xs">
-                        <span className="rounded-md bg-secondary px-1.5 py-0.5 text-xs font-medium text-foreground/80">
+                        <Badge variant="secondary" className="font-medium text-foreground/80">
                           {STATUS_LABEL[note.status]}
-                        </span>
+                        </Badge>
                         {repo && (
                           <span className="truncate font-mono text-xs text-muted-foreground/70">
                             {repo.owner}/{repo.name}
@@ -594,7 +632,7 @@ export function Inbox({
                 title="Generate Drafts activates in Phase 3"
                 className="flex-1 justify-center"
               >
-                <HugeiconsIcon icon={SparklesIcon} className="h-4 w-4" aria-hidden />
+                <HugeiconsIcon icon={SparklesIcon} data-icon="inline-start" aria-hidden />
                 Generate Drafts
               </Button>
               <Button
@@ -604,7 +642,7 @@ export function Inbox({
                 title="Dismiss activates in Phase 4"
                 className="flex-1 justify-center"
               >
-                <HugeiconsIcon icon={CancelCircleIcon} className="h-4 w-4" aria-hidden />
+                <HugeiconsIcon icon={CancelCircleIcon} data-icon="inline-start" aria-hidden />
                 Dismiss
               </Button>
             </div>
@@ -615,7 +653,7 @@ export function Inbox({
               className="w-full justify-center"
               data-testid="new-note-footer"
             >
-              <HugeiconsIcon icon={Add01Icon} className="h-4 w-4" aria-hidden />
+              <HugeiconsIcon icon={Add01Icon} data-icon="inline-start" aria-hidden />
               New note
             </Button>
           )}
@@ -638,13 +676,13 @@ export function Inbox({
             onNavigateToRepositories={onNavigateToRepositories}
           />
         ) : (
-          <div className="flex h-full w-full flex-col items-center justify-center gap-3 px-6 text-center">
-            <p className="max-w-[36ch] text-sm text-muted-foreground">
+          <Empty className="h-full border-none bg-transparent shadow-none">
+            <EmptyDescription className="max-w-[36ch]">
               {selectionCount > 1
                 ? `${selectionCount} notes selected. Triage actions live in the sidebar footer; press Esc to clear.`
                 : 'Select a note to read or edit.'}
-            </p>
-          </div>
+            </EmptyDescription>
+          </Empty>
         )}
       </section>
 
