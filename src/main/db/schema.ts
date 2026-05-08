@@ -59,9 +59,7 @@ export const agentRuns = sqliteTable('agent_runs', {
 
 export const publishLog = sqliteTable('publish_log', {
   id: text('id').primaryKey(),
-  draftId: text('draft_id')
-    .notNull()
-    .references(() => issueDrafts.id),
+  draftId: text('draft_id').references(() => issueDrafts.id),
   repoId: text('repo_id')
     .notNull()
     .references(() => repos.id),

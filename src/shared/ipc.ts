@@ -58,6 +58,35 @@ export type LinkRepoRequest = {
   defaultBranch: string
 }
 
+export type GitHubLabel = {
+  id: number
+  name: string
+  color: string
+  description: string | null
+}
+
+export type CreateIssueRequest = {
+  owner: string
+  repo: string
+  repoId: string
+  title: string
+  body: string
+  labels?: string[]
+}
+
+export type CreatedIssue = {
+  url: string
+  number: number
+}
+
+export type PublishLogEntry = {
+  id: string
+  draftId: string | null
+  repoId: string
+  githubIssueUrl: string
+  publishedAt: string
+}
+
 export type IpcContract = {
   'note:create': { request: { content: string; repoId?: string | null }; response: Note }
   'note:list': { request: ListNotesRequest | void; response: Note[] }
@@ -76,6 +105,14 @@ export type IpcContract = {
   'repos:link': { request: LinkRepoRequest; response: Repo }
   'repos:unlink': { request: { id: string }; response: boolean }
   'dialog:openDirectory': { request: void; response: string | null }
+  'github:listLabels': {
+    request: { owner: string; repo: string }
+    response: GitHubLabel[]
+  }
+  'github:createIssue': {
+    request: CreateIssueRequest
+    response: CreatedIssue
+  }
 }
 
 export type IpcChannel = keyof IpcContract

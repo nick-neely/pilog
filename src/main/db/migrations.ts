@@ -60,12 +60,33 @@ export function runMigrations(db: PilogDatabase): void {
   db.run(sql`
     CREATE TABLE IF NOT EXISTS publish_log (
       id TEXT PRIMARY KEY,
-      draft_id TEXT NOT NULL REFERENCES issue_drafts(id),
+      draft_id TEXT REFERENCES issue_drafts(id),
       repo_id TEXT NOT NULL REFERENCES repos(id),
       github_issue_url TEXT NOT NULL,
       published_at TEXT NOT NULL
     )
   `)
+
+  // If draft_id was previously NOT NULL, recreate the table to allow null
+  // (needed for hand-written issues that have no parent issue_draft)
+  const cols = db.all(
+    sql`PRAGMA table_info(publish_log)`
+  ) as Array<{ name: string; notnull: number }>
+  const draftIdCol = cols.find((c) => c.name === 'draft_id')
+  if (draftIdCol && draftIdCol.notnull === 1) {
+    db.run(sql`ALTER TABLE publish_log RENAME TO publish_log_old`)
+    db.run(sql`
+      CREATE TABLE publish_log (
+        id TEXT PRIMARY KEY,
+        draft_id TEXT REFERENCES issue_drafts(id),
+        repo_id TEXT NOT NULL REFERENCES repos(id),
+        github_issue_url TEXT NOT NULL,
+        published_at TEXT NOT NULL
+      )
+    `)
+    db.run(sql`INSERT INTO publish_log SELECT * FROM publish_log_old`)
+    db.run(sql`DROP TABLE publish_log_old`)
+  }
 
   db.run(sql`
     CREATE TABLE IF NOT EXISTS settings (

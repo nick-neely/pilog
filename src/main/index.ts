@@ -46,10 +46,13 @@ app.whenReady().then(() => {
 
   registerIpcHandlers(db, { onNoteCreated: broadcastNoteCreated })
 
-  registerGitHubIpcHandlers({
-    clientId: process.env.GITHUB_CLIENT_ID ?? '',
-    clientSecret: process.env.GITHUB_CLIENT_SECRET ?? ''
-  })
+  registerGitHubIpcHandlers(
+    {
+      clientId: process.env.GITHUB_CLIENT_ID ?? '',
+      clientSecret: process.env.GITHUB_CLIENT_SECRET ?? ''
+    },
+    db
+  )
 
   registerRepoIpcHandlers(db)
 

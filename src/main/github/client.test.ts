@@ -30,6 +30,16 @@ const mockRepoPage = [
   }
 ]
 
+const mockLabelsPage = [
+  { id: 1, name: 'bug', color: 'ff0000', description: 'Something is broken' },
+  { id: 2, name: 'enhancement', color: '00ff00', description: null }
+]
+
+// Controls for issue mock behavior — closures capture by reference so tests can mutate these
+let mockIssueCreateReject = false
+let mockIssueCreateStatus = 422
+let mockIssueCreateMessage = 'Validation Failed'
+
 vi.mock('@octokit/rest', () => {
   class MockOctokit {
     rest = {
@@ -40,6 +50,23 @@ vi.mock('@octokit/rest', () => {
       },
       repos: {
         listForAuthenticatedUser: vi.fn()
+      },
+      issues: {
+        listLabelsForRepo: vi.fn().mockResolvedValue({ data: mockLabelsPage }),
+        create: vi.fn().mockImplementation(() => {
+          if (mockIssueCreateReject) {
+            const err = Object.assign(new Error(mockIssueCreateMessage), {
+              status: mockIssueCreateStatus
+            })
+            return Promise.reject(err)
+          }
+          return Promise.resolve({
+            data: {
+              html_url: 'https://github.com/nick-neely/pilog/issues/42',
+              number: 42
+            }
+          })
+        })
       }
     }
     paginate = {
@@ -59,6 +86,9 @@ describe('github client', () => {
 
   beforeEach(async () => {
     vi.resetModules()
+    mockIssueCreateReject = false
+    mockIssueCreateStatus = 422
+    mockIssueCreateMessage = 'Validation Failed'
     const secrets = await import('../security/secrets')
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     secretsStore = (secrets as any).__store
@@ -130,5 +160,71 @@ describe('github client', () => {
       url: 'https://github.com/nick-neely/pilog',
       defaultBranch: 'main'
     })
+  })
+
+  // listLabels tests
+  it('listLabels returns empty array when not authenticated', async () => {
+    const labels = await client.listLabels('nick-neely', 'pilog')
+    expect(labels).toEqual([])
+  })
+
+  it('listLabels returns mapped labels when authenticated', async () => {
+    secretsStore.set('github_token', 'gho_abc')
+    const labels = await client.listLabels('nick-neely', 'pilog')
+    expect(labels).toHaveLength(2)
+    expect(labels[0]).toEqual({
+      id: 1,
+      name: 'bug',
+      color: 'ff0000',
+      description: 'Something is broken'
+    })
+    expect(labels[1]).toEqual({
+      id: 2,
+      name: 'enhancement',
+      color: '00ff00',
+      description: null
+    })
+  })
+
+  // createIssue tests
+  it('createIssue throws when not authenticated', async () => {
+    await expect(
+      client.createIssue('nick-neely', 'pilog', { title: 'Bug', body: 'Details' })
+    ).rejects.toThrow('Not authenticated')
+  })
+
+  it('createIssue returns url and number on success', async () => {
+    secretsStore.set('github_token', 'gho_abc')
+    const result = await client.createIssue('nick-neely', 'pilog', {
+      title: 'Test issue',
+      body: 'Test body',
+      labels: ['bug']
+    })
+    expect(result).toEqual({
+      url: 'https://github.com/nick-neely/pilog/issues/42',
+      number: 42
+    })
+  })
+
+  it('createIssue propagates 422 validation error without retry', async () => {
+    secretsStore.set('github_token', 'gho_abc')
+    mockIssueCreateReject = true
+    mockIssueCreateStatus = 422
+    mockIssueCreateMessage = 'Validation Failed'
+
+    await expect(
+      client.createIssue('nick-neely', 'pilog', { title: '', body: '' })
+    ).rejects.toMatchObject({ status: 422 })
+  })
+
+  it('createIssue propagates 401 token-expired error without retry', async () => {
+    secretsStore.set('github_token', 'gho_abc')
+    mockIssueCreateReject = true
+    mockIssueCreateStatus = 401
+    mockIssueCreateMessage = 'Bad credentials'
+
+    await expect(
+      client.createIssue('nick-neely', 'pilog', { title: 'Test', body: 'Body' })
+    ).rejects.toMatchObject({ status: 401 })
   })
 })
