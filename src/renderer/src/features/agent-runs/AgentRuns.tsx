@@ -10,6 +10,7 @@ import {
 import { Badge } from '@renderer/components/ui/badge'
 import { Button } from '@renderer/components/ui/button'
 import { Empty, EmptyDescription } from '@renderer/components/ui/empty'
+import { cn } from '@renderer/lib/utils'
 import type { AgentRunDetail, AgentRunListItem, AgentRunStatus } from '@shared/ipc'
 
 const STATUS_FILTERS: { value: AgentRunStatus; label: string }[] = [
@@ -36,22 +37,49 @@ function formatDuration(run: AgentRunListItem): string {
   const duration = run.durationMs ?? Date.now() - Date.parse(run.startedAt)
   if (!Number.isFinite(duration) || duration < 0) return '...'
   if (duration < 1000) return `${duration} ms`
-  return `${(duration / 1000).toFixed(duration < 10000 ? 1 : 0)} s`
+
+  const precision = duration < 10000 ? 1 : 0
+  return `${(duration / 1000).toFixed(precision)} s`
 }
 
 function statusIcon(status: AgentRunStatus): React.JSX.Element {
-  if (status === 'running')
-    return <HugeiconsIcon icon={Loading03Icon} aria-hidden className="animate-spin" />
-  if (status === 'succeeded') return <HugeiconsIcon icon={Tick02Icon} aria-hidden />
-  if (status === 'cancelled') return <HugeiconsIcon icon={CancelCircleIcon} aria-hidden />
-  return <HugeiconsIcon icon={UnfoldMoreIcon} aria-hidden />
+  switch (status) {
+    case 'running':
+      return <HugeiconsIcon icon={Loading03Icon} aria-hidden className="animate-spin" />
+    case 'succeeded':
+      return <HugeiconsIcon icon={Tick02Icon} aria-hidden />
+    case 'cancelled':
+      return <HugeiconsIcon icon={CancelCircleIcon} aria-hidden />
+    case 'failed':
+      return <HugeiconsIcon icon={UnfoldMoreIcon} aria-hidden />
+  }
 }
 
 function statusTone(status: AgentRunStatus): string {
-  if (status === 'failed') return 'border-destructive/25 bg-destructive/10 text-destructive'
-  if (status === 'cancelled') return 'border-border bg-muted text-muted-foreground'
-  if (status === 'succeeded') return 'border-border bg-muted text-foreground'
-  return 'border-primary/30 bg-primary/10 text-foreground'
+  switch (status) {
+    case 'failed':
+      return 'border-destructive/25 bg-destructive/10 text-destructive'
+    case 'cancelled':
+      return 'border-border bg-muted text-muted-foreground'
+    case 'succeeded':
+      return 'border-border bg-muted text-foreground'
+    case 'running':
+      return 'border-primary/30 bg-primary/10 text-foreground'
+  }
+}
+
+function runRowClassName(selected: boolean): string {
+  return cn(
+    'mb-1 flex h-[84px] w-full min-w-0 flex-col rounded-md border px-3 py-2.5 text-left transition-colors',
+    selected ? 'border-border bg-muted' : 'border-transparent hover:bg-muted/60'
+  )
+}
+
+function outputDraftClassName(selected: boolean): string {
+  return cn(
+    'flex w-full items-start justify-between gap-3 rounded-md border px-3 py-2.5 text-left hover:bg-muted/60 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30',
+    selected ? 'bg-muted' : 'bg-background'
+  )
 }
 
 export function AgentRuns({
@@ -195,12 +223,7 @@ export function AgentRuns({
                       type="button"
                       data-testid="agent-run-row"
                       onClick={() => setSelectedRunId(run.id)}
-                      className={
-                        'mb-1 flex h-[84px] w-full min-w-0 flex-col rounded-md border px-3 py-2.5 text-left transition-colors ' +
-                        (selected
-                          ? 'border-border bg-muted'
-                          : 'border-transparent hover:bg-muted/60')
-                      }
+                      className={runRowClassName(selected)}
                     >
                       <span className="flex min-w-0 items-center justify-between gap-3">
                         <span className="tabular truncate font-mono text-xs text-muted-foreground">
@@ -338,10 +361,7 @@ function RunDetail({
                   type="button"
                   data-testid="run-output-draft"
                   onClick={() => onSelectDraft(draft.id)}
-                  className={
-                    'flex w-full items-start justify-between gap-3 rounded-md border px-3 py-2.5 text-left hover:bg-muted/60 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30 ' +
-                    (selectedDraftId === draft.id ? 'bg-muted' : 'bg-background')
-                  }
+                  className={outputDraftClassName(selectedDraftId === draft.id)}
                 >
                   <span className="min-w-0">
                     <span className="block truncate text-sm font-medium">{draft.title}</span>

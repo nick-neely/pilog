@@ -10,6 +10,20 @@ import type {
   IssueDraft
 } from '@shared/types'
 
+const ERROR_CAUSES = [
+  'auth_invalid',
+  'rate_limited',
+  'network',
+  'provider_error',
+  'unknown',
+  'repo_missing',
+  'pi_internal',
+  'turn_budget_exceeded',
+  'schema_validation',
+  'persistence',
+  'cancelled'
+] as const
+
 const agentRunColumns = {
   id: agentRuns.id,
   repoId: agentRuns.repoId,
@@ -120,8 +134,8 @@ export function getRunById(db: PilogDatabase, id: string): AgentRunDetail | null
   const row = db.select(agentRunColumns).from(agentRuns).where(eq(agentRuns.id, id)).get()
   if (!row) return null
 
-  const inputNoteIds = parseJsonArray<string>(row.inputNoteIds)
-  const outputDraftIds = parseJsonArray<string>(row.outputDraftIds)
+  const inputNoteIds = parseStringArray(row.inputNoteIds)
+  const outputDraftIds = parseStringArray(row.outputDraftIds)
   const sourceNotes = loadNotesByIds(db, inputNoteIds)
   const outputDrafts = loadDraftsByIds(db, outputDraftIds)
 
@@ -131,18 +145,18 @@ export function getRunById(db: PilogDatabase, id: string): AgentRunDetail | null
     outputDraftIds,
     sourceNotes,
     outputDrafts,
-    eventStream: parseJsonArray<unknown>(row.eventStream)
+    eventStream: parseJsonArray(row.eventStream)
   }
 }
 
 function normalizeLimit(limit: number | undefined): number {
-  if (!Number.isFinite(limit) || limit === undefined) return 100
+  if (limit === undefined || !Number.isFinite(limit)) return 100
   return Math.max(1, Math.min(Math.trunc(limit), 500))
 }
 
 function mapRunListItem(row: typeof agentRuns.$inferSelect): AgentRunListItem {
-  const inputNoteIds = parseJsonArray<string>(row.inputNoteIds)
-  const outputDraftIds = parseJsonArray<string>(row.outputDraftIds)
+  const inputNoteIds = parseStringArray(row.inputNoteIds)
+  const outputDraftIds = parseStringArray(row.outputDraftIds)
   return {
     id: row.id,
     repoId: row.repoId,
@@ -153,7 +167,7 @@ function mapRunListItem(row: typeof agentRuns.$inferSelect): AgentRunListItem {
     inputNoteCount: inputNoteIds.length,
     outputDraftCount: outputDraftIds.length,
     errorMessage: row.errorMessage,
-    errorCause: row.errorCause as ErrorCause | null
+    errorCause: parseErrorCause(row.errorCause)
   }
 }
 
@@ -187,9 +201,9 @@ function mapIssueDraft(row: typeof issueDrafts.$inferSelect): IssueDraft {
     repoId: row.repoId,
     title: row.title,
     body: row.body,
-    labels: parseJsonArray<string>(row.labels),
-    sourceNoteIds: parseJsonArray<string>(row.sourceNoteIds),
-    affectedFiles: parseJsonArray<{ path: string; reason: string }>(row.affectedFilesJson),
+    labels: parseStringArray(row.labels),
+    sourceNoteIds: parseStringArray(row.sourceNoteIds),
+    affectedFiles: parseAffectedFiles(row.affectedFilesJson),
     confidence: row.confidence,
     groupingReason: row.groupingReason,
     status: row.status,
@@ -199,7 +213,33 @@ function mapIssueDraft(row: typeof issueDrafts.$inferSelect): IssueDraft {
   }
 }
 
-function parseJsonArray<T>(value: string): T[] {
+function parseJsonArray(value: string): unknown[] {
   const parsed = JSON.parse(value) as unknown
-  return Array.isArray(parsed) ? (parsed as T[]) : []
+  return Array.isArray(parsed) ? parsed : []
+}
+
+function parseStringArray(value: string): string[] {
+  return parseJsonArray(value).filter((item): item is string => typeof item === 'string')
+}
+
+function parseAffectedFiles(value: string): IssueDraft['affectedFiles'] {
+  return parseJsonArray(value).filter((item): item is IssueDraft['affectedFiles'][number] => {
+    return (
+      item !== null &&
+      typeof item === 'object' &&
+      'path' in item &&
+      'reason' in item &&
+      typeof item.path === 'string' &&
+      typeof item.reason === 'string'
+    )
+  })
+}
+
+function parseErrorCause(value: string | null): ErrorCause | null {
+  if (!value) return null
+  return isErrorCause(value) ? value : 'unknown'
+}
+
+function isErrorCause(value: string): value is ErrorCause {
+  return ERROR_CAUSES.includes(value as ErrorCause)
 }
