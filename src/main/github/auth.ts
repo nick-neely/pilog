@@ -2,6 +2,7 @@ import { shell } from 'electron'
 import { createServer, type Server } from 'node:http'
 import { randomBytes } from 'node:crypto'
 import { setSecret, deleteSecret, getSecret } from '../security/secrets'
+import type { GitHubStatus } from '@shared/ipc'
 
 const SCOPES = 'repo'
 const SECRET_KEY_TOKEN = 'github_token'
@@ -65,7 +66,11 @@ export async function exchangeCodeForToken(
     throw new Error(data.error_description || data.error)
   }
 
-  return data.access_token!
+  if (!data.access_token) {
+    throw new Error('GitHub did not return an access token')
+  }
+
+  return data.access_token
 }
 
 async function fetchLogin(token: string): Promise<string> {
@@ -75,11 +80,17 @@ async function fetchLogin(token: string): Promise<string> {
       Accept: 'application/json'
     }
   })
-  const data = (await response.json()) as { login: string }
+
+  if (!response.ok) {
+    throw new Error(`GitHub API returned ${response.status}`)
+  }
+
+  const data = (await response.json()) as { login?: string }
+  if (!data.login) {
+    throw new Error('GitHub API did not return a login')
+  }
   return data.login
 }
-
-export type GitHubStatus = { connected: boolean; login?: string }
 
 export async function startOAuthFlow(
   clientId: string,

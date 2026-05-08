@@ -1,13 +1,11 @@
 import { Octokit } from '@octokit/rest'
-import { getSecret } from '../security/secrets'
-
-const SECRET_KEY_TOKEN = 'github_token'
+import { getStoredToken } from './auth'
 
 let cachedClient: Octokit | null = null
 let cachedToken: string | null = null
 
 export function getOctokitClient(): Octokit | null {
-  const token = getSecret(SECRET_KEY_TOKEN)
+  const token = getStoredToken()
   if (!token) return null
 
   if (cachedClient && cachedToken === token) {
