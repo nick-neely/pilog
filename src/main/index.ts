@@ -9,6 +9,7 @@ import { registerGlobalHotkeys, unregisterGlobalHotkeys } from './hotkeys/regist
 import { registerIpcHandlers } from './ipc/handlers'
 import { registerGitHubIpcHandlers } from './ipc/github-handlers'
 import { registerRepoIpcHandlers } from './ipc/repo-handlers'
+import { registerPiIpcHandlers } from './ipc/pi-handlers'
 import { buildAppMenu } from './menu/app-menu'
 import { createTray, destroyTray } from './tray/create-tray'
 import {
@@ -55,6 +56,7 @@ app.whenReady().then(() => {
   )
 
   registerRepoIpcHandlers(db)
+  registerPiIpcHandlers(db, { onDraftsGenerated: broadcastNoteCreated })
 
   ipcMain.on('scratchpad:hide', () => {
     hideScratchpad()
