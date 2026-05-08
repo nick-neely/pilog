@@ -78,4 +78,44 @@ describe('Pi config', () => {
     expect(getSetting(db, 'pi.activeModel')).toBeNull()
     expect((await createSafeStorageAuthStorage()).hasAuth(model.provider)).toBe(false)
   })
+
+  it('round-trips advanced settings and keeps web search keys out of SQLite', async () => {
+    const { getAdvancedSettings, setAdvancedSettings } = await import('./advanced-config')
+
+    await expect(getAdvancedSettings(db)).resolves.toMatchObject({
+      turnBudget: 20,
+      webSearchEnabled: false,
+      webSearchProvider: 'brave',
+      webSearchHasApiKey: false
+    })
+
+    const saved = await setAdvancedSettings(db, {
+      turnBudget: 5,
+      webSearchEnabled: true,
+      webSearchProvider: 'tavily',
+      webSearchApiKey: 'tvly-test-secret'
+    })
+
+    expect(saved).toMatchObject({
+      turnBudget: 5,
+      webSearchEnabled: true,
+      webSearchProvider: 'tavily',
+      webSearchHasApiKey: true
+    })
+    expect(await getAdvancedSettings(db)).toEqual(saved)
+    expect(JSON.stringify(db.select().from(settings).all())).not.toContain('tvly-test-secret')
+  })
+
+  it('rejects invalid advanced turn budgets before saving', async () => {
+    const { getAdvancedSettings, setAdvancedSettings } = await import('./advanced-config')
+
+    await expect(setAdvancedSettings(db, { turnBudget: 0 })).rejects.toThrow(
+      'Turn Budget must be an integer from 1 to 100.'
+    )
+    await expect(setAdvancedSettings(db, { turnBudget: 101 })).rejects.toThrow(
+      'Turn Budget must be an integer from 1 to 100.'
+    )
+
+    await expect(getAdvancedSettings(db)).resolves.toMatchObject({ turnBudget: 20 })
+  })
 })

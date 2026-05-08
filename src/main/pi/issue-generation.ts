@@ -1,7 +1,7 @@
 import { and, eq, inArray } from 'drizzle-orm'
 import type { AgentTool } from '@earendil-works/pi-agent-core'
 import type { PilogDatabase } from '../db/client'
-import { agentRuns, issueDrafts, notes, settings } from '../db/schema'
+import { agentRuns, issueDrafts, notes } from '../db/schema'
 import { formatIssueDraftBody } from '../db/repositories/issue-drafts'
 import { getRepoById } from '../db/repositories/repos'
 import {
@@ -11,6 +11,7 @@ import {
   type GeneratedIssueDraft
 } from '@shared/types'
 import type { Note, Repo } from '@shared/ipc'
+import type { SearchProvider } from '@shared/types'
 
 export type IssueGenerationInput = {
   runId: string
@@ -19,6 +20,7 @@ export type IssueGenerationInput = {
   provider: string
   model: string
   turnBudget: number
+  webSearch?: { provider: SearchProvider; apiKey: string }
   signal?: AbortSignal
 }
 
@@ -92,16 +94,6 @@ export function createSubmitIssueDraftsTool(
       }
     }
   }
-}
-
-export function getTurnBudget(db: PilogDatabase): number {
-  const row = db
-    .select({ value: settings.value })
-    .from(settings)
-    .where(eq(settings.key, 'pi.turnBudget'))
-    .get()
-  const parsed = Number(row?.value)
-  return Number.isInteger(parsed) && parsed > 0 ? parsed : 20
 }
 
 export function getSelectedNotesForGeneration(

@@ -18,8 +18,13 @@ import {
 } from '../pi/config'
 import { createSafeStorageAuthStorage } from '../pi/auth-storage'
 import {
-  getSelectedNotesForGeneration,
+  getAdvancedSettings,
   getTurnBudget,
+  getWebSearchConfig,
+  setAdvancedSettings
+} from '../pi/advanced-config'
+import {
+  getSelectedNotesForGeneration,
   persistGeneratedIssueDrafts,
   type RunAgent
 } from '../pi/issue-generation'
@@ -54,6 +59,20 @@ export function registerPiIpcHandlers(
   ipcMain.handle('pi:getActiveConfig', async (): Promise<IpcResponse<'pi:getActiveConfig'>> => {
     return await getActivePiConfig(db)
   })
+
+  ipcMain.handle('settings:getAdvanced', async (): Promise<IpcResponse<'settings:getAdvanced'>> => {
+    return await getAdvancedSettings(db)
+  })
+
+  ipcMain.handle(
+    'settings:setAdvanced',
+    async (
+      _event,
+      request: IpcRequest<'settings:setAdvanced'>
+    ): Promise<IpcResponse<'settings:setAdvanced'>> => {
+      return await setAdvancedSettings(db, request)
+    }
+  )
 
   ipcMain.handle(
     'pi:setActiveConfig',
@@ -130,6 +149,7 @@ export function registerPiIpcHandlers(
 
       void (async () => {
         try {
+          const webSearch = await getWebSearchConfig(db)
           for await (const agentEvent of runAgentImpl({
             runId: run.id,
             repo,
@@ -137,6 +157,7 @@ export function registerPiIpcHandlers(
             provider,
             model,
             turnBudget: getTurnBudget(db),
+            webSearch: webSearch.enabled ? webSearch : undefined,
             signal: controller.signal
           })) {
             active.eventStream.push(agentEvent)
@@ -148,6 +169,17 @@ export function registerPiIpcHandlers(
                 repoId: repo.id,
                 selectedNoteIds: notes.map((note) => note.id),
                 drafts: agentEvent.drafts,
+                eventStream: active.eventStream
+              })
+              active.finalized = true
+            }
+
+            if (agentEvent.type === 'error' && !active.finalized) {
+              finalizeAgentRun(db, {
+                id: run.id,
+                status: agentEvent.cause === 'cancelled' ? 'cancelled' : 'failed',
+                errorMessage: agentEvent.message,
+                errorCause: agentEvent.cause,
                 eventStream: active.eventStream
               })
               active.finalized = true

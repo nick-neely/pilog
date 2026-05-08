@@ -5,7 +5,8 @@ import {
   DatabaseImportIcon,
   Delete02Icon,
   EyeIcon,
-  FileKeyIcon
+  FileKeyIcon,
+  Search01Icon
 } from '@hugeicons/core-free-icons'
 import { Avatar, AvatarFallback } from '@renderer/components/ui/avatar'
 import {
@@ -34,9 +35,11 @@ import {
 import { Switch } from '@renderer/components/ui/switch'
 import type {
   GitHubStatus,
+  AdvancedSettings,
   PiActiveConfig,
   PiModelOption,
   PiProviderOption,
+  SearchProvider,
   SettingKey
 } from '@shared/ipc'
 
@@ -54,6 +57,20 @@ type PiConfigState = {
   save: () => Promise<void>
   importExisting: () => Promise<void>
   reset: () => Promise<void>
+}
+
+type AdvancedSettingsState = {
+  settings: AdvancedSettings | null
+  turnBudgetDraft: string
+  turnBudgetError: string | null
+  webSearchApiKey: string
+  savingKey: boolean
+  setTurnBudgetDraft: (value: string) => void
+  saveTurnBudget: () => Promise<void>
+  setWebSearchEnabled: (enabled: boolean) => Promise<void>
+  setWebSearchProvider: (provider: SearchProvider) => Promise<void>
+  setWebSearchApiKey: (apiKey: string) => void
+  saveWebSearchApiKey: () => Promise<void>
 }
 
 function useSetting(key: SettingKey): [string | null, (value: string) => Promise<void>] {
@@ -216,6 +233,84 @@ function usePiConfig(): PiConfigState {
   }
 }
 
+function useAdvancedSettings(): AdvancedSettingsState {
+  const [settings, setSettings] = useState<AdvancedSettings | null>(null)
+  const [turnBudgetDraft, setTurnBudgetDraftState] = useState('20')
+  const [turnBudgetError, setTurnBudgetError] = useState<string | null>(null)
+  const [webSearchApiKey, setWebSearchApiKey] = useState('')
+  const [savingKey, setSavingKey] = useState(false)
+  const mountedRef = useRef(false)
+
+  const refresh = useCallback(async () => {
+    const next = await window.pilog.invoke('settings:getAdvanced')
+    if (!mountedRef.current) return
+    setSettings(next)
+    setTurnBudgetDraftState(String(next.turnBudget))
+    setTurnBudgetError(null)
+  }, [])
+
+  useEffect(() => {
+    mountedRef.current = true
+    refresh().catch(() => undefined)
+    return () => {
+      mountedRef.current = false
+    }
+  }, [refresh])
+
+  const setTurnBudgetDraft = useCallback((value: string) => {
+    setTurnBudgetDraftState(value)
+    setTurnBudgetError(null)
+  }, [])
+
+  const saveTurnBudget = useCallback(async () => {
+    const parsed = Number(turnBudgetDraft)
+    if (!Number.isInteger(parsed) || parsed < 1 || parsed > 100) {
+      setTurnBudgetError('Enter a whole number from 1 to 100.')
+      return
+    }
+
+    const next = await window.pilog.invoke('settings:setAdvanced', { turnBudget: parsed })
+    setSettings(next)
+    setTurnBudgetDraftState(String(next.turnBudget))
+    setTurnBudgetError(null)
+  }, [turnBudgetDraft])
+
+  const setWebSearchEnabled = useCallback(async (enabled: boolean) => {
+    setSettings(await window.pilog.invoke('settings:setAdvanced', { webSearchEnabled: enabled }))
+  }, [])
+
+  const setWebSearchProvider = useCallback(async (provider: SearchProvider) => {
+    setSettings(await window.pilog.invoke('settings:setAdvanced', { webSearchProvider: provider }))
+  }, [])
+
+  const saveWebSearchApiKey = useCallback(async () => {
+    const apiKey = webSearchApiKey.trim()
+    if (!apiKey) return
+    setSavingKey(true)
+    try {
+      const next = await window.pilog.invoke('settings:setAdvanced', { webSearchApiKey: apiKey })
+      setSettings(next)
+      setWebSearchApiKey('')
+    } finally {
+      setSavingKey(false)
+    }
+  }, [webSearchApiKey])
+
+  return {
+    settings,
+    turnBudgetDraft,
+    turnBudgetError,
+    webSearchApiKey,
+    savingKey,
+    setTurnBudgetDraft,
+    saveTurnBudget,
+    setWebSearchEnabled,
+    setWebSearchProvider,
+    setWebSearchApiKey,
+    saveWebSearchApiKey
+  }
+}
+
 function getPreferredModelId({
   current,
   activeProvider,
@@ -253,6 +348,7 @@ export function Settings({
   const [userEdited, setUserEdited] = useState(false)
   const github = useGitHubStatus()
   const pi = usePiConfig()
+  const advanced = useAdvancedSettings()
 
   const displayValue = userEdited ? (hotkeyDraft ?? '') : (hotkey ?? '')
   const dirty = userEdited && hotkeyDraft !== (hotkey ?? '')
@@ -261,6 +357,12 @@ export function Settings({
     : 'Paste API key'
   const piCredentialStatus = pi.active?.hasApiKey ? 'stored' : 'not stored'
   const piSaveLabel = getPiSaveLabel(pi)
+  const advancedSettings = advanced.settings
+  const turnBudgetDirty =
+    advancedSettings !== null && advanced.turnBudgetDraft !== String(advancedSettings.turnBudget)
+  const searchKeyPlaceholder = advancedSettings?.webSearchHasApiKey
+    ? 'API key stored. Paste a new key to replace it.'
+    : 'Paste search API key'
 
   const handleHotkeyChange = (value: string): void => {
     setUserEdited(true)
@@ -492,6 +594,126 @@ export function Settings({
                 </AlertDialogContent>
               </AlertDialog>
             </div>
+          </section>
+
+          <section className="flex flex-col gap-3" data-testid="advanced-settings-panel">
+            <div>
+              <h2 className="text-sm font-medium text-foreground">Advanced</h2>
+              <p className="mt-1 max-w-[68ch] text-xs text-muted-foreground">
+                Tune draft-generation limits and opt into bounded provider search. Search keys are
+                stored in OS-backed safe storage, separate from model credentials.
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="turn-budget">Turn Budget</Label>
+              <div className="flex items-center gap-3">
+                <Input
+                  id="turn-budget"
+                  data-testid="turn-budget-input"
+                  inputMode="numeric"
+                  type="number"
+                  min={1}
+                  max={100}
+                  step={1}
+                  value={advanced.turnBudgetDraft}
+                  onChange={(event) => advanced.setTurnBudgetDraft(event.target.value)}
+                  onBlur={() => void advanced.saveTurnBudget()}
+                  aria-invalid={Boolean(advanced.turnBudgetError)}
+                  aria-describedby={
+                    advanced.turnBudgetError ? 'turn-budget-error' : 'turn-budget-help'
+                  }
+                  className="max-w-28 font-mono"
+                />
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => void advanced.saveTurnBudget()}
+                  disabled={!turnBudgetDirty}
+                >
+                  Save
+                </Button>
+              </div>
+              {advanced.turnBudgetError ? (
+                <p id="turn-budget-error" className="text-xs text-destructive">
+                  {advanced.turnBudgetError}
+                </p>
+              ) : (
+                <p id="turn-budget-help" className="text-xs text-muted-foreground">
+                  Generation stops if a run passes this many turns. Default is 20.
+                </p>
+              )}
+            </div>
+
+            <div className="flex items-start justify-between gap-4 rounded-md border bg-muted/35 p-3">
+              <div>
+                <Label htmlFor="web-search-enabled" className="text-sm font-medium">
+                  Web Search
+                </Label>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Registers a bounded search-results tool only when enabled and keyed.
+                </p>
+              </div>
+              <Switch
+                id="web-search-enabled"
+                data-testid="web-search-toggle"
+                checked={advancedSettings?.webSearchEnabled ?? false}
+                onCheckedChange={(enabled) => void advanced.setWebSearchEnabled(enabled)}
+                aria-label="Enable Web Search"
+              />
+            </div>
+
+            {advancedSettings?.webSearchEnabled && (
+              <div className="grid gap-3 rounded-md border bg-muted/20 p-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)]">
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="web-search-provider">Search Provider</Label>
+                  <Select
+                    value={advancedSettings.webSearchProvider}
+                    onValueChange={(provider) =>
+                      void advanced.setWebSearchProvider(provider as SearchProvider)
+                    }
+                  >
+                    <SelectTrigger id="web-search-provider" data-testid="web-search-provider">
+                      <SelectValue placeholder="Choose provider" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        <SelectItem value="brave">Brave</SelectItem>
+                        <SelectItem value="tavily">Tavily</SelectItem>
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="web-search-api-key">Search Credential</Label>
+                  <div className="flex items-center gap-3">
+                    <Input
+                      id="web-search-api-key"
+                      data-testid="web-search-api-key"
+                      type="password"
+                      value={advanced.webSearchApiKey}
+                      onChange={(event) => advanced.setWebSearchApiKey(event.target.value)}
+                      placeholder={searchKeyPlaceholder}
+                      className="flex-1 font-mono"
+                    />
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => void advanced.saveWebSearchApiKey()}
+                      disabled={!advanced.webSearchApiKey.trim() || advanced.savingKey}
+                    >
+                      <HugeiconsIcon icon={Search01Icon} data-icon="inline-start" aria-hidden />
+                      {advanced.savingKey ? 'Saving' : 'Save'}
+                    </Button>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    Current: {advancedSettings.webSearchProvider} · key{' '}
+                    {advancedSettings.webSearchHasApiKey ? 'stored' : 'not stored'}
+                  </p>
+                </div>
+              </div>
+            )}
           </section>
 
           <section className="flex flex-col gap-3">

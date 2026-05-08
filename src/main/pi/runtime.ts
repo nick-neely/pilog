@@ -1,4 +1,4 @@
-import type { AgentEvent as PiAgentEvent } from '@earendil-works/pi-agent-core'
+import type { AgentEvent as PiAgentEvent, AgentTool } from '@earendil-works/pi-agent-core'
 import type { getModel as getModelType } from '@earendil-works/pi-ai'
 import { setTimeout as delay } from 'node:timers/promises'
 import { createModelRegistry, createSafeStorageAuthStorage } from './auth-storage'
@@ -8,6 +8,7 @@ import {
   type IssueGenerationInput
 } from './issue-generation'
 import { createReadOnlyRepoTools } from './tools/repo-tools'
+import { createWebSearchTool } from './tools/web-search'
 import { createAsyncQueue } from '@shared/async-queue'
 import type { AgentEvent, GeneratedIssueDraft } from '@shared/types'
 
@@ -72,18 +73,17 @@ export async function* runAgent(input: IssueGenerationInput): AsyncIterable<Agen
   const queue = createAsyncQueue<AgentEvent>()
   let submittedDrafts: GeneratedIssueDraft[] | null = null
   let toolCallCount = 0
+  let turnCount = 0
+  let turnBudgetExceeded = false
   let agentEndSeen = false
 
   const agent = new Agent({
     initialState: {
       systemPrompt: prompt,
       model,
-      tools: [
-        ...createReadOnlyRepoTools(input.repo.localPath),
-        createSubmitIssueDraftsTool((drafts) => {
-          submittedDrafts = drafts
-        })
-      ]
+      tools: createIssueGenerationTools(input, (drafts) => {
+        submittedDrafts = drafts
+      })
     },
     getApiKey: (provider) => (provider === input.provider ? auth.apiKey : undefined),
     toolExecution: 'parallel'
@@ -92,7 +92,21 @@ export async function* runAgent(input: IssueGenerationInput): AsyncIterable<Agen
   input.signal?.addEventListener('abort', () => agent.abort(), { once: true })
 
   agent.subscribe((event: PiAgentEvent) => {
-    if (event.type === 'turn_start') queue.push({ type: 'progress', phase: 'turn_start' })
+    if (event.type === 'turn_start') {
+      turnCount += 1
+      if (turnCount > input.turnBudget) {
+        turnBudgetExceeded = true
+        agent.abort()
+        queue.push({
+          type: 'error',
+          message: `Turn budget exceeded after ${input.turnBudget} turns.`,
+          cause: 'turn_budget_exceeded'
+        })
+        queue.close()
+        return
+      }
+      queue.push({ type: 'progress', phase: 'turn_start' })
+    }
     if (event.type === 'tool_execution_start') {
       queue.push({ type: 'progress', phase: event.toolName })
       if (event.toolName === 'submit_issue_drafts') toolCallCount += 1
@@ -134,10 +148,37 @@ export async function* runAgent(input: IssueGenerationInput): AsyncIterable<Agen
     agent.abort()
   }
 
+  if (turnBudgetExceeded) return
+
   assertProcessStateUnchanged(before)
 }
 
+export function createIssueGenerationTools(
+  input: Pick<IssueGenerationInput, 'repo' | 'webSearch'>,
+  onSubmit: (drafts: GeneratedIssueDraft[]) => void
+): AgentTool[] {
+  return [
+    ...createReadOnlyRepoTools(input.repo.localPath),
+    ...(input.webSearch ? [createWebSearchTool(input.webSearch)] : []),
+    createSubmitIssueDraftsTool(onSubmit)
+  ]
+}
+
 async function* runFixtureAgent(input: IssueGenerationInput): AsyncIterable<AgentEvent> {
+  if (input.model === 'turn-budget-loop') {
+    for (let turn = 1; turn <= input.turnBudget + 1; turn += 1) {
+      yield { type: 'progress', phase: 'turn_start' }
+      await delay(5, undefined, { signal: input.signal }).catch(() => undefined)
+      if (input.signal?.aborted) return
+    }
+    yield {
+      type: 'error',
+      message: `Turn budget exceeded after ${input.turnBudget} turns.`,
+      cause: 'turn_budget_exceeded'
+    }
+    return
+  }
+
   yield { type: 'progress', phase: 'agent_start' }
   await delay(150, undefined, { signal: input.signal }).catch(() => undefined)
   if (input.signal?.aborted) return

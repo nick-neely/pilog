@@ -152,3 +152,39 @@ test('Agent Runs shows live generation, detail transcript, and source note navig
 
   await app.close()
 })
+
+test('Advanced Turn Budget stops draft generation when exceeded', async () => {
+  const app = await launchApp()
+  const page = await app.firstWindow()
+
+  await page.evaluate(
+    async ({ repoPath }) => {
+      await window.pilog.invoke('debug:seedIssueGenerationFixture', {
+        repoPath,
+        notes: ['force a looping draft generation run']
+      })
+      await window.pilog.invoke('settings:setAdvanced', { turnBudget: 5 })
+      await window.pilog.invoke('setting:set', { key: 'pi.activeModel', value: 'turn-budget-loop' })
+    },
+    { repoPath: repoDir }
+  )
+  await page.reload()
+
+  const noteRows = page.locator('[data-testid="note-row"]')
+  await expect(noteRows).toHaveCount(1)
+  await noteRows.first().click()
+
+  await page.locator('button:has-text("Generate Drafts")').click()
+
+  await expect
+    .poll(async () => {
+      const runs = await page.evaluate(async () => window.pilog.invoke('agent-runs:list'))
+      return runs[0]?.errorCause
+    })
+    .toBe('turn_budget_exceeded')
+
+  const runs = await page.evaluate(async () => window.pilog.invoke('agent-runs:list'))
+  expect(runs[0]?.status).toBe('failed')
+
+  await app.close()
+})

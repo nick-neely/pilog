@@ -118,6 +118,22 @@ export type GenerateDraftsStartResponse = {
   runId: string
 }
 
+export type SearchProvider = 'brave' | 'tavily'
+
+export type AdvancedSettings = {
+  turnBudget: number
+  webSearchEnabled: boolean
+  webSearchProvider: SearchProvider
+  webSearchHasApiKey: boolean
+}
+
+export type SetAdvancedSettingsRequest = {
+  turnBudget?: number
+  webSearchEnabled?: boolean
+  webSearchProvider?: SearchProvider
+  webSearchApiKey?: string
+}
+
 export type PiStatus = {
   configured: boolean
   reason?: 'missing-provider' | 'missing-model' | 'missing-credential'

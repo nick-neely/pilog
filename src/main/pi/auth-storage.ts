@@ -66,9 +66,9 @@ async function loadPiCodingAgent(): Promise<PiCodingAgentModule> {
   return piCodingAgentModule
 }
 
-export async function createSafeStorageAuthStorage(): Promise<AuthStorage> {
+export async function createSafeStorageAuthStorage(dir?: string): Promise<AuthStorage> {
   const { AuthStorage } = await loadPiCodingAgent()
-  return AuthStorage.fromStorage(new SafeStorageAuthStorageBackend())
+  return AuthStorage.fromStorage(new SafeStorageAuthStorageBackend(dir))
 }
 
 export async function createModelRegistry(authStorage?: AuthStorage): Promise<ModelRegistry> {
