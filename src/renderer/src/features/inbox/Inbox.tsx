@@ -682,35 +682,48 @@ export function Inbox({
             // selection lives on the title strip (the count chip) and on
             // Esc / the palette, which keeps the footer uncluttered and
             // gives the action buttons room to breathe in 320px.
-            <div className="flex items-center gap-2">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span className="flex-1">
-                    <Button
-                      size="sm"
-                      variant={canGenerateDrafts ? 'default' : 'outline'}
-                      disabled={!canGenerateDrafts}
-                      title={generateDraftsReason}
-                      className="w-full justify-center"
-                      onClick={() => void handleGenerateDrafts()}
-                    >
-                      <HugeiconsIcon icon={SparklesIcon} data-icon="inline-start" aria-hidden />
-                      {generating ? 'Generating' : 'Generate Drafts'}
-                    </Button>
-                  </span>
-                </TooltipTrigger>
-                {!canGenerateDrafts && <TooltipContent>{generateDraftsReason}</TooltipContent>}
-              </Tooltip>
-              <Button
-                size="sm"
-                variant="outline"
-                disabled
-                title="Dismiss activates in Phase 4"
-                className="flex-1 justify-center"
-              >
-                <HugeiconsIcon icon={CancelCircleIcon} data-icon="inline-start" aria-hidden />
-                Dismiss
-              </Button>
+            <div className="flex w-full flex-col gap-1.5">
+              <div className="flex items-center gap-2">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="flex-1">
+                      <Button
+                        size="sm"
+                        variant={canGenerateDrafts ? 'default' : 'outline'}
+                        disabled={!canGenerateDrafts}
+                        title={generateDraftsReason}
+                        className="w-full justify-center"
+                        onClick={() => void handleGenerateDrafts()}
+                      >
+                        <HugeiconsIcon icon={SparklesIcon} data-icon="inline-start" aria-hidden />
+                        {generating ? 'Generating' : 'Generate Drafts'}
+                      </Button>
+                    </span>
+                  </TooltipTrigger>
+                  {!canGenerateDrafts && <TooltipContent>{generateDraftsReason}</TooltipContent>}
+                </Tooltip>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled
+                  title="Dismiss activates in Phase 4"
+                  className="flex-1 justify-center"
+                >
+                  <HugeiconsIcon icon={CancelCircleIcon} data-icon="inline-start" aria-hidden />
+                  Dismiss
+                </Button>
+              </div>
+              {!piStatus.configured && selectedNotesShareRepo && (
+                <Button
+                  type="button"
+                  variant="link"
+                  size="sm"
+                  className="h-auto justify-start p-0 text-xs"
+                  onClick={onNavigateToSettings}
+                >
+                  Configure Pi to generate drafts
+                </Button>
+              )}
             </div>
           ) : (
             <Button

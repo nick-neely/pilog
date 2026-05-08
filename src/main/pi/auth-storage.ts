@@ -1,13 +1,16 @@
 import { app, safeStorage } from 'electron'
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { basename, join } from 'node:path'
-import {
+import type {
   AuthStorage,
-  ModelRegistry,
-  type AuthStorageBackend
+  AuthStorageBackend,
+  ModelRegistry
 } from '@earendil-works/pi-coding-agent'
 
 type LockResult<T> = { result: T; next?: string }
+type PiCodingAgentModule = typeof import('@earendil-works/pi-coding-agent')
+
+let piCodingAgentModule: Promise<PiCodingAgentModule> | null = null
 
 export class SafeStorageAuthStorageBackend implements AuthStorageBackend {
   constructor(private readonly dir = join(app.getPath('userData'), 'pi-auth')) {}
@@ -58,10 +61,57 @@ export class SafeStorageAuthStorageBackend implements AuthStorageBackend {
   }
 }
 
-export function createSafeStorageAuthStorage(): AuthStorage {
+async function loadPiCodingAgent(): Promise<PiCodingAgentModule> {
+  piCodingAgentModule ??= import('@earendil-works/pi-coding-agent')
+  return piCodingAgentModule
+}
+
+export async function createSafeStorageAuthStorage(): Promise<AuthStorage> {
+  const { AuthStorage } = await loadPiCodingAgent()
   return AuthStorage.fromStorage(new SafeStorageAuthStorageBackend())
 }
 
-export function createModelRegistry(authStorage = createSafeStorageAuthStorage()): ModelRegistry {
-  return ModelRegistry.inMemory(authStorage)
+export async function createModelRegistry(authStorage?: AuthStorage): Promise<ModelRegistry> {
+  const { ModelRegistry } = await loadPiCodingAgent()
+  return ModelRegistry.inMemory(authStorage ?? (await createSafeStorageAuthStorage()))
+}
+
+export function clearSafeStorageAuthStorage(): void {
+  const dir = join(app.getPath('userData'), 'pi-auth')
+  rmSync(dir, { recursive: true, force: true })
+}
+
+export async function importAuthJsonIntoSafeStorage(authJsonPath: string): Promise<string[]> {
+  if (!existsSync(authJsonPath)) return []
+
+  const parsed = parseAuthJson(readFileSync(authJsonPath, 'utf-8'))
+  if (!parsed) return []
+
+  const authStorage = await createSafeStorageAuthStorage()
+  const imported: string[] = []
+
+  for (const [provider, credential] of Object.entries(parsed)) {
+    if (!isAuthCredential(credential)) continue
+    authStorage.set(provider, credential)
+    imported.push(provider)
+  }
+
+  return imported
+}
+
+function parseAuthJson(contents: string): Record<string, unknown> | null {
+  const parsed = JSON.parse(contents) as unknown
+  return isObjectLike(parsed) ? (parsed as Record<string, unknown>) : null
+}
+
+function isAuthCredential(value: unknown): value is Parameters<AuthStorage['set']>[1] {
+  if (!value || typeof value !== 'object') return false
+  const credential = value as { type?: unknown; key?: unknown }
+  if (credential.type === 'api_key') return typeof credential.key === 'string'
+  if (credential.type === 'oauth') return true
+  return false
+}
+
+function isObjectLike(value: unknown): boolean {
+  return Boolean(value) && typeof value === 'object'
 }

@@ -14,3 +14,7 @@ export function setSetting(db: PilogDatabase, key: SettingKey, value: string): v
     .onConflictDoUpdate({ target: settings.key, set: { value } })
     .run()
 }
+
+export function deleteSetting(db: PilogDatabase, key: SettingKey): void {
+  db.delete(settings).where(eq(settings.key, key)).run()
+}
