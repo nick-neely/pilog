@@ -24,12 +24,19 @@ An issue is **unblocked** if it has zero blocking dependencies on other open iss
 
 For each unblocked issue, assign a branch name using the format `sandcastle/issue-{id}-{slug}`.
 
+For each unblocked issue, choose an implementation model:
+
+- Use `"sonnet"` by default.
+- Use `"opus"` only when the issue is architecturally risky, cross-cutting, security-sensitive, likely to touch unfamiliar core abstractions, likely to require a data migration, or explicitly asks for deeper implementation reasoning.
+
+Include a short `implementationModelReason` explaining the choice.
+
 # OUTPUT
 
 Output your plan as a JSON object wrapped in `<plan>` tags:
 
 <plan>
-{"issues": [{"id": "42", "title": "Fix auth bug", "branch": "sandcastle/issue-42-fix-auth-bug"}]}
+{"issues": [{"id": "42", "title": "Fix auth bug", "branch": "sandcastle/issue-42-fix-auth-bug", "implementationModel": "sonnet", "implementationModelReason": "Small localized bug fix."}]}
 </plan>
 
 Include only unblocked issues. If every issue is blocked, include the single highest-priority candidate (the one with the fewest or weakest dependencies).

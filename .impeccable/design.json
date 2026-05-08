@@ -308,16 +308,56 @@
       "Editor (CodeMirror/Milkdown) is the gravitational center of the scratchpad; UI chrome must defer to it."
     ],
     "rules": [
-      { "name": "The One Voice Rule", "body": "Reading-Room Moss appears on ≤10% of any given screen. Its rarity is the point. If two moss elements are visible at once, one of them is wrong.", "section": "colors" },
-      { "name": "The Warm Neutral Rule", "body": "No neutral in this system is pure gray. Every step has chroma ≥ 0.005 toward warm yellow (light) or warm orange (dark). Pure #000, pure #fff, and untinted zinc/slate are prohibited.", "section": "colors" },
-      { "name": "The Color-Independence Rule", "body": "Status, priority, and confidence are never conveyed by hue alone. Every state carries a label, glyph, or shape signal alongside any color cue. Non-negotiable.", "section": "colors" },
-      { "name": "The Single-Border Rule", "body": "Every visible border is --border at 1px. Borders are never colored to convey state. Use a label, glyph, or tonal-contrast surface change instead.", "section": "colors" },
-      { "name": "The Hierarchy-Through-Type Rule", "body": "Visual hierarchy comes from typeface, weight, and scale (≥1.25 ratio between adjacent steps), not from background color, side-stripes, or boxed cards. If you're tempted to add a colored border to make a section stand out, change the type instead.", "section": "typography" },
-      { "name": "The Editor-Gravitational Rule", "body": "When the scratchpad is open, the IBM Plex Mono editor body is the visual center. UI chrome sits at the periphery, lower contrast than the editor body. The editor must never feel decorated.", "section": "typography" },
-      { "name": "The No-Decorative-Type Rule", "body": "No gradient text, no background-clip: text, no decorative all-caps tracking, no display weights below 200. Emphasis is weight or size, never effect.", "section": "typography" },
-      { "name": "The Flat-By-Default Rule", "body": "Surfaces are flat at rest. Shadows appear only as a response to state (hover, focus, active dialog). A static screenshot of any surface in its rest state contains zero box-shadow.", "section": "elevation" },
-      { "name": "The Tonal-Depth Rule", "body": "When two surfaces need separation, the answer is tonal contrast on the warm-neutral ramp, not a shadow. Borders are 1px low-contrast; never a colored stripe.", "section": "elevation" },
-      { "name": "The No-Glassmorphism Rule", "body": "Backdrop blur is forbidden. The alert-dialog overlay uses a tonal scrim (bg-foreground/40 light, bg-background/70 dark) — same hue family as the rest of the system, no backdrop-filter, no glass.", "section": "elevation" }
+      {
+        "name": "The One Voice Rule",
+        "body": "Reading-Room Moss appears on ≤10% of any given screen. Its rarity is the point. If two moss elements are visible at once, one of them is wrong.",
+        "section": "colors"
+      },
+      {
+        "name": "The Warm Neutral Rule",
+        "body": "No neutral in this system is pure gray. Every step has chroma ≥ 0.005 toward warm yellow (light) or warm orange (dark). Pure #000, pure #fff, and untinted zinc/slate are prohibited.",
+        "section": "colors"
+      },
+      {
+        "name": "The Color-Independence Rule",
+        "body": "Status, priority, and confidence are never conveyed by hue alone. Every state carries a label, glyph, or shape signal alongside any color cue. Non-negotiable.",
+        "section": "colors"
+      },
+      {
+        "name": "The Single-Border Rule",
+        "body": "Every visible border is --border at 1px. Borders are never colored to convey state. Use a label, glyph, or tonal-contrast surface change instead.",
+        "section": "colors"
+      },
+      {
+        "name": "The Hierarchy-Through-Type Rule",
+        "body": "Visual hierarchy comes from typeface, weight, and scale (≥1.25 ratio between adjacent steps), not from background color, side-stripes, or boxed cards. If you're tempted to add a colored border to make a section stand out, change the type instead.",
+        "section": "typography"
+      },
+      {
+        "name": "The Editor-Gravitational Rule",
+        "body": "When the scratchpad is open, the IBM Plex Mono editor body is the visual center. UI chrome sits at the periphery, lower contrast than the editor body. The editor must never feel decorated.",
+        "section": "typography"
+      },
+      {
+        "name": "The No-Decorative-Type Rule",
+        "body": "No gradient text, no background-clip: text, no decorative all-caps tracking, no display weights below 200. Emphasis is weight or size, never effect.",
+        "section": "typography"
+      },
+      {
+        "name": "The Flat-By-Default Rule",
+        "body": "Surfaces are flat at rest. Shadows appear only as a response to state (hover, focus, active dialog). A static screenshot of any surface in its rest state contains zero box-shadow.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Tonal-Depth Rule",
+        "body": "When two surfaces need separation, the answer is tonal contrast on the warm-neutral ramp, not a shadow. Borders are 1px low-contrast; never a colored stripe.",
+        "section": "elevation"
+      },
+      {
+        "name": "The No-Glassmorphism Rule",
+        "body": "Backdrop blur is forbidden. The alert-dialog overlay uses a tonal scrim (bg-foreground/40 light, bg-background/70 dark) — same hue family as the rest of the system, no backdrop-filter, no glass.",
+        "section": "elevation"
+      }
     ],
     "dos": [
       "Do anchor color tokens in OKLCH. Neutrals stay even as lightness shifts and moss reads true across displays.",

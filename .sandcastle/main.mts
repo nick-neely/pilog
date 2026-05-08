@@ -1,7 +1,7 @@
 // Parallel Planner with Review — four-phase orchestration loop
 //
 // This template drives a multi-phase workflow:
-//   Phase 1 (Plan):             An opus agent analyzes open issues, builds a
+//   Phase 1 (Plan):             A Sonnet agent analyzes open issues, builds a
 //                               dependency graph, and outputs a <plan> JSON
 //                               listing unblocked issues with branch names.
 //   Phase 2 (Execute + Review): For each issue, a sandbox is created via
@@ -27,6 +27,10 @@
 import type { AgentProvider, SandboxProvider } from '@ai-hero/sandcastle'
 import * as sandcastle from '@ai-hero/sandcastle'
 import { docker } from '@ai-hero/sandcastle/sandboxes/docker'
+import { execFileSync } from 'node:child_process'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 
 // ---------------------------------------------------------------------------
 // Agent mode: Claude Code (API key) vs Codex (host ~/.codex subscription auth)
@@ -37,6 +41,13 @@ const useCodex = process.argv.includes('--codex')
 /** Codex model string passed to sandcastle.codex(); adjust if you prefer another tier. */
 const CODEX_MODEL = 'gpt-5.5'
 
+const CLAUDE_MODELS = {
+  sonnet: 'claude-sonnet-4-6',
+  opus: 'claude-opus-4-6'
+} as const
+
+type ClaudeModelRole = keyof typeof CLAUDE_MODELS
+
 /** Copy mounted host ~/.codex into the path Codex expects inside the sandbox (subscription login workaround). */
 const CODEX_AUTH_HOOK =
   'rm -rf /home/agent/.codex && mkdir -p /home/agent/.codex && ' +
@@ -44,8 +55,8 @@ const CODEX_AUTH_HOOK =
   'if [ -e "/home/agent/.codex-host/$item" ]; then cp -R "/home/agent/.codex-host/$item" /home/agent/.codex/; fi; done && ' +
   'chmod -R u+rwX /home/agent/.codex'
 
-function agent(): AgentProvider {
-  return useCodex ? sandcastle.codex(CODEX_MODEL) : sandcastle.claudeCode('claude-opus-4-6')
+function agent(model: ClaudeModelRole = 'sonnet'): AgentProvider {
+  return useCodex ? sandcastle.codex(CODEX_MODEL) : sandcastle.claudeCode(CLAUDE_MODELS[model])
 }
 
 function sandboxProvider(): SandboxProvider {
@@ -89,6 +100,61 @@ const MAX_ITERATIONS = 10
 // the safety net for platform-specific binaries.
 const copyToWorktree = ['node_modules']
 
+type PlannedIssue = {
+  id: string
+  title: string
+  branch: string
+  implementationModel?: ClaudeModelRole
+  implementationModelReason?: string
+}
+
+function implementationModelFor(issue: PlannedIssue): ClaudeModelRole {
+  return issue.implementationModel === 'opus' ? 'opus' : 'sonnet'
+}
+
+function needsOpusForMerge(branches: string[]): boolean {
+  if (branches.length === 0) {
+    return false
+  }
+
+  const probeDir = mkdtempSync(join(tmpdir(), 'sandcastle-merge-probe-'))
+  const probeEnv = {
+    ...process.env,
+    GIT_AUTHOR_NAME: process.env.GIT_AUTHOR_NAME ?? 'Sandcastle Merge Probe',
+    GIT_AUTHOR_EMAIL: process.env.GIT_AUTHOR_EMAIL ?? 'sandcastle-merge-probe@example.invalid',
+    GIT_COMMITTER_NAME: process.env.GIT_COMMITTER_NAME ?? 'Sandcastle Merge Probe',
+    GIT_COMMITTER_EMAIL: process.env.GIT_COMMITTER_EMAIL ?? 'sandcastle-merge-probe@example.invalid'
+  }
+
+  try {
+    execFileSync('git', ['worktree', 'add', '--detach', probeDir, 'HEAD'], { stdio: 'pipe' })
+
+    for (const branch of branches) {
+      try {
+        execFileSync('git', ['merge', '--no-edit', branch], {
+          cwd: probeDir,
+          env: probeEnv,
+          stdio: 'pipe'
+        })
+      } catch {
+        console.log(`Merge preflight found conflicts while checking ${branch}; using Opus.`)
+        return true
+      }
+    }
+
+    return false
+  } catch {
+    console.log('Merge preflight could not complete cleanly; using Opus.')
+    return true
+  } finally {
+    try {
+      execFileSync('git', ['worktree', 'remove', '--force', probeDir], { stdio: 'pipe' })
+    } catch {
+      rmSync(probeDir, { recursive: true, force: true })
+    }
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Main loop
 // ---------------------------------------------------------------------------
@@ -99,7 +165,7 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
   // -------------------------------------------------------------------------
   // Phase 1: Plan
   //
-  // The planning agent (opus, for deeper reasoning) reads the open issue list,
+  // The planning agent reads the open issue list,
   // builds a dependency graph, and selects the issues that can be worked in
   // parallel right now (i.e., no blocking dependencies on other open issues).
   //
@@ -112,8 +178,7 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
     // One iteration is enough: the planner just needs to read and reason,
     // not write code.
     maxIterations: 1,
-    // Opus for planning: dependency analysis benefits from deeper reasoning.
-    agent: agent(),
+    agent: agent('sonnet'),
     promptFile: './.sandcastle/plan-prompt.md'
   })
 
@@ -124,9 +189,7 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
   }
 
   // The plan JSON contains an array of issues, each with id, title, branch.
-  const { issues } = JSON.parse(planMatch[1]!) as {
-    issues: { id: string; title: string; branch: string }[]
-  }
+  const { issues } = JSON.parse(planMatch[1]!) as { issues: PlannedIssue[] }
 
   if (issues.length === 0) {
     // No unblocked work — either everything is done or everything is blocked.
@@ -136,7 +199,8 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
 
   console.log(`Planning complete. ${issues.length} issue(s) to work in parallel:`)
   for (const issue of issues) {
-    console.log(`  ${issue.id}: ${issue.title} → ${issue.branch}`)
+    const implementationModel = implementationModelFor(issue)
+    console.log(`  ${issue.id}: ${issue.title} → ${issue.branch} (${implementationModel})`)
   }
 
   // -------------------------------------------------------------------------
@@ -160,15 +224,19 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
 
       try {
         // Run the implementer
+        const implementationModel = implementationModelFor(issue)
         const implement = await sandbox.run({
           name: 'implementer',
           maxIterations: 100,
-          agent: agent(),
+          agent: agent(implementationModel),
           promptFile: './.sandcastle/implement-prompt.md',
           promptArgs: {
             TASK_ID: issue.id,
             ISSUE_TITLE: issue.title,
-            BRANCH: issue.branch
+            BRANCH: issue.branch,
+            IMPLEMENTATION_MODEL: implementationModel,
+            IMPLEMENTATION_MODEL_REASON:
+              issue.implementationModelReason ?? 'Default implementation model.'
           }
         })
 
@@ -177,7 +245,7 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
           const review = await sandbox.run({
             name: 'reviewer',
             maxIterations: 1,
-            agent: agent(),
+            agent: agent('opus'),
             promptFile: './.sandcastle/review-prompt.md',
             promptArgs: {
               BRANCH: issue.branch
@@ -237,12 +305,14 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
   // The {{BRANCHES}} and {{ISSUES}} prompt arguments are lists that the agent
   // uses to know which branches to merge and which issues to close.
   // -------------------------------------------------------------------------
+  const mergeModel = needsOpusForMerge(completedBranches) ? 'opus' : 'sonnet'
+
   await sandcastle.run({
     hooks,
     sandbox: sandboxProvider(),
     name: 'merger',
     maxIterations: 1,
-    agent: agent(),
+    agent: agent(mergeModel),
     promptFile: './.sandcastle/merge-prompt.md',
     promptArgs: {
       // A markdown list of branch names, one per line.

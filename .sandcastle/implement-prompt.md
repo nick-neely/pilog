@@ -8,6 +8,9 @@ Only work on the issue specified.
 
 Work on branch {{BRANCH}}. Make commits and run tests.
 
+The planner selected implementation model `{{IMPLEMENTATION_MODEL}}`.
+Reason: {{IMPLEMENTATION_MODEL_REASON}}
+
 # CONTEXT
 
 Here are the last 10 commits:

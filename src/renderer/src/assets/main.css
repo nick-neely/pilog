@@ -146,8 +146,7 @@
   /* Body / UI sans — IBM Plex Sans (humanist, warm) */
   --font-sans: 'IBM Plex Sans Variable', 'IBM Plex Sans', system-ui, sans-serif;
   /* Display serif — Source Serif 4. The Reading-Room Journal's literary voice. */
-  --font-heading:
-    'Source Serif 4 Variable', 'Source Serif 4', Georgia, 'Iowan Old Style', serif;
+  --font-heading: 'Source Serif 4 Variable', 'Source Serif 4', Georgia, 'Iowan Old Style', serif;
   /* Editor / code mono — IBM Plex Mono, paired family with the body sans */
   --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
 

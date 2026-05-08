@@ -2,100 +2,100 @@
 name: PiLog
 description: A developer's bedside journal — paper-warm, type-led, moss-accented.
 colors:
-  parchment: "oklch(0.96 0.006 75)"
-  parchment-light: "oklch(0.97 0.005 75)"
-  ash: "oklch(0.92 0.006 75)"
-  pencil: "oklch(0.48 0.012 60)"
-  ink: "oklch(0.22 0.012 60)"
-  border-warm: "oklch(0.88 0.008 70)"
-  moss: "oklch(0.48 0.08 145)"
-  moss-lifted: "oklch(0.6 0.085 145)"
-  clay: "oklch(0.5 0.16 28)"
-  clay-lifted: "oklch(0.64 0.155 28)"
-  dark-ink: "oklch(0.18 0.012 60)"
-  dark-card: "oklch(0.22 0.014 60)"
-  dark-ash: "oklch(0.26 0.014 60)"
-  dark-pencil: "oklch(0.7 0.012 70)"
-  dark-paper: "oklch(0.92 0.008 75)"
+  parchment: 'oklch(0.96 0.006 75)'
+  parchment-light: 'oklch(0.97 0.005 75)'
+  ash: 'oklch(0.92 0.006 75)'
+  pencil: 'oklch(0.48 0.012 60)'
+  ink: 'oklch(0.22 0.012 60)'
+  border-warm: 'oklch(0.88 0.008 70)'
+  moss: 'oklch(0.48 0.08 145)'
+  moss-lifted: 'oklch(0.6 0.085 145)'
+  clay: 'oklch(0.5 0.16 28)'
+  clay-lifted: 'oklch(0.64 0.155 28)'
+  dark-ink: 'oklch(0.18 0.012 60)'
+  dark-card: 'oklch(0.22 0.014 60)'
+  dark-ash: 'oklch(0.26 0.014 60)'
+  dark-pencil: 'oklch(0.7 0.012 70)'
+  dark-paper: 'oklch(0.92 0.008 75)'
 typography:
   display:
-    fontFamily: "Source Serif 4 Variable, Source Serif 4, Georgia, serif"
-    fontSize: "clamp(1.75rem, 3.5vw, 2.5rem)"
+    fontFamily: 'Source Serif 4 Variable, Source Serif 4, Georgia, serif'
+    fontSize: 'clamp(1.75rem, 3.5vw, 2.5rem)'
     fontWeight: 400
     lineHeight: 1.15
-    letterSpacing: "-0.005em"
+    letterSpacing: '-0.005em'
   headline:
-    fontFamily: "Source Serif 4 Variable, Source Serif 4, Georgia, serif"
-    fontSize: "1.5rem"
+    fontFamily: 'Source Serif 4 Variable, Source Serif 4, Georgia, serif'
+    fontSize: '1.5rem'
     fontWeight: 500
     lineHeight: 1.25
-    letterSpacing: "normal"
+    letterSpacing: 'normal'
   title:
-    fontFamily: "IBM Plex Sans Variable, IBM Plex Sans, system-ui, sans-serif"
-    fontSize: "1rem"
+    fontFamily: 'IBM Plex Sans Variable, IBM Plex Sans, system-ui, sans-serif'
+    fontSize: '1rem'
     fontWeight: 600
     lineHeight: 1.4
-    letterSpacing: "normal"
+    letterSpacing: 'normal'
   body:
-    fontFamily: "IBM Plex Sans Variable, IBM Plex Sans, system-ui, sans-serif"
-    fontSize: "0.9375rem"
+    fontFamily: 'IBM Plex Sans Variable, IBM Plex Sans, system-ui, sans-serif'
+    fontSize: '0.9375rem'
     fontWeight: 400
     lineHeight: 1.55
-    letterSpacing: "normal"
+    letterSpacing: 'normal'
   label:
-    fontFamily: "IBM Plex Sans Variable, IBM Plex Sans, system-ui, sans-serif"
-    fontSize: "0.8125rem"
+    fontFamily: 'IBM Plex Sans Variable, IBM Plex Sans, system-ui, sans-serif'
+    fontSize: '0.8125rem'
     fontWeight: 500
     lineHeight: 1.35
-    letterSpacing: "0.01em"
+    letterSpacing: '0.01em'
   mono:
-    fontFamily: "IBM Plex Mono, ui-monospace, SFMono-Regular, Menlo, monospace"
-    fontSize: "0.875rem"
+    fontFamily: 'IBM Plex Mono, ui-monospace, SFMono-Regular, Menlo, monospace'
+    fontSize: '0.875rem'
     fontWeight: 400
     lineHeight: 1.6
-    letterSpacing: "normal"
+    letterSpacing: 'normal'
 rounded:
-  sm: "0.3rem"
-  md: "0.4rem"
-  lg: "0.5rem"
-  xl: "0.7rem"
-  2xl: "0.9rem"
+  sm: '0.3rem'
+  md: '0.4rem'
+  lg: '0.5rem'
+  xl: '0.7rem'
+  2xl: '0.9rem'
 components:
   button-primary:
-    backgroundColor: "{colors.moss}"
-    textColor: "{colors.parchment-light}"
-    typography: "{typography.label}"
-    rounded: "{rounded.md}"
-    padding: "0 0.75rem"
-    height: "2.25rem"
+    backgroundColor: '{colors.moss}'
+    textColor: '{colors.parchment-light}'
+    typography: '{typography.label}'
+    rounded: '{rounded.md}'
+    padding: '0 0.75rem'
+    height: '2.25rem'
   button-primary-hover:
-    backgroundColor: "{colors.moss}"
-    textColor: "{colors.parchment-light}"
+    backgroundColor: '{colors.moss}'
+    textColor: '{colors.parchment-light}'
   button-outline:
-    backgroundColor: "{colors.parchment}"
-    textColor: "{colors.ink}"
-    rounded: "{rounded.md}"
-    padding: "0 0.75rem"
-    height: "2.25rem"
+    backgroundColor: '{colors.parchment}'
+    textColor: '{colors.ink}'
+    rounded: '{rounded.md}'
+    padding: '0 0.75rem'
+    height: '2.25rem'
   button-ghost:
-    backgroundColor: "{colors.parchment}"
-    textColor: "{colors.ink}"
-    rounded: "{rounded.md}"
-    padding: "0 0.75rem"
-    height: "2.25rem"
+    backgroundColor: '{colors.parchment}'
+    textColor: '{colors.ink}'
+    rounded: '{rounded.md}'
+    padding: '0 0.75rem'
+    height: '2.25rem'
   button-destructive:
-    backgroundColor: "{colors.parchment}"
-    textColor: "{colors.clay}"
-    rounded: "{rounded.md}"
-    padding: "0 0.75rem"
-    height: "2.25rem"
+    backgroundColor: '{colors.parchment}'
+    textColor: '{colors.clay}'
+    rounded: '{rounded.md}'
+    padding: '0 0.75rem'
+    height: '2.25rem'
   alert-dialog-content:
-    backgroundColor: "{colors.parchment-light}"
-    textColor: "{colors.ink}"
-    rounded: "{rounded.xl}"
-    padding: "1.5rem"
+    backgroundColor: '{colors.parchment-light}'
+    textColor: '{colors.ink}'
+    rounded: '{rounded.xl}'
+    padding: '1.5rem'
   alert-dialog-overlay:
-    backgroundColor: "{colors.ink}"
+    backgroundColor: '{colors.ink}'
 ---
 
 # Design System: PiLog
@@ -134,6 +134,7 @@ A paper-warm neutral field with a single moss accent. The canonical color space 
 The neutral ramp is the project's main visual surface. Light steps are tinted toward warm yellow at ~75° hue, low chroma (~0.005–0.012), so the page reads as paper rather than sterile gray. Dark steps shift slightly inward to ~60° hue so ink-warm shadows feel built from the same family.
 
 **Light:**
+
 - **Parchment** (`oklch(0.96 0.006 75)`): the default page surface, card surface, and scratchpad canvas.
 - **Parchment-Light** (`oklch(0.97 0.005 75)`): popover and sidebar surface; one tonal step lighter than the page so floating chrome separates by tone, not shadow.
 - **Ash** (`oklch(0.92 0.006 75)`): subtle surface separation — inbox row hover, settings group dividers, the "second card under the first" surface where unavoidable.
@@ -142,6 +143,7 @@ The neutral ramp is the project's main visual surface. Light steps are tinted to
 - **Border-Warm** (`oklch(0.88 0.008 70)`): the only border color in light. 1px, low-contrast, never colored, never striped.
 
 **Dark:**
+
 - **Dark Ink** (`oklch(0.18 0.012 60)`): the page surface. Warm-tinted dark, never blue-black.
 - **Dark Card** (`oklch(0.22 0.014 60)`): card and popover surface; one step up from the page.
 - **Dark Ash** (`oklch(0.26 0.014 60)`): muted/secondary surface for separation.
@@ -250,7 +252,7 @@ The implemented primitives at this writing are `Button` and `AlertDialog`. The I
 
 - **Do** anchor color tokens in OKLCH. Neutrals stay even as lightness shifts and moss reads true across displays.
 - **Do** use Reading-Room Moss only for primary actions, focus rings, and at-a-glance state where unavoidable. ≤10% of any screen.
-- **Do** convey status, priority, and confidence with a label, glyph, *or* shape alongside any color cue. The Color-Independence Rule is non-negotiable.
+- **Do** convey status, priority, and confidence with a label, glyph, _or_ shape alongside any color cue. The Color-Independence Rule is non-negotiable.
 - **Do** lean on type, weight, and tonal neutrals for hierarchy. Headers earn their weight; backgrounds don't.
 - **Do** respect `prefers-reduced-motion`. Reduced-motion users get instant transitions, never broken interactions.
 - **Do** keep focus rings visible and on-brand. Use `focus-visible:ring-3 focus-visible:ring-ring/30 focus-visible:border-ring`; never suppress.
