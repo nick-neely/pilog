@@ -30,3 +30,11 @@ Before any UI work, read `PRODUCT.md` and `DESIGN.md` at the repo root. They def
 - **Accessibility:** WCAG 2.2 AA, keyboard parity, color independence for status/priority/confidence, on-brand visible focus rings.
 
 `DESIGN.md` is now live (no longer a seed). Tokens are wired in `src/renderer/src/assets/main.css` (`:root` light, `.dark` dark) and the `.impeccable/design.json` sidecar holds tonal ramps, narrative, and the rendered button/alert-dialog component snippets. Re-run `$impeccable document` whenever new themed primitives land (Input, Inbox Row, Draft Card, Scratchpad Editor, Settings Group) so the spec keeps pace with the code.
+
+## UI/UX skill routing
+
+Use skills to keep implementation aligned with PiLog’s design system and shadcn discipline.
+
+- **Before any UI/UX work** (renderer components, layout, typography, microcopy, visual hierarchy, accessibility, settings/onboarding/empty states, tokens, or themed primitives): invoke `/impeccable` and follow its setup. If slash commands or skills are unavailable in your harness, read `PRODUCT.md` and `DESIGN.md` end to end and apply the same constraints (Reading-Room Journal, anti-references, WCAG 2.2 AA, keyboard parity).
+- **When touching shadcn/ui** (adding, changing, debugging, or composing primitives under `src/renderer/src/components/ui/` or imports from `@renderer/components/ui`): invoke `/shadcn`. Prefer existing primitives; add missing ones with `pnpm dlx shadcn@latest add <component>` (this repo uses pnpm). After `add`, read the generated files and fix imports, icon library (HugeIcons only), and composition before shipping.
+- **Sandcastle (Claude):** the driver mounts host `~/.claude/skills` at `/home/agent/.claude/skills` so Claude Code can resolve those skills in-container. Ensure that directory exists on the machine that runs Sandcastle.

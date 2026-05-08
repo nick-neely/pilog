@@ -5,6 +5,7 @@ import {
   Cancel01Icon,
   CancelCircleIcon,
   Search01Icon,
+  Settings02Icon,
   SparklesIcon
 } from '@hugeicons/core-free-icons'
 import { Button } from '@renderer/components/ui/button'
@@ -140,7 +141,7 @@ function NoteDetail({
 
   return (
     <article className="flex h-full flex-col">
-      <header className="flex items-center justify-between gap-3 border-b px-6 py-4">
+      <header className="flex min-h-14 shrink-0 items-center justify-between gap-3 border-b px-6 py-3">
         <p className="tabular font-mono text-xs text-muted-foreground">
           {formatNoteTimestamp(note.createdAt)}
         </p>
@@ -185,7 +186,7 @@ function NoteDetail({
         />
       </div>
       {/* Repo association — below the content area */}
-      <footer className="border-t px-6 py-3">
+      <footer className="flex min-h-14 shrink-0 items-center border-t px-6 py-3">
         <div className="flex items-center gap-3">
           <span className="text-xs font-medium text-muted-foreground">Repo</span>
           {repos.length === 0 ? (
@@ -221,9 +222,11 @@ function NoteDetail({
 }
 
 export function Inbox({
-  onNavigateToRepositories
+  onNavigateToRepositories,
+  onNavigateToSettings
 }: {
   onNavigateToRepositories: () => void
+  onNavigateToSettings: () => void
 }): React.JSX.Element {
   const [notes, setNotes] = useState<Note[]>([])
   const [repos, setRepos] = useState<Repo[]>([])
@@ -411,7 +414,7 @@ export function Inbox({
         contained instead of bleeding into the detail pane (the bug from the
         first polish pass). The sidebar is structured as four regions:
           (1) title strip with capture-mode count or triage-mode badge
-          (2) filter rail (single-row tab-like chips + repo dropdown)
+          (2) filter rail (status chips + full-width repo row)
           (3) scrolling list (the only region that grows)
           (4) mode footer that swaps capture <-> triage
         The Cmd+K palette absorbs search and discovery so the chrome above
@@ -419,7 +422,7 @@ export function Inbox({
       */}
       <div className="flex w-80 min-w-0 shrink-0 flex-col overflow-hidden border-r">
         {/* (1) Title strip — single line, never grows */}
-        <header className="flex items-center justify-between gap-3 border-b px-6 pt-5 pb-3">
+        <header className="flex min-h-14 shrink-0 items-center justify-between gap-3 border-b px-6 py-3">
           <div className="flex min-w-0 items-baseline gap-2">
             <h1 className="font-heading text-xl font-medium tracking-tight">Inbox</h1>
             {hasSelection ? (
@@ -452,21 +455,34 @@ export function Inbox({
               )
             )}
           </div>
-          <button
-            type="button"
-            data-testid="open-command"
-            onClick={() => setPaletteOpen(true)}
-            aria-label="Open command palette"
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-border bg-transparent px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/30 focus-visible:border-ring"
-          >
-            <HugeiconsIcon icon={Search01Icon} className="h-3.5 w-3.5" aria-hidden />
-            <kbd className="font-mono">{META_KEY}K</kbd>
-          </button>
+          <div className="flex shrink-0 items-center gap-1">
+            <button
+              type="button"
+              data-testid="open-settings"
+              onClick={() => onNavigateToSettings()}
+              aria-label="Settings"
+              title="Settings"
+              className="inline-flex shrink-0 items-center justify-center rounded-md border border-border bg-transparent px-2 py-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/30 focus-visible:border-ring"
+            >
+              <HugeiconsIcon icon={Settings02Icon} className="h-3.5 w-3.5" aria-hidden />
+            </button>
+            <button
+              type="button"
+              data-testid="open-command"
+              onClick={() => setPaletteOpen(true)}
+              aria-label="Open command palette"
+              title="Search and commands"
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-border bg-transparent px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/30 focus-visible:border-ring"
+            >
+              <HugeiconsIcon icon={Search01Icon} className="h-3.5 w-3.5" aria-hidden />
+              <kbd className="font-mono">{META_KEY}K</kbd>
+            </button>
+          </div>
         </header>
 
-        {/* (2) Filter rail — status chips + repo dropdown */}
-        <div className="flex flex-wrap items-center gap-1.5 border-b px-6 py-2.5">
-          {STATUS_CHIPS.map((chip) => {
+        {/* (2) Filter rail — status row, then repo (avoids wrapped chip + orphaned select) */}
+        <div className="shrink-0 space-y-2 border-b px-6 py-2.5">
+          <div className="flex flex-wrap gap-x-1.5 gap-y-1">{STATUS_CHIPS.map((chip) => {
             const active = statusFilter === chip.value
             return (
               <button
@@ -495,7 +511,7 @@ export function Inbox({
               </button>
             )
           })}
-          {/* Repo filter — right-aligned, complements the status chips */}
+          </div>
           <select
             aria-label="Filter by repository"
             data-testid="filter-repo"
@@ -506,7 +522,7 @@ export function Inbox({
               lastClickedIndex.current = null
             }}
             disabled={repos.length === 0}
-            className="ml-auto rounded border border-border bg-transparent px-2 py-0.5 text-xs text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/30 disabled:opacity-40"
+            className="h-8 w-full max-w-full rounded border border-border bg-background px-2 text-xs text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/30 disabled:opacity-40"
           >
             <option value="">All repos</option>
             <option value={UNASSIGNED_KEY}>Unassigned</option>
@@ -564,7 +580,7 @@ export function Inbox({
         </main>
 
         {/* (4) Mode footer — capture by default, triage on selection */}
-        <footer className="border-t bg-background px-4 py-3">
+        <footer className="flex min-h-14 shrink-0 items-center border-t bg-background px-6 py-3">
           {hasSelection ? (
             // Triage-mode: only the two actual triage actions. Clearing the
             // selection lives on the title strip (the count chip) and on
@@ -622,17 +638,12 @@ export function Inbox({
             onNavigateToRepositories={onNavigateToRepositories}
           />
         ) : (
-          <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
+          <div className="flex h-full w-full flex-col items-center justify-center gap-3 px-6 text-center">
             <p className="max-w-[36ch] text-sm text-muted-foreground">
               {selectionCount > 1
                 ? `${selectionCount} notes selected. Triage actions live in the sidebar footer; press Esc to clear.`
                 : 'Select a note to read or edit.'}
             </p>
-            {selectionCount <= 1 && (
-              <p className="text-xs text-muted-foreground">
-                or press <kbd className="font-mono">{META_KEY}K</kbd> to search and run commands.
-              </p>
-            )}
           </div>
         )}
       </section>
@@ -660,6 +671,19 @@ export function Inbox({
               <HugeiconsIcon icon={Add01Icon} aria-hidden />
               <span>New note</span>
               <CommandShortcut>{META_KEY}N</CommandShortcut>
+            </CommandItem>
+          </CommandGroup>
+
+          <CommandSeparator />
+
+          <CommandGroup heading="Navigate">
+            <CommandItem
+              data-testid="cmd-settings"
+              onSelect={() => runCommand(onNavigateToSettings)}
+            >
+              <HugeiconsIcon icon={Settings02Icon} aria-hidden />
+              <span>Settings</span>
+              <CommandShortcut>{`${META_KEY},`}</CommandShortcut>
             </CommandItem>
           </CommandGroup>
 

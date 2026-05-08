@@ -142,9 +142,12 @@ Each test responds to what you learned from the previous cycle. Never refactor w
 ## UI
 
 - Tailwind CSS for styling. No inline `style` attributes except for genuinely dynamic values (computed dimensions, transforms).
-- Use shadcn/ui primitives from `components/ui/` before reaching for a new dependency. If a primitive doesn't exist, generate it via the shadcn CLI rather than writing one from scratch.
-- HugeIcons React for icons (`import { HugeiconsIcon } from '@hugeicons/react'` + named icons from `@hugeicons/core-free-icons`). No mixing icon libraries.
-- Accessibility: every interactive element has a discernible label (text, `aria-label`, or `aria-labelledby`). Forms have associated `<label>` elements. Keyboard navigation works without a mouse.
+- Prefer semantic theme tokens (`bg-background`, `text-foreground`, `text-muted-foreground`, moss/brand tokens from `main.css`) over raw color utilities (`bg-blue-500`, `text-zinc-*`, ad-hoc `dark:` palettes) unless the diff is intentionally touching token definitions.
+- Use shadcn/ui primitives from `src/renderer/src/components/ui/` (alias `@renderer/components/ui`) before a new dependency or custom markup duplicating those roles. If a primitive is missing, add it with `pnpm dlx shadcn@latest add <component>` and commit generated files — do not copy-paste undocumented component source. After `add`, fix imports to project aliases and replace any wrong icon imports with HugeIcons per `components.json`.
+- No duplicate one-off primitives: if `Button`, `Dialog`, `Card`, etc. already exist under `components/ui`, the diff should use or extend them, not reinvent.
+- HugeIcons React for icons (`import { HugeiconsIcon } from '@hugeicons/react'` + named icons from `@hugeicons/core-free-icons`). No mixing icon libraries in the diff.
+- Accessibility: every interactive element has a discernible label (text, `aria-label`, or `aria-labelledby`). Forms use proper controls and labels (and shadcn Field patterns when adding forms). Keyboard navigation works without a mouse; focus rings stay visible — no `outline-none` without an equivalent visible focus style.
+- UI changes affecting visual language or primitives should stay consistent with `PRODUCT.md` and `DESIGN.md` (warm neutrals, moss accent sparingly, anti-references respected).
 - React: function components only. Hooks at the top of the component. No business logic in components — extract to hooks (`use*`) or to main-process services.
 - State: local state via `useState`/`useReducer`. Cross-component server state via TanStack Query (added when needed) calling the IPC layer. No Redux in MVP.
 

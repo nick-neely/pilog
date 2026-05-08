@@ -60,17 +60,30 @@ function agent(model: ClaudeModelRole = 'sonnet'): AgentProvider {
 }
 
 function sandboxProvider(): SandboxProvider {
-  return useCodex
-    ? docker({
-        mounts: [
-          {
-            hostPath: '~/.codex',
-            sandboxPath: '/home/agent/.codex-host',
-            readonly: true
-          }
-        ]
-      })
-    : docker()
+  if (useCodex) {
+    return docker({
+      mounts: [
+        {
+          hostPath: '~/.codex',
+          sandboxPath: '/home/agent/.codex-host',
+          readonly: true
+        }
+      ]
+    })
+  }
+
+  // Expose host Claude Code skills (`~/.claude/skills`) so agents can invoke
+  // slash skills like `/impeccable` and `/shadcn` inside the container.
+  // Ensure that directory exists on the host before running Sandcastle.
+  return docker({
+    mounts: [
+      {
+        hostPath: '~/.claude/skills',
+        sandboxPath: '/home/agent/.claude/skills',
+        readonly: true
+      }
+    ]
+  })
 }
 
 // Hooks run inside the sandbox before the agent starts each iteration.

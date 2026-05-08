@@ -40,7 +40,12 @@ Review the code changes on branch `{{BRANCH}}` and improve code clarity, consist
 
 5. **Apply project standards**: Follow the coding standards defined in @.sandcastle/CODING_STANDARDS.md
 
-6. **Preserve functionality**: Never change what the code does - only how it does it. All original features, outputs, and behaviors must remain intact.
+6. **UI/UX and shadcn (when the diff touches renderer or `components/ui`)**:
+   - Check alignment with `PRODUCT.md` / `DESIGN.md`: Reading-Room neutrals, moss accent discipline, typography, motion, and anti-references (no generic AI look, no stock shadcn demo palette, no side-stripe accents, no gradient text).
+   - Check shadcn usage: semantic tokens and variants before raw Tailwind colors; correct composition (e.g. overlays with titles, full Card structure); no hand-rolled substitutes for available primitives; HugeIcons only.
+   - Check accessibility from the diff: labels, keyboard paths, focus visibility, status not by color alone where applicable.
+
+7. **Preserve functionality**: Never change what the code does - only how it does it. All original features, outputs, and behaviors must remain intact.
 
 # EXECUTION
 

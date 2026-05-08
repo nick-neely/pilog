@@ -1,6 +1,10 @@
 import { Menu, type MenuItemConstructorOptions } from 'electron'
 
-export function buildAppMenu(onNewNote: () => void): Menu {
+export function buildAppMenu(callbacks: {
+  onNewNote: () => void
+  onOpenSettings: () => void
+}): Menu {
+  const { onNewNote, onOpenSettings } = callbacks
   const template: MenuItemConstructorOptions[] = [
     {
       label: 'File',
@@ -9,6 +13,12 @@ export function buildAppMenu(onNewNote: () => void): Menu {
           label: 'New Note',
           accelerator: 'CmdOrCtrl+N',
           click: onNewNote
+        },
+        { type: 'separator' },
+        {
+          label: 'Settings…',
+          accelerator: 'CmdOrCtrl+,',
+          click: onOpenSettings
         },
         { type: 'separator' },
         { role: 'quit' }

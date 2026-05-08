@@ -27,6 +27,13 @@ Explore the repo and fill your context window with relevant information that wil
 
 Pay extra attention to test files that touch the relevant parts of the code.
 
+# UI/UX AND SHADCN (PRE-EDIT GATE)
+
+If the issue touches **any** renderer UI/UX (components under `src/renderer/`, layout, typography, copy, theming, accessibility, or `src/renderer/src/assets/main.css` tokens), **before** you edit project files:
+
+1. Invoke `/impeccable` and follow its setup. If `/impeccable` is unavailable, read `PRODUCT.md` and `DESIGN.md` at the repo root and align with PiLog’s Reading-Room Journal constraints, anti-references, and accessibility rules in `AGENTS.md`.
+2. If the work adds, changes, or composes **shadcn/ui** primitives (`src/renderer/src/components/ui/` or `@renderer/components/ui`): invoke `/shadcn`. Prefer existing primitives; run `pnpm dlx shadcn@latest add <component>` when a standard primitive is the right building block. Run `pnpm dlx shadcn@latest docs <component>` when unsure of API. After any `add`, read the new files, fix project aliases and HugeIcons usage (no other icon libraries), and verify composition (accessibility, groups, variants) before using the component.
+
 # EXECUTION
 
 If applicable, use RGR to complete the task.

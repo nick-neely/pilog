@@ -66,7 +66,10 @@ app.whenReady().then(() => {
 
   registerGlobalHotkeys(db, openScratchpad)
 
-  const menu = buildAppMenu(openScratchpad)
+  const menu = buildAppMenu({
+    onNewNote: openScratchpad,
+    onOpenSettings: () => showMainWindowOnRoute(icon, 'navigate:settings')
+  })
   Menu.setApplicationMenu(menu)
 
   createTray(icon, {
