@@ -23,7 +23,7 @@ export function registerRepoIpcHandlers(db: PilogDatabase): void {
 
   ipcMain.handle('dialog:openDirectory', async (event) => {
     const win = BrowserWindow.fromWebContents(event.sender)
-    const options = { properties: ['openDirectory'] as const }
+    const options = { properties: ['openDirectory' as const] }
     const result = win
       ? await dialog.showOpenDialog(win, options)
       : await dialog.showOpenDialog(options)
