@@ -1,6 +1,6 @@
 import type { AgentTool } from '@earendil-works/pi-agent-core'
 import { rgPath } from '@vscode/ripgrep'
-import { Type } from 'typebox'
+import { Type, type Static } from 'typebox'
 import { existsSync, statSync, readFileSync, readdirSync } from 'node:fs'
 import path from 'node:path'
 import { spawnSync } from 'node:child_process'
@@ -13,6 +13,51 @@ const MAX_DIR_ENTRIES = 500
 const MAX_GLOB_RESULTS = 500
 const MAX_GREP_MATCHES = 200
 const MAX_GIT_OUTPUT_BYTES = 256 * 1024
+
+const ReadFileParameters = Type.Object({
+  path: Type.String(),
+  maxBytes: Type.Optional(Type.Number({ minimum: 1, maximum: MAX_READ_BYTES }))
+})
+type ReadFileParameters = Static<typeof ReadFileParameters>
+
+const ListDirParameters = Type.Object({
+  path: Type.String(),
+  depth: Type.Optional(Type.Number({ minimum: 0, maximum: 4 }))
+})
+type ListDirParameters = Static<typeof ListDirParameters>
+
+const GlobParameters = Type.Object({ pattern: Type.String() })
+type GlobParameters = Static<typeof GlobParameters>
+
+const GrepParameters = Type.Object({
+  pattern: Type.String(),
+  path: Type.Optional(Type.String()),
+  isRegex: Type.Optional(Type.Boolean())
+})
+type GrepParameters = Static<typeof GrepParameters>
+
+const GitDiffParameters = Type.Object({
+  path: Type.Optional(Type.String()),
+  staged: Type.Optional(Type.Boolean())
+})
+type GitDiffParameters = Static<typeof GitDiffParameters>
+
+const GitLogParameters = Type.Object({
+  path: Type.Optional(Type.String()),
+  limit: Type.Optional(Type.Number({ minimum: 1, maximum: 50 }))
+})
+type GitLogParameters = Static<typeof GitLogParameters>
+
+const GitBlameParameters = Type.Object({
+  path: Type.String(),
+  lineRange: Type.Optional(
+    Type.Object({
+      start: Type.Number({ minimum: 1 }),
+      end: Type.Number({ minimum: 1 })
+    })
+  )
+})
+type GitBlameParameters = Static<typeof GitBlameParameters>
 
 type RipgrepEvent = {
   type: string
@@ -43,18 +88,14 @@ export function createReadOnlyRepoTools(repoPath: string): AgentTool[] {
   ]
 }
 
-export function createReadFileTool(repoPath: string): AgentTool {
+export function createReadFileTool(repoPath: string): AgentTool<typeof ReadFileParameters> {
   return {
     name: 'read_file',
     label: 'Read File',
     description: 'Read a UTF-8 text file from the selected repository.',
-    parameters: Type.Object({
-      path: Type.String(),
-      maxBytes: Type.Optional(Type.Number({ minimum: 1, maximum: MAX_READ_BYTES }))
-    }),
+    parameters: ReadFileParameters,
     executionMode: 'parallel',
-    execute: async (_toolCallId, params: unknown) => {
-      const input = params as { path: string; maxBytes?: number }
+    execute: async (_toolCallId, input) => {
       const sandbox = createRepoSandbox(repoPath)
       const filePath = sandbox.resolvePath(input.path)
       const maxBytes = input.maxBytes ?? MAX_READ_BYTES
@@ -68,18 +109,14 @@ export function createReadFileTool(repoPath: string): AgentTool {
   }
 }
 
-export function createListDirTool(repoPath: string): AgentTool {
+export function createListDirTool(repoPath: string): AgentTool<typeof ListDirParameters> {
   return {
     name: 'list_dir',
     label: 'List Directory',
     description: 'List repository directory entries up to a bounded depth.',
-    parameters: Type.Object({
-      path: Type.String(),
-      depth: Type.Optional(Type.Number({ minimum: 0, maximum: 4 }))
-    }),
+    parameters: ListDirParameters,
     executionMode: 'parallel',
-    execute: async (_toolCallId, params: unknown) => {
-      const input = params as { path: string; depth?: number }
+    execute: async (_toolCallId, input) => {
       const sandbox = createRepoSandbox(repoPath)
       const start = sandbox.resolvePath(input.path)
       const maxDepth = input.depth ?? 1
@@ -90,8 +127,7 @@ export function createListDirTool(repoPath: string): AgentTool {
           if (entries.length >= MAX_DIR_ENTRIES) return
           const absolutePath = path.join(dir, entry.name)
           const relativePath = sandbox.assertResolvedPath(absolutePath)
-          const type = entry.isDirectory() ? 'directory' : entry.isFile() ? 'file' : 'other'
-          entries.push({ path: relativePath, type })
+          entries.push({ path: relativePath, type: getDirEntryType(entry) })
           if (entry.isDirectory() && depth < maxDepth) visit(absolutePath, depth + 1)
         }
       }
@@ -102,15 +138,14 @@ export function createListDirTool(repoPath: string): AgentTool {
   }
 }
 
-export function createGlobTool(repoPath: string): AgentTool {
+export function createGlobTool(repoPath: string): AgentTool<typeof GlobParameters> {
   return {
     name: 'glob',
     label: 'Glob',
     description: 'Find repository files matching a glob pattern, honoring .gitignore.',
-    parameters: Type.Object({ pattern: Type.String() }),
+    parameters: GlobParameters,
     executionMode: 'parallel',
-    execute: async (_toolCallId, params: unknown) => {
-      const input = params as { pattern: string }
+    execute: async (_toolCallId, input) => {
       const sandbox = createRepoSandbox(repoPath)
       sandbox.assertPattern(input.pattern)
       const results = globSync(input.pattern, {
@@ -128,19 +163,14 @@ export function createGlobTool(repoPath: string): AgentTool {
   }
 }
 
-export function createGrepTool(repoPath: string): AgentTool {
+export function createGrepTool(repoPath: string): AgentTool<typeof GrepParameters> {
   return {
     name: 'grep',
     label: 'Grep',
     description: 'Search repository text with ripgrep.',
-    parameters: Type.Object({
-      pattern: Type.String(),
-      path: Type.Optional(Type.String()),
-      isRegex: Type.Optional(Type.Boolean())
-    }),
+    parameters: GrepParameters,
     executionMode: 'parallel',
-    execute: async (_toolCallId, params: unknown) => {
-      const input = params as { pattern: string; path?: string; isRegex?: boolean }
+    execute: async (_toolCallId, input) => {
       const sandbox = createRepoSandbox(repoPath)
       const searchPath = input.path ? sandbox.resolvePath(input.path) : sandbox.root
       const args = ['--json', '--max-count', '20']
@@ -189,18 +219,14 @@ export function createGitStatusTool(repoPath: string): AgentTool {
   }
 }
 
-export function createGitDiffTool(repoPath: string): AgentTool {
+export function createGitDiffTool(repoPath: string): AgentTool<typeof GitDiffParameters> {
   return {
     name: 'git_diff',
     label: 'Git Diff',
     description: 'Return a bounded git diff for the selected repository.',
-    parameters: Type.Object({
-      path: Type.Optional(Type.String()),
-      staged: Type.Optional(Type.Boolean())
-    }),
+    parameters: GitDiffParameters,
     executionMode: 'parallel',
-    execute: async (_toolCallId, params: unknown) => {
-      const input = params as { path?: string; staged?: boolean }
+    execute: async (_toolCallId, input) => {
       const sandbox = createRepoSandbox(repoPath)
       const diffPath = input.path
         ? sandbox.assertResolvedPath(sandbox.resolvePath(input.path))
@@ -213,18 +239,14 @@ export function createGitDiffTool(repoPath: string): AgentTool {
   }
 }
 
-export function createGitLogTool(repoPath: string): AgentTool {
+export function createGitLogTool(repoPath: string): AgentTool<typeof GitLogParameters> {
   return {
     name: 'git_log',
     label: 'Git Log',
     description: 'Return recent commits for the selected repository or path.',
-    parameters: Type.Object({
-      path: Type.Optional(Type.String()),
-      limit: Type.Optional(Type.Number({ minimum: 1, maximum: 50 }))
-    }),
+    parameters: GitLogParameters,
     executionMode: 'parallel',
-    execute: async (_toolCallId, params: unknown) => {
-      const input = params as { path?: string; limit?: number }
+    execute: async (_toolCallId, input) => {
       const sandbox = createRepoSandbox(repoPath)
       const args = [
         'log',
@@ -247,23 +269,14 @@ export function createGitLogTool(repoPath: string): AgentTool {
   }
 }
 
-export function createGitBlameTool(repoPath: string): AgentTool {
+export function createGitBlameTool(repoPath: string): AgentTool<typeof GitBlameParameters> {
   return {
     name: 'git_blame',
     label: 'Git Blame',
     description: 'Return bounded git blame output for a repository file.',
-    parameters: Type.Object({
-      path: Type.String(),
-      lineRange: Type.Optional(
-        Type.Object({
-          start: Type.Number({ minimum: 1 }),
-          end: Type.Number({ minimum: 1 })
-        })
-      )
-    }),
+    parameters: GitBlameParameters,
     executionMode: 'parallel',
-    execute: async (_toolCallId, params: unknown) => {
-      const input = params as { path: string; lineRange?: { start: number; end: number } }
+    execute: async (_toolCallId, input) => {
       const sandbox = createRepoSandbox(repoPath)
       const filePath = sandbox.resolvePath(input.path)
       const relativeFilePath = sandbox.assertResolvedPath(filePath)
@@ -274,6 +287,15 @@ export function createGitBlameTool(repoPath: string): AgentTool {
       return textResult({ blame: truncate(blame, MAX_GIT_OUTPUT_BYTES) })
     }
   }
+}
+
+function getDirEntryType(entry: {
+  isDirectory(): boolean
+  isFile(): boolean
+}): 'file' | 'directory' | 'other' {
+  if (entry.isDirectory()) return 'directory'
+  if (entry.isFile()) return 'file'
+  return 'other'
 }
 
 export function resolveRgPath(): string {

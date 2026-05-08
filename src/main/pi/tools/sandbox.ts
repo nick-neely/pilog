@@ -1,8 +1,12 @@
 import { realpathSync } from 'node:fs'
 import path from 'node:path'
 
-const DEFAULT_DENYLIST = {
+const DEFAULT_SANDBOX_OPTIONS = {
   allowNodeModules: false
+} as const
+
+type RepoSandboxOptions = {
+  allowNodeModules?: boolean
 }
 
 export type RepoSandbox = {
@@ -14,7 +18,7 @@ export type RepoSandbox = {
 
 export function createRepoSandbox(
   repoPath: string,
-  options: { allowNodeModules?: boolean } = DEFAULT_DENYLIST
+  options: RepoSandboxOptions = DEFAULT_SANDBOX_OPTIONS
 ): RepoSandbox {
   const root = realpathSync(repoPath)
 
@@ -37,8 +41,7 @@ export function createRepoSandbox(
 
   function assertContained(realPath: string): string {
     const relativePath = path.relative(root, realPath)
-    if (relativePath === '') return relativePath
-    if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
+    if (isPathOutsideRoot(relativePath)) {
       throw new Error('Tool path escapes the selected repository.')
     }
     return relativePath
@@ -53,7 +56,7 @@ export function createRepoSandbox(
 
       const candidate = path.resolve(root, inputPath)
       const candidateRelative = path.relative(root, candidate)
-      if (candidateRelative.startsWith('..') || path.isAbsolute(candidateRelative)) {
+      if (isPathOutsideRoot(candidateRelative)) {
         throw new Error('Tool path escapes the selected repository.')
       }
       assertRelativeAllowed(candidateRelative || '.')
@@ -81,4 +84,8 @@ export function createRepoSandbox(
       return relativePath
     }
   }
+}
+
+function isPathOutsideRoot(relativePath: string): boolean {
+  return relativePath !== '' && (relativePath.startsWith('..') || path.isAbsolute(relativePath))
 }
