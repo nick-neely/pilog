@@ -92,6 +92,33 @@ export type PiStatus = {
   reason?: 'missing-provider' | 'missing-model' | 'missing-credential'
 }
 
+export type PiAuthMethod = 'api_key' | 'oauth'
+
+export type PiActiveConfig = {
+  provider: string | null
+  providerName: string | null
+  modelId: string | null
+  modelName: string | null
+  hasApiKey: boolean
+  authMethod: PiAuthMethod | null
+  valid: boolean
+  reason?: PiStatus['reason'] | 'unknown-provider' | 'unknown-model'
+}
+
+export type PiProviderOption = {
+  id: string
+  name: string
+  modelCount: number
+  hasCredential: boolean
+  authMethod: PiAuthMethod | null
+}
+
+export type PiModelOption = {
+  id: string
+  name: string
+  provider: string
+}
+
 export type IssueDraft = {
   id: string
   repoId: string

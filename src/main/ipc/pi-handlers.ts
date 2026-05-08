@@ -8,6 +8,14 @@ import { listIssueDrafts } from '../db/repositories/issue-drafts'
 import { createNote } from '../db/repositories/notes'
 import { createRepo } from '../db/repositories/repos'
 import { getSetting, setSetting } from '../db/repositories/settings'
+import {
+  getActivePiConfig,
+  importExistingPiConfig,
+  listPiModels,
+  listPiProviders,
+  resetPiConfig,
+  setActivePiConfig
+} from '../pi/config'
 import { createSafeStorageAuthStorage } from '../pi/auth-storage'
 import {
   getSelectedNotesForGeneration,
@@ -31,24 +39,63 @@ export function registerPiIpcHandlers(
 ): void {
   const runAgentImpl = options?.runAgentImpl ?? runAgent
 
-  ipcMain.handle('pi:status', (): IpcResponse<'pi:status'> => {
+  ipcMain.handle('pi:status', async (): Promise<IpcResponse<'pi:status'>> => {
     const provider = getSetting(db, 'pi.activeProvider')
     const model = getSetting(db, 'pi.activeModel')
     if (!provider) return { configured: false, reason: 'missing-provider' }
     if (!model) return { configured: false, reason: 'missing-model' }
 
-    const authStorage = createSafeStorageAuthStorage()
+    const authStorage = await createSafeStorageAuthStorage()
     return authStorage.hasAuth(provider)
       ? { configured: true }
       : { configured: false, reason: 'missing-credential' }
   })
 
+  ipcMain.handle('pi:getActiveConfig', async (): Promise<IpcResponse<'pi:getActiveConfig'>> => {
+    return await getActivePiConfig(db)
+  })
+
+  ipcMain.handle(
+    'pi:setActiveConfig',
+    async (
+      _event,
+      request: IpcRequest<'pi:setActiveConfig'>
+    ): Promise<IpcResponse<'pi:setActiveConfig'>> => {
+      return await setActivePiConfig(db, request)
+    }
+  )
+
+  ipcMain.handle('pi:listProviders', async (): Promise<IpcResponse<'pi:listProviders'>> => {
+    return await listPiProviders()
+  })
+
+  ipcMain.handle(
+    'pi:listModels',
+    async (
+      _event,
+      request?: IpcRequest<'pi:listModels'>
+    ): Promise<IpcResponse<'pi:listModels'>> => {
+      return await listPiModels(request?.provider)
+    }
+  )
+
+  ipcMain.handle(
+    'pi:importExistingPiConfig',
+    async (): Promise<IpcResponse<'pi:importExistingPiConfig'>> => {
+      return await importExistingPiConfig(db)
+    }
+  )
+
+  ipcMain.handle('pi:resetConfig', async (): Promise<IpcResponse<'pi:resetConfig'>> => {
+    return await resetPiConfig(db)
+  })
+
   ipcMain.handle(
     'pi:generateDrafts:start',
-    (
+    async (
       event,
       request: IpcRequest<'pi:generateDrafts:start'>
-    ): IpcResponse<'pi:generateDrafts:start'> => {
+    ): Promise<IpcResponse<'pi:generateDrafts:start'>> => {
       const { repo, notes } = getSelectedNotesForGeneration(db, request.noteIds)
       if (!existsSync(repo.localPath))
         throw new Error('The linked repository path no longer exists.')
@@ -58,7 +105,7 @@ export function registerPiIpcHandlers(
       if (!provider || !model)
         throw new Error('Configure Pi provider and model before generating drafts.')
 
-      const authStorage = createSafeStorageAuthStorage()
+      const authStorage = await createSafeStorageAuthStorage()
       if (!authStorage.hasAuth(provider))
         throw new Error('Configure Pi credentials before generating drafts.')
 
@@ -146,7 +193,7 @@ export function registerPiIpcHandlers(
   if (process.env.PILOG_DEBUG_IPC === '1') {
     ipcMain.handle(
       'debug:seedIssueGenerationFixture',
-      (_event, request: IpcRequest<'debug:seedIssueGenerationFixture'>) => {
+      async (_event, request: IpcRequest<'debug:seedIssueGenerationFixture'>) => {
         mkdirSync(request.repoPath, { recursive: true })
         const repo = createRepo(db, {
           name: 'fixture',
@@ -161,7 +208,10 @@ export function registerPiIpcHandlers(
 
         setSetting(db, 'pi.activeProvider', 'pilog-fixture')
         setSetting(db, 'pi.activeModel', 'tracer')
-        createSafeStorageAuthStorage().set('pilog-fixture', { type: 'api_key', key: 'fixture-key' })
+        ;(await createSafeStorageAuthStorage()).set('pilog-fixture', {
+          type: 'api_key',
+          key: 'fixture-key'
+        })
 
         return { repoId: repo.id, noteIds }
       }

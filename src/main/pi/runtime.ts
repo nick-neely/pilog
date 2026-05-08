@@ -1,5 +1,5 @@
-import { Agent, type AgentEvent as PiAgentEvent } from '@earendil-works/pi-agent-core'
-import { getModel } from '@earendil-works/pi-ai'
+import type { AgentEvent as PiAgentEvent } from '@earendil-works/pi-agent-core'
+import type { getModel as getModelType } from '@earendil-works/pi-ai'
 import { createModelRegistry, createSafeStorageAuthStorage } from './auth-storage'
 import {
   buildIssueGenerationPrompt,
@@ -47,12 +47,16 @@ export async function* runAgent(input: IssueGenerationInput): AsyncIterable<Agen
   }
 
   const before = snapshotProcessState()
+  const [{ Agent }, { getModel }] = await Promise.all([
+    import('@earendil-works/pi-agent-core'),
+    import('@earendil-works/pi-ai')
+  ])
   const prompt = buildIssueGenerationPrompt({ repo: input.repo, notes: input.notes })
-  const authStorage = createSafeStorageAuthStorage()
-  const registry = createModelRegistry(authStorage)
+  const authStorage = await createSafeStorageAuthStorage()
+  const registry = await createModelRegistry(authStorage)
   const model =
     registry.find(input.provider, input.model) ??
-    (getModel as (provider: string, modelId: string) => ReturnType<typeof getModel>)(
+    (getModel as (provider: string, modelId: string) => ReturnType<typeof getModelType>)(
       input.provider,
       input.model
     )

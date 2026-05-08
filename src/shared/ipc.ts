@@ -2,6 +2,9 @@ import type {
   AgentEvent,
   GenerateDraftsRequest,
   GenerateDraftsStartResponse,
+  PiActiveConfig,
+  PiModelOption,
+  PiProviderOption,
   IssueDraft,
   PiStatus
 } from './types'
@@ -128,6 +131,15 @@ export type IpcContract = {
     response: CreatedIssue
   }
   'pi:status': { request: void; response: PiStatus }
+  'pi:getActiveConfig': { request: void; response: PiActiveConfig }
+  'pi:setActiveConfig': {
+    request: { provider: string; modelId: string; apiKey?: string }
+    response: PiActiveConfig
+  }
+  'pi:listProviders': { request: void; response: PiProviderOption[] }
+  'pi:listModels': { request: { provider?: string } | void; response: PiModelOption[] }
+  'pi:importExistingPiConfig': { request: void; response: PiActiveConfig }
+  'pi:resetConfig': { request: void; response: PiActiveConfig }
   'pi:generateDrafts:start': {
     request: GenerateDraftsRequest
     response: GenerateDraftsStartResponse
@@ -148,4 +160,11 @@ export type IpcEvent = 'note:created' | 'scratchpad:reset' | 'navigate:inbox' | 
 
 export type IpcAction = 'scratchpad:hide'
 
-export type { AgentEvent, GenerateDraftsRequest, PiStatus }
+export type {
+  AgentEvent,
+  GenerateDraftsRequest,
+  PiActiveConfig,
+  PiModelOption,
+  PiProviderOption,
+  PiStatus
+}

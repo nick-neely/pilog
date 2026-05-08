@@ -1,11 +1,44 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { HugeiconsIcon } from '@hugeicons/react'
+import {
+  CheckmarkCircle01Icon,
+  DatabaseImportIcon,
+  Delete02Icon,
+  EyeIcon,
+  FileKeyIcon
+} from '@hugeicons/core-free-icons'
 import { Avatar, AvatarFallback } from '@renderer/components/ui/avatar'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger
+} from '@renderer/components/ui/alert-dialog'
 import { Button } from '@renderer/components/ui/button'
 import { Card, CardContent } from '@renderer/components/ui/card'
 import { Input } from '@renderer/components/ui/input'
 import { Label } from '@renderer/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '@renderer/components/ui/select'
 import { Switch } from '@renderer/components/ui/switch'
-import type { GitHubStatus, SettingKey } from '@shared/ipc'
+import type {
+  GitHubStatus,
+  PiActiveConfig,
+  PiModelOption,
+  PiProviderOption,
+  SettingKey
+} from '@shared/ipc'
 
 function useSetting(key: SettingKey): [string | null, (value: string) => Promise<void>] {
   const [value, setValue] = useState<string | null>(null)
@@ -62,6 +95,124 @@ function useGitHubStatus(): {
   return { status, connecting, connect, signOut }
 }
 
+function usePiConfig(): {
+  active: PiActiveConfig | null
+  providers: PiProviderOption[]
+  models: PiModelOption[]
+  selectedProvider: string
+  selectedModel: string
+  apiKey: string
+  saving: boolean
+  setSelectedProvider: (provider: string) => void
+  setSelectedModel: (model: string) => void
+  setApiKey: (apiKey: string) => void
+  save: () => Promise<void>
+  importExisting: () => Promise<void>
+  reset: () => Promise<void>
+} {
+  const [active, setActive] = useState<PiActiveConfig | null>(null)
+  const [providers, setProviders] = useState<PiProviderOption[]>([])
+  const [models, setModels] = useState<PiModelOption[]>([])
+  const [selectedProvider, setSelectedProviderState] = useState('')
+  const [selectedModel, setSelectedModel] = useState('')
+  const [apiKey, setApiKey] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  const refresh = useCallback(async () => {
+    const [nextActive, nextProviders] = await Promise.all([
+      window.pilog.invoke('pi:getActiveConfig'),
+      window.pilog.invoke('pi:listProviders')
+    ])
+    setActive(nextActive)
+    setProviders(nextProviders)
+    setSelectedProviderState(nextActive.provider ?? nextProviders[0]?.id ?? '')
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+
+    Promise.all([
+      window.pilog.invoke('pi:getActiveConfig'),
+      window.pilog.invoke('pi:listProviders')
+    ])
+      .then(([nextActive, nextProviders]) => {
+        if (cancelled) return
+        setActive(nextActive)
+        setProviders(nextProviders)
+        setSelectedProviderState(nextActive.provider ?? nextProviders[0]?.id ?? '')
+      })
+      .catch(() => {
+        if (!cancelled) setProviders([])
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
+    window.pilog
+      .invoke('pi:listModels', selectedProvider ? { provider: selectedProvider } : undefined)
+      .then((nextModels) => {
+        setModels(nextModels)
+        setSelectedModel((current) => {
+          if (current && nextModels.some((model) => model.id === current)) return current
+          if (active?.provider === selectedProvider && active.modelId) return active.modelId
+          return nextModels[0]?.id ?? ''
+        })
+      })
+  }, [active?.modelId, active?.provider, selectedProvider])
+
+  const setSelectedProvider = useCallback((provider: string) => {
+    setSelectedProviderState(provider)
+    setSelectedModel('')
+  }, [])
+
+  const save = useCallback(async () => {
+    if (!selectedProvider || !selectedModel) return
+    setSaving(true)
+    try {
+      const next = await window.pilog.invoke('pi:setActiveConfig', {
+        provider: selectedProvider,
+        modelId: selectedModel,
+        apiKey
+      })
+      setActive(next)
+      setApiKey('')
+      setProviders(await window.pilog.invoke('pi:listProviders'))
+    } finally {
+      setSaving(false)
+    }
+  }, [apiKey, selectedModel, selectedProvider])
+
+  const importExisting = useCallback(async () => {
+    setActive(await window.pilog.invoke('pi:importExistingPiConfig'))
+    await refresh()
+  }, [refresh])
+
+  const reset = useCallback(async () => {
+    setActive(await window.pilog.invoke('pi:resetConfig'))
+    setApiKey('')
+    await refresh()
+  }, [refresh])
+
+  return {
+    active,
+    providers,
+    models,
+    selectedProvider,
+    selectedModel,
+    apiKey,
+    saving,
+    setSelectedProvider,
+    setSelectedModel,
+    setApiKey,
+    save,
+    importExisting,
+    reset
+  }
+}
+
 export function Settings({
   onBack,
   onNavigateRepositories
@@ -74,6 +225,7 @@ export function Settings({
   const [hotkeyDraft, setHotkeyDraft] = useState<string | null>(null)
   const [userEdited, setUserEdited] = useState(false)
   const github = useGitHubStatus()
+  const pi = usePiConfig()
 
   const displayValue = userEdited ? (hotkeyDraft ?? '') : (hotkey ?? '')
   const dirty = userEdited && hotkeyDraft !== (hotkey ?? '')
@@ -143,6 +295,176 @@ export function Settings({
             <Button size="sm" variant="ghost" onClick={onNavigateRepositories} className="px-0">
               Manage repositories &rarr;
             </Button>
+          </section>
+
+          <section className="flex flex-col gap-3" data-testid="pi-config-panel">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-sm font-medium text-foreground">Provider &amp; Model</h2>
+                <p className="mt-1 max-w-[68ch] text-xs text-muted-foreground">
+                  Choose the Pi model used for draft generation. Provider credentials are stored in
+                  OS-backed safe storage, separate from PiLog settings.
+                </p>
+              </div>
+              {pi.active?.valid && (
+                <span className="inline-flex items-center gap-1.5 rounded-md bg-muted px-2 py-1 text-xs text-foreground">
+                  <HugeiconsIcon icon={CheckmarkCircle01Icon} aria-hidden className="size-3.5" />
+                  Configured
+                </span>
+              )}
+            </div>
+
+            {!pi.active?.valid && (
+              <div className="rounded-md border bg-muted/45 p-3">
+                <p className="text-sm font-medium">Configure Pi</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Select a provider, choose a model, then paste an API key to enable Generate
+                  Drafts.
+                </p>
+              </div>
+            )}
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="pi-provider">Active Provider</Label>
+                <Select
+                  value={pi.selectedProvider}
+                  onValueChange={pi.setSelectedProvider}
+                  disabled={pi.providers.length === 0}
+                >
+                  <SelectTrigger id="pi-provider" data-testid="pi-provider-select">
+                    <SelectValue placeholder="Choose provider" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      {pi.providers.map((provider) => (
+                        <SelectItem key={provider.id} value={provider.id}>
+                          {provider.name}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="pi-model">Active Model</Label>
+                <Select
+                  value={pi.selectedModel}
+                  onValueChange={pi.setSelectedModel}
+                  disabled={pi.models.length === 0}
+                >
+                  <SelectTrigger id="pi-model" data-testid="pi-model-select">
+                    <SelectValue placeholder="Choose model" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      {pi.models.map((model) => (
+                        <SelectItem key={`${model.provider}:${model.id}`} value={model.id}>
+                          {model.name}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="pi-api-key">Credential</Label>
+              <div className="flex items-center gap-3">
+                <Input
+                  id="pi-api-key"
+                  data-testid="pi-api-key-input"
+                  type="password"
+                  value={pi.apiKey}
+                  onChange={(event) => pi.setApiKey(event.target.value)}
+                  placeholder={
+                    pi.active?.hasApiKey
+                      ? 'API key stored. Paste a new key to replace it.'
+                      : 'Paste API key'
+                  }
+                  className="flex-1 font-mono"
+                />
+                <Button
+                  size="sm"
+                  onClick={() => void pi.save()}
+                  disabled={!pi.selectedProvider || !pi.selectedModel || pi.saving}
+                  data-testid="pi-save-config"
+                >
+                  <HugeiconsIcon icon={FileKeyIcon} data-icon="inline-start" aria-hidden />
+                  {pi.saving ? 'Saving' : pi.active?.valid ? 'Change…' : 'Configure Pi'}
+                </Button>
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                Current: {pi.active?.providerName ?? 'No provider'} ·{' '}
+                {pi.active?.modelName ?? 'No model'} · key{' '}
+                {pi.active?.hasApiKey ? 'stored' : 'not stored'}
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              <Button variant="outline" size="sm" onClick={() => void pi.importExisting()}>
+                <HugeiconsIcon icon={DatabaseImportIcon} data-icon="inline-start" aria-hidden />
+                Import existing Pi config
+              </Button>
+
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <HugeiconsIcon icon={EyeIcon} data-icon="inline-start" aria-hidden />
+                    View active config
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Active Pi config</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Raw credentials are never shown in the renderer.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <pre className="overflow-x-auto rounded-md bg-muted p-3 font-mono text-xs leading-relaxed text-foreground">
+                    {JSON.stringify(
+                      {
+                        provider: pi.active?.provider,
+                        modelId: pi.active?.modelId,
+                        hasApiKey: Boolean(pi.active?.hasApiKey),
+                        authMethod: pi.active?.authMethod
+                      },
+                      null,
+                      2
+                    )}
+                  </pre>
+                  <AlertDialogFooter>
+                    <AlertDialogAction>Done</AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="destructive" size="sm">
+                    <HugeiconsIcon icon={Delete02Icon} data-icon="inline-start" aria-hidden />
+                    Reset Pi config
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Reset Pi config?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This removes PiLog&apos;s stored Pi credentials and clears the active provider
+                      and model. Your standalone Pi config is left untouched.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction variant="destructive" onClick={() => void pi.reset()}>
+                      Reset
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
           </section>
 
           <section className="flex flex-col gap-3">
