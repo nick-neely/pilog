@@ -1,0 +1,7 @@
+{
+  "name": "pilog-fixture-app",
+  "private": true,
+  "scripts": {
+    "test": "vitest"
+  }
+}

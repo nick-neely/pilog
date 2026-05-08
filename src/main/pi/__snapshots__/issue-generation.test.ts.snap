@@ -5,12 +5,19 @@ exports[`issue generation > assembles the PRD-guided prompt with repo path and s
 Use the local repository context to infer likely affected areas, but do not invent details.
 Group related small notes into one issue when they affect the same feature, page, component, or user flow.
 Split notes into separate issues when they affect unrelated systems or require separate implementation work.
-For this tracer-bullet run, return exactly one issue draft.
+Do not create one issue per note by default.
+Group related minor UX notes.
+Split unrelated or complex notes.
+For larger work, create a parent issue with checklist subtasks only when the scope clearly crosses multiple implementation areas.
+Inspect repository structure and search likely files/components/routes based on note language before drafting.
+Return 1-3 issue drafts.
+Each draft must have non-empty affectedFiles, acceptanceCriteria, and groupingReason when enough context exists.
 Prefer concrete acceptance criteria.
 Avoid overclaiming certainty.
+Use repo context when available.
 Include concise rationale, not hidden reasoning.
 Mark vague notes as needing clarification.
-Call submit_issue_drafts with structured JSON matching the provided schema.
+Return structured JSON only by calling submit_issue_drafts with data matching the provided schema; do not emit prose outside the tool call.
 
 Repository:
 owner: nick-neely

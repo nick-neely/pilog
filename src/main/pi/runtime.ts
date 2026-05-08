@@ -6,6 +6,7 @@ import {
   createSubmitIssueDraftsTool,
   type IssueGenerationInput
 } from './issue-generation'
+import { createReadOnlyRepoTools } from './tools/repo-tools'
 import { createAsyncQueue } from '@shared/async-queue'
 import type { AgentEvent, GeneratedIssueDraft } from '@shared/types'
 
@@ -73,13 +74,14 @@ export async function* runAgent(input: IssueGenerationInput): AsyncIterable<Agen
       systemPrompt: prompt,
       model,
       tools: [
+        ...createReadOnlyRepoTools(input.repo.localPath),
         createSubmitIssueDraftsTool((drafts) => {
           submittedDrafts = drafts
         })
       ]
     },
     getApiKey: (provider) => (provider === input.provider ? auth.apiKey : undefined),
-    toolExecution: 'sequential'
+    toolExecution: 'parallel'
   })
 
   input.signal?.addEventListener('abort', () => agent.abort(), { once: true })
@@ -132,7 +134,7 @@ export async function* runAgent(input: IssueGenerationInput): AsyncIterable<Agen
 
 async function* runFixtureAgent(input: IssueGenerationInput): AsyncIterable<AgentEvent> {
   yield { type: 'progress', phase: 'agent_start' }
-  yield { type: 'partial', text: 'Generating one issue draft from selected notes.' }
+  yield { type: 'partial', text: 'Generating issue drafts from selected notes.' }
   yield {
     type: 'final',
     drafts: [
@@ -145,7 +147,13 @@ async function* runFixtureAgent(input: IssueGenerationInput): AsyncIterable<Agen
         context: `Generated from ${input.notes.length} selected notes for ${input.repo.owner}/${input.repo.name}.`,
         sourceNoteIds: input.notes.map((note) => note.id),
         suggestedLabels: ['triaged-by-pilog'],
-        affectedFiles: [],
+        affectedFiles: [
+          {
+            path: 'package.json',
+            reason:
+              'Debug fixture uses a repository root file as a stable affected-file placeholder.'
+          }
+        ],
         acceptanceCriteria: ['A persisted issue draft exists for the selected notes.'],
         implementationNotes: ['Review the source notes before publishing.'],
         confidence: 'medium',

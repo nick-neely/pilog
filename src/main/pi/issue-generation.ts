@@ -42,12 +42,19 @@ export function buildIssueGenerationPrompt(input: { repo: Repo; notes: Note[] })
     'Use the local repository context to infer likely affected areas, but do not invent details.',
     'Group related small notes into one issue when they affect the same feature, page, component, or user flow.',
     'Split notes into separate issues when they affect unrelated systems or require separate implementation work.',
-    'For this tracer-bullet run, return exactly one issue draft.',
+    'Do not create one issue per note by default.',
+    'Group related minor UX notes.',
+    'Split unrelated or complex notes.',
+    'For larger work, create a parent issue with checklist subtasks only when the scope clearly crosses multiple implementation areas.',
+    'Inspect repository structure and search likely files/components/routes based on note language before drafting.',
+    'Return 1-3 issue drafts.',
+    'Each draft must have non-empty affectedFiles, acceptanceCriteria, and groupingReason when enough context exists.',
     'Prefer concrete acceptance criteria.',
     'Avoid overclaiming certainty.',
+    'Use repo context when available.',
     'Include concise rationale, not hidden reasoning.',
     'Mark vague notes as needing clarification.',
-    'Call submit_issue_drafts with structured JSON matching the provided schema.',
+    'Return structured JSON only by calling submit_issue_drafts with data matching the provided schema; do not emit prose outside the tool call.',
     '',
     'Repository:',
     `owner: ${input.repo.owner}`,
@@ -144,7 +151,9 @@ export function persistGeneratedIssueDrafts(
     const now = new Date().toISOString()
     const draftIds: string[] = []
 
-    for (const draft of input.drafts.slice(0, 1)) {
+    const sourceNoteIds = assertNoSourceNoteCollisions(input.selectedNoteIds, input.drafts)
+
+    for (const draft of input.drafts) {
       const id = crypto.randomUUID()
       draftIds.push(id)
 
@@ -168,7 +177,7 @@ export function persistGeneratedIssueDrafts(
 
     tx.update(notes)
       .set({ status: 'drafted', updatedAt: now })
-      .where(and(inArray(notes.id, input.selectedNoteIds), eq(notes.repoId, input.repoId)))
+      .where(and(inArray(notes.id, sourceNoteIds), eq(notes.repoId, input.repoId)))
       .run()
 
     tx.update(agentRuns)
@@ -184,4 +193,28 @@ export function persistGeneratedIssueDrafts(
 
     return draftIds
   })
+}
+
+export function assertNoSourceNoteCollisions(
+  selectedNoteIds: string[],
+  drafts: GeneratedIssueDraft[]
+): string[] {
+  const selected = new Set(selectedNoteIds)
+  const seen = new Set<string>()
+  const ordered: string[] = []
+
+  for (const draft of drafts) {
+    for (const noteId of draft.sourceNoteIds) {
+      if (!selected.has(noteId)) {
+        throw new Error(`Draft "${draft.title}" references an unselected source note: ${noteId}`)
+      }
+      if (seen.has(noteId)) {
+        throw new Error(`Source note ${noteId} appears in more than one generated draft.`)
+      }
+      seen.add(noteId)
+      ordered.push(noteId)
+    }
+  }
+
+  return ordered
 }
