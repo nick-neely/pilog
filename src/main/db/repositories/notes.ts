@@ -2,7 +2,13 @@ import { and, desc, eq, isNull, like, sql, type SQLWrapper } from 'drizzle-orm'
 import { v4 as uuidv4 } from 'uuid'
 import type { PilogDatabase } from '../client'
 import { notes } from '../schema'
-import type { ListNotesRequest, Note, NoteStatus } from '@shared/ipc'
+import type {
+  CountNotesRequest,
+  ListNotesRequest,
+  Note,
+  NoteStatus,
+  NoteStatusCounts
+} from '@shared/ipc'
 
 const noteColumns = {
   id: notes.id,
@@ -66,6 +72,49 @@ export function listNotes(db: PilogDatabase, filter?: ListNotesRequest): Note[] 
   const ordered = conditions.length > 0 ? query.where(and(...conditions)) : query
 
   return ordered.orderBy(desc(notes.createdAt), desc(sql`rowid`)).all()
+}
+
+/**
+ * Returns a count for every NoteStatus, even when zero. The sidebar's status
+ * filter shows all four rows always; the response shape mirrors that so the
+ * renderer never has to fill gaps. Honours search and repoId filters so the
+ * counts answer "if I pick this status next, how many notes will I see?".
+ */
+export function countNotesByStatus(
+  db: PilogDatabase,
+  filter?: CountNotesRequest
+): NoteStatusCounts {
+  const conditions: SQLWrapper[] = []
+
+  if (filter?.search) {
+    conditions.push(like(notes.content, `%${filter.search}%`))
+  }
+
+  // Same repoId encoding as listNotes: null → unassigned only, undefined → all.
+  if (filter !== undefined && 'repoId' in filter) {
+    if (filter.repoId === null) {
+      conditions.push(isNull(notes.repoId))
+    } else if (filter.repoId !== undefined) {
+      conditions.push(eq(notes.repoId, filter.repoId))
+    }
+  }
+
+  const baseQuery = db.select({ status: notes.status, count: sql<number>`count(*)` }).from(notes)
+  const grouped =
+    conditions.length > 0
+      ? baseQuery.where(and(...conditions)).groupBy(notes.status)
+      : baseQuery.groupBy(notes.status)
+
+  const counts: NoteStatusCounts = {
+    unprocessed: 0,
+    drafted: 0,
+    published: 0,
+    dismissed: 0
+  }
+  for (const row of grouped.all()) {
+    counts[row.status as NoteStatus] = Number(row.count)
+  }
+  return counts
 }
 
 export function updateNoteStatus(db: PilogDatabase, id: string, status: NoteStatus): Note {

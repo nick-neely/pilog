@@ -2,7 +2,13 @@ import { ipcMain, app } from 'electron'
 import type { IpcRequest, IpcResponse } from '@shared/ipc'
 import type { PilogDatabase } from '../db/client'
 import { getRunById, listRuns } from '../db/repositories/agent-runs'
-import { createNote, listNotes, updateNote, deleteNote } from '../db/repositories/notes'
+import {
+  countNotesByStatus,
+  createNote,
+  listNotes,
+  updateNote,
+  deleteNote
+} from '../db/repositories/notes'
 import { getSetting, setSetting } from '../db/repositories/settings'
 
 type DbChannel =
@@ -10,6 +16,7 @@ type DbChannel =
   | 'agent-runs:list'
   | 'note:create'
   | 'note:list'
+  | 'note:counts'
   | 'note:update'
   | 'note:delete'
   | 'setting:get'
@@ -22,6 +29,7 @@ const handlers: { [C in DbChannel]: Handler<C> } = {
   'agent-runs:list': (db, request) => listRuns(db, request ?? undefined),
   'note:create': (db, request) => createNote(db, request),
   'note:list': (db, request) => listNotes(db, request ?? undefined),
+  'note:counts': (db, request) => countNotesByStatus(db, request ?? undefined),
   'note:update': (db, request) => updateNote(db, request),
   'note:delete': (db, request) => deleteNote(db, request),
   'setting:get': (db, request) => getSetting(db, request.key),

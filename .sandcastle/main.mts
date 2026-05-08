@@ -59,7 +59,7 @@ function agent(model: ClaudeModelRole = 'sonnet'): AgentProvider {
   return useCodex ? sandcastle.codex(CODEX_MODEL) : sandcastle.claudeCode(CLAUDE_MODELS[model])
 }
 
-function skillMounts() {
+function skillMounts(): Array<{ hostPath: string; sandboxPath: string; readonly: true }> {
   const mounts: Array<{ hostPath: string; sandboxPath: string; readonly: true }> = []
   const hostHome = homedir()
 

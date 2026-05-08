@@ -32,6 +32,18 @@ export type ListNotesRequest = {
   repoId?: string | null
 }
 
+/**
+ * Status totals for the inbox sidebar's status filter. Counts honour the
+ * caller's non-status filters (search, repoId) so each row reads as the
+ * answer to "how many of these would I see if I picked this status next?"
+ */
+export type NoteStatusCounts = Record<NoteStatus, number>
+
+export type CountNotesRequest = {
+  search?: string
+  repoId?: string | null
+}
+
 export type SettingKey =
   | 'hotkey.scratchpad'
   | 'openInboxAtLogin'
@@ -115,6 +127,7 @@ export type PublishLogEntry = {
 export type IpcContract = {
   'note:create': { request: { content: string; repoId?: string | null }; response: Note }
   'note:list': { request: ListNotesRequest | void; response: Note[] }
+  'note:counts': { request: CountNotesRequest | void; response: NoteStatusCounts }
   'note:update': {
     request: { id: string; content: string; repoId?: string | null }
     response: Note | null

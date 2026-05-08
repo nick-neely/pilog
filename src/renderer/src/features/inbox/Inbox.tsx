@@ -32,6 +32,7 @@ import {
 } from '@renderer/components/ui/command'
 import { Badge } from '@renderer/components/ui/badge'
 import { Empty, EmptyDescription } from '@renderer/components/ui/empty'
+import { StatusFilter } from './StatusFilter'
 import {
   Select,
   SelectContent,
@@ -42,19 +43,37 @@ import {
 } from '@renderer/components/ui/select'
 import { Textarea } from '@renderer/components/ui/textarea'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@renderer/components/ui/tooltip'
-import type { ListNotesRequest, Note, NoteStatus, PiStatus, Repo } from '@shared/ipc'
+import { cn } from '@renderer/lib/utils'
+import type {
+  ListNotesRequest,
+  Note,
+  NoteStatus,
+  NoteStatusCounts,
+  PiStatus,
+  Repo
+} from '@shared/ipc'
 
-const STATUS_CHIPS: { value: NoteStatus; label: string }[] = [
+// Status filter rows. Order matches the inbox lifecycle (capture →
+// triage → publish → archive) so the list reads top-to-bottom as a
+// pipeline and the user's eye lands on Unprocessed first by default.
+const STATUS_FILTER_ROWS: { value: NoteStatus; label: string }[] = [
   { value: 'unprocessed', label: 'Unprocessed' },
   { value: 'drafted', label: 'Drafted' },
   { value: 'published', label: 'Published' },
   { value: 'dismissed', label: 'Dismissed' }
 ]
 
-const STATUS_LABEL: Record<NoteStatus, string> = STATUS_CHIPS.reduce(
+const STATUS_LABEL: Record<NoteStatus, string> = STATUS_FILTER_ROWS.reduce(
   (acc, { value, label }) => ({ ...acc, [value]: label }),
   {} as Record<NoteStatus, string>
 )
+
+const EMPTY_STATUS_COUNTS: NoteStatusCounts = {
+  unprocessed: 0,
+  drafted: 0,
+  published: 0,
+  dismissed: 0
+}
 
 // Detect once at module load. Affects only the visible kbd hint, never the
 // keybind handler (which always accepts both metaKey and ctrlKey).
@@ -282,6 +301,7 @@ export function Inbox({
   onPaletteOpenChange: (open: boolean) => void
 }): React.JSX.Element {
   const [notes, setNotes] = useState<Note[]>([])
+  const [statusCounts, setStatusCounts] = useState<NoteStatusCounts>(EMPTY_STATUS_COUNTS)
   const [repos, setRepos] = useState<Repo[]>([])
   const [piStatus, setPiStatus] = useState<PiStatus>({ configured: false })
   const [generating, setGenerating] = useState(false)
@@ -291,6 +311,7 @@ export function Inbox({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const lastClickedIndex = useRef<number | null>(null)
   const fetchIdRef = useRef(0)
+  const countsFetchIdRef = useRef(0)
 
   // The palette's text query also seeds the server-side search filter so
   // typing in the palette narrows the inbox list as a side-effect, not the
@@ -321,9 +342,27 @@ export function Inbox({
     })
   }, [statusFilter, debouncedPaletteQuery, repoFilter])
 
+  // Status counts honour the search and repo filters but not the status
+  // filter itself; they're the answer to "if I pick this status next, how
+  // many notes will I see?". Keep them out-of-band from `fetchNotes` so
+  // toggling the status chip doesn't refetch counts that didn't change.
+  const fetchStatusCounts = useCallback(async (): Promise<void> => {
+    const id = ++countsFetchIdRef.current
+    const result = await window.pilog.invoke('note:counts', {
+      search: debouncedPaletteQuery || undefined,
+      repoId: repoFilter
+    })
+    if (id !== countsFetchIdRef.current) return
+    setStatusCounts(result)
+  }, [debouncedPaletteQuery, repoFilter])
+
   useEffect(() => {
     fetchNotes()
   }, [fetchNotes])
+
+  useEffect(() => {
+    fetchStatusCounts()
+  }, [fetchStatusCounts])
 
   useEffect(() => {
     if (!focusNoteId) return
@@ -340,20 +379,23 @@ export function Inbox({
   useEffect(() => {
     return window.pilog.on('note:created', () => {
       fetchNotes()
+      fetchStatusCounts()
     })
-  }, [fetchNotes])
+  }, [fetchNotes, fetchStatusCounts])
 
   const handleNewNote = useCallback(async (): Promise<void> => {
     // Capture-before-triage: a new note opens empty so the editor is waiting,
     // not pre-loaded with boilerplate the user has to delete first.
     const created = await window.pilog.invoke('note:create', { content: '' })
-    await fetchNotes()
+    await Promise.all([fetchNotes(), fetchStatusCounts()])
     setSelectedIds(new Set([created.id]))
-  }, [fetchNotes])
+  }, [fetchNotes, fetchStatusCounts])
 
   const handleSave = async (id: string, content: string): Promise<void> => {
     await window.pilog.invoke('note:update', { id, content })
-    await fetchNotes()
+    // Content edits can shift counts when a search filter is active
+    // (matching becomes non-matching). Cheap to refetch unconditionally.
+    await Promise.all([fetchNotes(), fetchStatusCounts()])
   }
 
   const handleDelete = async (id: string): Promise<void> => {
@@ -363,14 +405,14 @@ export function Inbox({
       next.delete(id)
       return next
     })
-    await fetchNotes()
+    await Promise.all([fetchNotes(), fetchStatusCounts()])
   }
 
   const handleRepoChange = async (id: string, repoId: string | null): Promise<void> => {
     const note = notes.find((n) => n.id === id)
     if (!note) return
     await window.pilog.invoke('note:update', { id, content: note.content, repoId })
-    await fetchNotes()
+    await Promise.all([fetchNotes(), fetchStatusCounts()])
   }
 
   const toggleStatus = useCallback((status: NoteStatus): void => {
@@ -456,30 +498,41 @@ export function Inbox({
   )
 
   // Cmd/Ctrl+K toggles the command palette globally on the inbox surface.
-  // Esc clears any active selection, but only when the user isn't typing in
-  // an input/textarea/contenteditable and the palette isn't open (cmdk and
-  // Radix's AlertDialog both intercept Esc themselves before it reaches us).
-  // The kbd hint shows ⌘ on macOS, Ctrl elsewhere; the keybind handler
-  // accepts both regardless.
+  // Esc clears note selection when the palette is closed. The listener uses
+  // capture on `document` so key events still reach us when a control stops
+  // propagation before `window`; we skip handling when the repo Select menu
+  // is open so Esc can close that surface first.
+  const paletteOpenRef = useRef(paletteOpen)
+  const hasNoteSelectionRef = useRef(selectedIds.size > 0)
+
   useEffect(() => {
+    paletteOpenRef.current = paletteOpen
+    hasNoteSelectionRef.current = selectedIds.size > 0
+
     const onKey = (e: KeyboardEvent): void => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault()
-        setPaletteOpen(!paletteOpen)
+        setPaletteOpen(!paletteOpenRef.current)
         return
       }
-      if (e.key === 'Escape' && selectedIds.size > 0 && !paletteOpen) {
-        const active = document.activeElement as HTMLElement | null
-        const tag = active?.tagName.toLowerCase()
-        const editable = tag === 'input' || tag === 'textarea' || active?.isContentEditable === true
-        if (editable) return
-        e.preventDefault()
-        clearSelection()
+      if (e.key !== 'Escape' || !hasNoteSelectionRef.current || paletteOpenRef.current) {
+        return
       }
+      if (document.querySelector('[data-slot="select-content"][data-state="open"]')) {
+        return
+      }
+      const t = e.target
+      const el = t instanceof HTMLElement ? t : null
+      const tag = el?.tagName?.toLowerCase()
+      const typingSurface =
+        tag === 'input' || tag === 'textarea' || tag === 'select' || el?.isContentEditable === true
+      if (typingSurface) return
+      e.preventDefault()
+      clearSelection()
     }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [paletteOpen, setPaletteOpen, selectedIds.size, clearSelection])
+    document.addEventListener('keydown', onKey, { capture: true })
+    return () => document.removeEventListener('keydown', onKey, { capture: true })
+  }, [paletteOpen, selectedIds.size, setPaletteOpen, clearSelection])
 
   const emptyMessage = useMemo(() => {
     const filtered = Boolean(statusFilter || debouncedPaletteQuery || repoFilter !== undefined)
@@ -502,7 +555,7 @@ export function Inbox({
     try {
       for await (const event of window.pilog.runAgent({ noteIds: [...selectedIds] })) {
         if (event.type === 'final') {
-          await fetchNotes()
+          await Promise.all([fetchNotes(), fetchStatusCounts()])
           clearSelection()
         }
         if (event.type === 'error') {
@@ -521,7 +574,8 @@ export function Inbox({
         Sidebar — overflow-hidden + min-w-0 keep any future toolbar overflow
         contained instead of bleeding into the detail pane. The sidebar
         is structured as three regions:
-          (1) filter rail (status chips, repo row, count + selection chip)
+          (1) filter rail (vertical status list, optional selection row,
+              repo Select)
           (2) scrolling list (the only region that grows)
           (3) mode footer that swaps capture <-> triage
         View nav and global chrome (Settings, Cmd+K) live in AppShell's
@@ -529,71 +583,61 @@ export function Inbox({
         for 320px of width.
       */}
       <div className="flex w-80 min-w-0 shrink-0 flex-col overflow-hidden border-r">
-        {/* (1) Filter rail — status row, then repo, then count/selection
-            chip. The chip swaps between a quiet count and a moss-tinted
-            "× N selected" pill; both live in the same right-edge slot so
-            the status chips never reflow. */}
-        <div className="flex shrink-0 flex-col gap-2 border-b px-6 py-2.5">
-          <div className="flex items-start justify-between gap-2">
-            <div className="flex flex-wrap gap-x-1.5 gap-y-1">
-              {STATUS_CHIPS.map((chip) => {
-                const active = statusFilter === chip.value
-                return (
-                  <Button
-                    key={chip.value}
-                    type="button"
-                    variant={active ? 'secondary' : 'ghost'}
-                    size="xs"
-                    data-testid={`filter-${chip.value}`}
-                    onClick={() => toggleStatus(chip.value)}
-                    aria-pressed={active}
-                    className="rounded-full gap-1.5 font-medium"
-                  >
-                    {/* Moss leading dot only on the active filter — type-led
-                      emphasis with a small on-brand accent, not a fill. */}
-                    <span
-                      aria-hidden
-                      className={
-                        'h-1.5 w-1.5 rounded-full transition-colors ' +
-                        (active ? 'bg-primary' : 'bg-transparent')
-                      }
-                    />
-                    {chip.label}
-                  </Button>
-                )
-              })}
-            </div>
-            {/* Count / selection chip lives at the right edge of the
-                status row. The slot swaps between a tabular count and
-                a moss-tinted "× N selected" button, but never causes
-                surrounding chips to reflow. */}
-            {hasSelection ? (
-              <Button
-                type="button"
-                variant="ghost"
-                size="xs"
-                data-testid="selected-count"
-                onClick={clearSelection}
-                title={`Clear ${selectionCount} selected (Esc)`}
-                aria-label={`Clear ${selectionCount} selected ${
-                  selectionCount === 1 ? 'note' : 'notes'
-                }`}
-                className="tabular h-6 shrink-0 gap-1 rounded-full bg-primary/10 px-2 py-0 text-xs text-foreground hover:bg-primary/15"
-              >
-                <HugeiconsIcon
-                  icon={Cancel01Icon}
-                  aria-hidden
-                  strokeWidth={2}
-                  className="size-3 text-primary"
-                />
+        {/* (1) Filter rail — compact status grid, optional selection
+            row, then the repo Select. Each region owns its own line, so
+            the moss "N selected" indicator never reflows the status
+            rows when it appears. The shape echoes Things 3's sidebar
+            list (PRODUCT.md names it as a reference): type-led, calm,
+            and dense with signal (per-status counts) rather than chrome. */}
+        <div className="flex shrink-0 flex-col gap-1 border-b px-2.5 py-2">
+          <StatusFilter
+            rows={STATUS_FILTER_ROWS}
+            counts={statusCounts}
+            active={statusFilter}
+            onToggle={toggleStatus}
+          />
+          {/* Selection row — only renders when there's an active selection.
+              Lives on its own line so the status grid above never
+              reflow. The moss tint is the system's One-Voice accent
+              applied deliberately: at most one of these is visible at a
+              time, well within the ≤10% accent budget. Click anywhere on
+              the row (or press Esc) to clear. */}
+          {hasSelection ? (
+            <button
+              type="button"
+              onClick={clearSelection}
+              title={`Clear ${selectionCount} selected (Esc)`}
+              aria-label={`Clear ${selectionCount} selected ${
+                selectionCount === 1 ? 'note' : 'notes'
+              }`}
+              className={cn(
+                'flex h-7 cursor-pointer items-center gap-2 rounded-md px-1.5 text-xs transition-colors',
+                'bg-primary/10 text-foreground hover:bg-primary/15',
+                'focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/30'
+              )}
+            >
+              <HugeiconsIcon
+                icon={Cancel01Icon}
+                aria-hidden
+                strokeWidth={2}
+                className="size-3.5 shrink-0 text-primary"
+              />
+              {/* The testid lives on the count span (not the button) so the
+                  e2e suite's exact-text match against "{N} selected" stays
+                  green even with the trailing "Esc" hint kbd inside the
+                  same row. The button's aria-label carries the full
+                  intent for assistive tech. */}
+              <span data-testid="selected-count" className="tabular flex-1 text-left">
                 {selectionCount} selected
-              </Button>
-            ) : notes.length > 0 ? (
-              <span className="tabular shrink-0 self-center text-xs text-muted-foreground">
-                {notes.length}
               </span>
-            ) : null}
-          </div>
+              <span
+                aria-hidden
+                className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground/80"
+              >
+                Esc
+              </span>
+            </button>
+          ) : null}
           <Select
             value={encodeRepoFilter(repoFilter)}
             onValueChange={(v) => {
@@ -607,7 +651,7 @@ export function Inbox({
               aria-label="Filter by repository"
               data-testid="filter-repo"
               size="sm"
-              className="h-8 w-full max-w-full text-xs text-muted-foreground disabled:opacity-40"
+              className="h-7 w-full max-w-full text-xs text-muted-foreground disabled:opacity-40"
             >
               <SelectValue placeholder="All repos" />
             </SelectTrigger>
@@ -811,13 +855,13 @@ export function Inbox({
           <CommandSeparator />
 
           <CommandGroup heading="Filters">
-            {STATUS_CHIPS.map((chip) => {
-              const active = statusFilter === chip.value
+            {STATUS_FILTER_ROWS.map((row) => {
+              const active = statusFilter === row.value
               return (
                 <CommandItem
-                  key={chip.value}
-                  data-testid={`cmd-filter-${chip.value}`}
-                  onSelect={() => runCommand(() => toggleStatus(chip.value))}
+                  key={row.value}
+                  data-testid={`cmd-filter-${row.value}`}
+                  onSelect={() => runCommand(() => toggleStatus(row.value))}
                 >
                   <span
                     aria-hidden
@@ -826,7 +870,7 @@ export function Inbox({
                       (active ? 'bg-primary' : 'bg-muted-foreground/40')
                     }
                   />
-                  <span>{`Show ${chip.label.toLowerCase()}`}</span>
+                  <span>{`Show ${row.label.toLowerCase()}`}</span>
                   {active && <CommandShortcut>active</CommandShortcut>}
                 </CommandItem>
               )
