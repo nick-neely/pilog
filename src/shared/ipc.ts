@@ -1,5 +1,8 @@
 import type {
   AgentEvent,
+  AgentRunDetail,
+  AgentRunListItem,
+  AgentRunStatus,
   GenerateDraftsRequest,
   GenerateDraftsStartResponse,
   IssueDraft,
@@ -133,6 +136,14 @@ export type IpcContract = {
     response: GenerateDraftsStartResponse
   }
   'pi:generateDrafts:cancel': { request: { runId: string }; response: void }
+  'agent-runs:list': {
+    request: { status?: AgentRunStatus; limit?: number } | void
+    response: AgentRunListItem[]
+  }
+  'agent-runs:get': {
+    request: { id: string }
+    response: AgentRunDetail | null
+  }
   'debug:seedIssueGenerationFixture': {
     request: { repoPath: string; notes: string[] }
     response: { repoId: string; noteIds: string[] }
@@ -144,8 +155,20 @@ export type IpcChannel = keyof IpcContract
 export type IpcRequest<C extends IpcChannel> = IpcContract[C]['request']
 export type IpcResponse<C extends IpcChannel> = IpcContract[C]['response']
 
-export type IpcEvent = 'note:created' | 'scratchpad:reset' | 'navigate:inbox' | 'navigate:settings'
+export type IpcEvent =
+  | 'note:created'
+  | 'scratchpad:reset'
+  | 'navigate:inbox'
+  | 'navigate:settings'
+  | 'agent-runs:invalidated'
 
 export type IpcAction = 'scratchpad:hide'
 
-export type { AgentEvent, GenerateDraftsRequest, PiStatus }
+export type {
+  AgentEvent,
+  AgentRunDetail,
+  AgentRunListItem,
+  AgentRunStatus,
+  GenerateDraftsRequest,
+  PiStatus
+}

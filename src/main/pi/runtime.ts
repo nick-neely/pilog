@@ -1,5 +1,5 @@
-import { Agent, type AgentEvent as PiAgentEvent } from '@earendil-works/pi-agent-core'
-import { getModel } from '@earendil-works/pi-ai'
+import type { AgentEvent as PiAgentEvent } from '@earendil-works/pi-agent-core'
+import { setTimeout as delay } from 'node:timers/promises'
 import { createModelRegistry, createSafeStorageAuthStorage } from './auth-storage'
 import {
   buildIssueGenerationPrompt,
@@ -50,6 +50,10 @@ export async function* runAgent(input: IssueGenerationInput): AsyncIterable<Agen
   const prompt = buildIssueGenerationPrompt({ repo: input.repo, notes: input.notes })
   const authStorage = createSafeStorageAuthStorage()
   const registry = createModelRegistry(authStorage)
+  const [{ Agent }, { getModel }] = await Promise.all([
+    import('@earendil-works/pi-agent-core'),
+    import('@earendil-works/pi-ai')
+  ])
   const model =
     registry.find(input.provider, input.model) ??
     (getModel as (provider: string, modelId: string) => ReturnType<typeof getModel>)(
@@ -132,7 +136,11 @@ export async function* runAgent(input: IssueGenerationInput): AsyncIterable<Agen
 
 async function* runFixtureAgent(input: IssueGenerationInput): AsyncIterable<AgentEvent> {
   yield { type: 'progress', phase: 'agent_start' }
+  await delay(150, undefined, { signal: input.signal }).catch(() => undefined)
+  if (input.signal?.aborted) return
   yield { type: 'partial', text: 'Generating one issue draft from selected notes.' }
+  await delay(50, undefined, { signal: input.signal }).catch(() => undefined)
+  if (input.signal?.aborted) return
   yield {
     type: 'final',
     drafts: [

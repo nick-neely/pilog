@@ -66,6 +66,7 @@ export function registerPiIpcHandlers(
         repoId: repo.id,
         inputNoteIds: notes.map((note) => note.id)
       })
+      broadcastAgentRunsInvalidated()
       const { port1, port2 } = new MessageChannelMain()
       const controller = new AbortController()
       const active: ActiveRun = { controller, finalized: false, eventStream: [] }

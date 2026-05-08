@@ -79,6 +79,34 @@ export type AgentEvent =
 
 export type AgentRunStatus = 'running' | 'succeeded' | 'failed' | 'cancelled'
 
+export type AgentRunListItem = {
+  id: string
+  repoId: string | null
+  status: AgentRunStatus
+  startedAt: string
+  finishedAt: string | null
+  durationMs: number | null
+  inputNoteCount: number
+  outputDraftCount: number
+  errorMessage: string | null
+  errorCause: ErrorCause | null
+}
+
+export type AgentRunDetail = AgentRunListItem & {
+  inputNoteIds: string[]
+  outputDraftIds: string[]
+  sourceNotes: Array<{
+    id: string
+    content: string
+    status: 'unprocessed' | 'drafted' | 'published' | 'dismissed'
+    repoId: string | null
+    createdAt: string
+    updatedAt: string
+  }>
+  outputDrafts: IssueDraft[]
+  eventStream: unknown[]
+}
+
 export type GenerateDraftsRequest = {
   noteIds: string[]
 }
