@@ -118,7 +118,16 @@ export type GenerateDraftsStartResponse = {
   runId: string
 }
 
-export type SearchProvider = 'brave' | 'tavily'
+export const DEFAULT_TURN_BUDGET = 20
+export const MIN_TURN_BUDGET = 1
+export const MAX_TURN_BUDGET = 100
+
+export const SEARCH_PROVIDERS = ['brave', 'tavily'] as const
+export type SearchProvider = (typeof SEARCH_PROVIDERS)[number]
+
+export function isSearchProvider(value: unknown): value is SearchProvider {
+  return typeof value === 'string' && SEARCH_PROVIDERS.some((provider) => provider === value)
+}
 
 export type AdvancedSettings = {
   turnBudget: number

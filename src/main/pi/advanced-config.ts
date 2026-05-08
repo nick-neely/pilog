@@ -4,13 +4,17 @@ import type { AuthStorage } from '@earendil-works/pi-coding-agent'
 import type { PilogDatabase } from '../db/client'
 import { getSetting, setSetting } from '../db/repositories/settings'
 import { createSafeStorageAuthStorage } from './auth-storage'
-import type { AdvancedSettings, SearchProvider, SetAdvancedSettingsRequest } from '@shared/types'
+import {
+  DEFAULT_TURN_BUDGET,
+  MAX_TURN_BUDGET,
+  MIN_TURN_BUDGET,
+  isSearchProvider,
+  type AdvancedSettings,
+  type SearchProvider,
+  type SetAdvancedSettingsRequest
+} from '@shared/types'
 
-export const DEFAULT_TURN_BUDGET = 20
-export const MIN_TURN_BUDGET = 1
-export const MAX_TURN_BUDGET = 100
-export const DEFAULT_SEARCH_PROVIDER: SearchProvider = 'brave'
-export const SEARCH_PROVIDERS: SearchProvider[] = ['brave', 'tavily']
+const DEFAULT_SEARCH_PROVIDER: SearchProvider = 'brave'
 
 const WEB_SEARCH_AUTH_NAMESPACE = 'web-search-auth'
 
@@ -82,13 +86,9 @@ function parseSearchProvider(value: string | null): SearchProvider {
   return isSearchProvider(value) ? value : DEFAULT_SEARCH_PROVIDER
 }
 
-function validateSearchProvider(value: SearchProvider): SearchProvider {
+function validateSearchProvider(value: unknown): SearchProvider {
   if (!isSearchProvider(value)) throw new Error('Unsupported search provider.')
   return value
-}
-
-function isSearchProvider(value: unknown): value is SearchProvider {
-  return typeof value === 'string' && SEARCH_PROVIDERS.includes(value as SearchProvider)
 }
 
 function getWebSearchAuthStorage(): Promise<AuthStorage> {

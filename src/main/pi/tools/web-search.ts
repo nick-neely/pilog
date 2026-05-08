@@ -58,10 +58,14 @@ export async function searchWeb(
   limit: number,
   signal?: AbortSignal
 ): Promise<WebSearchResult[]> {
-  const boundedLimit = Math.min(Math.max(Math.trunc(limit), 1), MAX_SEARCH_RESULTS)
-  return config.provider === 'tavily'
-    ? searchTavily(config, query, boundedLimit, signal)
-    : searchBrave(config, query, boundedLimit, signal)
+  const boundedLimit = normalizeSearchLimit(limit)
+
+  switch (config.provider) {
+    case 'brave':
+      return searchBrave(config, query, boundedLimit, signal)
+    case 'tavily':
+      return searchTavily(config, query, boundedLimit, signal)
+  }
 }
 
 async function searchBrave(
@@ -126,6 +130,10 @@ function getFetch(config: WebSearchConfig): typeof fetch {
   return config.fetchImpl ?? fetch
 }
 
+function normalizeSearchLimit(limit: number): number {
+  return Math.min(Math.max(Math.trunc(limit), 1), MAX_SEARCH_RESULTS)
+}
+
 async function readJson(response: Response): Promise<unknown> {
   if (!response.ok) {
     throw new Error(`Search provider request failed with status ${response.status}.`)
@@ -144,7 +152,7 @@ function getRecordArray(value: unknown, key: string): Array<Record<string, unkno
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === 'object'
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
 }
 
 function getString(value: unknown): string {

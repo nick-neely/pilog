@@ -10,7 +10,7 @@ import {
 import { createReadOnlyRepoTools } from './tools/repo-tools'
 import { createWebSearchTool } from './tools/web-search'
 import { createAsyncQueue } from '@shared/async-queue'
-import type { AgentEvent, GeneratedIssueDraft } from '@shared/types'
+import type { AgentEvent, ErrorCause, GeneratedIssueDraft } from '@shared/types'
 
 export type ProcessSnapshot = {
   cwd: string
@@ -92,42 +92,44 @@ export async function* runAgent(input: IssueGenerationInput): AsyncIterable<Agen
   input.signal?.addEventListener('abort', () => agent.abort(), { once: true })
 
   agent.subscribe((event: PiAgentEvent) => {
-    if (event.type === 'turn_start') {
-      turnCount += 1
-      if (turnCount > input.turnBudget) {
-        turnBudgetExceeded = true
-        agent.abort()
-        queue.push({
-          type: 'error',
-          message: `Turn budget exceeded after ${input.turnBudget} turns.`,
-          cause: 'turn_budget_exceeded'
-        })
+    switch (event.type) {
+      case 'turn_start': {
+        turnCount += 1
+        if (turnCount > input.turnBudget) {
+          turnBudgetExceeded = true
+          agent.abort()
+          queue.push(createTurnBudgetExceededEvent(input.turnBudget))
+          queue.close()
+          return
+        }
+        queue.push({ type: 'progress', phase: 'turn_start' })
+        return
+      }
+      case 'tool_execution_start': {
+        queue.push({ type: 'progress', phase: event.toolName })
+        if (event.toolName === 'submit_issue_drafts') toolCallCount += 1
+        return
+      }
+      case 'message_update': {
+        if (
+          event.assistantMessageEvent.type === 'text_delta' &&
+          event.assistantMessageEvent.delta
+        ) {
+          queue.push({ type: 'partial', text: event.assistantMessageEvent.delta })
+        }
+        return
+      }
+      case 'tool_execution_end': {
+        if (event.toolName === 'submit_issue_drafts' && submittedDrafts) {
+          queue.push({ type: 'final', drafts: submittedDrafts })
+        }
+        return
+      }
+      case 'agent_end': {
+        agentEndSeen = true
         queue.close()
         return
       }
-      queue.push({ type: 'progress', phase: 'turn_start' })
-    }
-    if (event.type === 'tool_execution_start') {
-      queue.push({ type: 'progress', phase: event.toolName })
-      if (event.toolName === 'submit_issue_drafts') toolCallCount += 1
-    }
-    if (
-      event.type === 'message_update' &&
-      event.assistantMessageEvent.type === 'text_delta' &&
-      event.assistantMessageEvent.delta
-    ) {
-      queue.push({ type: 'partial', text: event.assistantMessageEvent.delta })
-    }
-    if (
-      event.type === 'tool_execution_end' &&
-      event.toolName === 'submit_issue_drafts' &&
-      submittedDrafts
-    ) {
-      queue.push({ type: 'final', drafts: submittedDrafts })
-    }
-    if (event.type === 'agent_end') {
-      agentEndSeen = true
-      queue.close()
     }
   })
 
@@ -171,11 +173,7 @@ async function* runFixtureAgent(input: IssueGenerationInput): AsyncIterable<Agen
       await delay(5, undefined, { signal: input.signal }).catch(() => undefined)
       if (input.signal?.aborted) return
     }
-    yield {
-      type: 'error',
-      message: `Turn budget exceeded after ${input.turnBudget} turns.`,
-      cause: 'turn_budget_exceeded'
-    }
+    yield createTurnBudgetExceededEvent(input.turnBudget)
     return
   }
 
@@ -211,5 +209,16 @@ async function* runFixtureAgent(input: IssueGenerationInput): AsyncIterable<Agen
         publishReady: true
       }
     ]
+  }
+}
+
+function createTurnBudgetExceededEvent(turnBudget: number): AgentEvent & {
+  type: 'error'
+  cause: Extract<ErrorCause, 'turn_budget_exceeded'>
+} {
+  return {
+    type: 'error',
+    message: `Turn budget exceeded after ${turnBudget} turns.`,
+    cause: 'turn_budget_exceeded'
   }
 }

@@ -42,6 +42,20 @@ import type {
   SearchProvider,
   SettingKey
 } from '@shared/ipc'
+import {
+  DEFAULT_TURN_BUDGET,
+  MAX_TURN_BUDGET,
+  MIN_TURN_BUDGET,
+  SEARCH_PROVIDERS,
+  isSearchProvider
+} from '@shared/types'
+
+const SEARCH_PROVIDER_LABELS: Record<SearchProvider, string> = {
+  brave: 'Brave',
+  tavily: 'Tavily'
+}
+const TURN_BUDGET_ERROR = `Enter a whole number from ${MIN_TURN_BUDGET} to ${MAX_TURN_BUDGET}.`
+const TURN_BUDGET_HELP = `Generation stops if a run passes this many turns. Default is ${DEFAULT_TURN_BUDGET}.`
 
 type PiConfigState = {
   active: PiActiveConfig | null
@@ -264,8 +278,8 @@ function useAdvancedSettings(): AdvancedSettingsState {
 
   const saveTurnBudget = useCallback(async () => {
     const parsed = Number(turnBudgetDraft)
-    if (!Number.isInteger(parsed) || parsed < 1 || parsed > 100) {
-      setTurnBudgetError('Enter a whole number from 1 to 100.')
+    if (!Number.isInteger(parsed) || parsed < MIN_TURN_BUDGET || parsed > MAX_TURN_BUDGET) {
+      setTurnBudgetError(TURN_BUDGET_ERROR)
       return
     }
 
@@ -613,8 +627,8 @@ export function Settings({
                   data-testid="turn-budget-input"
                   inputMode="numeric"
                   type="number"
-                  min={1}
-                  max={100}
+                  min={MIN_TURN_BUDGET}
+                  max={MAX_TURN_BUDGET}
                   step={1}
                   value={advanced.turnBudgetDraft}
                   onChange={(event) => advanced.setTurnBudgetDraft(event.target.value)}
@@ -640,7 +654,7 @@ export function Settings({
                 </p>
               ) : (
                 <p id="turn-budget-help" className="text-xs text-muted-foreground">
-                  Generation stops if a run passes this many turns. Default is 20.
+                  {TURN_BUDGET_HELP}
                 </p>
               )}
             </div>
@@ -669,17 +683,22 @@ export function Settings({
                   <Label htmlFor="web-search-provider">Search Provider</Label>
                   <Select
                     value={advancedSettings.webSearchProvider}
-                    onValueChange={(provider) =>
-                      void advanced.setWebSearchProvider(provider as SearchProvider)
-                    }
+                    onValueChange={(provider) => {
+                      if (isSearchProvider(provider)) {
+                        void advanced.setWebSearchProvider(provider)
+                      }
+                    }}
                   >
                     <SelectTrigger id="web-search-provider" data-testid="web-search-provider">
                       <SelectValue placeholder="Choose provider" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectGroup>
-                        <SelectItem value="brave">Brave</SelectItem>
-                        <SelectItem value="tavily">Tavily</SelectItem>
+                        {SEARCH_PROVIDERS.map((provider) => (
+                          <SelectItem key={provider} value={provider}>
+                            {SEARCH_PROVIDER_LABELS[provider]}
+                          </SelectItem>
+                        ))}
                       </SelectGroup>
                     </SelectContent>
                   </Select>
