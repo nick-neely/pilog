@@ -10,6 +10,8 @@ import {
 } from './auth-storage'
 import type { PiActiveConfig, PiAuthMethod, PiModelOption, PiProviderOption } from '@shared/types'
 
+const EXISTING_PI_AUTH_PATH = join(homedir(), '.pi', 'agent', 'auth.json')
+
 export async function getActivePiConfig(db: PilogDatabase): Promise<PiActiveConfig> {
   const provider = getSetting(db, 'pi.activeProvider')
   const modelId = getSetting(db, 'pi.activeModel')
@@ -18,8 +20,7 @@ export async function getActivePiConfig(db: PilogDatabase): Promise<PiActiveConf
   const credential = provider ? authStorage.get(provider) : undefined
   const model = provider && modelId ? registry.find(provider, modelId) : undefined
   const providerKnown = provider ? registry.getAll().some((m) => m.provider === provider) : false
-  const authMethod =
-    credential?.type === 'api_key' || credential?.type === 'oauth' ? credential.type : null
+  const authMethod = getAuthMethod(credential)
   const hasApiKey = credential?.type === 'api_key' && credential.key.length > 0
 
   return {
@@ -54,7 +55,8 @@ export async function setActivePiConfig(
 
   const apiKey = input.apiKey?.trim()
   if (apiKey) {
-    ;(await createSafeStorageAuthStorage()).set(input.provider, {
+    const authStorage = await createSafeStorageAuthStorage()
+    authStorage.set(input.provider, {
       type: 'api_key',
       key: apiKey
     })
@@ -66,13 +68,13 @@ export async function setActivePiConfig(
 export async function listPiProviders(): Promise<PiProviderOption[]> {
   const authStorage = await createSafeStorageAuthStorage()
   const registry = await createModelRegistry(authStorage)
-  const modelsByProvider = new Map<string, number>()
+  const modelCountByProvider = new Map<string, number>()
 
   for (const model of registry.getAll()) {
-    modelsByProvider.set(model.provider, (modelsByProvider.get(model.provider) ?? 0) + 1)
+    modelCountByProvider.set(model.provider, (modelCountByProvider.get(model.provider) ?? 0) + 1)
   }
 
-  return [...modelsByProvider.entries()]
+  return [...modelCountByProvider.entries()]
     .map(([provider, modelCount]) => {
       const credential = authStorage.get(provider)
       return {
@@ -80,8 +82,7 @@ export async function listPiProviders(): Promise<PiProviderOption[]> {
         name: registry.getProviderDisplayName(provider),
         modelCount,
         hasCredential: authStorage.hasAuth(provider),
-        authMethod:
-          credential?.type === 'api_key' || credential?.type === 'oauth' ? credential.type : null
+        authMethod: getAuthMethod(credential)
       }
     })
     .sort((a, b) => a.name.localeCompare(b.name))
@@ -96,13 +97,11 @@ export async function listPiModels(provider?: string): Promise<PiModelOption[]> 
 }
 
 export async function importExistingPiConfig(db: PilogDatabase): Promise<PiActiveConfig> {
-  const importedProviders = await importAuthJsonIntoSafeStorage(
-    join(homedir(), '.pi', 'agent', 'auth.json')
-  )
+  const importedProviders = await importAuthJsonIntoSafeStorage(EXISTING_PI_AUTH_PATH)
   const active = await getActivePiConfig(db)
 
   if (!active.provider && importedProviders.length > 0) {
-    const provider = importedProviders[0]!
+    const provider = importedProviders[0]
     const model = (await listPiModels(provider))[0]
     if (model) {
       setSetting(db, 'pi.activeProvider', provider)
@@ -118,6 +117,12 @@ export async function resetPiConfig(db: PilogDatabase): Promise<PiActiveConfig> 
   deleteSetting(db, 'pi.activeProvider')
   deleteSetting(db, 'pi.activeModel')
   return getActivePiConfig(db)
+}
+
+function getAuthMethod(credential: unknown): PiAuthMethod | null {
+  if (!credential || typeof credential !== 'object') return null
+  const authMethod = (credential as { type?: unknown }).type
+  return authMethod === 'api_key' || authMethod === 'oauth' ? authMethod : null
 }
 
 function getConfigReason(input: {

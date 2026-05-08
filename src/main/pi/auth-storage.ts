@@ -3,11 +3,14 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync
 import { basename, join } from 'node:path'
 import type {
   AuthStorage,
-  ModelRegistry,
-  AuthStorageBackend
+  AuthStorageBackend,
+  ModelRegistry
 } from '@earendil-works/pi-coding-agent'
 
 type LockResult<T> = { result: T; next?: string }
+type PiCodingAgentModule = typeof import('@earendil-works/pi-coding-agent')
+
+let piCodingAgentModule: Promise<PiCodingAgentModule> | null = null
 
 export class SafeStorageAuthStorageBackend implements AuthStorageBackend {
   constructor(private readonly dir = join(app.getPath('userData'), 'pi-auth')) {}
@@ -58,8 +61,9 @@ export class SafeStorageAuthStorageBackend implements AuthStorageBackend {
   }
 }
 
-async function loadPiCodingAgent(): Promise<typeof import('@earendil-works/pi-coding-agent')> {
-  return import('@earendil-works/pi-coding-agent')
+async function loadPiCodingAgent(): Promise<PiCodingAgentModule> {
+  piCodingAgentModule ??= import('@earendil-works/pi-coding-agent')
+  return piCodingAgentModule
 }
 
 export async function createSafeStorageAuthStorage(): Promise<AuthStorage> {
@@ -80,7 +84,9 @@ export function clearSafeStorageAuthStorage(): void {
 export async function importAuthJsonIntoSafeStorage(authJsonPath: string): Promise<string[]> {
   if (!existsSync(authJsonPath)) return []
 
-  const parsed = JSON.parse(readFileSync(authJsonPath, 'utf-8')) as Record<string, unknown>
+  const parsed = parseAuthJson(readFileSync(authJsonPath, 'utf-8'))
+  if (!parsed) return []
+
   const authStorage = await createSafeStorageAuthStorage()
   const imported: string[] = []
 
@@ -93,10 +99,19 @@ export async function importAuthJsonIntoSafeStorage(authJsonPath: string): Promi
   return imported
 }
 
+function parseAuthJson(contents: string): Record<string, unknown> | null {
+  const parsed = JSON.parse(contents) as unknown
+  return isObjectLike(parsed) ? (parsed as Record<string, unknown>) : null
+}
+
 function isAuthCredential(value: unknown): value is Parameters<AuthStorage['set']>[1] {
   if (!value || typeof value !== 'object') return false
   const credential = value as { type?: unknown; key?: unknown }
   if (credential.type === 'api_key') return typeof credential.key === 'string'
   if (credential.type === 'oauth') return true
   return false
+}
+
+function isObjectLike(value: unknown): boolean {
+  return Boolean(value) && typeof value === 'object'
 }

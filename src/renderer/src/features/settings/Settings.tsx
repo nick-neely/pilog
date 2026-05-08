@@ -40,6 +40,22 @@ import type {
   SettingKey
 } from '@shared/ipc'
 
+type PiConfigState = {
+  active: PiActiveConfig | null
+  providers: PiProviderOption[]
+  models: PiModelOption[]
+  selectedProvider: string
+  selectedModel: string
+  apiKey: string
+  saving: boolean
+  setSelectedProvider: (provider: string) => void
+  setSelectedModel: (model: string) => void
+  setApiKey: (apiKey: string) => void
+  save: () => Promise<void>
+  importExisting: () => Promise<void>
+  reset: () => Promise<void>
+}
+
 function useSetting(key: SettingKey): [string | null, (value: string) => Promise<void>] {
   const [value, setValue] = useState<string | null>(null)
   const fetchIdRef = useRef(0)
@@ -95,21 +111,7 @@ function useGitHubStatus(): {
   return { status, connecting, connect, signOut }
 }
 
-function usePiConfig(): {
-  active: PiActiveConfig | null
-  providers: PiProviderOption[]
-  models: PiModelOption[]
-  selectedProvider: string
-  selectedModel: string
-  apiKey: string
-  saving: boolean
-  setSelectedProvider: (provider: string) => void
-  setSelectedModel: (model: string) => void
-  setApiKey: (apiKey: string) => void
-  save: () => Promise<void>
-  importExisting: () => Promise<void>
-  reset: () => Promise<void>
-} {
+function usePiConfig(): PiConfigState {
   const [active, setActive] = useState<PiActiveConfig | null>(null)
   const [providers, setProviders] = useState<PiProviderOption[]>([])
   const [models, setModels] = useState<PiModelOption[]>([])
@@ -117,48 +119,49 @@ function usePiConfig(): {
   const [selectedModel, setSelectedModel] = useState('')
   const [apiKey, setApiKey] = useState('')
   const [saving, setSaving] = useState(false)
+  const modelFetchIdRef = useRef(0)
+  const mountedRef = useRef(false)
 
   const refresh = useCallback(async () => {
     const [nextActive, nextProviders] = await Promise.all([
       window.pilog.invoke('pi:getActiveConfig'),
       window.pilog.invoke('pi:listProviders')
     ])
+    if (!mountedRef.current) return
     setActive(nextActive)
     setProviders(nextProviders)
     setSelectedProviderState(nextActive.provider ?? nextProviders[0]?.id ?? '')
   }, [])
 
   useEffect(() => {
-    let cancelled = false
+    mountedRef.current = true
 
-    Promise.all([
-      window.pilog.invoke('pi:getActiveConfig'),
-      window.pilog.invoke('pi:listProviders')
-    ])
-      .then(([nextActive, nextProviders]) => {
-        if (cancelled) return
-        setActive(nextActive)
-        setProviders(nextProviders)
-        setSelectedProviderState(nextActive.provider ?? nextProviders[0]?.id ?? '')
-      })
-      .catch(() => {
-        if (!cancelled) setProviders([])
-      })
+    refresh().catch(() => {
+      if (mountedRef.current) setProviders([])
+    })
 
     return () => {
-      cancelled = true
+      mountedRef.current = false
+      modelFetchIdRef.current += 1
     }
-  }, [])
+  }, [refresh])
 
   useEffect(() => {
+    const fetchId = ++modelFetchIdRef.current
+
     window.pilog
       .invoke('pi:listModels', selectedProvider ? { provider: selectedProvider } : undefined)
       .then((nextModels) => {
+        if (fetchId !== modelFetchIdRef.current) return
         setModels(nextModels)
         setSelectedModel((current) => {
-          if (current && nextModels.some((model) => model.id === current)) return current
-          if (active?.provider === selectedProvider && active.modelId) return active.modelId
-          return nextModels[0]?.id ?? ''
+          return getPreferredModelId({
+            current,
+            activeProvider: active?.provider ?? null,
+            activeModelId: active?.modelId ?? null,
+            models: nextModels,
+            selectedProvider
+          })
         })
       })
   }, [active?.modelId, active?.provider, selectedProvider])
@@ -179,19 +182,19 @@ function usePiConfig(): {
       })
       setActive(next)
       setApiKey('')
-      setProviders(await window.pilog.invoke('pi:listProviders'))
+      await refresh()
     } finally {
       setSaving(false)
     }
-  }, [apiKey, selectedModel, selectedProvider])
+  }, [apiKey, refresh, selectedModel, selectedProvider])
 
   const importExisting = useCallback(async () => {
-    setActive(await window.pilog.invoke('pi:importExistingPiConfig'))
+    await window.pilog.invoke('pi:importExistingPiConfig')
     await refresh()
   }, [refresh])
 
   const reset = useCallback(async () => {
-    setActive(await window.pilog.invoke('pi:resetConfig'))
+    await window.pilog.invoke('pi:resetConfig')
     setApiKey('')
     await refresh()
   }, [refresh])
@@ -213,6 +216,30 @@ function usePiConfig(): {
   }
 }
 
+function getPreferredModelId({
+  current,
+  activeProvider,
+  activeModelId,
+  models,
+  selectedProvider
+}: {
+  current: string
+  activeProvider: string | null
+  activeModelId: string | null
+  models: PiModelOption[]
+  selectedProvider: string
+}): string {
+  if (current && models.some((model) => model.id === current)) return current
+  if (activeProvider === selectedProvider && activeModelId) return activeModelId
+  return models[0]?.id ?? ''
+}
+
+function getPiSaveLabel(pi: Pick<PiConfigState, 'active' | 'saving'>): string {
+  if (pi.saving) return 'Saving'
+  if (pi.active?.valid) return 'Change…'
+  return 'Configure Pi'
+}
+
 export function Settings({
   onBack,
   onNavigateRepositories
@@ -229,6 +256,11 @@ export function Settings({
 
   const displayValue = userEdited ? (hotkeyDraft ?? '') : (hotkey ?? '')
   const dirty = userEdited && hotkeyDraft !== (hotkey ?? '')
+  const piApiKeyPlaceholder = pi.active?.hasApiKey
+    ? 'API key stored. Paste a new key to replace it.'
+    : 'Paste API key'
+  const piCredentialStatus = pi.active?.hasApiKey ? 'stored' : 'not stored'
+  const piSaveLabel = getPiSaveLabel(pi)
 
   const handleHotkeyChange = (value: string): void => {
     setUserEdited(true)
@@ -379,11 +411,7 @@ export function Settings({
                   type="password"
                   value={pi.apiKey}
                   onChange={(event) => pi.setApiKey(event.target.value)}
-                  placeholder={
-                    pi.active?.hasApiKey
-                      ? 'API key stored. Paste a new key to replace it.'
-                      : 'Paste API key'
-                  }
+                  placeholder={piApiKeyPlaceholder}
                   className="flex-1 font-mono"
                 />
                 <Button
@@ -393,13 +421,12 @@ export function Settings({
                   data-testid="pi-save-config"
                 >
                   <HugeiconsIcon icon={FileKeyIcon} data-icon="inline-start" aria-hidden />
-                  {pi.saving ? 'Saving' : pi.active?.valid ? 'Change…' : 'Configure Pi'}
+                  {piSaveLabel}
                 </Button>
               </div>
               <p className="text-[11px] text-muted-foreground">
                 Current: {pi.active?.providerName ?? 'No provider'} ·{' '}
-                {pi.active?.modelName ?? 'No model'} · key{' '}
-                {pi.active?.hasApiKey ? 'stored' : 'not stored'}
+                {pi.active?.modelName ?? 'No model'} · key {piCredentialStatus}
               </p>
             </div>
 
