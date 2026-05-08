@@ -32,7 +32,14 @@ export function createNote(
     })
     .run()
 
-  return { id, content: input.content, status: 'unprocessed', repoId, createdAt: now, updatedAt: now }
+  return {
+    id,
+    content: input.content,
+    status: 'unprocessed',
+    repoId,
+    createdAt: now,
+    updatedAt: now
+  }
 }
 
 export function listNotes(db: PilogDatabase, filter?: ListNotesRequest): Note[] {
@@ -88,12 +95,7 @@ export function updateNote(
     patch.repoId = input.repoId ?? null
   }
 
-  const row = db
-    .update(notes)
-    .set(patch)
-    .where(eq(notes.id, input.id))
-    .returning(noteColumns)
-    .get()
+  const row = db.update(notes).set(patch).where(eq(notes.id, input.id)).returning(noteColumns).get()
 
   return row ?? null
 }
