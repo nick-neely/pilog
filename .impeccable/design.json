@@ -1,0 +1,353 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-05-08T02:00:05Z",
+  "title": "Design System: PiLog",
+  "extensions": {
+    "colorMeta": {
+      "parchment": {
+        "role": "neutral",
+        "displayName": "Parchment",
+        "canonical": "oklch(0.96 0.006 75)",
+        "tonalRamp": [
+          "oklch(0.18 0.012 60)",
+          "oklch(0.30 0.010 65)",
+          "oklch(0.45 0.010 70)",
+          "oklch(0.60 0.008 72)",
+          "oklch(0.75 0.007 75)",
+          "oklch(0.88 0.008 70)",
+          "oklch(0.92 0.006 75)",
+          "oklch(0.96 0.006 75)"
+        ]
+      },
+      "parchment-light": {
+        "role": "neutral",
+        "displayName": "Parchment Light",
+        "canonical": "oklch(0.97 0.005 75)",
+        "tonalRamp": [
+          "oklch(0.18 0.012 60)",
+          "oklch(0.32 0.010 65)",
+          "oklch(0.48 0.008 70)",
+          "oklch(0.62 0.007 72)",
+          "oklch(0.78 0.006 75)",
+          "oklch(0.90 0.006 75)",
+          "oklch(0.94 0.005 75)",
+          "oklch(0.97 0.005 75)"
+        ]
+      },
+      "ash": {
+        "role": "neutral",
+        "displayName": "Ash",
+        "canonical": "oklch(0.92 0.006 75)",
+        "tonalRamp": [
+          "oklch(0.18 0.012 60)",
+          "oklch(0.30 0.010 65)",
+          "oklch(0.45 0.010 68)",
+          "oklch(0.60 0.008 72)",
+          "oklch(0.75 0.008 75)",
+          "oklch(0.85 0.007 75)",
+          "oklch(0.92 0.006 75)",
+          "oklch(0.96 0.005 75)"
+        ]
+      },
+      "pencil": {
+        "role": "neutral",
+        "displayName": "Pencil",
+        "canonical": "oklch(0.48 0.012 60)",
+        "tonalRamp": [
+          "oklch(0.15 0.012 60)",
+          "oklch(0.25 0.012 60)",
+          "oklch(0.35 0.012 60)",
+          "oklch(0.48 0.012 60)",
+          "oklch(0.60 0.012 65)",
+          "oklch(0.72 0.012 70)",
+          "oklch(0.84 0.010 72)",
+          "oklch(0.92 0.008 75)"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Ink",
+        "canonical": "oklch(0.22 0.012 60)",
+        "tonalRamp": [
+          "oklch(0.18 0.012 60)",
+          "oklch(0.22 0.012 60)",
+          "oklch(0.30 0.012 60)",
+          "oklch(0.42 0.012 60)",
+          "oklch(0.55 0.012 65)",
+          "oklch(0.70 0.012 70)",
+          "oklch(0.85 0.010 72)",
+          "oklch(0.96 0.006 75)"
+        ]
+      },
+      "border-warm": {
+        "role": "neutral",
+        "displayName": "Border Warm",
+        "canonical": "oklch(0.88 0.008 70)",
+        "tonalRamp": [
+          "oklch(0.20 0.012 60)",
+          "oklch(0.32 0.010 65)",
+          "oklch(0.48 0.010 68)",
+          "oklch(0.62 0.008 70)",
+          "oklch(0.75 0.008 70)",
+          "oklch(0.84 0.008 70)",
+          "oklch(0.88 0.008 70)",
+          "oklch(0.94 0.006 72)"
+        ]
+      },
+      "moss": {
+        "role": "primary",
+        "displayName": "Reading-Room Moss",
+        "canonical": "oklch(0.48 0.08 145)",
+        "tonalRamp": [
+          "oklch(0.18 0.06 145)",
+          "oklch(0.28 0.07 145)",
+          "oklch(0.38 0.08 145)",
+          "oklch(0.48 0.08 145)",
+          "oklch(0.60 0.085 145)",
+          "oklch(0.72 0.07 145)",
+          "oklch(0.84 0.05 145)",
+          "oklch(0.94 0.025 145)"
+        ]
+      },
+      "moss-lifted": {
+        "role": "primary",
+        "displayName": "Moss Lifted (dark mode)",
+        "canonical": "oklch(0.6 0.085 145)",
+        "tonalRamp": [
+          "oklch(0.20 0.06 145)",
+          "oklch(0.32 0.07 145)",
+          "oklch(0.44 0.08 145)",
+          "oklch(0.55 0.085 145)",
+          "oklch(0.60 0.085 145)",
+          "oklch(0.72 0.075 145)",
+          "oklch(0.84 0.05 145)",
+          "oklch(0.94 0.025 145)"
+        ]
+      },
+      "clay": {
+        "role": "tertiary",
+        "displayName": "Clay",
+        "canonical": "oklch(0.5 0.16 28)",
+        "tonalRamp": [
+          "oklch(0.20 0.10 28)",
+          "oklch(0.30 0.13 28)",
+          "oklch(0.40 0.15 28)",
+          "oklch(0.50 0.16 28)",
+          "oklch(0.60 0.16 28)",
+          "oklch(0.72 0.14 28)",
+          "oklch(0.84 0.10 28)",
+          "oklch(0.94 0.04 28)"
+        ]
+      },
+      "dark-ink": {
+        "role": "neutral",
+        "displayName": "Dark Ink",
+        "canonical": "oklch(0.18 0.012 60)",
+        "tonalRamp": [
+          "oklch(0.12 0.012 60)",
+          "oklch(0.18 0.012 60)",
+          "oklch(0.22 0.014 60)",
+          "oklch(0.26 0.014 60)",
+          "oklch(0.36 0.014 62)",
+          "oklch(0.50 0.012 65)",
+          "oklch(0.70 0.012 70)",
+          "oklch(0.92 0.008 75)"
+        ]
+      },
+      "dark-card": {
+        "role": "neutral",
+        "displayName": "Dark Card",
+        "canonical": "oklch(0.22 0.014 60)",
+        "tonalRamp": [
+          "oklch(0.14 0.012 60)",
+          "oklch(0.18 0.012 60)",
+          "oklch(0.22 0.014 60)",
+          "oklch(0.28 0.014 60)",
+          "oklch(0.40 0.014 65)",
+          "oklch(0.55 0.012 68)",
+          "oklch(0.74 0.012 70)",
+          "oklch(0.92 0.008 75)"
+        ]
+      },
+      "dark-paper": {
+        "role": "neutral",
+        "displayName": "Dark Paper",
+        "canonical": "oklch(0.92 0.008 75)",
+        "tonalRamp": [
+          "oklch(0.18 0.012 60)",
+          "oklch(0.30 0.010 65)",
+          "oklch(0.45 0.010 68)",
+          "oklch(0.60 0.010 70)",
+          "oklch(0.72 0.010 72)",
+          "oklch(0.84 0.009 74)",
+          "oklch(0.92 0.008 75)",
+          "oklch(0.97 0.005 75)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Inbox section titles, settings page headers, the rare scratchpad title. Source Serif 4. Sparingly used."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Draft card titles, dialog headers (font-heading on AlertDialogTitle). Source Serif 4 at 1.5rem."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "UI section labels, settings group titles. IBM Plex Sans 600."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Primary reading text, draft descriptions, settings copy. IBM Plex Sans 400 at 0.9375rem; 65–75ch line length in reading surfaces."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Button text, input labels, microcopy. IBM Plex Sans 500 at 0.8125rem with +0.01em tracking. Mixed-case, never uppercase-everything."
+      },
+      "mono": {
+        "displayName": "Mono",
+        "purpose": "Note bodies in editor, file paths in affected-files lists, code blocks, agent run output. IBM Plex Mono 400. Never decorative."
+      }
+    },
+    "shadows": [
+      {
+        "name": "hover-lift",
+        "value": "0 1px 2px oklch(0.22 0.012 60 / 0.06), 0 2px 6px oklch(0.22 0.012 60 / 0.05)",
+        "purpose": "Reserved for draft cards on hover only. Disabled under prefers-reduced-motion. Most surfaces take no hover lift."
+      },
+      {
+        "name": "active-dialog",
+        "value": "0 25px 50px -12px oklch(0.22 0.012 60 / 0.25)",
+        "purpose": "Documented Active-dialog elevation role. The lone exception to flat-by-default. Used only on alert-dialog content."
+      },
+      {
+        "name": "focus-ring",
+        "value": "0 0 0 3px oklch(0.48 0.08 145 / 0.3)",
+        "purpose": "Keyboard focus on every interactive element. Always visible, never suppressed for aesthetics. Resolves to moss in both themes."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease-feedback",
+        "value": "cubic-bezier(0.22, 1, 0.36, 1)",
+        "purpose": "Ease-out-quart for state transitions. Responsive feedback only; never choreography."
+      },
+      {
+        "name": "duration-feedback",
+        "value": "150ms",
+        "purpose": "Default transition for hover, focus, active. Short enough to feel immediate, long enough to feel intentional."
+      },
+      {
+        "name": "duration-dialog",
+        "value": "100ms",
+        "purpose": "Alert-dialog open/close timing. Quick acknowledgement, never a presentation."
+      }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "md", "value": "768px" },
+      { "name": "lg", "value": "1024px" },
+      { "name": "xl", "value": "1280px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Reading-Room Moss accent button. Reserved for the single most consequential action on screen (Generate Drafts, Publish). One on screen at a time.",
+      "html": "<button class=\"ds-btn-primary\">Generate Drafts</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; height: 2.25rem; padding: 0 0.75rem; border: 1px solid transparent; border-radius: 0.4rem; background: oklch(0.48 0.08 145); color: oklch(0.97 0.005 75); font-family: 'IBM Plex Sans Variable', 'IBM Plex Sans', system-ui, sans-serif; font-size: 0.8125rem; font-weight: 500; letter-spacing: 0.01em; cursor: pointer; transition: background 150ms cubic-bezier(0.22, 1, 0.36, 1), transform 150ms cubic-bezier(0.22, 1, 0.36, 1); } .ds-btn-primary:hover { background: oklch(0.42 0.08 145); } .ds-btn-primary:focus-visible { outline: none; box-shadow: 0 0 0 3px oklch(0.48 0.08 145 / 0.3); border-color: oklch(0.48 0.08 145); } .ds-btn-primary:active { transform: translateY(1px); }"
+    },
+    {
+      "name": "Outline Button",
+      "kind": "button",
+      "refersTo": "button-outline",
+      "description": "The default for 'secondary action with chrome'. Border-Warm border on Parchment, ink text.",
+      "html": "<button class=\"ds-btn-outline\">Open inbox</button>",
+      "css": ".ds-btn-outline { display: inline-flex; align-items: center; justify-content: center; height: 2.25rem; padding: 0 0.75rem; border: 1px solid oklch(0.88 0.008 70); border-radius: 0.4rem; background: oklch(0.96 0.006 75); color: oklch(0.22 0.012 60); font-family: 'IBM Plex Sans Variable', 'IBM Plex Sans', system-ui, sans-serif; font-size: 0.8125rem; font-weight: 500; letter-spacing: 0.01em; cursor: pointer; transition: background 150ms cubic-bezier(0.22, 1, 0.36, 1); } .ds-btn-outline:hover { background: oklch(0.92 0.006 75); } .ds-btn-outline:focus-visible { outline: none; box-shadow: 0 0 0 3px oklch(0.48 0.08 145 / 0.3); border-color: oklch(0.48 0.08 145); }"
+    },
+    {
+      "name": "Ghost Button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "Tertiary or chrome-adjacent actions where any frame would be too loud. Transparent background, ink text, hover shifts to Ash.",
+      "html": "<button class=\"ds-btn-ghost\">Dismiss</button>",
+      "css": ".ds-btn-ghost { display: inline-flex; align-items: center; justify-content: center; height: 2.25rem; padding: 0 0.75rem; border: 1px solid transparent; border-radius: 0.4rem; background: transparent; color: oklch(0.22 0.012 60); font-family: 'IBM Plex Sans Variable', 'IBM Plex Sans', system-ui, sans-serif; font-size: 0.8125rem; font-weight: 500; letter-spacing: 0.01em; cursor: pointer; transition: background 150ms cubic-bezier(0.22, 1, 0.36, 1); } .ds-btn-ghost:hover { background: oklch(0.92 0.006 75); } .ds-btn-ghost:focus-visible { outline: none; box-shadow: 0 0 0 3px oklch(0.48 0.08 145 / 0.3); border-color: oklch(0.48 0.08 145); }"
+    },
+    {
+      "name": "Destructive Button",
+      "kind": "button",
+      "refersTo": "button-destructive",
+      "description": "Warm-clay destructive affordance. Reads in the paper world; never pure red. Used for delete-note, dismiss-draft, and undo-publish actions.",
+      "html": "<button class=\"ds-btn-destructive\">Delete note</button>",
+      "css": ".ds-btn-destructive { display: inline-flex; align-items: center; justify-content: center; height: 2.25rem; padding: 0 0.75rem; border: 1px solid transparent; border-radius: 0.4rem; background: oklch(0.5 0.16 28 / 0.10); color: oklch(0.5 0.16 28); font-family: 'IBM Plex Sans Variable', 'IBM Plex Sans', system-ui, sans-serif; font-size: 0.8125rem; font-weight: 500; letter-spacing: 0.01em; cursor: pointer; transition: background 150ms cubic-bezier(0.22, 1, 0.36, 1); } .ds-btn-destructive:hover { background: oklch(0.5 0.16 28 / 0.20); } .ds-btn-destructive:focus-visible { outline: none; box-shadow: 0 0 0 3px oklch(0.5 0.16 28 / 0.20); border-color: oklch(0.5 0.16 28 / 0.40); }"
+    },
+    {
+      "name": "Alert Dialog",
+      "kind": "card",
+      "refersTo": "alert-dialog-content",
+      "description": "The system's one elevated surface. Tonal scrim (no glass), Parchment-Light card, Source Serif 4 title, paired action + cancel buttons. Used only when an action genuinely takes the user out of the current task.",
+      "html": "<div class=\"ds-alert-dialog-overlay\"><div class=\"ds-alert-dialog-content\" role=\"alertdialog\" aria-modal=\"true\" aria-labelledby=\"ds-ad-title\" aria-describedby=\"ds-ad-desc\"><h2 class=\"ds-alert-dialog-title\" id=\"ds-ad-title\">Publish three drafts to nick-neely/pilog?</h2><p class=\"ds-alert-dialog-description\" id=\"ds-ad-desc\">Drafts will be created as GitHub issues with their suggested labels. The publish log will record this action.</p><div class=\"ds-alert-dialog-footer\"><button class=\"ds-btn-outline\">Cancel</button><button class=\"ds-btn-primary\">Publish</button></div></div></div>",
+      "css": ".ds-alert-dialog-overlay { position: relative; display: grid; place-items: center; min-height: 320px; padding: 2rem; background: oklch(0.22 0.012 60 / 0.4); border-radius: 0.4rem; } .ds-alert-dialog-content { display: grid; gap: 1.5rem; width: 100%; max-width: 28rem; padding: 1.5rem; background: oklch(0.97 0.005 75); color: oklch(0.22 0.012 60); border-radius: 0.7rem; box-shadow: 0 25px 50px -12px oklch(0.22 0.012 60 / 0.25); outline: 1px solid oklch(0.22 0.012 60 / 0.05); } .ds-alert-dialog-title { margin: 0; font-family: 'Source Serif 4 Variable', 'Source Serif 4', Georgia, serif; font-size: 1.125rem; font-weight: 500; line-height: 1.3; color: oklch(0.22 0.012 60); } .ds-alert-dialog-description { margin: 0; font-family: 'IBM Plex Sans Variable', 'IBM Plex Sans', system-ui, sans-serif; font-size: 0.875rem; line-height: 1.5; color: oklch(0.48 0.012 60); text-wrap: balance; } .ds-alert-dialog-footer { display: flex; justify-content: flex-end; gap: 0.5rem; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Reading-Room Journal",
+    "overview": "PiLog is a quiet annotated page in a sunlit reading room. The neutrals are paper-warm and faintly ash-toned — never #fff, never #000, never zinc. The single accent is Reading-Room Moss (oklch(0.48 0.08 145) light, lifted to oklch(0.6 0.085 145) for low-ambient dark): the color a librarian might use for marginalia. Type carries the weight a frame would in a SaaS dashboard: Source Serif 4 for display gravity, IBM Plex Sans for the humanist body, IBM Plex Mono for code, paths, and editor body. Surfaces are flat by default; depth is conveyed by tonal contrast on the warm-neutral ramp, never by shadow. The system explicitly rejects three patterns named in PRODUCT.md: the generic AI-tool aesthetic (purple/teal gradients, glassmorphism, gradient text, '✨ AI' garnish), the SaaS-cliché dashboard (hero-metric tiles, identical icon-heading-text card grids, side-stripe colored borders, friendly-rounded illustrations), and the stock shadcn dashboard demo look (default theme, Inter, zinc neutrals, blue accent). Both light and dark themes are first-class.",
+    "keyCharacteristics": [
+      "Paper-warm tinted neutrals at ~75° hue light / ~60° hue dark; never #fff, never #000, never untinted zinc.",
+      "Single moss-green accent, used on ≤10% of any given screen.",
+      "Source Serif 4 (display) + IBM Plex Sans (body) + IBM Plex Mono (code/editor).",
+      "Flat by default; depth conveyed through tonal contrast on the warm-neutral ramp, not shadow.",
+      "Quiet shapes: 8px base radius, buttons settle on rounded-md (~6.4px), elevated dialogs on rounded-xl (~11px). No pill shapes.",
+      "Responsive motion only; every animation justifiable as feedback. prefers-reduced-motion honored.",
+      "Keyboard-first; focus rings visible and on-brand (moss, 3px, never suppressed).",
+      "Editor (CodeMirror/Milkdown) is the gravitational center of the scratchpad; UI chrome must defer to it."
+    ],
+    "rules": [
+      { "name": "The One Voice Rule", "body": "Reading-Room Moss appears on ≤10% of any given screen. Its rarity is the point. If two moss elements are visible at once, one of them is wrong.", "section": "colors" },
+      { "name": "The Warm Neutral Rule", "body": "No neutral in this system is pure gray. Every step has chroma ≥ 0.005 toward warm yellow (light) or warm orange (dark). Pure #000, pure #fff, and untinted zinc/slate are prohibited.", "section": "colors" },
+      { "name": "The Color-Independence Rule", "body": "Status, priority, and confidence are never conveyed by hue alone. Every state carries a label, glyph, or shape signal alongside any color cue. Non-negotiable.", "section": "colors" },
+      { "name": "The Single-Border Rule", "body": "Every visible border is --border at 1px. Borders are never colored to convey state. Use a label, glyph, or tonal-contrast surface change instead.", "section": "colors" },
+      { "name": "The Hierarchy-Through-Type Rule", "body": "Visual hierarchy comes from typeface, weight, and scale (≥1.25 ratio between adjacent steps), not from background color, side-stripes, or boxed cards. If you're tempted to add a colored border to make a section stand out, change the type instead.", "section": "typography" },
+      { "name": "The Editor-Gravitational Rule", "body": "When the scratchpad is open, the IBM Plex Mono editor body is the visual center. UI chrome sits at the periphery, lower contrast than the editor body. The editor must never feel decorated.", "section": "typography" },
+      { "name": "The No-Decorative-Type Rule", "body": "No gradient text, no background-clip: text, no decorative all-caps tracking, no display weights below 200. Emphasis is weight or size, never effect.", "section": "typography" },
+      { "name": "The Flat-By-Default Rule", "body": "Surfaces are flat at rest. Shadows appear only as a response to state (hover, focus, active dialog). A static screenshot of any surface in its rest state contains zero box-shadow.", "section": "elevation" },
+      { "name": "The Tonal-Depth Rule", "body": "When two surfaces need separation, the answer is tonal contrast on the warm-neutral ramp, not a shadow. Borders are 1px low-contrast; never a colored stripe.", "section": "elevation" },
+      { "name": "The No-Glassmorphism Rule", "body": "Backdrop blur is forbidden. The alert-dialog overlay uses a tonal scrim (bg-foreground/40 light, bg-background/70 dark) — same hue family as the rest of the system, no backdrop-filter, no glass.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do anchor color tokens in OKLCH. Neutrals stay even as lightness shifts and moss reads true across displays.",
+      "Do use Reading-Room Moss only for primary actions, focus rings, and at-a-glance state where unavoidable. ≤10% of any screen.",
+      "Do convey status, priority, and confidence with a label, glyph, or shape alongside any color cue. The Color-Independence Rule is non-negotiable.",
+      "Do lean on type, weight, and tonal neutrals for hierarchy. Headers earn their weight; backgrounds don't.",
+      "Do respect prefers-reduced-motion. Reduced-motion users get instant transitions, never broken interactions.",
+      "Do keep focus rings visible and on-brand. Use focus-visible:ring-3 focus-visible:ring-ring/30 focus-visible:border-ring; never suppress.",
+      "Do treat the IBM Plex Mono editor as the gravitational center of the scratchpad. UI chrome defers.",
+      "Do ship the warm neutral. Every neutral has chroma ≥ 0.005 toward warm yellow (light) or warm orange (dark).",
+      "Do keep body line length at 65–75ch in any reading-heavy surface (draft body, source notes, settings copy).",
+      "Do use .tabular (font-variant-numeric: tabular-nums) on inbox counts, dates, and run-log timestamps; not on flowing prose.",
+      "Do separate stacked surfaces with tonal contrast (Parchment-Light over Parchment, Dark Card over Dark Ink), not with shadow."
+    ],
+    "donts": [
+      "Don't ship the generic AI-tool aesthetic named in PRODUCT.md: no purple/teal gradients, no glassmorphic cards, no gradient text, no '✨ AI' badges, no shimmer, no wand icons, no 'magic' copy.",
+      "Don't ship the SaaS-cliché dashboard named in PRODUCT.md: no hero-metric template, no identical icon-heading-text card grids, no friendly-rounded illustrations, no decorative blurs.",
+      "Don't ship the stock shadcn dashboard demo look named in PRODUCT.md: default shadcn theme + Inter + zinc neutrals + blue accent are the failure mode this design exists to refuse.",
+      "Don't use #000 or #fff anywhere. Pure neutrals are prohibited.",
+      "Don't use side-stripe borders. border-left or border-right greater than 1px as a colored accent is prohibited.",
+      "Don't use background-clip: text for gradient text. Single solid color, emphasis via weight or size.",
+      "Don't use backdrop-filter or backdrop-blur-*. The alert-dialog overlay is a tonal scrim, never glass.",
+      "Don't reach for a modal as the first thought. Inline and progressive disclosure first; modal only when the action genuinely takes the user out of the current task.",
+      "Don't nest cards. A card inside a card is always wrong.",
+      "Don't wrap everything in a container. Most surfaces don't need one.",
+      "Don't animate CSS layout properties (width, height, top, left, margin). transform, opacity, and color only.",
+      "Don't suppress focus rings for aesthetics. The keyboard-first promise is honored visibly.",
+      "Don't use color alone for status, priority, or confidence — ever.",
+      "Don't add a second accent because 'the page feels empty.' Empty is the design.",
+      "Don't restore rounded-4xl on buttons or pill shapes anywhere. The Reading-Room Journal's shapes are quiet."
+    ]
+  }
+}
