@@ -5,24 +5,26 @@ export const ConfidenceSchema = z.enum(['low', 'medium', 'high'])
 export const PrioritySchema = z.enum(['low', 'medium', 'high'])
 
 export const GeneratedIssueDraftSchema = z.object({
-  title: z.string(),
-  summary: z.string(),
-  context: z.string(),
-  sourceNoteIds: z.array(z.string()),
+  title: z.string().min(1),
+  summary: z.string().min(1),
+  context: z.string().min(1),
+  sourceNoteIds: z.array(z.string()).min(1),
   suggestedLabels: z.array(z.string()),
   priority: PrioritySchema.optional(),
-  affectedFiles: z.array(
-    z.object({
-      path: z.string(),
-      reason: z.string()
-    })
-  ),
-  acceptanceCriteria: z.array(z.string()),
+  affectedFiles: z
+    .array(
+      z.object({
+        path: z.string().min(1),
+        reason: z.string().min(1)
+      })
+    )
+    .min(1),
+  acceptanceCriteria: z.array(z.string().min(1)).min(1),
   implementationNotes: z.array(z.string()),
   confidence: ConfidenceSchema,
-  groupingReason: z.string(),
+  groupingReason: z.string().min(1),
   publishReady: z.boolean(),
-  needsClarification: z.array(z.string()).optional()
+  needsClarification: z.array(z.string().min(1)).optional()
 })
 
 export const GeneratedIssueDraftsSchema = z.array(GeneratedIssueDraftSchema)
@@ -30,30 +32,31 @@ export const GeneratedIssueDraftsSchema = z.array(GeneratedIssueDraftSchema)
 export type GeneratedIssueDraft = z.infer<typeof GeneratedIssueDraftSchema>
 
 export const GeneratedIssueDraftTypeBox = Type.Object({
-  title: Type.String(),
-  summary: Type.String(),
-  context: Type.String(),
-  sourceNoteIds: Type.Array(Type.String()),
+  title: Type.String({ minLength: 1 }),
+  summary: Type.String({ minLength: 1 }),
+  context: Type.String({ minLength: 1 }),
+  sourceNoteIds: Type.Array(Type.String(), { minItems: 1 }),
   suggestedLabels: Type.Array(Type.String()),
   priority: Type.Optional(
     Type.Union([Type.Literal('low'), Type.Literal('medium'), Type.Literal('high')])
   ),
   affectedFiles: Type.Array(
     Type.Object({
-      path: Type.String(),
-      reason: Type.String()
-    })
+      path: Type.String({ minLength: 1 }),
+      reason: Type.String({ minLength: 1 })
+    }),
+    { minItems: 1 }
   ),
-  acceptanceCriteria: Type.Array(Type.String()),
+  acceptanceCriteria: Type.Array(Type.String({ minLength: 1 }), { minItems: 1 }),
   implementationNotes: Type.Array(Type.String()),
   confidence: Type.Union([Type.Literal('low'), Type.Literal('medium'), Type.Literal('high')]),
-  groupingReason: Type.String(),
+  groupingReason: Type.String({ minLength: 1 }),
   publishReady: Type.Boolean(),
-  needsClarification: Type.Optional(Type.Array(Type.String()))
+  needsClarification: Type.Optional(Type.Array(Type.String({ minLength: 1 })))
 })
 
 export const SubmitIssueDraftsParameters = Type.Object({
-  drafts: Type.Array(GeneratedIssueDraftTypeBox, { minItems: 1, maxItems: 1 })
+  drafts: Type.Array(GeneratedIssueDraftTypeBox, { minItems: 1, maxItems: 3 })
 })
 
 export type SubmitIssueDraftsParameters = Static<typeof SubmitIssueDraftsParameters>

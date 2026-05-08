@@ -98,8 +98,10 @@
     "@earendil-works/pi-agent-core": "0.74.0",
     "@earendil-works/pi-ai": "0.74.0",
     "@earendil-works/pi-coding-agent": "0.74.0",
+    "@vscode/ripgrep": "^1.18.0",
     "react-resizable-panels": "^4.11.0",
     "simple-git": "^3.36.0",
+    "tinyglobby": "^0.2.16",
     "typebox": "1.1.24",
     "zod": "4.4.3"
   }

@@ -1,0 +1,22 @@
+[
+  {
+    "id": "note-settings-spacing",
+    "content": "settings mobile spacing feels cramped around the save controls"
+  },
+  {
+    "id": "note-settings-loading",
+    "content": "settings save button should show a loading state"
+  },
+  {
+    "id": "note-avatar-error",
+    "content": "avatar upload error is silent in settings"
+  },
+  {
+    "id": "note-auth-session",
+    "content": "session expires and redirect breaks, probably auth middleware; token refresh and session persistence may need cleanup"
+  },
+  {
+    "id": "note-vague",
+    "content": "dashboard thing is weird"
+  }
+]

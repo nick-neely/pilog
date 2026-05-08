@@ -8,6 +8,7 @@ files:
   - package.json
 asarUnpack:
   - '**/*.node'
+  - '**/node_modules/@vscode/ripgrep/bin/**'
   - resources/**
 win:
   executableName: pilog

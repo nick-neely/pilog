@@ -9,9 +9,15 @@ import { agentRuns, issueDrafts } from '../db/schema'
 import {
   buildIssueGenerationPrompt,
   persistGeneratedIssueDrafts,
-  createSubmitIssueDraftsTool
+  createSubmitIssueDraftsTool,
+  assertNoSourceNoteCollisions
 } from './issue-generation'
-import type { GeneratedIssueDraft } from '@shared/types'
+import { GeneratedIssueDraftsSchema, type GeneratedIssueDraft } from '@shared/types'
+import {
+  clarificationResponse,
+  singleDraftResponse,
+  threeDraftResponse
+} from '../../../fixtures/agent/fixture-responses'
 
 const draft: GeneratedIssueDraft = {
   title: 'Fix mobile settings spacing',
@@ -53,6 +59,12 @@ describe('issue generation', () => {
     })
 
     expect(prompt).toMatchSnapshot()
+    expect(prompt).toContain('Do not create one issue per note by default.')
+    expect(prompt).toContain('Group related minor UX notes.')
+    expect(prompt).toContain('Split unrelated or complex notes.')
+    expect(prompt).toContain('parent issue with checklist subtasks')
+    expect(prompt).toContain('Return structured JSON only')
+    expect(prompt).toContain('Mark vague notes as needing clarification.')
   })
 
   it('persists final drafts and finalizes the run in one transaction', () => {
@@ -92,6 +104,73 @@ describe('issue generation', () => {
     expect(JSON.parse(finalizedRun?.eventStream ?? '[]')).toEqual([{ type: 'final' }])
   })
 
+  it('persists multiple drafts and records every output id', () => {
+    const db = createInMemoryDatabase()
+    runMigrations(db)
+    const repo = createRepo(db, {
+      owner: 'nick-neely',
+      name: 'pilog',
+      localPath: '/workspace/pilog',
+      githubUrl: 'https://github.com/nick-neely/pilog',
+      defaultBranch: 'main'
+    })
+    const noteIds = [
+      'note-settings-spacing',
+      'note-settings-loading',
+      'note-avatar-error',
+      'note-auth-session',
+      'note-vague'
+    ].map((id) => createNote(db, { content: id, repoId: repo.id }).id)
+    const draftSourceIds = new Map(
+      [
+        'note-settings-spacing',
+        'note-settings-loading',
+        'note-avatar-error',
+        'note-auth-session',
+        'note-vague'
+      ].map((fixtureId, index) => [fixtureId, noteIds[index]!])
+    )
+    const drafts = threeDraftResponse.map((fixtureDraft) => ({
+      ...fixtureDraft,
+      sourceNoteIds: fixtureDraft.sourceNoteIds.map((id) => draftSourceIds.get(id)!)
+    }))
+    const run = createAgentRun(db, { repoId: repo.id, inputNoteIds: noteIds })
+
+    const draftIds = persistGeneratedIssueDrafts(db, {
+      runId: run.id,
+      repoId: repo.id,
+      selectedNoteIds: noteIds,
+      drafts,
+      eventStream: [{ type: 'final' }]
+    })
+
+    const persistedDrafts = db.select().from(issueDrafts).all()
+    const finalizedRun = db.select().from(agentRuns).where(eq(agentRuns.id, run.id)).get()
+
+    expect(draftIds).toHaveLength(3)
+    expect(persistedDrafts).toHaveLength(3)
+    expect(JSON.parse(finalizedRun?.outputDraftIds ?? '[]')).toEqual(draftIds)
+    expect(listNotes(db).map((note) => note.status)).toEqual([
+      'drafted',
+      'drafted',
+      'drafted',
+      'drafted',
+      'drafted'
+    ])
+  })
+
+  it('rejects source-note collisions within one generated run', () => {
+    expect(() =>
+      assertNoSourceNoteCollisions(
+        ['note-1', 'note-2'],
+        [
+          { ...draft, sourceNoteIds: ['note-1'] },
+          { ...draft, title: 'Second draft', sourceNoteIds: ['note-1'] }
+        ]
+      )
+    ).toThrow('appears in more than one generated draft')
+  })
+
   it('terminates the exit tool after the first valid submit call', async () => {
     const submitted: GeneratedIssueDraft[][] = []
     const tool = createSubmitIssueDraftsTool((drafts) => submitted.push(drafts))
@@ -102,5 +181,21 @@ describe('issue generation', () => {
     expect(result.terminate).toBe(true)
     expect(second.terminate).toBe(true)
     expect(submitted).toHaveLength(1)
+  })
+
+  it('accepts fixture responses for merge, split, parent/subtask, single-draft, and clarification shapes', () => {
+    expect(GeneratedIssueDraftsSchema.parse(threeDraftResponse)).toHaveLength(3)
+    expect(threeDraftResponse[0]?.groupingReason).toContain('src/settings/SettingsForm.tsx')
+    expect(threeDraftResponse[1]?.groupingReason).toContain('parent-with-subtasks')
+    expect(GeneratedIssueDraftsSchema.parse(singleDraftResponse)).toHaveLength(1)
+    expect(GeneratedIssueDraftsSchema.parse(clarificationResponse)[0]?.needsClarification).toEqual(
+      expect.arrayContaining(['Which dashboard screen or component is affected?'])
+    )
+  })
+
+  it('rejects malformed fixture output cleanly', () => {
+    const malformed = [{ ...draft, affectedFiles: [], acceptanceCriteria: [], groupingReason: '' }]
+
+    expect(() => GeneratedIssueDraftsSchema.parse(malformed)).toThrow()
   })
 })

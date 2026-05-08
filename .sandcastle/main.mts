@@ -266,7 +266,7 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
         const implementationModelLabel = executionModelLabel(issue)
         const implementationModelReason = useCodex
           ? `Codex mode uses a single model (${CODEX_MODEL}) for implementation and review.`
-          : issue.implementationModelReason ?? 'Default implementation model.'
+          : (issue.implementationModelReason ?? 'Default implementation model.')
         const implement = await sandbox.run({
           name: 'implementer',
           maxIterations: 100,
