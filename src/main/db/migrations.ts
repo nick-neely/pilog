@@ -37,6 +37,7 @@ export function runMigrations(db: PilogDatabase): void {
       source_note_ids TEXT NOT NULL DEFAULT '[]',
       affected_files_json TEXT NOT NULL DEFAULT '[]',
       confidence TEXT NOT NULL DEFAULT 'medium',
+      grouping_reason TEXT NOT NULL DEFAULT '',
       status TEXT NOT NULL DEFAULT 'draft',
       github_issue_url TEXT,
       created_at TEXT NOT NULL,
@@ -48,13 +49,50 @@ export function runMigrations(db: PilogDatabase): void {
     CREATE TABLE IF NOT EXISTS agent_runs (
       id TEXT PRIMARY KEY,
       repo_id TEXT REFERENCES repos(id),
-      source_note_ids TEXT NOT NULL DEFAULT '[]',
-      result_draft_ids TEXT NOT NULL DEFAULT '[]',
-      status TEXT NOT NULL DEFAULT 'pending',
+      input_note_ids TEXT NOT NULL DEFAULT '[]',
+      output_draft_ids TEXT NOT NULL DEFAULT '[]',
+      status TEXT NOT NULL DEFAULT 'running',
       error_message TEXT,
+      error_cause TEXT,
+      event_stream TEXT NOT NULL DEFAULT '[]',
+      started_at TEXT NOT NULL,
+      finished_at TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     )
+  `)
+
+  addColumnIfMissing(db, 'issue_drafts', 'grouping_reason', "TEXT NOT NULL DEFAULT ''")
+  addColumnIfMissing(db, 'agent_runs', 'input_note_ids', "TEXT NOT NULL DEFAULT '[]'")
+  addColumnIfMissing(db, 'agent_runs', 'output_draft_ids', "TEXT NOT NULL DEFAULT '[]'")
+  addColumnIfMissing(db, 'agent_runs', 'error_cause', 'TEXT')
+  addColumnIfMissing(db, 'agent_runs', 'event_stream', "TEXT NOT NULL DEFAULT '[]'")
+  addColumnIfMissing(db, 'agent_runs', 'started_at', 'TEXT')
+  addColumnIfMissing(db, 'agent_runs', 'finished_at', 'TEXT')
+
+  if (hasColumn(db, 'agent_runs', 'source_note_ids')) {
+    db.run(sql`
+      UPDATE agent_runs
+      SET input_note_ids = COALESCE(NULLIF(input_note_ids, '[]'), source_note_ids, '[]')
+    `)
+  }
+
+  if (hasColumn(db, 'agent_runs', 'result_draft_ids')) {
+    db.run(sql`
+      UPDATE agent_runs
+      SET output_draft_ids = COALESCE(NULLIF(output_draft_ids, '[]'), result_draft_ids, '[]')
+    `)
+  }
+
+  db.run(sql`
+    UPDATE agent_runs
+    SET
+      started_at = COALESCE(started_at, created_at),
+      status = CASE
+        WHEN status = 'completed' THEN 'succeeded'
+        WHEN status = 'pending' THEN 'running'
+        ELSE status
+      END
   `)
 
   db.run(sql`
@@ -95,4 +133,20 @@ export function runMigrations(db: PilogDatabase): void {
       value TEXT NOT NULL
     )
   `)
+}
+
+function addColumnIfMissing(
+  db: PilogDatabase,
+  table: string,
+  column: string,
+  definition: string
+): void {
+  const cols = db.all(sql.raw(`PRAGMA table_info(${table})`)) as Array<{ name: string }>
+  if (cols.some((c) => c.name === column)) return
+  db.run(sql.raw(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`))
+}
+
+function hasColumn(db: PilogDatabase, table: string, column: string): boolean {
+  const cols = db.all(sql.raw(`PRAGMA table_info(${table})`)) as Array<{ name: string }>
+  return cols.some((c) => c.name === column)
 }

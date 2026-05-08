@@ -36,6 +36,7 @@ export const issueDrafts = sqliteTable('issue_drafts', {
   confidence: text('confidence', { enum: ['low', 'medium', 'high'] })
     .notNull()
     .default('medium'),
+  groupingReason: text('grouping_reason').notNull().default(''),
   status: text('status', { enum: ['draft', 'published', 'dismissed'] })
     .notNull()
     .default('draft'),
@@ -47,12 +48,16 @@ export const issueDrafts = sqliteTable('issue_drafts', {
 export const agentRuns = sqliteTable('agent_runs', {
   id: text('id').primaryKey(),
   repoId: text('repo_id').references(() => repos.id),
-  sourceNoteIds: text('source_note_ids').notNull().default('[]'),
-  resultDraftIds: text('result_draft_ids').notNull().default('[]'),
-  status: text('status', { enum: ['pending', 'running', 'completed', 'failed'] })
+  inputNoteIds: text('input_note_ids').notNull().default('[]'),
+  outputDraftIds: text('output_draft_ids').notNull().default('[]'),
+  status: text('status', { enum: ['running', 'succeeded', 'failed', 'cancelled'] })
     .notNull()
-    .default('pending'),
+    .default('running'),
   errorMessage: text('error_message'),
+  errorCause: text('error_cause'),
+  eventStream: text('event_stream').notNull().default('[]'),
+  startedAt: text('started_at').notNull(),
+  finishedAt: text('finished_at'),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull()
 })

@@ -1,0 +1,27 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`issue generation > assembles the PRD-guided prompt with repo path and selected notes 1`] = `
+"You are generating GitHub issue drafts from rough developer scratchpad notes.
+Use the local repository context to infer likely affected areas, but do not invent details.
+Group related small notes into one issue when they affect the same feature, page, component, or user flow.
+Split notes into separate issues when they affect unrelated systems or require separate implementation work.
+For this tracer-bullet run, return exactly one issue draft.
+Prefer concrete acceptance criteria.
+Avoid overclaiming certainty.
+Include concise rationale, not hidden reasoning.
+Mark vague notes as needing clarification.
+Call submit_issue_drafts with structured JSON matching the provided schema.
+
+Repository:
+owner: nick-neely
+name: pilog
+localPath: /workspace/pilog
+defaultBranch: main
+
+Selected notes:
+Note 1
+id: note-1
+status: unprocessed
+content:
+settings page spacing is weird on mobile"
+`;

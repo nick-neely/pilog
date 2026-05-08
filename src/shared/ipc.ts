@@ -1,3 +1,11 @@
+import type {
+  AgentEvent,
+  GenerateDraftsRequest,
+  GenerateDraftsStartResponse,
+  IssueDraft,
+  PiStatus
+} from './types'
+
 export type NoteStatus = 'unprocessed' | 'drafted' | 'published' | 'dismissed'
 
 export type Note = {
@@ -15,7 +23,13 @@ export type ListNotesRequest = {
   repoId?: string | null
 }
 
-export type SettingKey = 'hotkey.scratchpad' | 'openInboxAtLogin' | 'scratchpad.lastRepoId'
+export type SettingKey =
+  | 'hotkey.scratchpad'
+  | 'openInboxAtLogin'
+  | 'scratchpad.lastRepoId'
+  | 'pi.activeProvider'
+  | 'pi.activeModel'
+  | 'pi.turnBudget'
 
 export type GitHubStatus = { connected: boolean; login?: string }
 
@@ -113,6 +127,17 @@ export type IpcContract = {
     request: CreateIssueRequest
     response: CreatedIssue
   }
+  'pi:status': { request: void; response: PiStatus }
+  'pi:generateDrafts:start': {
+    request: GenerateDraftsRequest
+    response: GenerateDraftsStartResponse
+  }
+  'pi:generateDrafts:cancel': { request: { runId: string }; response: void }
+  'debug:seedIssueGenerationFixture': {
+    request: { repoPath: string; notes: string[] }
+    response: { repoId: string; noteIds: string[] }
+  }
+  'debug:listIssueDrafts': { request: void; response: IssueDraft[] }
 }
 
 export type IpcChannel = keyof IpcContract
@@ -122,3 +147,5 @@ export type IpcResponse<C extends IpcChannel> = IpcContract[C]['response']
 export type IpcEvent = 'note:created' | 'scratchpad:reset' | 'navigate:inbox' | 'navigate:settings'
 
 export type IpcAction = 'scratchpad:hide'
+
+export type { AgentEvent, GenerateDraftsRequest, PiStatus }

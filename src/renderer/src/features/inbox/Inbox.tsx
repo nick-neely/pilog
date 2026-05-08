@@ -41,7 +41,8 @@ import {
   SelectValue
 } from '@renderer/components/ui/select'
 import { Textarea } from '@renderer/components/ui/textarea'
-import type { ListNotesRequest, Note, NoteStatus, Repo } from '@shared/ipc'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@renderer/components/ui/tooltip'
+import type { ListNotesRequest, Note, NoteStatus, PiStatus, Repo } from '@shared/ipc'
 
 const STATUS_CHIPS: { value: NoteStatus; label: string }[] = [
   { value: 'unprocessed', label: 'Unprocessed' },
@@ -116,6 +117,23 @@ function buildFilter(
   if (search) filter.search = search
   if (repoFilter !== undefined) filter.repoId = repoFilter
   return Object.keys(filter).length > 0 ? filter : undefined
+}
+
+function getGenerateDraftsReason(input: {
+  hasSelection: boolean
+  selectedNotesShareRepo: boolean
+  piStatus: PiStatus
+  generating: boolean
+}): string {
+  if (input.generating) return 'Generating drafts for the selected notes.'
+  if (!input.hasSelection) return 'Select one or more notes to generate drafts.'
+  if (!input.selectedNotesShareRepo) return 'Selected notes must share one linked repository.'
+  if (!input.piStatus.configured) {
+    if (input.piStatus.reason === 'missing-credential')
+      return 'Configure Pi credentials in Settings.'
+    return 'Choose an active Pi provider and model in Settings.'
+  }
+  return 'Generate one issue draft from the selected notes.'
 }
 
 function NoteDetail({
@@ -254,6 +272,8 @@ export function Inbox({
 }): React.JSX.Element {
   const [notes, setNotes] = useState<Note[]>([])
   const [repos, setRepos] = useState<Repo[]>([])
+  const [piStatus, setPiStatus] = useState<PiStatus>({ configured: false })
+  const [generating, setGenerating] = useState(false)
   const [statusFilter, setStatusFilter] = useState<NoteStatus | undefined>()
   const [repoFilter, setRepoFilter] = useState<string | null | undefined>(undefined)
   const [commandOpen, setCommandOpen] = useState(false)
@@ -273,6 +293,7 @@ export function Inbox({
 
   useEffect(() => {
     window.pilog.invoke('repos:list').then(setRepos)
+    window.pilog.invoke('pi:status').then(setPiStatus)
   }, [])
 
   const fetchNotes = useCallback(async (): Promise<void> => {
@@ -381,6 +402,24 @@ export function Inbox({
 
   const selectionCount = selectedIds.size
   const hasSelection = selectionCount > 0
+  const selectedNotes = useMemo(
+    () => notes.filter((note) => selectedIds.has(note.id)),
+    [notes, selectedIds]
+  )
+  const selectedRepoIds = useMemo(
+    () => new Set(selectedNotes.map((note) => note.repoId)),
+    [selectedNotes]
+  )
+  const selectedNotesShareRepo =
+    selectedNotes.length > 0 && selectedRepoIds.size === 1 && !selectedRepoIds.has(null)
+  const canGenerateDrafts =
+    hasSelection && selectedNotesShareRepo && piStatus.configured && !generating
+  const generateDraftsReason = getGenerateDraftsReason({
+    hasSelection,
+    selectedNotesShareRepo,
+    piStatus,
+    generating
+  })
 
   // Single open/close path so the query reset, focus restoration, and any
   // future side-effects all live together. Avoids a setState-in-effect
@@ -429,6 +468,25 @@ export function Inbox({
     // state change re-renders the underlying surface, keeping focus
     // restoration from the dialog clean.
     requestAnimationFrame(action)
+  }
+
+  const handleGenerateDrafts = async (): Promise<void> => {
+    if (!canGenerateDrafts) return
+    setGenerating(true)
+    try {
+      for await (const event of window.pilog.runAgent({ noteIds: [...selectedIds] })) {
+        if (event.type === 'final') {
+          await fetchNotes()
+          clearSelection()
+        }
+        if (event.type === 'error') {
+          console.error(event.message)
+        }
+      }
+    } finally {
+      setGenerating(false)
+      window.pilog.invoke('pi:status').then(setPiStatus)
+    }
   }
 
   return (
@@ -625,16 +683,24 @@ export function Inbox({
             // Esc / the palette, which keeps the footer uncluttered and
             // gives the action buttons room to breathe in 320px.
             <div className="flex items-center gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                disabled
-                title="Generate Drafts activates in Phase 3"
-                className="flex-1 justify-center"
-              >
-                <HugeiconsIcon icon={SparklesIcon} data-icon="inline-start" aria-hidden />
-                Generate Drafts
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="flex-1">
+                    <Button
+                      size="sm"
+                      variant={canGenerateDrafts ? 'default' : 'outline'}
+                      disabled={!canGenerateDrafts}
+                      title={generateDraftsReason}
+                      className="w-full justify-center"
+                      onClick={() => void handleGenerateDrafts()}
+                    >
+                      <HugeiconsIcon icon={SparklesIcon} data-icon="inline-start" aria-hidden />
+                      {generating ? 'Generating' : 'Generate Drafts'}
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                {!canGenerateDrafts && <TooltipContent>{generateDraftsReason}</TooltipContent>}
+              </Tooltip>
               <Button
                 size="sm"
                 variant="outline"
