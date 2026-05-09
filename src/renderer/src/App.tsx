@@ -136,6 +136,13 @@ function App(): React.JSX.Element {
         />
       ) : route === 'draft-review' ? (
         <DraftReview
+          onNavigateToInbox={() => setAppRoute('inbox')}
+          onNavigateToAgentRuns={(runId) => {
+            if (runId) setFocusedRunId(runId)
+            setAppRoute('agent-runs')
+          }}
+          onNavigateToSettings={() => setAppRoute('settings')}
+          onNavigateToRepositories={() => setAppRoute('repositories')}
           onOpenSourceNote={(noteId) => {
             setFocusedNoteId(noteId)
             setAppRoute('inbox')
