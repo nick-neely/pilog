@@ -5,6 +5,7 @@ RUN apt-get update && apt-get install -y \
   git \
   curl \
   jq \
+  ripgrep \
   # Electron/Chromium runtime deps for Playwright e2e in sandbox
   libasound2 \
   libatk-bridge2.0-0 \
