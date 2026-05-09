@@ -1,11 +1,4 @@
-import {
-  Activity01Icon,
-  Add01Icon,
-  Cancel01Icon,
-  CancelCircleIcon,
-  Settings02Icon,
-  SparklesIcon
-} from '@hugeicons/core-free-icons'
+import { Add01Icon, Cancel01Icon, CancelCircleIcon, SparklesIcon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
   AlertDialog,
@@ -20,17 +13,8 @@ import {
 } from '@renderer/components/ui/alert-dialog'
 import { Badge } from '@renderer/components/ui/badge'
 import { Button } from '@renderer/components/ui/button'
-import {
-  CommandDialog,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-  CommandSeparator,
-  CommandShortcut
-} from '@renderer/components/ui/command'
 import { Empty, EmptyDescription } from '@renderer/components/ui/empty'
+import { ScrollArea } from '@renderer/components/ui/scroll-area'
 import {
   Select,
   SelectContent,
@@ -41,6 +25,7 @@ import {
 } from '@renderer/components/ui/select'
 import { Textarea } from '@renderer/components/ui/textarea'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@renderer/components/ui/tooltip'
+import type { RunNavigationOrigin } from '@renderer/features/agent-runs/navigation'
 import { cn } from '@renderer/lib/utils'
 import type {
   ListNotesRequest,
@@ -50,6 +35,7 @@ import type {
   PiStatus,
   Repo
 } from '@shared/ipc'
+import type { IssueDraftForReview, IssueDraftStatus } from '@shared/types'
 import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
 import { StatusFilter } from './StatusFilter'
 
@@ -74,11 +60,6 @@ const EMPTY_STATUS_COUNTS: NoteStatusCounts = {
   published: 0,
   dismissed: 0
 }
-
-// Detect once at module load. Affects only the visible kbd hint, never the
-// keybind handler (which always accepts both metaKey and ctrlKey).
-const IS_MAC = typeof navigator !== 'undefined' && navigator.platform.toUpperCase().includes('MAC')
-const META_KEY = IS_MAC ? '⌘' : 'Ctrl'
 
 const CURRENT_YEAR = new Date().getFullYear()
 const SHORT_NOTE_TIMESTAMP_FORMATTER = new Intl.DateTimeFormat(undefined, {
@@ -113,6 +94,13 @@ const UNASSIGNED_KEY = '$unassigned'
 /** Note/scratchpad: no repo assigned */
 const NOTE_REPO_NONE = '__none__'
 
+type NoteDraftLink = {
+  id: string
+  title: string
+  status: IssueDraftStatus
+  updatedAt: string
+}
+
 function encodeRepoFilter(f: string | null | undefined): string {
   if (f === undefined) return FILTER_ALL_REPOS
   if (f === null) return UNASSIGNED_KEY
@@ -135,6 +123,29 @@ function buildFilter(
   if (search) filter.search = search
   if (repoFilter !== undefined) filter.repoId = repoFilter
   return Object.keys(filter).length > 0 ? filter : undefined
+}
+
+function mapDraftLinksByNote(drafts: IssueDraftForReview[]): Map<string, NoteDraftLink[]> {
+  const linksByNote = new Map<string, NoteDraftLink[]>()
+
+  for (const issueDraft of drafts) {
+    for (const noteId of issueDraft.sourceNoteIds) {
+      const links = linksByNote.get(noteId) ?? []
+      links.push({
+        id: issueDraft.id,
+        title: issueDraft.title,
+        status: issueDraft.status,
+        updatedAt: issueDraft.updatedAt
+      })
+      linksByNote.set(noteId, links)
+    }
+  }
+
+  for (const links of linksByNote.values()) {
+    links.sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))
+  }
+
+  return linksByNote
 }
 
 function getGenerateDraftsReason(input: {
@@ -163,18 +174,23 @@ function NoteDetail({
   onDelete,
   onRepoChange,
   onNavigateToRepositories,
-  onNavigateToAgentRuns
+  onNavigateToAgentRuns,
+  onNavigateToDraftReview,
+  draftLinks
 }: {
   note: Note
   repos: Repo[]
+  draftLinks: NoteDraftLink[]
   onSave: (id: string, content: string) => Promise<void>
   onDelete: (id: string) => Promise<void>
   onRepoChange: (id: string, repoId: string | null) => Promise<void>
   onNavigateToRepositories: () => void
-  onNavigateToAgentRuns: (runId?: string) => void
+  onNavigateToAgentRuns: (runId?: string, origin?: RunNavigationOrigin) => void
+  onNavigateToDraftReview: (draftId?: string) => void
 }): React.JSX.Element {
   const [draft, setDraft] = useState(note.content)
   const dirty = draft !== note.content
+  const primaryDraftLink = draftLinks[0] ?? null
 
   const handleSave = useCallback(async (): Promise<void> => {
     await onSave(note.id, draft)
@@ -203,13 +219,13 @@ function NoteDetail({
           <p className="tabular font-mono text-xs text-muted-foreground">
             {formatNoteTimestamp(note.createdAt)}
           </p>
-          {note.runId && (
+          {primaryDraftLink && (
             <button
               type="button"
-              onClick={() => onNavigateToAgentRuns(note.runId!)}
+              onClick={() => onNavigateToDraftReview(primaryDraftLink.id)}
               className="text-left text-xs text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
             >
-              View run
+              {draftLinks.length > 1 ? 'View drafts' : 'View draft'}
             </button>
           )}
         </div>
@@ -241,20 +257,22 @@ function NoteDetail({
           </AlertDialog>
         </div>
       </header>
-      <div className="flex-1 overflow-y-auto">
-        <Textarea
-          aria-label="Note content"
-          // Body line length capped at 72ch per DESIGN.md; mono editor body
-          // pairs with the rest of the system (file paths, code blocks).
-          className="mx-auto block min-h-full w-full max-w-[72ch] rounded-none border-0 bg-transparent p-6 font-mono text-sm leading-relaxed text-foreground shadow-none field-sizing-content focus-visible:ring-0"
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          placeholder="Capture a thought…"
-        />
+      <div className="flex-1">
+        <ScrollArea className="h-full">
+          <Textarea
+            aria-label="Note content"
+            // Body line length capped at 72ch per DESIGN.md; mono editor body
+            // pairs with the rest of the system (file paths, code blocks).
+            className="mx-auto block min-h-full w-full max-w-[72ch] rounded-none border-0 bg-transparent p-6 font-mono text-sm leading-relaxed text-foreground shadow-none field-sizing-content focus-visible:ring-0"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            placeholder="Capture a thought…"
+          />
+        </ScrollArea>
       </div>
-      {/* Repo association — below the content area */}
-      <footer className="flex min-h-14 shrink-0 items-center border-t px-6 py-3">
-        <div className="flex items-center gap-3">
+      {/* Repo and generation provenance, kept secondary to the editor body. */}
+      <footer className="flex min-h-14 shrink-0 flex-wrap items-center justify-between gap-x-6 gap-y-2 border-t px-6 py-3">
+        <div className="flex min-w-0 items-center gap-3">
           <span className="text-xs font-medium text-muted-foreground">Repo</span>
           {repos.length === 0 ? (
             <span className="text-xs text-muted-foreground">
@@ -293,6 +311,15 @@ function NoteDetail({
             </Select>
           )}
         </div>
+        {note.runId && (
+          <button
+            type="button"
+            onClick={() => onNavigateToAgentRuns(note.runId!, { kind: 'note', noteId: note.id })}
+            className="shrink-0 text-xs text-muted-foreground transition-colors hover:text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+          >
+            Run
+          </button>
+        )}
       </footer>
     </article>
   )
@@ -304,36 +331,39 @@ export function Inbox({
   onNavigateToAgentRuns,
   onNavigateToRepositories,
   onNavigateToSettings,
-  onNavigateToDraftReview,
-  paletteOpen,
-  onPaletteOpenChange
+  onNavigateToDraftReview
 }: {
   focusNoteId?: string | null
   onFocusNoteHandled?: () => void
-  onNavigateToAgentRuns: (runId?: string) => void
   onNavigateToRepositories: () => void
   onNavigateToSettings: () => void
-  onNavigateToDraftReview: () => void
-  /** Controlled by App so the global Cmd-K trigger in AppShell can open the palette. */
-  paletteOpen: boolean
-  onPaletteOpenChange: (open: boolean) => void
+  onNavigateToDraftReview: (draftId?: string) => void
+  onNavigateToAgentRuns: (runId?: string, origin?: RunNavigationOrigin) => void
 }): React.JSX.Element {
   const [notes, setNotes] = useState<Note[]>([])
+  const [draftLinksByNote, setDraftLinksByNote] = useState<Map<string, NoteDraftLink[]>>(
+    () => new Map()
+  )
   const [statusCounts, setStatusCounts] = useState<NoteStatusCounts>(EMPTY_STATUS_COUNTS)
   const [repos, setRepos] = useState<Repo[]>([])
   const [piStatus, setPiStatus] = useState<PiStatus>({ configured: false })
   const [generating, setGenerating] = useState(false)
   const [statusFilter, setStatusFilter] = useState<NoteStatus | undefined>()
   const [repoFilter, setRepoFilter] = useState<string | null | undefined>(undefined)
-  const [paletteQuery, setPaletteQuery] = useState('')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const lastClickedIndex = useRef<number | null>(null)
   const fetchIdRef = useRef(0)
   const countsFetchIdRef = useRef(0)
+  const mountedRef = useRef(true)
 
-  // Palette search only narrows rows inside Cmd+K (`paletteJumpNotes`); it does
-  // not change the sidebar list, so the list stays stable while the dialog has focus.
   const reposById = useMemo(() => new Map(repos.map((r) => [r.id, r])), [repos])
+
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+    }
+  }, [])
 
   useEffect(() => {
     window.pilog.invoke('repos:list').then(setRepos)
@@ -373,6 +403,17 @@ export function Inbox({
     fetchNotes()
   }, [fetchNotes])
 
+  const fetchDraftLinks = useCallback(async (): Promise<void> => {
+    const drafts = await window.pilog.invoke('issue-drafts:list', { status: 'all' })
+    setDraftLinksByNote(mapDraftLinksByNote(drafts))
+  }, [])
+
+  useEffect(() => {
+    queueMicrotask(() => {
+      void fetchDraftLinks()
+    })
+  }, [fetchDraftLinks])
+
   useEffect(() => {
     fetchStatusCounts()
   }, [fetchStatusCounts])
@@ -386,7 +427,6 @@ export function Inbox({
     queueMicrotask(() => {
       setStatusFilter(undefined)
       setRepoFilter(undefined)
-      setPaletteQuery('')
       setSelectedIds(new Set([focusNoteId]))
       lastClickedIndex.current = null
       handleFocusNoteHandled()
@@ -400,12 +440,18 @@ export function Inbox({
 
   useEffect(() => window.pilog.on('note:created', handleNoteCreated), [])
 
+  const handleIssueDraftsInvalidated = useEffectEvent(() => {
+    void fetchDraftLinks()
+  })
+
+  useEffect(() => window.pilog.on('issue-drafts:invalidated', handleIssueDraftsInvalidated), [])
+
   const handleNewNote = useCallback(async (): Promise<void> => {
     // Capture-before-triage: a new note opens empty so the editor is waiting,
     // not pre-loaded with boilerplate the user has to delete first.
     const created = await window.pilog.invoke('note:create', { content: '' })
     await Promise.all([fetchNotes(), fetchStatusCounts()])
-    setSelectedIds(new Set([created.id]))
+    requestAnimationFrame(() => setSelectedIds(new Set([created.id])))
   }, [fetchNotes, fetchStatusCounts])
 
   const handleSave = async (id: string, content: string): Promise<void> => {
@@ -432,12 +478,6 @@ export function Inbox({
 
   const toggleStatus = useCallback((status: NoteStatus): void => {
     setStatusFilter((prev) => (prev === status ? undefined : status))
-    setSelectedIds(new Set())
-    lastClickedIndex.current = null
-  }, [])
-
-  const clearStatusFilter = useCallback((): void => {
-    setStatusFilter(undefined)
     setSelectedIds(new Set())
     lastClickedIndex.current = null
   }, [])
@@ -506,30 +546,12 @@ export function Inbox({
     generating
   })
 
-  // Single open/close path so the query reset and any future side-effects
-  // live together. The dialog is controlled by App so the global Cmd-K
-  // trigger in AppShell can drive it; this wrapper just adds the local
-  // concern of clearing the query when the palette closes.
-  const setPaletteOpen = useCallback(
-    (open: boolean): void => {
-      onPaletteOpenChange(open)
-      if (!open) setPaletteQuery('')
-    },
-    [onPaletteOpenChange]
-  )
-
-  // Cmd/Ctrl+K toggles the command palette globally on the inbox surface.
-  // Esc clears note selection when the palette is closed. The listener uses
+  // Esc clears note selection. The listener uses
   // capture on `document` so key events still reach us when a control stops
   // propagation before `window`; we skip handling when the repo Select menu
   // is open so Esc can close that surface first.
   const handleInboxKeydown = useEffectEvent((e: KeyboardEvent): void => {
-    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
-      e.preventDefault()
-      setPaletteOpen(!paletteOpen)
-      return
-    }
-    if (e.key !== 'Escape' || selectedIds.size === 0 || paletteOpen) {
+    if (e.key !== 'Escape' || selectedIds.size === 0) {
       return
     }
     if (document.querySelector('[data-slot="select-content"][data-state="open"]')) {
@@ -551,14 +573,6 @@ export function Inbox({
     return () => document.removeEventListener('keydown', onKey, { capture: true })
   }, [])
 
-  const paletteJumpNotes = useMemo(() => {
-    const q = paletteQuery.trim().toLowerCase()
-    if (!q) return []
-    // Substring on note body (same rule as server `note:list` search). Sidebar
-    // is unchanged while typing; matches appear only in this palette.
-    return notes.filter((note) => note.content.toLowerCase().includes(q))
-  }, [notes, paletteQuery])
-
   const emptyMessage = useMemo(() => {
     const filtered = Boolean(statusFilter || repoFilter !== undefined)
     return filtered
@@ -566,21 +580,14 @@ export function Inbox({
       : 'No notes yet. Capture a thought from the footer below.'
   }, [statusFilter, repoFilter])
 
-  const runCommand = (action: () => void): void => {
-    setPaletteOpen(false)
-    // Defer the action one tick so the dialog can finish closing before any
-    // state change re-renders the underlying surface, keeping focus
-    // restoration from the dialog clean.
-    requestAnimationFrame(action)
-  }
-
   const handleGenerateDrafts = async (): Promise<void> => {
     if (!canGenerateDrafts) return
     setGenerating(true)
     try {
       await window.pilog.runAgent({ noteIds: [...selectedIds] }, async (event) => {
         if (event.type === 'final') {
-          await Promise.all([fetchNotes(), fetchStatusCounts()])
+          if (!mountedRef.current) return
+          await Promise.all([fetchNotes(), fetchStatusCounts(), fetchDraftLinks()])
           clearSelection()
           onNavigateToDraftReview()
         }
@@ -589,8 +596,10 @@ export function Inbox({
         }
       })
     } finally {
-      setGenerating(false)
-      window.pilog.invoke('pi:status').then(setPiStatus)
+      if (mountedRef.current) {
+        setGenerating(false)
+        window.pilog.invoke('pi:status').then(setPiStatus)
+      }
     }
   }
 
@@ -696,54 +705,62 @@ export function Inbox({
         </div>
 
         {/* (3) Scrolling list */}
-        <main className="flex-1 overflow-y-auto p-3">
-          {notes.length === 0 ? (
-            <Empty className="mt-12 border-none bg-transparent p-8 shadow-none">
-              <EmptyDescription>{emptyMessage}</EmptyDescription>
-            </Empty>
-          ) : (
-            <ul className="flex flex-col gap-1">
-              {notes.map((note, index) => {
-                const isSelected = selectedIds.has(note.id)
-                const preview = note.content.trim() || 'Untitled note'
-                const repo = note.repoId ? reposById.get(note.repoId) : undefined
-                return (
-                  <li key={note.id}>
-                    <button
-                      type="button"
-                      data-testid="note-row"
-                      onClick={(e) => handleNoteClick(note.id, index, e)}
-                      className={
-                        'flex w-full cursor-pointer items-start gap-3 rounded-md border px-3 py-2.5 text-left transition-colors select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30 ' +
-                        (isSelected
-                          ? 'border-border bg-muted'
-                          : 'border-transparent hover:bg-muted/60')
-                      }
-                    >
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm leading-snug">{preview}</span>
-                        <span className="mt-1 flex min-w-0 items-center justify-between gap-2 text-xs">
-                          <span className="flex min-w-0 items-center gap-2">
-                            <Badge variant="secondary" className="font-medium text-foreground/80">
-                              {STATUS_LABEL[note.status]}
-                            </Badge>
-                            {repo && (
-                              <span className="truncate font-mono text-muted-foreground/70">
-                                {repo.owner}/{repo.name}
+        <main className="flex-1 min-h-0">
+          <ScrollArea className="h-full">
+            <div className="min-w-0 px-3 py-3 pe-6">
+              {notes.length === 0 ? (
+                <Empty className="mt-12 border-none bg-transparent p-8 shadow-none">
+                  <EmptyDescription>{emptyMessage}</EmptyDescription>
+                </Empty>
+              ) : (
+                <ul className="flex flex-col gap-1">
+                  {notes.map((note, index) => {
+                    const isSelected = selectedIds.has(note.id)
+                    const preview = note.content.trim() || 'Untitled note'
+                    const repo = note.repoId ? reposById.get(note.repoId) : undefined
+                    return (
+                      <li key={note.id}>
+                        <button
+                          type="button"
+                          data-testid="note-row"
+                          onClick={(e) => handleNoteClick(note.id, index, e)}
+                          className={
+                            'flex min-w-0 max-w-full w-full cursor-pointer items-start gap-3 overflow-hidden rounded-md border px-3 py-2.5 text-left transition-colors select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30 ' +
+                            (isSelected
+                              ? 'border-border bg-muted'
+                              : 'border-transparent hover:bg-muted/60')
+                          }
+                        >
+                          <span className="min-w-0 flex flex-1 flex-col gap-1">
+                            <span className="block truncate text-sm leading-snug" title={preview}>
+                              {preview}
+                            </span>
+                            <span
+                              className="block truncate font-mono text-xs text-muted-foreground/80"
+                              title={repo ? `${repo.owner}/${repo.name}` : 'Unassigned'}
+                            >
+                              {repo ? `${repo.owner}/${repo.name}` : 'Unassigned'}
+                            </span>
+                            <span className="flex min-w-0 items-center justify-between gap-2 text-xs">
+                              <Badge
+                                variant="secondary"
+                                className="shrink-0 font-medium text-foreground/80"
+                              >
+                                {STATUS_LABEL[note.status]}
+                              </Badge>
+                              <span className="tabular shrink-0 whitespace-nowrap text-muted-foreground">
+                                {formatNoteTimestamp(note.createdAt)}
                               </span>
-                            )}
+                            </span>
                           </span>
-                          <span className="tabular shrink-0 whitespace-nowrap text-muted-foreground">
-                            {formatNoteTimestamp(note.createdAt)}
-                          </span>
-                        </span>
-                      </span>
-                    </button>
-                  </li>
-                )
-              })}
-            </ul>
-          )}
+                        </button>
+                      </li>
+                    )
+                  })}
+                </ul>
+              )}
+            </div>
+          </ScrollArea>
         </main>
 
         {/* (4) Mode footer — capture by default, triage on selection */}
@@ -751,7 +768,7 @@ export function Inbox({
           {hasSelection ? (
             // Triage-mode: only the two actual triage actions. Clearing the
             // selection lives on the title strip (the count chip) and on
-            // Esc / the palette, which keeps the footer uncluttered and
+            // Esc, which keeps the footer uncluttered and
             // gives the action buttons room to breathe in 320px.
             <div className="flex w-full flex-col gap-1.5">
               <div className="flex items-center gap-2">
@@ -825,6 +842,8 @@ export function Inbox({
             onRepoChange={handleRepoChange}
             onNavigateToRepositories={onNavigateToRepositories}
             onNavigateToAgentRuns={onNavigateToAgentRuns}
+            onNavigateToDraftReview={onNavigateToDraftReview}
+            draftLinks={draftLinksByNote.get(selectedNote.id) ?? []}
           />
         ) : (
           <Empty className="h-full border-none bg-transparent shadow-none">
@@ -836,136 +855,6 @@ export function Inbox({
           </Empty>
         )}
       </section>
-
-      {/*
-        Cmd+K palette — single keystroke surfaces capture, filter, and
-        jump-to-note in one place. The visible search input from the previous
-        polish pass moved here; the test data-testid follows it.
-      */}
-      <CommandDialog open={paletteOpen} onOpenChange={setPaletteOpen}>
-        <CommandInput
-          data-testid="search-input"
-          placeholder="Jump to a note or run a command…"
-          value={paletteQuery}
-          onValueChange={setPaletteQuery}
-        />
-        <CommandList>
-          <CommandEmpty>Nothing matches that yet.</CommandEmpty>
-
-          {paletteJumpNotes.length > 0 && (
-            <>
-              <CommandGroup heading="Notes">
-                {paletteJumpNotes.map((note) => {
-                  const preview = note.content.trim() || 'Untitled note'
-                  const repo = note.repoId ? reposById.get(note.repoId) : undefined
-                  const repoLabel = repo ? `${repo.owner}/${repo.name}` : ''
-                  return (
-                    <CommandItem
-                      key={note.id}
-                      data-testid="palette-note-row"
-                      value={`${note.content} ${preview} ${repoLabel} ${STATUS_LABEL[note.status]} ${note.id}`}
-                      onSelect={() =>
-                        runCommand(() => {
-                          const index = notes.findIndex((n) => n.id === note.id)
-                          setSelectedIds(new Set([note.id]))
-                          lastClickedIndex.current = index >= 0 ? index : null
-                        })
-                      }
-                      className="flex-col items-start gap-1 py-2"
-                    >
-                      <span className="line-clamp-2 w-full text-left">{preview}</span>
-                      <span className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                        <Badge variant="secondary" className="font-medium text-foreground/80">
-                          {STATUS_LABEL[note.status]}
-                        </Badge>
-                        {repo ? (
-                          <span className="truncate font-mono">{repoLabel}</span>
-                        ) : (
-                          <span className="text-muted-foreground/80">Unassigned</span>
-                        )}
-                      </span>
-                    </CommandItem>
-                  )
-                })}
-              </CommandGroup>
-              <CommandSeparator />
-            </>
-          )}
-
-          <CommandGroup heading="Capture">
-            <CommandItem
-              data-testid="cmd-new-note"
-              onSelect={() => runCommand(() => void handleNewNote())}
-            >
-              <HugeiconsIcon icon={Add01Icon} aria-hidden />
-              <span>New note</span>
-              <CommandShortcut>{META_KEY}N</CommandShortcut>
-            </CommandItem>
-          </CommandGroup>
-
-          <CommandSeparator />
-
-          <CommandGroup heading="Navigate">
-            <CommandItem
-              data-testid="cmd-agent-runs"
-              onSelect={() => runCommand(onNavigateToAgentRuns)}
-            >
-              <HugeiconsIcon icon={Activity01Icon} aria-hidden />
-              <span>Agent Runs</span>
-            </CommandItem>
-            <CommandItem
-              data-testid="cmd-settings"
-              onSelect={() => runCommand(onNavigateToSettings)}
-            >
-              <HugeiconsIcon icon={Settings02Icon} aria-hidden />
-              <span>Settings</span>
-              <CommandShortcut>{`${META_KEY},`}</CommandShortcut>
-            </CommandItem>
-          </CommandGroup>
-
-          <CommandSeparator />
-
-          <CommandGroup heading="Filters">
-            {STATUS_FILTER_ROWS.map((row) => {
-              const active = statusFilter === row.value
-              return (
-                <CommandItem
-                  key={row.value}
-                  data-testid={`cmd-filter-${row.value}`}
-                  onSelect={() => runCommand(() => toggleStatus(row.value))}
-                >
-                  <span
-                    aria-hidden
-                    className={
-                      'size-1.5 rounded-full ' + (active ? 'bg-primary' : 'bg-muted-foreground/40')
-                    }
-                  />
-                  <span>{`Show ${row.label.toLowerCase()}`}</span>
-                  {active && <CommandShortcut>active</CommandShortcut>}
-                </CommandItem>
-              )
-            })}
-            {statusFilter && (
-              <CommandItem onSelect={() => runCommand(clearStatusFilter)}>
-                <span aria-hidden className="size-1.5 rounded-full bg-muted-foreground/40" />
-                <span>Clear status filter</span>
-              </CommandItem>
-            )}
-          </CommandGroup>
-
-          {hasSelection && (
-            <>
-              <CommandSeparator />
-              <CommandGroup heading="Selection">
-                <CommandItem onSelect={() => runCommand(clearSelection)}>
-                  <span>Clear selection</span>
-                  <CommandShortcut>Esc</CommandShortcut>
-                </CommandItem>
-              </CommandGroup>
-            </>
-          )}
-        </CommandList>
-      </CommandDialog>
     </div>
   )
 }

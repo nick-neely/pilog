@@ -42,9 +42,12 @@ Use skills to keep implementation aligned with PiLog’s design system and shadc
 ## Learned User Preferences
 
 - Prefer incremental polish over a full UI redesign when feedback is localized to one surface (for example the Repositories New Issue dialog).
+- For sidebar and status-filter polish across Inbox, Runs, and Drafts, treat Inbox as the default visual standard unless the user specifies otherwise.
 
 ## Learned Workspace Facts
 
 - `.cursor/hooks/state/` is listed in `.gitignore`; hook state and continual-learning index files stay local and are not committed by default.
 - The shared `Note` type includes `runId: string | null`; main-process mapping from SQLite and test fixtures that construct `Note` values must include `runId` (from `run_id` or `null`).
 - The `.sandcastle/Dockerfile` image is a long-lived sandbox (`sleep infinity`); typical workflow is build, run with the repo mounted at `/home/agent/workspace`, then use `docker exec` for a shell (unless Sandcastle CLI drives mounts for you).
+- Sandcastle’s ready hook runs `CI=true PILOG_SANDBOX=1 pnpm install`, which skips `app:rebuild` (avoids flaky `electronjs.org` fetches during `electron-rebuild`). Normal install on the host or for e2e should not rely on `PILOG_SANDBOX` alone: run a full install/rebuild (`pnpm install` without that flag or `pnpm run app:install` / `app:rebuild`) so `better-sqlite3` matches Electron’s ABI.
+- In `src/shared/ipc.ts`, optional invoke payloads should be modeled as `T | undefined`, not `T | void`, so handlers line up with optional repository arguments and IDE TypeScript agrees with CLI checks.

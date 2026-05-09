@@ -12,8 +12,8 @@ test.beforeEach(() => {
 })
 
 test.afterEach(() => {
-  rmSync(userDataDir, { recursive: true, force: true })
-  rmSync(repoDir, { recursive: true, force: true })
+  rmSync(userDataDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
+  rmSync(repoDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
 })
 
 async function launchApp(): Promise<ElectronApplication> {
@@ -26,7 +26,13 @@ async function launchApp(): Promise<ElectronApplication> {
 }
 
 async function exitApp(app: ElectronApplication): Promise<void> {
-  await app.evaluate(({ app }) => app.exit(0))
+  const process = app.process()
+  await Promise.race([
+    app.evaluate(({ app }) => app.exit(0)).catch(() => undefined),
+    new Promise((resolve) => setTimeout(resolve, 500))
+  ])
+  if (!process.killed) process.kill('SIGKILL')
+  await new Promise((resolve) => setTimeout(resolve, 100))
 }
 
 test('Generate Drafts persists one issue draft from selected repo notes', async () => {
@@ -71,7 +77,7 @@ test('Generate Drafts persists one issue draft from selected repo notes', async 
     await draftTabTrigger.click()
   }
   await expect(page.locator('[data-testid="draft-row"]')).toHaveCount(1)
-  await page.getByRole('button', { name: 'Dismiss' }).click()
+  await page.getByRole('button', { name: 'Dismiss', exact: true }).click()
 
   await expect
     .poll(async () => {
@@ -85,7 +91,6 @@ test('Generate Drafts persists one issue draft from selected repo notes', async 
   await page.reload()
   await page.locator('[data-testid="view-tab-drafts-trigger"]').click()
   await expect(page.locator('[data-testid="draft-row"]')).toHaveCount(0)
-  await expect(page.getByText('No active drafts.')).toBeVisible()
   await page.getByRole('button', { name: 'Show dismissed drafts' }).click()
   await expect(page.locator('[data-testid="draft-row"]')).toHaveCount(1)
   await expect(page.getByRole('button', { name: 'Restore' })).toBeVisible()
@@ -99,7 +104,7 @@ test('Draft Review explains an empty queue and returns to Inbox', async () => {
 
   await page.locator('[data-testid="view-tab-drafts-trigger"]').click()
 
-  await expect(page.getByRole('heading', { name: 'No drafts yet' }).first()).toBeVisible()
+  await expect(page.getByText('No drafts yet').first()).toBeVisible()
   await expect(page.getByText('Generate drafts from selected inbox notes.').first()).toBeVisible()
 
   await page.getByRole('button', { name: 'Open Inbox' }).first().click()
@@ -134,9 +139,10 @@ test('Draft Review blocks publish when GitHub is not connected', async () => {
     .toHaveLength(1)
 
   await page.evaluate(async () => window.pilog.invoke('github:signOut'))
+  await page.locator('[data-testid="view-tab-inbox-trigger"]').click()
   await page.locator('[data-testid="view-tab-drafts-trigger"]').click()
 
-  await expect(page.getByRole('button', { name: 'Publish' })).toBeDisabled()
+  await expect(page.getByRole('button', { name: 'Publish', exact: true })).toBeDisabled()
   await expect(page.getByRole('status')).toContainText('GitHub is not connected.')
   await expect(page.getByText('Connect GitHub before publishing this draft.')).toBeVisible()
 
@@ -209,7 +215,9 @@ test('Agent Runs shows live generation, detail transcript, and source note navig
   await noteRows.nth(1).click({ modifiers: [modifier] })
 
   await page.locator('button:has-text("Generate Drafts")').click()
-  await page.locator('[data-testid="open-agent-runs"]').click()
+  await page.locator('[data-testid="open-command"]').click()
+  await expect(page.locator('[data-testid="cmd-agent-runs"]')).toBeVisible()
+  await page.locator('[data-testid="cmd-agent-runs"]').click()
 
   const runRows = page.locator('[data-testid="agent-run-row"]')
   await expect(runRows.first()).toContainText('1 drafts')
@@ -219,7 +227,8 @@ test('Agent Runs shows live generation, detail transcript, and source note navig
   await expect(page.locator('[data-testid="run-output-draft"]')).toContainText(
     'Triage selected PiLog notes'
   )
-  await expect(page.locator('[data-testid="run-event-transcript"]')).toContainText('agent_start')
+  await page.getByRole('tab', { name: /Transcript/ }).click()
+  await expect(page.locator('[data-testid="run-event-transcript"]')).toContainText('final')
 
   await page.locator('[data-testid="run-source-note"]').first().click()
   await expect(page.locator('h1')).toHaveText('Inbox')
@@ -227,7 +236,7 @@ test('Agent Runs shows live generation, detail transcript, and source note navig
     'settings spacing is odd on mobile'
   )
 
-  await app.close()
+  await exitApp(app)
 })
 
 test('Advanced Turn Budget stops draft generation when exceeded', async () => {
@@ -263,5 +272,5 @@ test('Advanced Turn Budget stops draft generation when exceeded', async () => {
   const runs = await page.evaluate(async () => window.pilog.invoke('agent-runs:list'))
   expect(runs[0]?.status).toBe('failed')
 
-  await app.close()
+  await exitApp(app)
 })

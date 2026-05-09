@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
+  Activity01Icon,
   ArrowDown01Icon,
   CheckmarkCircle01Icon,
   DatabaseImportIcon,
@@ -46,6 +47,7 @@ import {
   SelectTrigger,
   SelectValue
 } from '@renderer/components/ui/select'
+import { ScrollArea } from '@renderer/components/ui/scroll-area'
 import { Separator } from '@renderer/components/ui/separator'
 import { Switch } from '@renderer/components/ui/switch'
 import type {
@@ -376,10 +378,12 @@ function comboItemsEqual(a: ComboItem, b: ComboItem): boolean {
 
 export function Settings({
   onBack,
-  onNavigateRepositories
+  onNavigateRepositories,
+  onNavigateRunHistory
 }: {
   onBack: () => void
   onNavigateRepositories?: () => void
+  onNavigateRunHistory?: () => void
 }): React.JSX.Element {
   const [hotkey, setHotkey] = useSetting('hotkey.scratchpad')
   const [openAtLogin, setOpenAtLogin] = useSetting('openInboxAtLogin')
@@ -447,408 +451,443 @@ export function Settings({
         </Button>
         <h1 className="text-xl font-semibold">Settings</h1>
       </header>
-      <div className="flex-1 overflow-y-auto p-6">
-        <div className="mx-auto flex max-w-lg flex-col gap-8">
-          <section className="flex flex-col gap-3">
-            <h2 className="text-sm font-medium text-foreground">GitHub</h2>
-            <p className="text-xs text-muted-foreground">
-              Connect your GitHub account to create issues from PiLog.
-            </p>
-            {github.status?.connected ? (
-              <Card size="sm" className="shadow-none ring-1 ring-border">
-                <CardContent className="flex flex-row items-center justify-between gap-4 py-0">
-                  <div className="flex items-center gap-3">
-                    <Avatar size="sm">
-                      <AvatarFallback className="bg-primary/10 text-primary">
-                        {github.status.login?.charAt(0).toUpperCase() ?? '?'}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <p className="text-sm font-medium">{github.status.login}</p>
-                      <p className="text-xs text-muted-foreground">Connected</p>
-                    </div>
-                  </div>
-                  <Button variant="ghost" size="sm" onClick={github.signOut}>
-                    Sign out
-                  </Button>
-                </CardContent>
-              </Card>
-            ) : (
-              <Button onClick={github.connect} disabled={github.connecting} size="sm">
-                {github.connecting ? 'Connecting…' : 'Connect GitHub'}
-              </Button>
-            )}
-          </section>
-
-          <section className="flex flex-col gap-3">
-            <h2 className="text-sm font-medium text-foreground">Repositories</h2>
-            <p className="text-xs text-muted-foreground">
-              Link local Git repositories to your GitHub account.
-            </p>
-            <Button size="sm" variant="ghost" onClick={onNavigateRepositories} className="px-0">
-              Manage repositories &rarr;
-            </Button>
-          </section>
-
-          <section className="flex flex-col gap-4" data-testid="pi-config-panel">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h2 className="text-sm font-medium text-foreground">Provider &amp; Model</h2>
-                <p className="mt-1 max-w-[68ch] text-xs text-muted-foreground">
-                  Choose the Pi model used for draft generation. Credentials are stored in OS-backed
-                  safe storage, separate from PiLog settings.
+      <div className="flex-1">
+        <ScrollArea className="h-full">
+          <div className="p-6">
+            <div className="mx-auto flex max-w-lg flex-col gap-8">
+              <section className="flex flex-col gap-3">
+                <h2 className="text-sm font-medium text-foreground">GitHub</h2>
+                <p className="text-xs text-muted-foreground">
+                  Connect your GitHub account to create issues from PiLog.
                 </p>
-              </div>
-              {pi.active?.valid && (
-                <span className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-muted px-2 py-1 text-xs text-foreground">
-                  <HugeiconsIcon icon={CheckmarkCircle01Icon} aria-hidden className="size-3.5" />
-                  Configured
-                </span>
-              )}
-            </div>
+                {github.status?.connected ? (
+                  <Card size="sm" className="shadow-none ring-1 ring-border">
+                    <CardContent className="flex flex-row items-center justify-between gap-4 py-0">
+                      <div className="flex items-center gap-3">
+                        <Avatar size="sm">
+                          <AvatarFallback className="bg-primary/10 text-primary">
+                            {github.status.login?.charAt(0).toUpperCase() ?? '?'}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <p className="text-sm font-medium">{github.status.login}</p>
+                          <p className="text-xs text-muted-foreground">Connected</p>
+                        </div>
+                      </div>
+                      <Button variant="ghost" size="sm" onClick={github.signOut}>
+                        Sign out
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <Button onClick={github.connect} disabled={github.connecting} size="sm">
+                    {github.connecting ? 'Connecting…' : 'Connect GitHub'}
+                  </Button>
+                )}
+              </section>
 
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="pi-provider">Active provider</Label>
-                <Combobox
-                  items={providerItems}
-                  value={selectedProviderItem}
-                  onValueChange={(item) =>
-                    pi.setSelectedProvider((item as ComboItem | null)?.value ?? '')
-                  }
-                  isItemEqualToValue={comboItemsEqual}
-                >
-                  <ComboboxInput
-                    id="pi-provider"
-                    data-testid="pi-provider-select"
-                    placeholder={
-                      pi.providers.length === 0 ? 'Loading providers…' : 'Choose provider'
-                    }
-                    disabled={pi.providers.length === 0}
-                  />
-                  <ComboboxContent>
-                    <ComboboxList>
-                      {(item: ComboItem) => (
-                        <ComboboxItem key={item.value} value={item}>
-                          {item.label}
-                        </ComboboxItem>
-                      )}
-                    </ComboboxList>
-                    <ComboboxEmpty>No matching providers</ComboboxEmpty>
-                  </ComboboxContent>
-                </Combobox>
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="pi-model">Active model</Label>
-                <Combobox
-                  items={modelItems}
-                  value={selectedModelItem}
-                  onValueChange={(item) =>
-                    pi.setSelectedModel((item as ComboItem | null)?.value ?? '')
-                  }
-                  isItemEqualToValue={comboItemsEqual}
-                >
-                  <ComboboxInput
-                    id="pi-model"
-                    data-testid="pi-model-select"
-                    placeholder={pi.models.length === 0 ? 'Loading models…' : 'Search models…'}
-                    disabled={pi.models.length === 0}
-                  />
-                  <ComboboxContent>
-                    <ComboboxList>
-                      {(item: ComboItem) => (
-                        <ComboboxItem key={item.value} value={item}>
-                          {item.label}
-                        </ComboboxItem>
-                      )}
-                    </ComboboxList>
-                    <ComboboxEmpty>No matching models</ComboboxEmpty>
-                  </ComboboxContent>
-                </Combobox>
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="pi-api-key">API key</Label>
-              <div className="flex items-center gap-3">
-                <Input
-                  id="pi-api-key"
-                  data-testid="pi-api-key-input"
-                  type="password"
-                  value={pi.apiKey}
-                  onChange={(event) => pi.setApiKey(event.target.value)}
-                  placeholder={piApiKeyPlaceholder}
-                  className="flex-1 font-mono"
-                />
-                <Button
-                  size="sm"
-                  onClick={() => void pi.save()}
-                  disabled={!pi.selectedProvider || !pi.selectedModel || pi.saving}
-                  data-testid="pi-save-config"
-                >
-                  <HugeiconsIcon icon={FileKeyIcon} data-icon="inline-start" aria-hidden />
-                  {piSaveLabel}
+              <section className="flex flex-col gap-3">
+                <h2 className="text-sm font-medium text-foreground">Repositories</h2>
+                <p className="text-xs text-muted-foreground">
+                  Link local Git repositories to your GitHub account.
+                </p>
+                <Button size="sm" variant="ghost" onClick={onNavigateRepositories} className="px-0">
+                  Manage repositories &rarr;
                 </Button>
-              </div>
-              <p className="text-[11px] text-muted-foreground">
-                Current: {pi.active?.providerName ?? 'No provider'} ·{' '}
-                {pi.active?.modelName ?? 'No model'} · key {piCredentialStatus}
-              </p>
-            </div>
+              </section>
 
-            <Separator />
-
-            <div className="flex flex-wrap items-center gap-2">
-              <Button variant="outline" size="sm" onClick={() => void pi.importExisting()}>
-                <HugeiconsIcon icon={DatabaseImportIcon} data-icon="inline-start" aria-hidden />
-                Import existing Pi config
-              </Button>
-
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button variant="outline" size="sm">
-                    <HugeiconsIcon icon={EyeIcon} data-icon="inline-start" aria-hidden />
-                    View active config
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Active Pi config</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      Raw credentials are never shown in the renderer.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <pre className="overflow-x-auto rounded-md bg-muted p-3 font-mono text-xs leading-relaxed text-foreground">
-                    {JSON.stringify(
-                      {
-                        provider: pi.active?.provider,
-                        modelId: pi.active?.modelId,
-                        hasApiKey: Boolean(pi.active?.hasApiKey),
-                        authMethod: pi.active?.authMethod
-                      },
-                      null,
-                      2
-                    )}
-                  </pre>
-                  <AlertDialogFooter>
-                    <AlertDialogAction>Done</AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button variant="destructive" size="sm" className="ml-auto">
-                    <HugeiconsIcon icon={Delete02Icon} data-icon="inline-start" aria-hidden />
-                    Reset Pi config
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Reset Pi config?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      This removes PiLog&apos;s stored Pi credentials and clears the active provider
-                      and model. Your standalone Pi config is left untouched.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction variant="destructive" onClick={() => void pi.reset()}>
-                      Reset
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            </div>
-          </section>
-
-          <Collapsible asChild data-testid="advanced-settings-panel">
-            <section className="flex flex-col gap-3">
-              <CollapsibleTrigger className="group -mx-2 flex w-[calc(100%+1rem)] items-start justify-between gap-3 rounded-md px-2 py-1 text-left transition-colors hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/30">
-                <div className="min-w-0">
-                  <h2 className="text-sm font-medium text-foreground">Advanced</h2>
-                  <p className="mt-1 truncate text-xs text-muted-foreground">{advancedSummary}</p>
+              <section className="flex flex-col gap-4" data-testid="pi-config-panel">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h2 className="text-sm font-medium text-foreground">Provider &amp; Model</h2>
+                    <p className="mt-1 max-w-[68ch] text-xs text-muted-foreground">
+                      Choose the Pi model used for draft generation. Credentials are stored in
+                      OS-backed safe storage, separate from PiLog settings.
+                    </p>
+                  </div>
+                  {pi.active?.valid && (
+                    <span className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-muted px-2 py-1 text-xs text-foreground">
+                      <HugeiconsIcon
+                        icon={CheckmarkCircle01Icon}
+                        aria-hidden
+                        className="size-3.5"
+                      />
+                      Configured
+                    </span>
+                  )}
                 </div>
-                <HugeiconsIcon
-                  icon={ArrowDown01Icon}
-                  aria-hidden
-                  className="mt-1 size-4 shrink-0 text-muted-foreground transition-transform duration-200 group-data-[state=open]:rotate-180"
-                />
-              </CollapsibleTrigger>
 
-              <CollapsibleContent className="flex flex-col gap-4 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0">
-                <p className="max-w-[68ch] text-xs text-muted-foreground">
-                  Tune draft-generation limits and opt into bounded provider search. Search keys are
-                  stored in OS-backed safe storage, separate from model credentials.
-                </p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="pi-provider">Active provider</Label>
+                    <Combobox
+                      items={providerItems}
+                      value={selectedProviderItem}
+                      onValueChange={(item) =>
+                        pi.setSelectedProvider((item as ComboItem | null)?.value ?? '')
+                      }
+                      isItemEqualToValue={comboItemsEqual}
+                    >
+                      <ComboboxInput
+                        id="pi-provider"
+                        data-testid="pi-provider-select"
+                        placeholder={
+                          pi.providers.length === 0 ? 'Loading providers…' : 'Choose provider'
+                        }
+                        disabled={pi.providers.length === 0}
+                      />
+                      <ComboboxContent>
+                        <ComboboxList>
+                          {(item: ComboItem) => (
+                            <ComboboxItem key={item.value} value={item}>
+                              {item.label}
+                            </ComboboxItem>
+                          )}
+                        </ComboboxList>
+                        <ComboboxEmpty>No matching providers</ComboboxEmpty>
+                      </ComboboxContent>
+                    </Combobox>
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="pi-model">Active model</Label>
+                    <Combobox
+                      items={modelItems}
+                      value={selectedModelItem}
+                      onValueChange={(item) =>
+                        pi.setSelectedModel((item as ComboItem | null)?.value ?? '')
+                      }
+                      isItemEqualToValue={comboItemsEqual}
+                    >
+                      <ComboboxInput
+                        id="pi-model"
+                        data-testid="pi-model-select"
+                        placeholder={pi.models.length === 0 ? 'Loading models…' : 'Search models…'}
+                        disabled={pi.models.length === 0}
+                      />
+                      <ComboboxContent>
+                        <ComboboxList>
+                          {(item: ComboItem) => (
+                            <ComboboxItem key={item.value} value={item}>
+                              {item.label}
+                            </ComboboxItem>
+                          )}
+                        </ComboboxList>
+                        <ComboboxEmpty>No matching models</ComboboxEmpty>
+                      </ComboboxContent>
+                    </Combobox>
+                  </div>
+                </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="turn-budget">Turn budget</Label>
+                  <Label htmlFor="pi-api-key">API key</Label>
                   <div className="flex items-center gap-3">
                     <Input
-                      id="turn-budget"
-                      data-testid="turn-budget-input"
-                      inputMode="numeric"
-                      type="number"
-                      min={MIN_TURN_BUDGET}
-                      max={MAX_TURN_BUDGET}
-                      step={1}
-                      value={advanced.turnBudgetDraft}
-                      onChange={(event) => advanced.setTurnBudgetDraft(event.target.value)}
-                      onBlur={() => void advanced.saveTurnBudget()}
-                      aria-invalid={Boolean(advanced.turnBudgetError)}
-                      aria-describedby={
-                        advanced.turnBudgetError ? 'turn-budget-error' : 'turn-budget-help'
-                      }
-                      className="max-w-28 font-mono"
+                      id="pi-api-key"
+                      data-testid="pi-api-key-input"
+                      type="password"
+                      value={pi.apiKey}
+                      onChange={(event) => pi.setApiKey(event.target.value)}
+                      placeholder={piApiKeyPlaceholder}
+                      className="flex-1 font-mono"
                     />
                     <Button
                       size="sm"
-                      variant="outline"
-                      onClick={() => void advanced.saveTurnBudget()}
-                      disabled={!turnBudgetDirty}
+                      onClick={() => void pi.save()}
+                      disabled={!pi.selectedProvider || !pi.selectedModel || pi.saving}
+                      data-testid="pi-save-config"
                     >
-                      Save
+                      <HugeiconsIcon icon={FileKeyIcon} data-icon="inline-start" aria-hidden />
+                      {piSaveLabel}
                     </Button>
                   </div>
-                  {advanced.turnBudgetError ? (
-                    <p id="turn-budget-error" className="text-xs text-destructive">
-                      {advanced.turnBudgetError}
-                    </p>
-                  ) : (
-                    <p id="turn-budget-help" className="text-xs text-muted-foreground">
-                      {TURN_BUDGET_HELP}
-                    </p>
-                  )}
+                  <p className="text-[11px] text-muted-foreground">
+                    Current: {pi.active?.providerName ?? 'No provider'} ·{' '}
+                    {pi.active?.modelName ?? 'No model'} · key {piCredentialStatus}
+                  </p>
                 </div>
 
                 <Separator />
 
-                <div className="flex flex-col gap-3">
-                  <div className="flex items-start justify-between gap-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button variant="outline" size="sm" onClick={() => void pi.importExisting()}>
+                    <HugeiconsIcon icon={DatabaseImportIcon} data-icon="inline-start" aria-hidden />
+                    Import existing Pi config
+                  </Button>
+
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="outline" size="sm">
+                        <HugeiconsIcon icon={EyeIcon} data-icon="inline-start" aria-hidden />
+                        View active config
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Active Pi config</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Raw credentials are never shown in the renderer.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <pre className="overflow-x-auto rounded-md bg-muted p-3 font-mono text-xs leading-relaxed text-foreground">
+                        {JSON.stringify(
+                          {
+                            provider: pi.active?.provider,
+                            modelId: pi.active?.modelId,
+                            hasApiKey: Boolean(pi.active?.hasApiKey),
+                            authMethod: pi.active?.authMethod
+                          },
+                          null,
+                          2
+                        )}
+                      </pre>
+                      <AlertDialogFooter>
+                        <AlertDialogAction>Done</AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="destructive" size="sm" className="ml-auto">
+                        <HugeiconsIcon icon={Delete02Icon} data-icon="inline-start" aria-hidden />
+                        Reset Pi config
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Reset Pi config?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This removes PiLog&apos;s stored Pi credentials and clears the active
+                          provider and model. Your standalone Pi config is left untouched.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction variant="destructive" onClick={() => void pi.reset()}>
+                          Reset
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
+              </section>
+
+              <Collapsible asChild data-testid="advanced-settings-panel">
+                <section className="flex flex-col gap-3">
+                  <CollapsibleTrigger className="group -mx-2 flex w-[calc(100%+1rem)] items-start justify-between gap-3 rounded-md px-2 py-1 text-left transition-colors hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/30">
                     <div className="min-w-0">
-                      <Label htmlFor="web-search-enabled" className="text-sm font-medium">
-                        Web search
-                      </Label>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        Registers a bounded search-results tool only when enabled and keyed.
+                      <h2 className="text-sm font-medium text-foreground">Advanced</h2>
+                      <p className="mt-1 truncate text-xs text-muted-foreground">
+                        {advancedSummary}
                       </p>
                     </div>
-                    <Switch
-                      id="web-search-enabled"
-                      data-testid="web-search-toggle"
-                      checked={advancedSettings?.webSearchEnabled ?? false}
-                      onCheckedChange={(enabled) => void advanced.setWebSearchEnabled(enabled)}
-                      aria-label="Enable Web search"
+                    <HugeiconsIcon
+                      icon={ArrowDown01Icon}
+                      aria-hidden
+                      className="mt-1 size-4 shrink-0 text-muted-foreground transition-transform duration-200 group-data-[state=open]:rotate-180"
                     />
-                  </div>
+                  </CollapsibleTrigger>
 
-                  {advancedSettings?.webSearchEnabled && (
-                    <div className="grid gap-3 rounded-md bg-muted/35 p-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)]">
-                      <div className="flex flex-col gap-1.5">
-                        <Label htmlFor="web-search-provider">Search provider</Label>
-                        <Select
-                          value={advancedSettings.webSearchProvider}
-                          onValueChange={(provider) => {
-                            if (isSearchProvider(provider)) {
-                              void advanced.setWebSearchProvider(provider)
-                            }
-                          }}
+                  <CollapsibleContent className="flex flex-col gap-4 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0">
+                    <p className="max-w-[68ch] text-xs text-muted-foreground">
+                      Tune draft-generation limits and opt into bounded provider search. Search keys
+                      are stored in OS-backed safe storage, separate from model credentials.
+                    </p>
+                    {onNavigateRunHistory && (
+                      <div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={onNavigateRunHistory}
                         >
-                          <SelectTrigger id="web-search-provider" data-testid="web-search-provider">
-                            <SelectValue placeholder="Choose provider" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectGroup>
-                              {SEARCH_PROVIDERS.map((provider) => (
-                                <SelectItem key={provider} value={provider}>
-                                  {SEARCH_PROVIDER_LABELS[provider]}
-                                </SelectItem>
-                              ))}
-                            </SelectGroup>
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div className="flex flex-col gap-1.5">
-                        <Label htmlFor="web-search-api-key">Search API key</Label>
-                        <div className="flex items-center gap-3">
-                          <Input
-                            id="web-search-api-key"
-                            data-testid="web-search-api-key"
-                            type="password"
-                            value={advanced.webSearchApiKey}
-                            onChange={(event) => advanced.setWebSearchApiKey(event.target.value)}
-                            placeholder={searchKeyPlaceholder}
-                            className="flex-1 font-mono"
+                          <HugeiconsIcon
+                            icon={Activity01Icon}
+                            data-icon="inline-start"
+                            aria-hidden
                           />
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => void advanced.saveWebSearchApiKey()}
-                            disabled={!advanced.webSearchApiKey.trim() || advanced.savingKey}
-                          >
-                            <HugeiconsIcon
-                              icon={Search01Icon}
-                              data-icon="inline-start"
-                              aria-hidden
-                            />
-                            {advanced.savingKey ? 'Saving' : 'Save'}
-                          </Button>
-                        </div>
-                        <p className="text-[11px] text-muted-foreground">
-                          Current: {SEARCH_PROVIDER_LABELS[advancedSettings.webSearchProvider]} ·
-                          key {advancedSettings.webSearchHasApiKey ? 'stored' : 'not stored'}
-                        </p>
+                          Run history
+                        </Button>
                       </div>
+                    )}
+
+                    <div className="flex flex-col gap-1.5">
+                      <Label htmlFor="turn-budget">Turn budget</Label>
+                      <div className="flex items-center gap-3">
+                        <Input
+                          id="turn-budget"
+                          data-testid="turn-budget-input"
+                          inputMode="numeric"
+                          type="number"
+                          min={MIN_TURN_BUDGET}
+                          max={MAX_TURN_BUDGET}
+                          step={1}
+                          value={advanced.turnBudgetDraft}
+                          onChange={(event) => advanced.setTurnBudgetDraft(event.target.value)}
+                          onBlur={() => void advanced.saveTurnBudget()}
+                          aria-invalid={Boolean(advanced.turnBudgetError)}
+                          aria-describedby={
+                            advanced.turnBudgetError ? 'turn-budget-error' : 'turn-budget-help'
+                          }
+                          className="max-w-28 font-mono"
+                        />
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => void advanced.saveTurnBudget()}
+                          disabled={!turnBudgetDirty}
+                        >
+                          Save
+                        </Button>
+                      </div>
+                      {advanced.turnBudgetError ? (
+                        <p id="turn-budget-error" className="text-xs text-destructive">
+                          {advanced.turnBudgetError}
+                        </p>
+                      ) : (
+                        <p id="turn-budget-help" className="text-xs text-muted-foreground">
+                          {TURN_BUDGET_HELP}
+                        </p>
+                      )}
                     </div>
-                  )}
+
+                    <Separator />
+
+                    <div className="flex flex-col gap-3">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="min-w-0">
+                          <Label htmlFor="web-search-enabled" className="text-sm font-medium">
+                            Web search
+                          </Label>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            Registers a bounded search-results tool only when enabled and keyed.
+                          </p>
+                        </div>
+                        <Switch
+                          id="web-search-enabled"
+                          data-testid="web-search-toggle"
+                          checked={advancedSettings?.webSearchEnabled ?? false}
+                          onCheckedChange={(enabled) => void advanced.setWebSearchEnabled(enabled)}
+                          aria-label="Enable Web search"
+                        />
+                      </div>
+
+                      {advancedSettings?.webSearchEnabled && (
+                        <div className="grid gap-3 rounded-md bg-muted/35 p-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)]">
+                          <div className="flex flex-col gap-1.5">
+                            <Label htmlFor="web-search-provider">Search provider</Label>
+                            <Select
+                              value={advancedSettings.webSearchProvider}
+                              onValueChange={(provider) => {
+                                if (isSearchProvider(provider)) {
+                                  void advanced.setWebSearchProvider(provider)
+                                }
+                              }}
+                            >
+                              <SelectTrigger
+                                id="web-search-provider"
+                                data-testid="web-search-provider"
+                              >
+                                <SelectValue placeholder="Choose provider" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectGroup>
+                                  {SEARCH_PROVIDERS.map((provider) => (
+                                    <SelectItem key={provider} value={provider}>
+                                      {SEARCH_PROVIDER_LABELS[provider]}
+                                    </SelectItem>
+                                  ))}
+                                </SelectGroup>
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          <div className="flex flex-col gap-1.5">
+                            <Label htmlFor="web-search-api-key">Search API key</Label>
+                            <div className="flex items-center gap-3">
+                              <Input
+                                id="web-search-api-key"
+                                data-testid="web-search-api-key"
+                                type="password"
+                                value={advanced.webSearchApiKey}
+                                onChange={(event) =>
+                                  advanced.setWebSearchApiKey(event.target.value)
+                                }
+                                placeholder={searchKeyPlaceholder}
+                                className="flex-1 font-mono"
+                              />
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => void advanced.saveWebSearchApiKey()}
+                                disabled={!advanced.webSearchApiKey.trim() || advanced.savingKey}
+                              >
+                                <HugeiconsIcon
+                                  icon={Search01Icon}
+                                  data-icon="inline-start"
+                                  aria-hidden
+                                />
+                                {advanced.savingKey ? 'Saving' : 'Save'}
+                              </Button>
+                            </div>
+                            <p className="text-[11px] text-muted-foreground">
+                              Current: {SEARCH_PROVIDER_LABELS[advancedSettings.webSearchProvider]}{' '}
+                              · key {advancedSettings.webSearchHasApiKey ? 'stored' : 'not stored'}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </CollapsibleContent>
+                </section>
+              </Collapsible>
+
+              <section className="flex flex-col gap-3">
+                <h2 className="text-sm font-medium text-foreground">Global Hotkey</h2>
+                <p className="text-xs text-muted-foreground">
+                  Keyboard shortcut to open the scratchpad from anywhere.
+                </p>
+                <div className="flex items-center gap-3">
+                  <Input
+                    type="text"
+                    aria-label="Scratchpad hotkey"
+                    value={displayValue}
+                    onChange={(e) => handleHotkeyChange(e.target.value)}
+                    placeholder="CommandOrControl+Alt+N"
+                    className="flex-1"
+                  />
+                  <Button onClick={handleSaveHotkey} disabled={!dirty} size="sm">
+                    Save
+                  </Button>
                 </div>
-              </CollapsibleContent>
-            </section>
-          </Collapsible>
+                <p className="text-[11px] text-muted-foreground">
+                  Takes effect after restarting PiLog.
+                </p>
+              </section>
 
-          <section className="flex flex-col gap-3">
-            <h2 className="text-sm font-medium text-foreground">Global Hotkey</h2>
-            <p className="text-xs text-muted-foreground">
-              Keyboard shortcut to open the scratchpad from anywhere.
-            </p>
-            <div className="flex items-center gap-3">
-              <Input
-                type="text"
-                aria-label="Scratchpad hotkey"
-                value={displayValue}
-                onChange={(e) => handleHotkeyChange(e.target.value)}
-                placeholder="CommandOrControl+Alt+N"
-                className="flex-1"
-              />
-              <Button onClick={handleSaveHotkey} disabled={!dirty} size="sm">
-                Save
-              </Button>
+              <section className="flex flex-col gap-3">
+                <h2 className="text-sm font-medium text-foreground">Startup</h2>
+                <div className="flex items-center gap-3">
+                  <Switch
+                    id="open-inbox-at-login"
+                    checked={openAtLogin === 'true'}
+                    onCheckedChange={(c) => void handleOpenAtLoginChange(c)}
+                  />
+                  <Label
+                    htmlFor="open-inbox-at-login"
+                    className="cursor-pointer text-sm font-normal"
+                  >
+                    Open inbox window at login
+                  </Label>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  When disabled, PiLog starts in the system tray only.
+                </p>
+              </section>
             </div>
-            <p className="text-[11px] text-muted-foreground">
-              Takes effect after restarting PiLog.
-            </p>
-          </section>
-
-          <section className="flex flex-col gap-3">
-            <h2 className="text-sm font-medium text-foreground">Startup</h2>
-            <div className="flex items-center gap-3">
-              <Switch
-                id="open-inbox-at-login"
-                checked={openAtLogin === 'true'}
-                onCheckedChange={(c) => void handleOpenAtLoginChange(c)}
-              />
-              <Label htmlFor="open-inbox-at-login" className="cursor-pointer text-sm font-normal">
-                Open inbox window at login
-              </Label>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              When disabled, PiLog starts in the system tray only.
-            </p>
-          </section>
-        </div>
+          </div>
+        </ScrollArea>
       </div>
     </div>
   )

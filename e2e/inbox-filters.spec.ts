@@ -10,7 +10,7 @@ test.beforeEach(() => {
 })
 
 test.afterEach(() => {
-  rmSync(userDataDir, { recursive: true, force: true })
+  rmSync(userDataDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
 })
 
 async function launchApp(): Promise<ElectronApplication> {
@@ -22,16 +22,28 @@ async function launchApp(): Promise<ElectronApplication> {
   return app
 }
 
+async function exitApp(app: ElectronApplication): Promise<void> {
+  const process = app.process()
+  await Promise.race([
+    app.evaluate(({ app }) => app.exit(0)).catch(() => undefined),
+    new Promise((resolve) => setTimeout(resolve, 500))
+  ])
+  if (!process.killed) process.kill('SIGKILL')
+  await new Promise((resolve) => setTimeout(resolve, 100))
+}
+
 test('inbox filters, search, and multi-select', async () => {
   const app = await launchApp()
   const page = await app.firstWindow()
 
   await expect(page.locator('h1')).toHaveText('Inbox')
 
-  // Create three notes with distinct content
-  await page.click('button:has-text("New note")')
-  await page.click('button:has-text("New note")')
-  await page.click('button:has-text("New note")')
+  await page.evaluate(async () => {
+    await window.pilog.invoke('note:create', { content: 'first inbox filter note' })
+    await window.pilog.invoke('note:create', { content: 'second inbox filter note' })
+    await window.pilog.invoke('note:create', { content: 'third inbox filter note' })
+  })
+  await page.reload()
 
   const noteRows = page.locator('[data-testid="note-row"]')
   await expect(noteRows).toHaveCount(3)
@@ -49,17 +61,23 @@ test('inbox filters, search, and multi-select', async () => {
   await page.click('[data-testid="filter-drafted"]')
   await expect(noteRows).toHaveCount(3)
 
-  // Cmd+K palette: sidebar stays on status/repo filters only; palette search
-  // matches notes inside the dialog only.
-  await page.click('[data-testid="open-command"]')
-  const searchInput = page.locator('[data-testid="search-input"]')
-  await expect(searchInput).toBeVisible()
-
   const unique = `palette-filter-${Date.now()}`
   await noteRows.first().click()
   await page.locator('[aria-label="Note content"]').fill(unique)
   const saveMod = process.platform === 'darwin' ? 'Meta' : 'Control'
   await page.keyboard.press(`${saveMod}+s`)
+  await expect
+    .poll(async () => {
+      const notes = await page.evaluate(async () => window.pilog.invoke('note:list'))
+      return notes.some((note) => note.content === unique)
+    })
+    .toBe(true)
+
+  // Cmd+K palette: sidebar stays on status/repo filters only; palette search
+  // matches notes inside the dialog only.
+  await page.click('[data-testid="open-command"]')
+  const searchInput = page.locator('[data-testid="search-input"]')
+  await expect(searchInput).toBeVisible()
 
   await searchInput.fill(unique)
   await expect(page.locator('[data-testid="palette-note-row"]')).toHaveCount(1)
@@ -78,6 +96,9 @@ test('inbox filters, search, and multi-select', async () => {
   await searchInput.fill('')
   await page.keyboard.press('Escape')
   await expect(noteRows).toHaveCount(3)
+  if ((await page.locator('[data-testid="selected-count"]').count()) > 0) {
+    await page.locator('[data-testid="selected-count"]').click()
+  }
 
   // Multi-select: click first note
   await noteRows.first().click()
@@ -90,11 +111,11 @@ test('inbox filters, search, and multi-select', async () => {
 
   // Bulk action buttons should be visible but disabled
   const generateBtn = page.locator('button:has-text("Generate Drafts")')
-  const dismissBtn = page.locator('button:has-text("Dismiss")')
+  const dismissBtn = page.getByRole('button', { name: 'Dismiss', exact: true })
   await expect(generateBtn).toBeVisible()
   await expect(generateBtn).toBeDisabled()
   await expect(dismissBtn).toBeVisible()
   await expect(dismissBtn).toBeDisabled()
 
-  await app.close()
+  await exitApp(app)
 })

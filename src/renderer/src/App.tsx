@@ -1,13 +1,23 @@
-import { useState, useSyncExternalStore } from 'react'
+import { useEffect, useState, useSyncExternalStore } from 'react'
 import { AppShell } from './components/AppShell'
+import { GlobalCommandPalette } from './components/GlobalCommandPalette'
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator
+} from './components/ui/breadcrumb'
 import { Inbox } from './features/inbox/Inbox'
 import { Settings } from './features/settings/Settings'
 import { Repositories } from './features/repositories/Repositories'
 import { AgentRuns } from './features/agent-runs/AgentRuns'
 import { DraftReview } from './features/issue-drafts/DraftReview'
+import type { RunNavigationOrigin } from './features/agent-runs/navigation'
 
 type Route = 'inbox' | 'draft-review' | 'settings' | 'repositories' | 'agent-runs'
-type ViewTabValue = 'inbox' | 'drafts' | 'runs'
+type ViewTabValue = 'inbox' | 'drafts'
 
 let currentRoute: Route = 'inbox'
 const routeListeners = new Set<() => void>()
@@ -44,14 +54,6 @@ const VIEW_TABS = [
     activeTestId: 'view-tab-inbox'
   },
   {
-    value: 'runs' as const,
-    label: 'Runs',
-    // Preserved e2e-stable id; existing tests select this to navigate
-    // forward into the Agent Runs view from the Inbox surface.
-    testId: 'open-agent-runs',
-    activeTestId: 'view-tab-runs'
-  },
-  {
     value: 'drafts' as const,
     label: 'Drafts',
     testId: 'view-tab-drafts-trigger',
@@ -59,7 +61,7 @@ const VIEW_TABS = [
   }
 ]
 
-function routeToActiveTab(route: Route): ViewTabValue {
+function routeToActiveTab(route: Route): ViewTabValue | null {
   switch (route) {
     case 'inbox':
       return 'inbox'
@@ -68,7 +70,7 @@ function routeToActiveTab(route: Route): ViewTabValue {
     case 'agent-runs':
     case 'repositories':
     case 'settings':
-      return 'runs'
+      return null
   }
 }
 
@@ -78,85 +80,282 @@ function tabToRoute(tab: string): Route {
       return 'inbox'
     case 'drafts':
       return 'draft-review'
-    case 'runs':
     default:
-      return 'agent-runs'
+      return 'inbox'
   }
+}
+
+function RunBreadcrumbs({
+  origin,
+  focusedRunId,
+  onOpenInbox,
+  onOpenDrafts,
+  onOpenRunHistory,
+  onOpenNote,
+  onOpenDraft
+}: {
+  origin: RunNavigationOrigin | null
+  focusedRunId: string | null
+  onOpenInbox: () => void
+  onOpenDrafts: () => void
+  onOpenRunHistory: () => void
+  onOpenNote: (noteId: string) => void
+  onOpenDraft: (draftId: string) => void
+}): React.JSX.Element {
+  const currentRunLabel = focusedRunId ? 'Run' : 'Run history'
+
+  if (origin?.kind === 'note') {
+    return (
+      <Breadcrumb>
+        <BreadcrumbList>
+          <BreadcrumbItem>
+            <BreadcrumbLink asChild>
+              <button type="button" onClick={onOpenInbox}>
+                Inbox
+              </button>
+            </BreadcrumbLink>
+          </BreadcrumbItem>
+          <BreadcrumbSeparator />
+          <BreadcrumbItem>
+            <BreadcrumbLink asChild>
+              <button type="button" onClick={() => onOpenNote(origin.noteId)}>
+                Note
+              </button>
+            </BreadcrumbLink>
+          </BreadcrumbItem>
+          <BreadcrumbSeparator />
+          <BreadcrumbItem>
+            <BreadcrumbPage>{currentRunLabel}</BreadcrumbPage>
+          </BreadcrumbItem>
+        </BreadcrumbList>
+      </Breadcrumb>
+    )
+  }
+
+  if (origin?.kind === 'draft') {
+    return (
+      <Breadcrumb>
+        <BreadcrumbList>
+          <BreadcrumbItem>
+            <BreadcrumbLink asChild>
+              <button type="button" onClick={onOpenDrafts}>
+                Drafts
+              </button>
+            </BreadcrumbLink>
+          </BreadcrumbItem>
+          <BreadcrumbSeparator />
+          <BreadcrumbItem>
+            <BreadcrumbLink asChild>
+              <button type="button" onClick={() => onOpenDraft(origin.draftId)}>
+                {origin.label}
+              </button>
+            </BreadcrumbLink>
+          </BreadcrumbItem>
+          <BreadcrumbSeparator />
+          <BreadcrumbItem>
+            <BreadcrumbPage>{currentRunLabel}</BreadcrumbPage>
+          </BreadcrumbItem>
+        </BreadcrumbList>
+      </Breadcrumb>
+    )
+  }
+
+  if (origin?.kind === 'drafts') {
+    return (
+      <Breadcrumb>
+        <BreadcrumbList>
+          <BreadcrumbItem>
+            <BreadcrumbLink asChild>
+              <button type="button" onClick={onOpenDrafts}>
+                Drafts
+              </button>
+            </BreadcrumbLink>
+          </BreadcrumbItem>
+          <BreadcrumbSeparator />
+          <BreadcrumbItem>
+            <BreadcrumbPage>{origin.label ?? currentRunLabel}</BreadcrumbPage>
+          </BreadcrumbItem>
+        </BreadcrumbList>
+      </Breadcrumb>
+    )
+  }
+
+  return (
+    <Breadcrumb>
+      <BreadcrumbList>
+        {focusedRunId ? (
+          <>
+            <BreadcrumbItem>
+              <BreadcrumbLink asChild>
+                <button type="button" onClick={onOpenRunHistory}>
+                  Run history
+                </button>
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbPage>Run</BreadcrumbPage>
+            </BreadcrumbItem>
+          </>
+        ) : (
+          <BreadcrumbItem>
+            <BreadcrumbPage>Run history</BreadcrumbPage>
+          </BreadcrumbItem>
+        )}
+      </BreadcrumbList>
+    </Breadcrumb>
+  )
 }
 
 function App(): React.JSX.Element {
   const route = useSyncExternalStore(subscribeRoute, getRouteSnapshot)
   const [focusedNoteId, setFocusedNoteId] = useState<string | null>(null)
   const [focusedRunId, setFocusedRunId] = useState<string | null>(null)
-  // Lifted because the Cmd-K trigger now lives in the global top bar; the
-  // palette dialog itself stays inside Inbox where the inbox-specific
-  // commands are wired.
+  const [focusedDraftId, setFocusedDraftId] = useState<string | null>(null)
+  const [runOrigin, setRunOrigin] = useState<RunNavigationOrigin | null>(null)
   const [paletteOpen, setPaletteOpen] = useState(false)
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent): void => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault()
+        setPaletteOpen((open) => !open)
+      }
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [])
+
+  const openInbox = (): void => setAppRoute('inbox')
+  const openDrafts = (): void => setAppRoute('draft-review')
+  const openSettings = (): void => setAppRoute('settings')
+  const openNote = (noteId: string): void => {
+    setFocusedNoteId(noteId)
+    setAppRoute('inbox')
+  }
+  const openDraft = (draftId: string): void => {
+    setFocusedDraftId(draftId)
+    setAppRoute('draft-review')
+  }
+  const openRunHistory = (): void => {
+    setFocusedRunId(null)
+    setRunOrigin({ kind: 'history' })
+    setAppRoute('agent-runs')
+  }
+  const openAgentRun = (runId?: string, origin?: RunNavigationOrigin): void => {
+    setFocusedRunId(runId ?? null)
+    setRunOrigin(origin ?? { kind: 'history' })
+    setAppRoute('agent-runs')
+  }
+  const createNoteFromPalette = async (): Promise<void> => {
+    const created = await window.pilog.invoke('note:create', { content: '' })
+    openNote(created.id)
+  }
 
   if (route === 'settings') {
     return (
-      <Settings
-        onBack={() => setAppRoute('inbox')}
-        onNavigateRepositories={() => setAppRoute('repositories')}
-      />
+      <>
+        <Settings
+          onBack={openInbox}
+          onNavigateRepositories={() => setAppRoute('repositories')}
+          onNavigateRunHistory={openRunHistory}
+        />
+        <GlobalCommandPalette
+          open={paletteOpen}
+          onOpenChange={setPaletteOpen}
+          activeRoute={route}
+          onCreateNote={createNoteFromPalette}
+          onOpenInbox={openInbox}
+          onOpenDrafts={openDrafts}
+          onOpenRunHistory={openRunHistory}
+          onOpenSettings={openSettings}
+          onOpenNote={openNote}
+          onOpenDraft={openDraft}
+        />
+      </>
     )
   }
 
   if (route === 'repositories') {
-    return <Repositories onBack={() => setAppRoute('settings')} />
+    return (
+      <>
+        <Repositories onBack={openSettings} />
+        <GlobalCommandPalette
+          open={paletteOpen}
+          onOpenChange={setPaletteOpen}
+          activeRoute={route}
+          onCreateNote={createNoteFromPalette}
+          onOpenInbox={openInbox}
+          onOpenDrafts={openDrafts}
+          onOpenRunHistory={openRunHistory}
+          onOpenSettings={openSettings}
+          onOpenNote={openNote}
+          onOpenDraft={openDraft}
+        />
+      </>
+    )
   }
 
   const activeTab = routeToActiveTab(route)
+  const runBreadcrumbs =
+    route === 'agent-runs' ? (
+      <RunBreadcrumbs
+        origin={runOrigin}
+        focusedRunId={focusedRunId}
+        onOpenInbox={openInbox}
+        onOpenDrafts={openDrafts}
+        onOpenRunHistory={openRunHistory}
+        onOpenNote={openNote}
+        onOpenDraft={openDraft}
+      />
+    ) : undefined
 
   return (
     <AppShell
       tabs={VIEW_TABS}
-      activeTab={activeTab}
+      activeTab={activeTab ?? undefined}
       onTabChange={(next) => setAppRoute(tabToRoute(next))}
-      onNavigateToSettings={() => setAppRoute('settings')}
-      // Cmd-K lives in Inbox's command surface today; only show the
-      // chrome trigger when the active view actually has a palette.
-      onOpenCommandPalette={route === 'inbox' ? () => setPaletteOpen(true) : undefined}
+      onNavigateToSettings={openSettings}
+      navigationSlot={runBreadcrumbs}
+      onOpenCommandPalette={() => setPaletteOpen(true)}
     >
       {route === 'inbox' ? (
         <Inbox
           focusNoteId={focusedNoteId}
           onFocusNoteHandled={() => setFocusedNoteId(null)}
-          // The Cmd-K palette still has an "Agent Runs" navigate command;
-          // pass the route action through so it works from the inbox.
-          onNavigateToAgentRuns={(runId) => {
-            if (runId) setFocusedRunId(runId)
-            setAppRoute('agent-runs')
-          }}
+          onNavigateToAgentRuns={openAgentRun}
           onNavigateToRepositories={() => setAppRoute('repositories')}
-          onNavigateToSettings={() => setAppRoute('settings')}
-          onNavigateToDraftReview={() => setAppRoute('draft-review')}
-          paletteOpen={paletteOpen}
-          onPaletteOpenChange={setPaletteOpen}
+          onNavigateToSettings={openSettings}
+          onNavigateToDraftReview={(draftId) => {
+            if (draftId) openDraft(draftId)
+            else openDrafts()
+          }}
         />
       ) : route === 'draft-review' ? (
         <DraftReview
-          onNavigateToInbox={() => setAppRoute('inbox')}
-          onNavigateToAgentRuns={(runId) => {
-            if (runId) setFocusedRunId(runId)
-            setAppRoute('agent-runs')
-          }}
-          onNavigateToSettings={() => setAppRoute('settings')}
+          focusDraftId={focusedDraftId}
+          onFocusDraftHandled={() => setFocusedDraftId(null)}
+          onNavigateToInbox={openInbox}
+          onNavigateToAgentRuns={openAgentRun}
+          onNavigateToSettings={openSettings}
           onNavigateToRepositories={() => setAppRoute('repositories')}
-          onOpenSourceNote={(noteId) => {
-            setFocusedNoteId(noteId)
-            setAppRoute('inbox')
-          }}
+          onOpenSourceNote={openNote}
         />
       ) : (
-        <AgentRuns
-          focusRunId={focusedRunId}
-          onOpenSourceNote={(noteId) => {
-            setFocusedNoteId(noteId)
-            setAppRoute('inbox')
-          }}
-        />
+        <AgentRuns focusRunId={focusedRunId} onOpenSourceNote={openNote} />
       )}
+      <GlobalCommandPalette
+        open={paletteOpen}
+        onOpenChange={setPaletteOpen}
+        activeRoute={route}
+        onCreateNote={createNoteFromPalette}
+        onOpenInbox={openInbox}
+        onOpenDrafts={openDrafts}
+        onOpenRunHistory={openRunHistory}
+        onOpenSettings={openSettings}
+        onOpenNote={openNote}
+        onOpenDraft={openDraft}
+      />
     </AppShell>
   )
 }

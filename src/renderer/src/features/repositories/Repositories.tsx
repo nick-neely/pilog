@@ -19,6 +19,7 @@ import {
 import { Empty, EmptyDescription } from '@renderer/components/ui/empty'
 import { Input } from '@renderer/components/ui/input'
 import { Label } from '@renderer/components/ui/label'
+import { ScrollArea } from '@renderer/components/ui/scroll-area'
 import { Skeleton } from '@renderer/components/ui/skeleton'
 import { Toggle } from '@renderer/components/ui/toggle'
 import { cn } from '@renderer/lib/utils'
@@ -566,28 +567,32 @@ export function Repositories({ onBack }: { onBack: () => void }): React.JSX.Elem
         </Button>
         <h1 className="text-xl font-semibold">Repositories</h1>
       </header>
-      <div className="flex-1 overflow-y-auto p-6">
-        <div className="mx-auto flex max-w-lg flex-col gap-6">
-          {repos.length > 0 && (
-            <section className="flex flex-col gap-2">
-              {repos.map((repo) => (
-                <RepoRow key={repo.id} repo={repo} onUnlink={handleUnlink} />
-              ))}
-            </section>
-          )}
+      <div className="flex-1">
+        <ScrollArea className="h-full">
+          <div className="p-6">
+            <div className="mx-auto flex max-w-lg flex-col gap-6">
+              {repos.length > 0 && (
+                <section className="flex flex-col gap-2">
+                  {repos.map((repo) => (
+                    <RepoRow key={repo.id} repo={repo} onUnlink={handleUnlink} />
+                  ))}
+                </section>
+              )}
 
-          {repos.length === 0 && (
-            <Empty className="border-none bg-transparent p-6 shadow-none">
-              <EmptyDescription className="text-sm">
-                No repositories linked yet. Add a local Git repository to get started.
-              </EmptyDescription>
-            </Empty>
-          )}
+              {repos.length === 0 && (
+                <Empty className="border-none bg-transparent p-6 shadow-none">
+                  <EmptyDescription className="text-sm">
+                    No repositories linked yet. Add a local Git repository to get started.
+                  </EmptyDescription>
+                </Empty>
+              )}
 
-          <section>
-            <AddRepoFlow onLinked={reload} />
-          </section>
-        </div>
+              <section>
+                <AddRepoFlow onLinked={reload} />
+              </section>
+            </div>
+          </div>
+        </ScrollArea>
       </div>
     </div>
   )

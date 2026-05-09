@@ -142,8 +142,8 @@ export function AgentRuns({
     setRuns(result)
     setStatusCounts(counts)
     setSelectedRunId((current) => {
-      if (current) return current
       if (focusRunId && result.some((r) => r.id === focusRunId)) return focusRunId
+      if (current && result.some((r) => r.id === current)) return current
       return result[0]?.id ?? null
     })
   }, [statusFilter, focusRunId])
@@ -310,22 +310,24 @@ export function AgentRuns({
         </div>
       </aside>
 
-      <main className="min-w-0 flex-1 overflow-y-auto">
-        {detail ? (
-          <RunDetail
-            run={detail}
-            selectedDraftId={selectedDraftId}
-            selectedDraft={selectedDraft}
-            onSelectDraft={setSelectedDraftId}
-            onOpenSourceNote={onOpenSourceNote}
-          />
-        ) : (
-          <Empty className="h-full border-none bg-transparent shadow-none">
-            <EmptyDescription>
-              Select a run to inspect its notes, drafts, and transcript.
-            </EmptyDescription>
-          </Empty>
-        )}
+      <main className="min-w-0 flex-1">
+        <ScrollArea className="h-full">
+          {detail ? (
+            <RunDetail
+              run={detail}
+              selectedDraftId={selectedDraftId}
+              selectedDraft={selectedDraft}
+              onSelectDraft={setSelectedDraftId}
+              onOpenSourceNote={onOpenSourceNote}
+            />
+          ) : (
+            <Empty className="h-full border-none bg-transparent shadow-none">
+              <EmptyDescription>
+                Select a run to inspect its notes, drafts, and transcript.
+              </EmptyDescription>
+            </Empty>
+          )}
+        </ScrollArea>
       </main>
     </div>
   )
@@ -482,7 +484,7 @@ function RunDetail({
             </ScrollArea>
 
             {/* Right: Draft detail */}
-            <div className="h-full overflow-y-auto border-l bg-muted/20">
+            <ScrollArea className="h-full border-l bg-muted/20">
               <div className="p-8">
                 {selectedDraft ? (
                   <div
@@ -501,7 +503,7 @@ function RunDetail({
                   </Empty>
                 )}
               </div>
-            </div>
+            </ScrollArea>
           </div>
         </TabsContent>
 

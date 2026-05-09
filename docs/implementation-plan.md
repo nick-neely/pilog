@@ -64,7 +64,7 @@ Set up once; reused by every phase.
 | 1     | Desktop shell + local notes | Hotkey → scratchpad → inbox; persists across restarts                    |   ☑    |
 | 2     | GitHub + repo setup         | Connect GitHub, link a local repo, manually create a test issue          |   ☑    |
 | 3     | Pi agent runtime            | Selected notes + repo path → structured `IssueDraft` JSON stored locally |   ☑    |
-| 4     | Review mode                 | Draft cards: edit, split, merge, dismiss, publish to GitHub              |   ☐    |
+| 4     | Review mode                 | Draft cards: edit, split, merge, dismiss, publish to GitHub              |   ☑    |
 | 5     | Auto-publish mode           | One click: generate + publish, with safety rails and a publish report    |   ☐    |
 | 6     | Polish                      | Issue templates, label matching, prompt tuning, error states, packaging  |   ☐    |
 
@@ -201,17 +201,17 @@ User can connect GitHub, link a real repo, type a title/body, and see the issue 
 
 **Goal:** Drafts become first-class. User can edit them, split/merge, dismiss, or publish to GitHub.
 
-- ☐ **Draft review screen** — card per draft with the fields from PRD §9.5; inline editing of title/body/labels/acceptance criteria.
-- ☐ **Source notes panel** — show every note that fed this draft; clicking opens the note.
-- ☐ **Affected files panel** — clickable; opens in OS file explorer or copies path. (No in-app file viewer in MVP.)
-- ☐ **Split / merge** — split duplicates the draft and lets the user move sourceNoteIds; merge combines two drafts (concat bodies, union of labels and notes).
-- ☐ **Publish** — uses Phase 2's `createIssue`. On success, mark draft `published`, write `publish_log`, mark source notes `published`.
-- ☐ **Empty/error states** — no drafts yet, agent run failed, GitHub returned 422, etc.
-- ☐ **Tests** — Playwright e2e: from raw notes → draft → edit → publish → assert issue URL stored.
+- ☑ **Draft review screen** — card per draft with the fields from PRD §9.5; inline editing of title/body/labels/acceptance criteria.
+- ☑ **Source notes panel** — show every note that fed this draft; clicking opens the note.
+- ☑ **Affected files panel** — clickable; opens in OS file explorer or copies path. (No in-app file viewer in MVP.)
+- ☑ **Split / merge** — split duplicates the draft and lets the user move sourceNoteIds; merge combines two drafts (concat bodies, union of labels and notes).
+- ☑ **Publish** — uses Phase 2's `createIssue`. On success, mark draft `published`, write `publish_log`, mark source notes `published`.
+- ☑ **Empty/error states** — no drafts yet, agent run failed, GitHub returned 422, etc.
+- ☑ **Tests** — Playwright e2e: from raw notes → draft → edit → publish → assert issue URL stored.
 
 ### Phase 4 acceptance
 
-Full happy path of PRD Flow 2 works end-to-end against a real GitHub repo.
+☑ Full happy path of PRD Flow 2 works end-to-end against a real GitHub repo.
 
 ---
 

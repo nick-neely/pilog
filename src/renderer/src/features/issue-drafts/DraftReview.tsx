@@ -21,6 +21,7 @@ import {
   EmptyTitle
 } from '@renderer/components/ui/empty'
 import { Input } from '@renderer/components/ui/input'
+import { ScrollArea } from '@renderer/components/ui/scroll-area'
 import {
   Select,
   SelectContent,
@@ -30,6 +31,7 @@ import {
   SelectValue
 } from '@renderer/components/ui/select'
 import { Textarea } from '@renderer/components/ui/textarea'
+import type { RunNavigationOrigin } from '@renderer/features/agent-runs/navigation'
 import { cn } from '@renderer/lib/utils'
 import type {
   AgentRunListItem,
@@ -80,7 +82,7 @@ function hasDraftChanges(
 
 function draftCardClassName(selected: boolean): string {
   return cn(
-    'flex w-full min-w-0 flex-col rounded-md border px-3 py-2.5 text-left transition-colors',
+    'flex w-full max-w-full min-w-0 flex-col overflow-hidden rounded-md border px-3 py-2.5 text-left transition-colors',
     'focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30',
     selected ? 'border-border bg-muted' : 'border-transparent hover:bg-muted/60'
   )
@@ -94,6 +96,18 @@ function confidenceLabel(confidence: IssueDraft['confidence']): string {
       return 'Medium confidence'
     case 'low':
       return 'Low confidence'
+  }
+}
+
+/** Sidebar list rows only: keeps rhythm with inbox without long pill text. */
+function confidenceSidebarShort(confidence: IssueDraft['confidence']): string {
+  switch (confidence) {
+    case 'high':
+      return 'High'
+    case 'medium':
+      return 'Med'
+    case 'low':
+      return 'Low'
   }
 }
 
@@ -205,7 +219,7 @@ type PublishBlock = {
 
 type DraftReviewNavigation = {
   onNavigateToInbox: () => void
-  onNavigateToAgentRuns: (runId?: string) => void
+  onNavigateToAgentRuns: (runId?: string, origin?: RunNavigationOrigin) => void
   onNavigateToSettings: () => void
   onNavigateToRepositories: () => void
 }
@@ -368,12 +382,16 @@ function formatPublishError(error: unknown): string {
 }
 
 export function DraftReview({
+  focusDraftId,
+  onFocusDraftHandled,
   onNavigateToInbox,
   onNavigateToAgentRuns,
   onNavigateToSettings,
   onNavigateToRepositories,
   onOpenSourceNote
 }: DraftReviewNavigation & {
+  focusDraftId?: string | null
+  onFocusDraftHandled?: () => void
   onOpenSourceNote: (noteId: string) => void
 }): React.JSX.Element {
   const [drafts, setDrafts] = useState<IssueDraftForReview[]>([])
@@ -413,6 +431,15 @@ export function DraftReview({
       void fetchDrafts()
     })
   }, [fetchDrafts])
+
+  useEffect(() => {
+    if (!focusDraftId) return
+    queueMicrotask(() => {
+      setStatusFilter(undefined)
+      setSelectedDraftId(focusDraftId)
+      onFocusDraftHandled?.()
+    })
+  }, [focusDraftId, onFocusDraftHandled])
 
   const handleDraftsInvalidated = useEffectEvent(() => {
     void fetchDrafts()
@@ -493,12 +520,105 @@ export function DraftReview({
           </div>
         </div>
 
-        <main className="min-h-0 flex-1 overflow-y-auto p-3">
-          {drafts.length === 0 ? (
+        <main className="min-h-0 flex-1">
+          <ScrollArea className="h-full">
+            <div className="min-w-0 px-3 py-3 pe-6">
+              {drafts.length === 0 ? (
+                <ReviewEmptyState
+                  className="mt-10 p-6"
+                  title={emptyTitle}
+                  description={emptyDescription}
+                  statusFilter={statusFilter}
+                  statusCounts={statusCounts}
+                  failedRuns={failedRuns}
+                  onNavigateToInbox={onNavigateToInbox}
+                  onNavigateToAgentRuns={onNavigateToAgentRuns}
+                  onSetStatusFilter={setStatusFilter}
+                />
+              ) : (
+                <ul className="flex flex-col gap-1">
+                  {drafts.map((draft) => {
+                    const draftRepoEntry = reposById.get(draft.repoId)
+                    const repoLine = draftRepoEntry
+                      ? `${draftRepoEntry.owner}/${draftRepoEntry.name}`
+                      : 'Unassigned'
+                    return (
+                      <li key={draft.id}>
+                        <button
+                          type="button"
+                          data-testid="draft-row"
+                          onClick={() => setSelectedDraftId(draft.id)}
+                          className={draftCardClassName(selectedDraftId === draft.id)}
+                        >
+                          <span className="flex min-w-0 flex-col gap-1">
+                            <span
+                              className="min-w-0 block truncate text-sm leading-snug"
+                              title={normalizeDraftTitle(draft.title)}
+                            >
+                              {normalizeDraftTitle(draft.title)}
+                            </span>
+                            <span
+                              className="block truncate font-mono text-xs text-muted-foreground/80"
+                              title={repoLine}
+                            >
+                              {repoLine}
+                            </span>
+                            <span className="flex min-w-0 items-center justify-between gap-2 text-xs">
+                              <Badge variant="secondary" className="font-medium text-foreground/80">
+                                {statusLabel(draft.status)}
+                              </Badge>
+                              <span className="tabular shrink-0 whitespace-nowrap text-muted-foreground">
+                                {formatTimestamp(draft.updatedAt)}
+                              </span>
+                            </span>
+                            <span
+                              className="line-clamp-2 min-w-0 break-words text-xs leading-snug text-muted-foreground"
+                              title={
+                                draft.labels.length > 0
+                                  ? `${confidenceLabel(draft.confidence)} · ${draft.labels.join(', ')}`
+                                  : confidenceLabel(draft.confidence)
+                              }
+                            >
+                              {draft.labels.length > 0
+                                ? `${confidenceSidebarShort(draft.confidence)} · ${draft.labels.join(' · ')}`
+                                : confidenceSidebarShort(draft.confidence)}
+                            </span>
+                          </span>
+                        </button>
+                      </li>
+                    )
+                  })}
+                </ul>
+              )}
+            </div>
+          </ScrollArea>
+        </main>
+      </aside>
+
+      <main className="min-w-0 flex-1">
+        <ScrollArea className="h-full">
+          {selectedDraft ? (
+            <DraftEditor
+              key={selectedDraft.id}
+              draft={selectedDraft}
+              mergeCandidates={mergeCandidates}
+              repoPath={selectedDraftRepo?.localPath ?? null}
+              publishBlock={selectedDraftPublishBlock}
+              onSaved={fetchDrafts}
+              onNavigateToSettings={onNavigateToSettings}
+              onNavigateToRepositories={onNavigateToRepositories}
+              onOpenSourceNote={onOpenSourceNote}
+              onStatusChanged={fetchDrafts}
+              onSplitComplete={async (newDraftId) => {
+                setSelectedDraftId(newDraftId)
+                await fetchDrafts()
+              }}
+            />
+          ) : (
             <ReviewEmptyState
-              className="mt-10 p-6"
-              title={emptyTitle}
-              description={emptyDescription}
+              className="h-full"
+              title="No draft selected"
+              description="Select a draft from the list to review and edit it."
               statusFilter={statusFilter}
               statusCounts={statusCounts}
               failedRuns={failedRuns}
@@ -506,78 +626,8 @@ export function DraftReview({
               onNavigateToAgentRuns={onNavigateToAgentRuns}
               onSetStatusFilter={setStatusFilter}
             />
-          ) : (
-            <ul className="flex flex-col gap-1">
-              {drafts.map((draft) => (
-                <li key={draft.id}>
-                  <button
-                    type="button"
-                    data-testid="draft-row"
-                    onClick={() => setSelectedDraftId(draft.id)}
-                    className={draftCardClassName(selectedDraftId === draft.id)}
-                  >
-                    <span className="flex min-w-0 flex-col gap-1">
-                      <span className="block truncate text-sm leading-snug">
-                        {normalizeDraftTitle(draft.title)}
-                      </span>
-                      <span className="flex min-w-0 items-center justify-between gap-2 text-xs">
-                        <span className="flex min-w-0 flex-wrap items-center gap-1">
-                          <Badge variant="secondary" className="font-medium text-foreground/80">
-                            {statusLabel(draft.status)}
-                          </Badge>
-                          <Badge variant="outline" className="font-normal">
-                            {confidenceLabel(draft.confidence)}
-                          </Badge>
-                          {draft.labels.slice(0, 2).map((label) => (
-                            <Badge key={label} variant="outline" className="font-normal">
-                              {label}
-                            </Badge>
-                          ))}
-                        </span>
-                        <span className="tabular shrink-0 whitespace-nowrap text-muted-foreground">
-                          {formatTimestamp(draft.updatedAt)}
-                        </span>
-                      </span>
-                    </span>
-                  </button>
-                </li>
-              ))}
-            </ul>
           )}
-        </main>
-      </aside>
-
-      <main className="min-w-0 flex-1 overflow-y-auto">
-        {selectedDraft ? (
-          <DraftEditor
-            key={selectedDraft.id}
-            draft={selectedDraft}
-            mergeCandidates={mergeCandidates}
-            repoPath={selectedDraftRepo?.localPath ?? null}
-            publishBlock={selectedDraftPublishBlock}
-            onSaved={fetchDrafts}
-            onNavigateToSettings={onNavigateToSettings}
-            onNavigateToRepositories={onNavigateToRepositories}
-            onOpenSourceNote={onOpenSourceNote}
-            onStatusChanged={fetchDrafts}
-            onSplitComplete={async (newDraftId) => {
-              setSelectedDraftId(newDraftId)
-              await fetchDrafts()
-            }}
-          />
-        ) : (
-          <ReviewEmptyState
-            className="h-full"
-            title={emptyTitle}
-            description={emptyDescription}
-            statusFilter={statusFilter}
-            statusCounts={statusCounts}
-            failedRuns={failedRuns}
-            onNavigateToInbox={onNavigateToInbox}
-            onNavigateToAgentRuns={onNavigateToAgentRuns}
-            onSetStatusFilter={setStatusFilter}
-          />
-        )}
+        </ScrollArea>
       </main>
     </div>
   )
@@ -601,7 +651,7 @@ function ReviewEmptyState({
   statusCounts: Record<IssueDraftStatus, number>
   failedRuns: AgentRunListItem[]
   onNavigateToInbox: () => void
-  onNavigateToAgentRuns: (runId?: string) => void
+  onNavigateToAgentRuns: (runId?: string, origin?: RunNavigationOrigin) => void
   onSetStatusFilter: (status: IssueDraftStatus | undefined) => void
 }): React.JSX.Element {
   return (
@@ -642,7 +692,7 @@ function ReviewEmptyActions({
             Open Inbox
           </Button>
         )}
-        {statusFilter === 'draft' && statusCounts.dismissed > 0 ? (
+        {(statusFilter === 'draft' || statusFilter === undefined) && statusCounts.dismissed > 0 ? (
           <Button
             type="button"
             variant="outline"
@@ -652,7 +702,7 @@ function ReviewEmptyActions({
             Show dismissed drafts
           </Button>
         ) : null}
-        {statusFilter === 'draft' && statusCounts.published > 0 ? (
+        {(statusFilter === 'draft' || statusFilter === undefined) && statusCounts.published > 0 ? (
           <Button
             type="button"
             variant="outline"
@@ -672,7 +722,7 @@ function FailedRunsNotice({
   onNavigateToAgentRuns
 }: {
   failedRuns: AgentRunListItem[]
-  onNavigateToAgentRuns: (runId?: string) => void
+  onNavigateToAgentRuns: (runId?: string, origin?: RunNavigationOrigin) => void
 }): React.JSX.Element | null {
   if (failedRuns.length === 0) return null
 
@@ -694,11 +744,16 @@ function FailedRunsNotice({
           type="button"
           variant="outline"
           size="sm"
-          onClick={() => onNavigateToAgentRuns(latest.id)}
+          onClick={() => onNavigateToAgentRuns(latest.id, { kind: 'drafts', label: 'Failed run' })}
         >
           Inspect run
         </Button>
-        <Button type="button" variant="ghost" size="sm" onClick={() => onNavigateToAgentRuns()}>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => onNavigateToAgentRuns(undefined, { kind: 'history' })}
+        >
           All runs
         </Button>
       </div>
@@ -1398,7 +1453,7 @@ function SourceNoteItem({
             <span className="tabular text-xs text-muted-foreground">
               {formatTimestamp(note.createdAt)}
             </span>
-            <span className="truncate font-mono text-xs text-muted-foreground">
+            <span className="min-w-0 truncate font-mono text-xs text-muted-foreground">
               {note.id.slice(0, 8)}
             </span>
           </span>
@@ -1427,7 +1482,7 @@ function SourceNoteItem({
           <span className="tabular text-xs text-muted-foreground">
             {formatTimestamp(note.createdAt)}
           </span>
-          <span className="truncate font-mono text-xs text-muted-foreground">
+          <span className="min-w-0 truncate font-mono text-xs text-muted-foreground">
             {note.id.slice(0, 8)}
           </span>
         </span>

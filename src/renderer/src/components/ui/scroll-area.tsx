@@ -1,5 +1,5 @@
-import * as React from 'react'
 import { ScrollArea as ScrollAreaPrimitive } from 'radix-ui'
+import * as React from 'react'
 
 import { cn } from '@renderer/lib/utils'
 
@@ -11,12 +11,17 @@ function ScrollArea({
   return (
     <ScrollAreaPrimitive.Root
       data-slot="scroll-area"
-      className={cn('relative', className)}
+      className={cn('relative min-w-0', className)}
       {...props}
     >
       <ScrollAreaPrimitive.Viewport
         data-slot="scroll-area-viewport"
-        className="size-full rounded-[inherit] transition-[color,box-shadow] outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-1"
+        className={cn(
+          'size-full min-w-0 max-w-full rounded-[inherit] transition-[color,box-shadow] outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-1',
+          // Radix injects a content wrapper with minWidth:100% + display:table, which prevents
+          // flex children from shrinking and breaks text truncation in narrow sidebars.
+          '[&>div]:!block [&>div]:!min-w-0 [&>div]:!max-w-full'
+        )}
       >
         {children}
       </ScrollAreaPrimitive.Viewport>
@@ -44,7 +49,7 @@ function ScrollBar({
     >
       <ScrollAreaPrimitive.ScrollAreaThumb
         data-slot="scroll-area-thumb"
-        className="relative flex-1 rounded-full bg-border"
+        className="relative flex-1 rounded-full bg-[var(--scrollbar-thumb)] transition-colors hover:bg-[var(--scrollbar-thumb-hover)]"
       />
     </ScrollAreaPrimitive.ScrollAreaScrollbar>
   )

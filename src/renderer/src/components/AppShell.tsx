@@ -18,10 +18,11 @@ import { ViewTabs, type ViewTab } from '@renderer/features/shared/ViewTabs'
 //      battling the sidebar's fixed 320px budget.
 
 interface AppShellProps {
-  tabs: ViewTab[]
-  activeTab: string
+  tabs?: ViewTab[]
+  activeTab?: string
   onTabChange: (next: string) => void
   onNavigateToSettings: () => void
+  navigationSlot?: ReactNode
   /**
    * If provided, the search/Cmd-K affordance shows in the strip.
    * Hidden on views that don't have a palette (e.g., Agent Runs) so the
@@ -36,6 +37,7 @@ export function AppShell({
   activeTab,
   onTabChange,
   onNavigateToSettings,
+  navigationSlot,
   onOpenCommandPalette,
   children
 }: AppShellProps): React.JSX.Element {
@@ -48,7 +50,12 @@ export function AppShell({
   return (
     <div className="flex h-screen flex-col bg-background text-foreground">
       <header className="flex h-12 shrink-0 items-center justify-between gap-4 border-b bg-background px-4">
-        <ViewTabs tabs={tabs} active={activeTab} onChange={onTabChange} />
+        <div className="min-w-0">
+          {navigationSlot ??
+            (tabs && activeTab ? (
+              <ViewTabs tabs={tabs} active={activeTab} onChange={onTabChange} />
+            ) : null)}
+        </div>
         <div className="flex shrink-0 items-center gap-1">
           {onOpenCommandPalette ? (
             <Button

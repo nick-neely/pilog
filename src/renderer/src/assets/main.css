@@ -72,6 +72,10 @@
   --sidebar-accent-foreground: oklch(0.22 0.012 60);
   --sidebar-border: oklch(0.88 0.008 70);
   --sidebar-ring: oklch(0.48 0.08 145);
+
+  /* Scrollbar — warm neutral thumb, subtle hover lift */
+  --scrollbar-thumb: oklch(0.75 0.009 70);
+  --scrollbar-thumb-hover: oklch(0.65 0.011 70);
 }
 
 .dark {
@@ -115,6 +119,10 @@
   --sidebar-accent-foreground: oklch(0.92 0.008 75);
   --sidebar-border: oklch(0.92 0.008 75 / 8%);
   --sidebar-ring: oklch(0.6 0.085 145);
+
+  /* Scrollbar — warm-tinted alpha for dark surfaces */
+  --scrollbar-thumb: oklch(0.92 0.008 75 / 25%);
+  --scrollbar-thumb-hover: oklch(0.92 0.008 75 / 40%);
 }
 
 @layer base {
@@ -139,6 +147,32 @@
   pre,
   samp {
     font-family: var(--font-mono);
+  }
+
+  /* Scrollbar — warm neutrals, Reading-Room palette.
+     WebKit for Chromium/Electron; scrollbar-color for Firefox. */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--scrollbar-thumb);
+    border-radius: 9999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--scrollbar-thumb-hover);
+  }
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  /* Firefox */
+  html {
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-thumb) transparent;
   }
 }
 
