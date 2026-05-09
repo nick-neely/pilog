@@ -166,6 +166,12 @@ function formatDraftCount(count: number, status: IssueDraftStatus): string {
   return `${count} ${label} draft${count === 1 ? '' : 's'}`
 }
 
+function publishButtonLabel(input: { publishing: boolean; published: boolean }): string {
+  if (input.publishing) return 'Publishing'
+  if (input.published) return 'Published'
+  return 'Publish'
+}
+
 export function DraftReview({
   onOpenSourceNote
 }: {
@@ -513,12 +519,6 @@ function DraftEditor({
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
-  useEffect(() => {
-    setSplitMode(false)
-    setSplitSourceNoteIds([])
-    setSplitError(null)
-  }, [draft.id])
-
   return (
     <article className="mx-auto flex min-h-full max-w-5xl flex-col">
       <header className="shrink-0 border-b px-8 py-5">
@@ -544,7 +544,7 @@ function DraftEditor({
               onClick={() => void handlePublish()}
             >
               <HugeiconsIcon icon={ViewIcon} data-icon="inline-start" aria-hidden />
-              {publishing ? 'Publishing' : isPublished ? 'Published' : 'Publish'}
+              {publishButtonLabel({ publishing, published: isPublished })}
             </Button>
             {draft.status === 'dismissed' ? (
               <Button

@@ -260,15 +260,10 @@ export function markIssueDraftPublished(
     githubIssueUrl: string
   }
 ): IssueDraft | null {
-  const existing = db
-    .select({ updatedAt: issueDrafts.updatedAt })
-    .from(issueDrafts)
-    .where(eq(issueDrafts.id, input.id))
-    .get()
+  const previousUpdatedAt = getIssueDraftUpdatedAt(db, input.id)
+  if (!previousUpdatedAt) return null
 
-  if (!existing) return null
-
-  const now = nextUpdatedAt(existing.updatedAt)
+  const now = nextUpdatedAt(previousUpdatedAt)
 
   db.update(issueDrafts)
     .set({
