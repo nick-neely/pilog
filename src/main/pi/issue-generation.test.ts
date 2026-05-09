@@ -10,9 +10,11 @@ import { createInMemoryDatabase } from '../db/client'
 import { runMigrations } from '../db/migrations'
 import { createAgentRun } from '../db/repositories/agent-runs'
 import { createNote, listNotes } from '../db/repositories/notes'
+import { listPublishLog } from '../db/repositories/publish-log'
 import { createRepo } from '../db/repositories/repos'
 import { agentRuns, issueDrafts } from '../db/schema'
 import {
+  planAutoPublishPreviewDrafts,
   buildIssueGenerationPrompt,
   createSubmitIssueDraftsTool,
   persistGeneratedIssueDrafts,
@@ -163,6 +165,79 @@ describe('issue generation', () => {
       'drafted',
       'drafted'
     ])
+  })
+
+  it('plans auto-publish preview drafts with guardrails before any publish writes', () => {
+    const db = createInMemoryDatabase()
+    runMigrations(db)
+    const repo = createRepo(db, {
+      owner: 'nick-neely',
+      name: 'pilog',
+      localPath: '/workspace/pilog',
+      githubUrl: 'https://github.com/nick-neely/pilog',
+      defaultBranch: 'main'
+    })
+    const noteIds = ['settings spacing', 'avatar error', 'auth redirect'].map(
+      (content) => createNote(db, { content, repoId: repo.id }).id
+    )
+    const run = createAgentRun(db, { repoId: repo.id, inputNoteIds: noteIds })
+    const generatedDrafts = [
+      {
+        ...draft,
+        title: 'Fix settings spacing',
+        sourceNoteIds: [noteIds[0]!],
+        suggestedLabels: ['bug', 'triaged-by-pilog']
+      },
+      {
+        ...draft,
+        title: 'Handle avatar errors',
+        sourceNoteIds: [noteIds[1]!],
+        suggestedLabels: ['ux']
+      },
+      {
+        ...draft,
+        title: 'Repair auth redirect',
+        sourceNoteIds: [noteIds[2]!],
+        suggestedLabels: []
+      }
+    ]
+
+    const plan = planAutoPublishPreviewDrafts({
+      repo: {
+        ...repo,
+        autoPublishEnabled: true,
+        autoPublishMaxIssuesPerRun: 2,
+        autoPublishDefaultLabel: 'triaged-by-pilog',
+        autoPublishDryRun: true,
+        autoPublishRequireConfirmation: true
+      },
+      drafts: generatedDrafts
+    })
+    const draftIds = persistGeneratedIssueDrafts(db, {
+      runId: run.id,
+      repoId: repo.id,
+      selectedNoteIds: noteIds,
+      drafts: plan.drafts,
+      eventStream: [{ type: 'final', drafts: plan.drafts, autoPublishPreview: plan.summary }]
+    })
+
+    const persistedDrafts = db.select().from(issueDrafts).all()
+
+    expect(plan.summary).toMatchObject({
+      generatedDraftCount: 3,
+      plannedDraftCount: 2,
+      maxIssuesPerRun: 2,
+      defaultLabel: 'triaged-by-pilog',
+      dryRun: true,
+      limited: true
+    })
+    expect(plan.summary.message).toContain('1 draft is held back')
+    expect(draftIds).toHaveLength(2)
+    expect(persistedDrafts.map((persisted) => JSON.parse(persisted.labels))).toEqual([
+      ['bug', 'triaged-by-pilog'],
+      ['ux', 'triaged-by-pilog']
+    ])
+    expect(listPublishLog(db, { repoId: repo.id })).toEqual([])
   })
 
   it('persists split drafts that share one source note', () => {

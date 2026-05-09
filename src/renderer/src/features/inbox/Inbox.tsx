@@ -1,4 +1,10 @@
-import { Add01Icon, Cancel01Icon, CancelCircleIcon, SparklesIcon } from '@hugeicons/core-free-icons'
+import {
+  Add01Icon,
+  Cancel01Icon,
+  CancelCircleIcon,
+  GithubIcon,
+  SparklesIcon
+} from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
   AlertDialog,
@@ -35,7 +41,12 @@ import type {
   PiStatus,
   Repo
 } from '@shared/ipc'
-import type { IssueDraftForReview, IssueDraftStatus } from '@shared/types'
+import type {
+  AutoPublishPreviewSummary,
+  GeneratedIssueDraft,
+  IssueDraftForReview,
+  IssueDraftStatus
+} from '@shared/types'
 import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
 import { StatusFilter } from './StatusFilter'
 
@@ -165,6 +176,17 @@ function getGenerateDraftsReason(input: {
     return 'Choose an active Pi provider and model in Settings.'
   }
   return 'Generate one issue draft from the selected notes.'
+}
+
+function getGenerateAndPublishReason(input: {
+  canGenerateDrafts: boolean
+  generateDraftsReason: string
+  repo: Repo | null
+}): string {
+  if (!input.canGenerateDrafts) return input.generateDraftsReason
+  if (!input.repo?.autoPublishEnabled) return 'Enable auto-publish for this repository first.'
+  if (input.repo.autoPublishDryRun) return 'Generate a dry-run publish plan for selected notes.'
+  return 'Generate planned drafts for review before GitHub writes.'
 }
 
 function NoteDetail({
@@ -325,6 +347,117 @@ function NoteDetail({
   )
 }
 
+function AutoPublishPreviewDialog({
+  open,
+  summary,
+  drafts,
+  sourceNotes,
+  onOpenChange,
+  onOpenDrafts
+}: {
+  open: boolean
+  summary: AutoPublishPreviewSummary | null
+  drafts: GeneratedIssueDraft[]
+  sourceNotes: Note[]
+  onOpenChange: (open: boolean) => void
+  onOpenDrafts: () => void
+}): React.JSX.Element {
+  const sourceNotesById = useMemo(
+    () => new Map(sourceNotes.map((note) => [note.id, note])),
+    [sourceNotes]
+  )
+
+  return (
+    <AlertDialog open={open} onOpenChange={onOpenChange}>
+      <AlertDialogContent className="max-h-[min(42rem,calc(100vh-4rem))] max-w-3xl">
+        <AlertDialogHeader>
+          <AlertDialogTitle>
+            {summary?.dryRun ? 'Dry-run publish plan' : 'Review planned GitHub issues'}
+          </AlertDialogTitle>
+          <AlertDialogDescription>
+            {summary?.message ?? 'PiLog planned these drafts for review before any GitHub writes.'}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        {summary ? (
+          <div className="flex flex-wrap gap-2 text-xs text-muted-foreground" role="status">
+            <Badge variant="secondary">
+              {summary.plannedDraftCount} planned of {summary.generatedDraftCount}
+            </Badge>
+            <Badge variant="secondary">Limit {summary.maxIssuesPerRun}</Badge>
+            <Badge variant="secondary">Label {summary.defaultLabel}</Badge>
+            {summary.dryRun ? <Badge variant="secondary">Dry run, no GitHub writes</Badge> : null}
+          </div>
+        ) : null}
+        <ScrollArea className="max-h-[24rem] pe-3">
+          <div className="flex flex-col gap-4">
+            {drafts.map((draft, index) => (
+              <section key={`${draft.title}-${index}`} className="border-t pt-4 first:border-t-0">
+                <div className="flex flex-col gap-2">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <h3 className="max-w-[52ch] text-base font-semibold leading-snug">
+                      {draft.title}
+                    </h3>
+                    <Badge variant="outline">Confidence {draft.confidence}</Badge>
+                  </div>
+                  <p className="max-w-[68ch] text-sm leading-relaxed text-muted-foreground">
+                    {draft.summary}
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {draft.suggestedLabels.map((label) => (
+                      <Badge key={label} variant="secondary">
+                        {label}
+                      </Badge>
+                    ))}
+                  </div>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div className="flex flex-col gap-1">
+                      <p className="text-xs font-medium text-muted-foreground">Source notes</p>
+                      <ul className="flex flex-col gap-1">
+                        {draft.sourceNoteIds.map((noteId) => {
+                          const note = sourceNotesById.get(noteId)
+                          const preview = note?.content.trim() || noteId
+                          return (
+                            <li
+                              key={noteId}
+                              className="line-clamp-2 text-sm leading-relaxed"
+                              title={preview}
+                            >
+                              {preview}
+                            </li>
+                          )
+                        })}
+                      </ul>
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <p className="text-xs font-medium text-muted-foreground">Affected files</p>
+                      <ul className="flex flex-col gap-1">
+                        {draft.affectedFiles.map((file) => (
+                          <li key={file.path} className="min-w-0">
+                            <p className="truncate font-mono text-xs" title={file.path}>
+                              {file.path}
+                            </p>
+                            <p className="line-clamp-2 text-xs text-muted-foreground">
+                              {file.reason}
+                            </p>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              </section>
+            ))}
+          </div>
+        </ScrollArea>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Close</AlertDialogCancel>
+          <AlertDialogAction onClick={onOpenDrafts}>Open Drafts</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  )
+}
+
 export function Inbox({
   focusNoteId,
   onFocusNoteHandled,
@@ -348,6 +481,13 @@ export function Inbox({
   const [repos, setRepos] = useState<Repo[]>([])
   const [piStatus, setPiStatus] = useState<PiStatus>({ configured: false })
   const [generating, setGenerating] = useState(false)
+  const [autoPublishPreviewOpen, setAutoPublishPreviewOpen] = useState(false)
+  const [autoPublishPreviewSummary, setAutoPublishPreviewSummary] =
+    useState<AutoPublishPreviewSummary | null>(null)
+  const [autoPublishPreviewDrafts, setAutoPublishPreviewDrafts] = useState<GeneratedIssueDraft[]>(
+    []
+  )
+  const [autoPublishPreviewNotes, setAutoPublishPreviewNotes] = useState<Note[]>([])
   const [statusFilter, setStatusFilter] = useState<NoteStatus | undefined>()
   const [repoFilter, setRepoFilter] = useState<string | null | undefined>(undefined)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -532,6 +672,10 @@ export function Inbox({
   const selectedNotesShareRepo =
     selectedNotes.length > 0 && selectedRepoIds.size === 1 && !selectedRepoIds.has(null)
   const selectedNotesAllUnprocessed = selectedNotes.every((note) => note.status === 'unprocessed')
+  const selectedRepo =
+    selectedNotesShareRepo && selectedNotes[0]?.repoId
+      ? (reposById.get(selectedNotes[0].repoId) ?? null)
+      : null
   const canGenerateDrafts =
     hasSelection &&
     selectedNotesAllUnprocessed &&
@@ -544,6 +688,12 @@ export function Inbox({
     selectedNotesAllUnprocessed,
     piStatus,
     generating
+  })
+  const canGenerateAndPublish = canGenerateDrafts && selectedRepo?.autoPublishEnabled === true
+  const generateAndPublishReason = getGenerateAndPublishReason({
+    canGenerateDrafts,
+    generateDraftsReason,
+    repo: selectedRepo
   })
 
   // Esc clears note selection. The listener uses
@@ -580,16 +730,26 @@ export function Inbox({
       : 'No notes yet. Capture a thought from the footer below.'
   }, [statusFilter, repoFilter])
 
-  const handleGenerateDrafts = async (): Promise<void> => {
+  const handleGenerateDrafts = async (mode: 'review' | 'auto-publish-preview'): Promise<void> => {
     if (!canGenerateDrafts) return
+    if (mode === 'auto-publish-preview' && !canGenerateAndPublish) return
+    const selectedNoteSnapshot = [...selectedNotes]
+    const selectedIdSnapshot = [...selectedIds]
     setGenerating(true)
     try {
-      await window.pilog.runAgent({ noteIds: [...selectedIds] }, async (event) => {
+      await window.pilog.runAgent({ noteIds: selectedIdSnapshot, mode }, async (event) => {
         if (event.type === 'final') {
           if (!mountedRef.current) return
           await Promise.all([fetchNotes(), fetchStatusCounts(), fetchDraftLinks()])
-          clearSelection()
-          onNavigateToDraftReview()
+          if (mode === 'auto-publish-preview' && event.autoPublishPreview) {
+            setAutoPublishPreviewSummary(event.autoPublishPreview)
+            setAutoPublishPreviewDrafts(event.drafts)
+            setAutoPublishPreviewNotes(selectedNoteSnapshot)
+            setAutoPublishPreviewOpen(true)
+          } else {
+            clearSelection()
+            onNavigateToDraftReview()
+          }
         }
         if (event.type === 'error') {
           console.error(event.message)
@@ -781,7 +941,7 @@ export function Inbox({
                         disabled={!canGenerateDrafts}
                         title={generateDraftsReason}
                         className="w-full justify-center"
-                        onClick={() => void handleGenerateDrafts()}
+                        onClick={() => void handleGenerateDrafts('review')}
                       >
                         <HugeiconsIcon icon={SparklesIcon} data-icon="inline-start" aria-hidden />
                         {generating ? 'Generating' : 'Generate Drafts'}
@@ -801,6 +961,28 @@ export function Inbox({
                   Dismiss
                 </Button>
               </div>
+              {selectedRepo ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span>
+                      <Button
+                        size="sm"
+                        variant={canGenerateAndPublish ? 'outline' : 'ghost'}
+                        disabled={!canGenerateAndPublish}
+                        title={generateAndPublishReason}
+                        className="w-full justify-center"
+                        onClick={() => void handleGenerateDrafts('auto-publish-preview')}
+                      >
+                        <HugeiconsIcon icon={GithubIcon} data-icon="inline-start" aria-hidden />
+                        {generating ? 'Planning' : 'Generate and Publish'}
+                      </Button>
+                    </span>
+                  </TooltipTrigger>
+                  {!canGenerateAndPublish && (
+                    <TooltipContent>{generateAndPublishReason}</TooltipContent>
+                  )}
+                </Tooltip>
+              ) : null}
               {!piStatus.configured && selectedNotesShareRepo && (
                 <Button
                   type="button"
@@ -855,6 +1037,18 @@ export function Inbox({
           </Empty>
         )}
       </section>
+      <AutoPublishPreviewDialog
+        open={autoPublishPreviewOpen}
+        summary={autoPublishPreviewSummary}
+        drafts={autoPublishPreviewDrafts}
+        sourceNotes={autoPublishPreviewNotes}
+        onOpenChange={setAutoPublishPreviewOpen}
+        onOpenDrafts={() => {
+          setAutoPublishPreviewOpen(false)
+          clearSelection()
+          onNavigateToDraftReview()
+        }}
+      />
     </div>
   )
 }

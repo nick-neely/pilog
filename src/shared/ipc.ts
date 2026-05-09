@@ -5,7 +5,9 @@ import type {
   AgentRunListItem,
   AgentRunStatus,
   AgentRunStatusCounts,
+  AutoPublishPreviewSummary,
   GenerateDraftsRequest,
+  GenerateDraftsMode,
   GenerateDraftsStartResponse,
   IssueDraft,
   IssueDraftForReview,
@@ -310,6 +312,7 @@ export type IpcContract = {
     response: void
   }
   'debug:listIssueDrafts': { request: void; response: IssueDraft[] }
+  'debug:listPublishLog': { request: { repoId: string }; response: PublishLogEntry[] }
 }
 
 export type IpcChannel = keyof IpcContract
@@ -333,7 +336,9 @@ export type {
   AgentRunListItem,
   AgentRunStatus,
   AgentRunStatusCounts,
+  AutoPublishPreviewSummary,
   GenerateDraftsRequest,
+  GenerateDraftsMode,
   IssueDraftStatus,
   PiActiveConfig,
   PiModelOption,

@@ -1,6 +1,6 @@
 import type { AgentTool } from '@earendil-works/pi-agent-core'
 import type { Note, Repo } from '@shared/ipc'
-import type { SearchProvider } from '@shared/types'
+import type { AutoPublishPreviewSummary, SearchProvider } from '@shared/types'
 import {
   GeneratedIssueDraftsSchema,
   SubmitIssueDraftsParameters,
@@ -25,6 +25,11 @@ export type IssueGenerationInput = {
 }
 
 export type RunAgent = (input: IssueGenerationInput) => AsyncIterable<AgentEvent>
+
+export type AutoPublishPreviewPlan = {
+  drafts: GeneratedIssueDraft[]
+  summary: AutoPublishPreviewSummary
+}
 
 export function buildIssueGenerationPrompt(input: { repo: Repo; notes: Note[] }): string {
   const noteBlock = input.notes
@@ -187,6 +192,65 @@ export function persistGeneratedIssueDrafts(
 
     return draftIds
   })
+}
+
+export function planAutoPublishPreviewDrafts(input: {
+  repo: Repo
+  drafts: GeneratedIssueDraft[]
+}): AutoPublishPreviewPlan {
+  if (!input.repo.autoPublishEnabled) {
+    throw new Error('Auto-publish is not enabled for this repository.')
+  }
+
+  const maxIssuesPerRun = Math.max(1, Math.floor(input.repo.autoPublishMaxIssuesPerRun))
+  const defaultLabel = input.repo.autoPublishDefaultLabel.trim()
+  const plannedDrafts = input.drafts.slice(0, maxIssuesPerRun).map((draft) => ({
+    ...draft,
+    suggestedLabels: applyDefaultLabel(draft.suggestedLabels, defaultLabel)
+  }))
+  const heldBackCount = Math.max(0, input.drafts.length - plannedDrafts.length)
+  const limited = heldBackCount > 0
+
+  return {
+    drafts: plannedDrafts,
+    summary: {
+      repoId: input.repo.id,
+      generatedDraftCount: input.drafts.length,
+      plannedDraftCount: plannedDrafts.length,
+      maxIssuesPerRun,
+      defaultLabel,
+      dryRun: input.repo.autoPublishDryRun,
+      requireConfirmation: input.repo.autoPublishRequireConfirmation,
+      limited,
+      message: buildAutoPublishPreviewMessage({
+        heldBackCount,
+        maxIssuesPerRun,
+        dryRun: input.repo.autoPublishDryRun
+      })
+    }
+  }
+}
+
+function applyDefaultLabel(labels: string[], defaultLabel: string): string[] {
+  if (!defaultLabel) return labels
+  const seen = new Set(labels.map((label) => label.toLowerCase()))
+  return seen.has(defaultLabel.toLowerCase()) ? labels : [...labels, defaultLabel]
+}
+
+function buildAutoPublishPreviewMessage(input: {
+  heldBackCount: number
+  maxIssuesPerRun: number
+  dryRun: boolean
+}): string {
+  const dryRunPrefix = input.dryRun
+    ? 'Dry run: PiLog planned these drafts and will not write to GitHub.'
+    : 'PiLog planned these drafts for review before any GitHub writes.'
+
+  if (input.heldBackCount === 0) return dryRunPrefix
+
+  return `${dryRunPrefix} ${input.heldBackCount} ${
+    input.heldBackCount === 1 ? 'draft is' : 'drafts are'
+  } held back by the ${input.maxIssuesPerRun}-issue limit.`
 }
 
 export function validateAndCollectSourceNoteIds(

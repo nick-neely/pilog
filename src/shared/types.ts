@@ -78,7 +78,11 @@ export type ErrorCause =
 export type AgentEvent =
   | { type: 'progress'; phase: string }
   | { type: 'partial'; text: string }
-  | { type: 'final'; drafts: GeneratedIssueDraft[] }
+  | {
+      type: 'final'
+      drafts: GeneratedIssueDraft[]
+      autoPublishPreview?: AutoPublishPreviewSummary
+    }
   | { type: 'error'; message: string; cause: ErrorCause }
 
 export type AgentRunStatus = 'running' | 'succeeded' | 'failed' | 'cancelled'
@@ -114,8 +118,23 @@ export type AgentRunDetail = AgentRunListItem & {
   eventStream: unknown[]
 }
 
+export type GenerateDraftsMode = 'review' | 'auto-publish-preview'
+
+export type AutoPublishPreviewSummary = {
+  repoId: string
+  generatedDraftCount: number
+  plannedDraftCount: number
+  maxIssuesPerRun: number
+  defaultLabel: string
+  dryRun: boolean
+  requireConfirmation: boolean
+  limited: boolean
+  message: string
+}
+
 export type GenerateDraftsRequest = {
   noteIds: string[]
+  mode?: GenerateDraftsMode
 }
 
 export type GenerateDraftsStartResponse = {

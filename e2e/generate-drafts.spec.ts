@@ -100,6 +100,63 @@ test('Generate Drafts persists one issue draft from selected repo notes', async 
   }
 })
 
+test('Generate and Publish dry run previews planned drafts without publish writes', async () => {
+  const app = await launchApp()
+  const page = await app.firstWindow()
+
+  try {
+    const seed = await page.evaluate(
+      async ({ repoPath }) => {
+        return window.pilog.invoke('debug:seedIssueGenerationFixture', {
+          repoPath,
+          notes: ['dry run publish: save button needs loading state']
+        })
+      },
+      { repoPath: repoDir }
+    )
+    await page.evaluate(async ({ repoId }) => {
+      await window.pilog.invoke('repos:updateAutoPublishSettings', {
+        id: repoId,
+        autoPublishEnabled: true,
+        autoPublishMaxIssuesPerRun: 2,
+        autoPublishDefaultLabel: 'ready-for-agent',
+        autoPublishDryRun: true,
+        autoPublishRequireConfirmation: true
+      })
+    }, seed)
+    await page.reload()
+
+    const noteRows = page.locator('[data-testid="note-row"]')
+    await expect(noteRows).toHaveCount(1)
+    await noteRows.first().click()
+
+    const generateAndPublish = page.getByRole('button', {
+      name: 'Generate and Publish',
+      exact: true
+    })
+    await expect(generateAndPublish).toBeEnabled()
+    await generateAndPublish.click()
+
+    await expect(page.getByRole('alertdialog')).toContainText('Dry-run publish plan')
+    await expect(page.getByRole('alertdialog')).toContainText('Dry run, no GitHub writes')
+    await expect(page.getByRole('alertdialog')).toContainText('Triage selected PiLog notes')
+    await expect(page.getByRole('alertdialog')).toContainText('ready-for-agent')
+
+    const drafts = await page.evaluate(async () => window.pilog.invoke('debug:listIssueDrafts'))
+    expect(drafts).toHaveLength(1)
+    expect(drafts[0]?.labels).toEqual(['triaged-by-pilog', 'ready-for-agent'])
+    await expect
+      .poll(async () =>
+        page.evaluate(async ({ repoId }) => {
+          return window.pilog.invoke('debug:listPublishLog', { repoId })
+        }, seed)
+      )
+      .toEqual([])
+  } finally {
+    await exitApp(app)
+  }
+})
+
 test('Draft Review explains an empty queue and returns to Inbox', async () => {
   const app = await launchApp()
   const page = await app.firstWindow()

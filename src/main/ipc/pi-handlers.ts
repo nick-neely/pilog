@@ -10,6 +10,7 @@ import {
 } from '../db/repositories/agent-runs'
 import { listIssueDrafts } from '../db/repositories/issue-drafts'
 import { createNote } from '../db/repositories/notes'
+import { listPublishLog } from '../db/repositories/publish-log'
 import { createRepo } from '../db/repositories/repos'
 import { getSetting, setSetting } from '../db/repositories/settings'
 import {
@@ -30,6 +31,7 @@ import {
 } from '../pi/advanced-config'
 import {
   getSelectedNotesForGeneration,
+  planAutoPublishPreviewDrafts,
   persistGeneratedIssueDrafts,
   type RunAgent
 } from '../pi/issue-generation'
@@ -123,8 +125,12 @@ export function registerPiIpcHandlers(
       request: IpcRequest<'pi:generateDrafts:start'>
     ): Promise<IpcResponse<'pi:generateDrafts:start'>> => {
       const { repo, notes } = getSelectedNotesForGeneration(db, request.noteIds)
+      const mode = request.mode ?? 'review'
       if (!existsSync(repo.localPath))
         throw new Error('The linked repository path no longer exists.')
+      if (mode === 'auto-publish-preview' && !repo.autoPublishEnabled) {
+        throw new Error('Auto-publish is not enabled for this repository.')
+      }
 
       const provider = getSetting(db, 'pi.activeProvider')
       const model = getSetting(db, 'pi.activeModel')
@@ -172,15 +178,26 @@ export function registerPiIpcHandlers(
             signal: controller.signal
           })) {
             if (active.finalized) break
-            appendAgentEvent(db, run.id, active, agentEvent)
+            const eventForRenderer =
+              agentEvent.type === 'final' && mode === 'auto-publish-preview'
+                ? (() => {
+                    const plan = planAutoPublishPreviewDrafts({ repo, drafts: agentEvent.drafts })
+                    return {
+                      type: 'final' as const,
+                      drafts: plan.drafts,
+                      autoPublishPreview: plan.summary
+                    }
+                  })()
+                : agentEvent
+            appendAgentEvent(db, run.id, active, eventForRenderer)
 
-            if (agentEvent.type === 'final') {
+            if (eventForRenderer.type === 'final') {
               try {
                 persistGeneratedIssueDrafts(db, {
                   runId: run.id,
                   repoId: repo.id,
                   selectedNoteIds: notes.map((note) => note.id),
-                  drafts: agentEvent.drafts,
+                  drafts: eventForRenderer.drafts,
                   eventStream: active.eventStream
                 })
                 active.finalized = true
@@ -205,18 +222,18 @@ export function registerPiIpcHandlers(
               }
             }
 
-            if (agentEvent.type === 'error' && !active.finalized) {
+            if (eventForRenderer.type === 'error' && !active.finalized) {
               finalizeAgentRun(db, {
                 id: run.id,
-                status: agentEvent.cause === 'cancelled' ? 'cancelled' : 'failed',
-                errorMessage: agentEvent.message,
-                errorCause: agentEvent.cause,
+                status: eventForRenderer.cause === 'cancelled' ? 'cancelled' : 'failed',
+                errorMessage: eventForRenderer.message,
+                errorCause: eventForRenderer.cause,
                 eventStream: active.eventStream
               })
               active.finalized = true
             }
 
-            port1.postMessage(agentEvent)
+            port1.postMessage(eventForRenderer)
           }
 
           if (!active.finalized) {
@@ -316,6 +333,9 @@ export function registerPiIpcHandlers(
     })
 
     ipcMain.handle('debug:listIssueDrafts', () => listIssueDrafts(db, { status: 'all' }))
+    ipcMain.handle('debug:listPublishLog', (_event, request: IpcRequest<'debug:listPublishLog'>) =>
+      listPublishLog(db, request)
+    )
   }
 }
 
