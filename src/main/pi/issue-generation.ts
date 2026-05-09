@@ -122,15 +122,7 @@ export function getSelectedNotesForGeneration(
 
   const order = new Map(noteIds.map((id, index) => [id, index]))
   const orderedNotes = rows
-    .map((row) => ({
-      id: row.id,
-      content: row.content,
-      status: row.status,
-      repoId: row.repoId,
-      runId: row.runId ?? null,
-      createdAt: row.createdAt,
-      updatedAt: row.updatedAt
-    }))
+    .map(mapNoteRowForGeneration)
     .sort((a, b) => order.get(a.id)! - order.get(b.id)!)
 
   return { repo, notes: orderedNotes }
@@ -152,15 +144,19 @@ export function getCurrentInboxNotesForGeneration(
 
   return {
     repo,
-    notes: rows.map((row) => ({
-      id: row.id,
-      content: row.content,
-      status: row.status,
-      repoId: row.repoId,
-      runId: row.runId ?? null,
-      createdAt: row.createdAt,
-      updatedAt: row.updatedAt
-    }))
+    notes: rows.map(mapNoteRowForGeneration)
+  }
+}
+
+function mapNoteRowForGeneration(row: typeof notes.$inferSelect): Note {
+  return {
+    id: row.id,
+    content: row.content,
+    status: row.status,
+    repoId: row.repoId,
+    runId: row.runId ?? null,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt
   }
 }
 

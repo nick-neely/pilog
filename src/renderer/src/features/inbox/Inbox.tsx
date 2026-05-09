@@ -201,6 +201,33 @@ function getGenerateAndPublishReason(input: {
   return 'Generate planned drafts for review before GitHub writes.'
 }
 
+function getProcessCurrentInboxReason(input: {
+  repo: Repo | null
+  piStatus: PiStatus
+  generating: boolean
+}): string {
+  if (!input.repo) return 'Filter the inbox to one linked repository first.'
+  if (input.generating) return 'Planning current inbox drafts.'
+  if (!input.piStatus.configured) return 'Configure Pi credentials in Settings.'
+
+  return getGenerateAndPublishReason({
+    canGenerateDrafts: true,
+    generateDraftsReason: 'Ready to process current inbox.',
+    repo: input.repo
+  })
+}
+
+function getDetailEmptyDescription(input: {
+  currentInboxMessage: string | null
+  selectionCount: number
+}): string {
+  if (input.currentInboxMessage) return input.currentInboxMessage
+  if (input.selectionCount > 1) {
+    return `${input.selectionCount} notes selected. Triage actions live in the sidebar footer; press Esc to clear.`
+  }
+  return 'Select a note to read or edit.'
+}
+
 function NoteDetail({
   note,
   repos,
@@ -840,17 +867,15 @@ export function Inbox({
     generateDraftsReason,
     repo: selectedRepo
   })
-  const processCurrentInboxReason = currentInboxRepo
-    ? getGenerateAndPublishReason({
-        canGenerateDrafts: piStatus.configured && !generating,
-        generateDraftsReason: generating
-          ? 'Planning current inbox drafts.'
-          : piStatus.configured
-            ? 'Ready to process current inbox.'
-            : 'Configure Pi credentials in Settings.',
-        repo: currentInboxRepo
-      })
-    : 'Filter the inbox to one linked repository first.'
+  const processCurrentInboxReason = getProcessCurrentInboxReason({
+    repo: currentInboxRepo,
+    piStatus,
+    generating
+  })
+  const detailEmptyDescription = getDetailEmptyDescription({
+    currentInboxMessage,
+    selectionCount
+  })
 
   // Esc clears note selection. The listener uses
   // capture on `document` so key events still reach us when a control stops
@@ -1285,13 +1310,7 @@ export function Inbox({
           />
         ) : (
           <Empty className="h-full border-none bg-transparent shadow-none">
-            <EmptyDescription className="max-w-[36ch]">
-              {currentInboxMessage
-                ? currentInboxMessage
-                : selectionCount > 1
-                  ? `${selectionCount} notes selected. Triage actions live in the sidebar footer; press Esc to clear.`
-                  : 'Select a note to read or edit.'}
-            </EmptyDescription>
+            <EmptyDescription className="max-w-[36ch]">{detailEmptyDescription}</EmptyDescription>
           </Empty>
         )}
       </section>

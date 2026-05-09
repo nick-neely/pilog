@@ -76,8 +76,7 @@ export function registerPiIpcHandlers(
     input: { repo: Repo; notes: Note[]; mode: GenerateDraftsMode }
   ): Promise<IpcResponse<'pi:generateDrafts:start'>> => {
     const { repo, notes, mode } = input
-    if (!existsSync(repo.localPath))
-      throw new Error('The linked repository path no longer exists.')
+    if (!existsSync(repo.localPath)) throw new Error('The linked repository path no longer exists.')
     if (mode === 'auto-publish-preview' && !repo.autoPublishEnabled) {
       throw new Error('Auto-publish is not enabled for this repository.')
     }
