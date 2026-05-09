@@ -195,6 +195,7 @@ export function persistGeneratedIssueDrafts(
 }
 
 export function planAutoPublishPreviewDrafts(input: {
+  runId: string
   repo: Repo
   drafts: GeneratedIssueDraft[]
 }): AutoPublishPreviewPlan {
@@ -214,6 +215,7 @@ export function planAutoPublishPreviewDrafts(input: {
   return {
     drafts: plannedDrafts,
     summary: {
+      runId: input.runId,
       repoId: input.repo.id,
       generatedDraftCount: input.drafts.length,
       plannedDraftCount: plannedDrafts.length,

@@ -49,13 +49,14 @@ const DEFAULT_AGENT_RUN_TIMEOUT_MS = 10 * 60 * 1000
 function prepareAgentEventForMode(
   agentEvent: AgentEvent,
   mode: GenerateDraftsMode,
+  runId: string,
   repo: Repo
 ): AgentEvent {
   if (agentEvent.type !== 'final' || mode !== 'auto-publish-preview') {
     return agentEvent
   }
 
-  const plan = planAutoPublishPreviewDrafts({ repo, drafts: agentEvent.drafts })
+  const plan = planAutoPublishPreviewDrafts({ runId, repo, drafts: agentEvent.drafts })
   return {
     type: 'final',
     drafts: plan.drafts,
@@ -195,7 +196,7 @@ export function registerPiIpcHandlers(
             signal: controller.signal
           })) {
             if (active.finalized) break
-            const eventForRenderer = prepareAgentEventForMode(agentEvent, mode, repo)
+            const eventForRenderer = prepareAgentEventForMode(agentEvent, mode, run.id, repo)
             appendAgentEvent(db, run.id, active, eventForRenderer)
 
             if (eventForRenderer.type === 'final') {

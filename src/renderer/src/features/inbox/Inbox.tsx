@@ -43,6 +43,7 @@ import type {
   Repo
 } from '@shared/ipc'
 import type {
+  AutoPublishPublishReport,
   AutoPublishPreviewSummary,
   GeneratedIssueDraft,
   IssueDraftForReview,
@@ -118,6 +119,9 @@ type AutoPublishPreviewState = {
   summary: AutoPublishPreviewSummary | null
   drafts: GeneratedIssueDraft[]
   sourceNotes: Note[]
+  report: AutoPublishPublishReport | null
+  publishing: boolean
+  publishError: string | null
 }
 
 function encodeRepoFilter(f: string | null | undefined): string {
@@ -360,33 +364,56 @@ function AutoPublishPreviewDialog({
   summary,
   drafts,
   sourceNotes,
+  report,
+  publishing,
+  publishError,
   onOpenChange,
-  onOpenDrafts
+  onOpenDrafts,
+  onPublish
 }: {
   open: boolean
   summary: AutoPublishPreviewSummary | null
   drafts: GeneratedIssueDraft[]
   sourceNotes: Note[]
+  report: AutoPublishPublishReport | null
+  publishing: boolean
+  publishError: string | null
   onOpenChange: (open: boolean) => void
   onOpenDrafts: () => void
+  onPublish: () => void
 }): React.JSX.Element {
   const sourceNotesById = useMemo(
     () => new Map(sourceNotes.map((note) => [note.id, note])),
     [sourceNotes]
   )
+  const showReport = report !== null
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent className="max-h-[min(42rem,calc(100vh-4rem))] max-w-3xl">
         <AlertDialogHeader>
           <AlertDialogTitle>
-            {summary?.dryRun ? 'Dry-run publish plan' : 'Review planned GitHub issues'}
+            {showReport
+              ? 'Publish report'
+              : summary?.dryRun
+                ? 'Dry-run publish plan'
+                : 'Review planned GitHub issues'}
           </AlertDialogTitle>
           <AlertDialogDescription>
-            {summary?.message ?? 'PiLog planned these drafts for review before any GitHub writes.'}
+            {report
+              ? `${report.successCount} published, ${report.failureCount} failed.`
+              : (summary?.message ??
+                'PiLog planned these drafts for review before any GitHub writes.')}
           </AlertDialogDescription>
         </AlertDialogHeader>
-        {summary ? (
+        {publishError ? (
+          <div role="alert" className="rounded-md border bg-muted/50 px-3 py-2 text-sm">
+            {publishError}
+          </div>
+        ) : null}
+        {report ? (
+          <AutoPublishReport report={report} sourceNotesById={sourceNotesById} />
+        ) : summary ? (
           <div className="flex flex-wrap gap-2 text-xs text-muted-foreground" role="status">
             <Badge variant="secondary">
               {summary.plannedDraftCount} planned of {summary.generatedDraftCount}
@@ -396,38 +423,143 @@ function AutoPublishPreviewDialog({
             {summary.dryRun ? <Badge variant="secondary">Dry run, no GitHub writes</Badge> : null}
           </div>
         ) : null}
-        <ScrollArea className="max-h-[24rem] pe-3">
-          <div className="flex flex-col gap-4">
-            {drafts.map((draft, index) => (
-              <section key={`${draft.title}-${index}`} className="border-t pt-4 first:border-t-0">
-                <div className="flex flex-col gap-2">
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <h3 className="max-w-[52ch] text-base font-semibold leading-snug">
-                      {draft.title}
-                    </h3>
-                    <Badge variant="outline">Confidence {draft.confidence}</Badge>
+        {!report ? (
+          <ScrollArea className="max-h-[24rem] pe-3">
+            <div className="flex flex-col gap-4">
+              {drafts.map((draft, index) => (
+                <section key={`${draft.title}-${index}`} className="border-t pt-4 first:border-t-0">
+                  <div className="flex flex-col gap-2">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <h3 className="max-w-[52ch] text-base font-semibold leading-snug">
+                        {draft.title}
+                      </h3>
+                      <Badge variant="outline">Confidence {draft.confidence}</Badge>
+                    </div>
+                    <p className="max-w-[68ch] text-sm leading-relaxed text-muted-foreground">
+                      {draft.summary}
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {draft.suggestedLabels.map((label) => (
+                        <Badge key={label} variant="secondary">
+                          {label}
+                        </Badge>
+                      ))}
+                    </div>
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <div className="flex flex-col gap-1">
+                        <p className="text-xs font-medium text-muted-foreground">Source notes</p>
+                        <ul className="flex flex-col gap-1">
+                          {draft.sourceNoteIds.map((noteId) => {
+                            const note = sourceNotesById.get(noteId)
+                            const preview = note?.content.trim() || noteId
+                            return (
+                              <li
+                                key={noteId}
+                                className="line-clamp-2 text-sm leading-relaxed"
+                                title={preview}
+                              >
+                                {preview}
+                              </li>
+                            )
+                          })}
+                        </ul>
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <p className="text-xs font-medium text-muted-foreground">Affected files</p>
+                        <ul className="flex flex-col gap-1">
+                          {draft.affectedFiles.map((file) => (
+                            <li key={file.path} className="min-w-0">
+                              <p className="truncate font-mono text-xs" title={file.path}>
+                                {file.path}
+                              </p>
+                              <p className="line-clamp-2 text-xs text-muted-foreground">
+                                {file.reason}
+                              </p>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
                   </div>
-                  <p className="max-w-[68ch] text-sm leading-relaxed text-muted-foreground">
-                    {draft.summary}
-                  </p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {draft.suggestedLabels.map((label) => (
-                      <Badge key={label} variant="secondary">
-                        {label}
-                      </Badge>
-                    ))}
+                </section>
+              ))}
+            </div>
+          </ScrollArea>
+        ) : null}
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={publishing}>Close</AlertDialogCancel>
+          {report || summary?.dryRun ? (
+            <AlertDialogAction onClick={onOpenDrafts}>Open Drafts</AlertDialogAction>
+          ) : (
+            <AlertDialogAction disabled={publishing || !summary} onClick={onPublish}>
+              {publishing ? 'Publishing' : 'Publish to GitHub'}
+            </AlertDialogAction>
+          )}
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  )
+}
+
+function AutoPublishReport({
+  report,
+  sourceNotesById
+}: {
+  report: AutoPublishPublishReport
+  sourceNotesById: Map<string, Note>
+}): React.JSX.Element {
+  return (
+    <ScrollArea className="max-h-[24rem] pe-3">
+      <div className="flex flex-col gap-5" role="status" aria-live="polite">
+        {report.successes.length > 0 ? (
+          <section className="flex flex-col gap-2">
+            <h3 className="text-sm font-semibold">Published</h3>
+            <ul className="flex flex-col gap-2">
+              {report.successes.map((item) => (
+                <li key={item.draftId} className="rounded-md border bg-muted/30 p-3">
+                  <div className="flex flex-col gap-1">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <p className="max-w-[52ch] text-sm font-medium leading-snug">{item.title}</p>
+                      <Badge variant="secondary">Published</Badge>
+                    </div>
+                    <a
+                      href={item.githubIssueUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="truncate font-mono text-xs text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/30"
+                    >
+                      {item.githubIssueUrl}
+                    </a>
                   </div>
-                  <div className="grid gap-3 md:grid-cols-2">
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
+        {report.failures.length > 0 ? (
+          <section className="flex flex-col gap-2">
+            <h3 className="text-sm font-semibold">Needs review</h3>
+            <ul className="flex flex-col gap-2">
+              {report.failures.map((item) => (
+                <li key={item.draftId} className="rounded-md border bg-muted/30 p-3">
+                  <div className="flex flex-col gap-2">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <p className="max-w-[52ch] text-sm font-medium leading-snug">{item.title}</p>
+                      <Badge variant="outline">Kept as draft</Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground">{item.error}</p>
                     <div className="flex flex-col gap-1">
-                      <p className="text-xs font-medium text-muted-foreground">Source notes</p>
+                      <p className="font-mono text-xs text-muted-foreground">
+                        Draft {item.draftId}
+                      </p>
                       <ul className="flex flex-col gap-1">
-                        {draft.sourceNoteIds.map((noteId) => {
+                        {item.sourceNoteIds.map((noteId) => {
                           const note = sourceNotesById.get(noteId)
                           const preview = note?.content.trim() || noteId
                           return (
                             <li
                               key={noteId}
-                              className="line-clamp-2 text-sm leading-relaxed"
+                              className="line-clamp-2 text-xs leading-relaxed"
                               title={preview}
                             >
                               {preview}
@@ -436,33 +568,14 @@ function AutoPublishPreviewDialog({
                         })}
                       </ul>
                     </div>
-                    <div className="flex flex-col gap-1">
-                      <p className="text-xs font-medium text-muted-foreground">Affected files</p>
-                      <ul className="flex flex-col gap-1">
-                        {draft.affectedFiles.map((file) => (
-                          <li key={file.path} className="min-w-0">
-                            <p className="truncate font-mono text-xs" title={file.path}>
-                              {file.path}
-                            </p>
-                            <p className="line-clamp-2 text-xs text-muted-foreground">
-                              {file.reason}
-                            </p>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
                   </div>
-                </div>
-              </section>
-            ))}
-          </div>
-        </ScrollArea>
-        <AlertDialogFooter>
-          <AlertDialogCancel>Close</AlertDialogCancel>
-          <AlertDialogAction onClick={onOpenDrafts}>Open Drafts</AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
+      </div>
+    </ScrollArea>
   )
 }
 
@@ -493,7 +606,10 @@ export function Inbox({
     open: false,
     summary: null,
     drafts: [],
-    sourceNotes: []
+    sourceNotes: [],
+    report: null,
+    publishing: false,
+    publishError: null
   })
   const [statusFilter, setStatusFilter] = useState<NoteStatus | undefined>()
   const [repoFilter, setRepoFilter] = useState<string | null | undefined>(undefined)
@@ -753,7 +869,10 @@ export function Inbox({
               open: true,
               summary: event.autoPublishPreview,
               drafts: event.drafts,
-              sourceNotes: selectedNoteSnapshot
+              sourceNotes: selectedNoteSnapshot,
+              report: null,
+              publishing: false,
+              publishError: null
             })
           } else {
             clearSelection()
@@ -769,6 +888,31 @@ export function Inbox({
         setGenerating(false)
         window.pilog.invoke('pi:status').then(setPiStatus)
       }
+    }
+  }
+
+  const handleConfirmAutoPublish = async (): Promise<void> => {
+    const runId = autoPublishPreview.summary?.runId
+    if (!runId || autoPublishPreview.publishing) return
+
+    setAutoPublishPreview((prev) => ({ ...prev, publishing: true, publishError: null }))
+    try {
+      const report = await window.pilog.invoke('issue-drafts:publishAutoPublishRun', { runId })
+      await Promise.all([fetchNotes(), fetchStatusCounts(), fetchDraftLinks()])
+      if (!mountedRef.current) return
+      setAutoPublishPreview((prev) => ({
+        ...prev,
+        report,
+        publishing: false,
+        publishError: null
+      }))
+    } catch (error) {
+      if (!mountedRef.current) return
+      setAutoPublishPreview((prev) => ({
+        ...prev,
+        publishing: false,
+        publishError: error instanceof Error ? error.message : String(error)
+      }))
     }
   }
 
@@ -1051,12 +1195,16 @@ export function Inbox({
         summary={autoPublishPreview.summary}
         drafts={autoPublishPreview.drafts}
         sourceNotes={autoPublishPreview.sourceNotes}
+        report={autoPublishPreview.report}
+        publishing={autoPublishPreview.publishing}
+        publishError={autoPublishPreview.publishError}
         onOpenChange={(open) => setAutoPublishPreview((prev) => ({ ...prev, open }))}
         onOpenDrafts={() => {
           setAutoPublishPreview((prev) => ({ ...prev, open: false }))
           clearSelection()
           onNavigateToDraftReview()
         }}
+        onPublish={() => void handleConfirmAutoPublish()}
       />
     </div>
   )

@@ -5,6 +5,7 @@ import type {
   AgentRunListItem,
   AgentRunStatus,
   AgentRunStatusCounts,
+  AutoPublishPublishReport,
   AutoPublishPreviewSummary,
   GenerateDraftsRequest,
   GenerateDraftsMode,
@@ -214,6 +215,10 @@ export type MergeIssueDraftsRequest = {
 
 export type PublishIssueDraftRequest = UpdateIssueDraftRequest
 
+export type PublishAutoPublishRunRequest = {
+  runId: string
+}
+
 export type IpcContract = {
   'note:create': { request: { content: string; repoId?: string | null }; response: Note }
   'note:list': { request: ListNotesRequest | undefined; response: Note[] }
@@ -295,6 +300,10 @@ export type IpcContract = {
     request: PublishIssueDraftRequest
     response: IssueDraft
   }
+  'issue-drafts:publishAutoPublishRun': {
+    request: PublishAutoPublishRunRequest
+    response: AutoPublishPublishReport
+  }
   'path:copy': {
     request: PathActionRequest
     response: PathActionResult
@@ -336,6 +345,7 @@ export type {
   AgentRunListItem,
   AgentRunStatus,
   AgentRunStatusCounts,
+  AutoPublishPublishReport,
   AutoPublishPreviewSummary,
   GenerateDraftsRequest,
   GenerateDraftsMode,

@@ -4,7 +4,7 @@ import { resetClient, listLabels, createIssue } from '../github/client'
 import type { PilogDatabase } from '../db/client'
 import type { CreateIssueRequest } from '@shared/ipc'
 import { recordPublish } from '../db/repositories/publish-log'
-import { publishReviewedDraft } from '../github/publish-draft'
+import { publishAutoPublishRun, publishReviewedDraft } from '../github/publish-draft'
 
 export function registerGitHubIpcHandlers(
   options: { clientId: string; clientSecret: string },
@@ -55,6 +55,15 @@ export function registerGitHubIpcHandlers(
     if (published.githubIssueUrl) await openBrowserUrl(published.githubIssueUrl)
 
     return published
+  })
+
+  ipcMain.handle('issue-drafts:publishAutoPublishRun', async (_event, request) => {
+    const report = await publishAutoPublishRun(db, request, createIssue)
+
+    callbacks?.onIssueDraftsChanged?.()
+    callbacks?.onNoteChanged?.()
+
+    return report
   })
 }
 

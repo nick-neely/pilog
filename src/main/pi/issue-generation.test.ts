@@ -203,6 +203,7 @@ describe('issue generation', () => {
     ]
 
     const plan = planAutoPublishPreviewDrafts({
+      runId: run.id,
       repo: {
         ...repo,
         autoPublishEnabled: true,

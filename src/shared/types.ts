@@ -121,6 +121,7 @@ export type AgentRunDetail = AgentRunListItem & {
 export type GenerateDraftsMode = 'review' | 'auto-publish-preview'
 
 export type AutoPublishPreviewSummary = {
+  runId: string
   repoId: string
   generatedDraftCount: number
   plannedDraftCount: number
@@ -130,6 +131,29 @@ export type AutoPublishPreviewSummary = {
   requireConfirmation: boolean
   limited: boolean
   message: string
+}
+
+export type AutoPublishPublishReportItem = {
+  draftId: string
+  title: string
+  sourceNoteIds: string[]
+}
+
+export type AutoPublishPublishSuccess = AutoPublishPublishReportItem & {
+  githubIssueUrl: string
+}
+
+export type AutoPublishPublishFailure = AutoPublishPublishReportItem & {
+  error: string
+}
+
+export type AutoPublishPublishReport = {
+  runId: string
+  repoId: string
+  successCount: number
+  failureCount: number
+  successes: AutoPublishPublishSuccess[]
+  failures: AutoPublishPublishFailure[]
 }
 
 export type GenerateDraftsRequest = {

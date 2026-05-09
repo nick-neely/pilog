@@ -1,11 +1,16 @@
 import { and, eq, inArray } from 'drizzle-orm'
 import { v4 as uuidv4 } from 'uuid'
-import type { CreatedIssue, PublishIssueDraftRequest } from '@shared/ipc'
-import type { IssueDraft } from '@shared/types'
+import type {
+  CreatedIssue,
+  PublishAutoPublishRunRequest,
+  PublishIssueDraftRequest
+} from '@shared/ipc'
+import type { AutoPublishPublishReport, IssueDraft } from '@shared/types'
 import type { PilogDatabase } from '../db/client'
 import { issueDrafts, notes, publishLog } from '../db/schema'
 import { getIssueDraftById } from '../db/repositories/issue-drafts'
 import { getRepoById } from '../db/repositories/repos'
+import { getRunById } from '../db/repositories/agent-runs'
 
 type CreateIssueClient = (
   owner: string,
@@ -53,6 +58,68 @@ export async function publishReviewedDraft(
   return published
 }
 
+export async function publishAutoPublishRun(
+  db: PilogDatabase,
+  request: PublishAutoPublishRunRequest,
+  createIssue: CreateIssueClient
+): Promise<AutoPublishPublishReport> {
+  const run = getRunById(db, request.runId)
+  if (!run) throw new Error('Auto-publish run not found')
+  if (run.status !== 'succeeded') throw new Error('Auto-publish run is not ready to publish')
+  if (!run.repoId) throw new Error('Auto-publish run is missing a linked repository')
+
+  const successes: AutoPublishPublishReport['successes'] = []
+  const failures: AutoPublishPublishReport['failures'] = []
+
+  for (const draftId of run.outputDraftIds) {
+    const draft = getIssueDraftById(db, draftId)
+    if (!draft) {
+      failures.push({
+        draftId,
+        title: 'Missing draft',
+        sourceNoteIds: [],
+        error: 'Draft could not be loaded.'
+      })
+      continue
+    }
+
+    try {
+      const published = await publishReviewedDraft(
+        db,
+        {
+          id: draft.id,
+          title: draft.title,
+          body: draft.body,
+          labels: draft.labels
+        },
+        createIssue
+      )
+      successes.push({
+        draftId: published.id,
+        title: published.title,
+        sourceNoteIds: published.sourceNoteIds,
+        githubIssueUrl: published.githubIssueUrl ?? ''
+      })
+    } catch (error) {
+      failures.push({
+        draftId: draft.id,
+        title: draft.title,
+        sourceNoteIds: draft.sourceNoteIds,
+        error: formatPublishError(error)
+      })
+    }
+  }
+
+  return {
+    runId: run.id,
+    repoId: run.repoId,
+    successCount: successes.length,
+    failureCount: failures.length,
+    successes,
+    failures
+  }
+}
+
 function recordLocalPublishState(
   db: PilogDatabase,
   input: {
@@ -95,4 +162,12 @@ function recordLocalPublishState(
         .run()
     }
   })
+}
+
+function formatPublishError(error: unknown): string {
+  const status =
+    typeof error === 'object' && error !== null ? (error as { status?: unknown }).status : undefined
+  const statusText = typeof status === 'number' ? `GitHub ${status}: ` : ''
+  const message = error instanceof Error ? error.message : String(error)
+  return `${statusText}${message || 'Publish failed.'}`
 }
