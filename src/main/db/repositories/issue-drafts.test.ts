@@ -2,7 +2,13 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { createInMemoryDatabase, type PilogDatabase } from '../client'
 import { runMigrations } from '../migrations'
 import { createRepo } from './repos'
-import { createIssueDraft, listIssueDrafts, updateIssueDraft } from './issue-drafts'
+import {
+  createIssueDraft,
+  listIssueDrafts,
+  listIssueDraftsForReview,
+  updateIssueDraft
+} from './issue-drafts'
+import { createNote, updateNoteStatus } from './notes'
 import type { GeneratedIssueDraft } from '@shared/types'
 
 const generatedDraft: GeneratedIssueDraft = {
@@ -56,6 +62,39 @@ describe('issue-drafts repository', () => {
         })
       ])
     )
+  })
+
+  it('loads source note data for persisted drafts in source-note order', () => {
+    const firstNote = createNote(db, { content: 'save button needs loading copy', repoId })
+    const secondNote = createNote(db, { content: 'settings submit can double-fire', repoId })
+    updateNoteStatus(db, firstNote.id, 'drafted')
+    updateNoteStatus(db, secondNote.id, 'drafted')
+    const draft = createIssueDraft(db, {
+      repoId,
+      draft: {
+        ...generatedDraft,
+        sourceNoteIds: [secondNote.id, firstNote.id, 'deleted-note']
+      }
+    })
+
+    expect(listIssueDraftsForReview(db)[0]).toMatchObject({
+      id: draft.id,
+      sourceNoteIds: [secondNote.id, firstNote.id, 'deleted-note'],
+      sourceNotes: [
+        {
+          id: secondNote.id,
+          content: 'settings submit can double-fire',
+          status: 'drafted',
+          repoId
+        },
+        {
+          id: firstNote.id,
+          content: 'save button needs loading copy',
+          status: 'drafted',
+          repoId
+        }
+      ]
+    })
   })
 
   it('updates mutable draft fields and persists them for later listing', () => {

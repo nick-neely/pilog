@@ -191,3 +191,17 @@ export type IssueDraft = {
   createdAt: string
   updatedAt: string
 }
+
+export type IssueDraftSourceNote = {
+  id: string
+  content: string
+  status: 'unprocessed' | 'drafted' | 'published' | 'dismissed'
+  repoId: string | null
+  runId: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export type IssueDraftForReview = IssueDraft & {
+  sourceNotes: IssueDraftSourceNote[]
+}

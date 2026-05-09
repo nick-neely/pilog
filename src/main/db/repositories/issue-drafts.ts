@@ -1,8 +1,8 @@
-import { desc, eq } from 'drizzle-orm'
+import { desc, eq, inArray } from 'drizzle-orm'
 import { v4 as uuidv4 } from 'uuid'
 import type { PilogDatabase } from '../client'
-import { issueDrafts } from '../schema'
-import type { GeneratedIssueDraft, IssueDraft } from '@shared/types'
+import { issueDrafts, notes } from '../schema'
+import type { GeneratedIssueDraft, IssueDraft, IssueDraftForReview } from '@shared/types'
 
 const issueDraftColumns = {
   id: issueDrafts.id,
@@ -18,6 +18,16 @@ const issueDraftColumns = {
   githubIssueUrl: issueDrafts.githubIssueUrl,
   createdAt: issueDrafts.createdAt,
   updatedAt: issueDrafts.updatedAt
+} as const
+
+const sourceNoteColumns = {
+  id: notes.id,
+  content: notes.content,
+  status: notes.status,
+  repoId: notes.repoId,
+  runId: notes.runId,
+  createdAt: notes.createdAt,
+  updatedAt: notes.updatedAt
 } as const
 
 export function createIssueDraft(
@@ -69,6 +79,29 @@ export function listIssueDrafts(db: PilogDatabase): IssueDraft[] {
     .orderBy(desc(issueDrafts.createdAt))
     .all()
     .map(mapIssueDraft)
+}
+
+export function listIssueDraftsForReview(db: PilogDatabase): IssueDraftForReview[] {
+  const drafts = listIssueDrafts(db)
+  const sourceNoteIds = [...new Set(drafts.flatMap((draft) => draft.sourceNoteIds))]
+
+  if (sourceNoteIds.length === 0) {
+    return drafts.map((draft) => ({ ...draft, sourceNotes: [] }))
+  }
+
+  const sourceNotes = db
+    .select(sourceNoteColumns)
+    .from(notes)
+    .where(inArray(notes.id, sourceNoteIds))
+    .all()
+  const sourceNotesById = new Map(sourceNotes.map((note) => [note.id, note]))
+
+  return drafts.map((draft) => ({
+    ...draft,
+    sourceNotes: draft.sourceNoteIds
+      .map((id) => sourceNotesById.get(id))
+      .filter((note): note is NonNullable<typeof note> => note !== undefined)
+  }))
 }
 
 export function updateIssueDraft(

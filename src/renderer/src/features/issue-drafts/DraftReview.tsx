@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useEffectEvent, useMemo, useState } from 'react'
-import { ArrowRight01Icon, Tick02Icon, ViewIcon } from '@hugeicons/core-free-icons'
+import {
+  ArrowRight01Icon,
+  Copy01Icon,
+  FolderOpenIcon,
+  Tick02Icon,
+  ViewIcon
+} from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { Badge } from '@renderer/components/ui/badge'
 import { Button } from '@renderer/components/ui/button'
@@ -10,8 +16,8 @@ import { Separator } from '@renderer/components/ui/separator'
 import { Textarea } from '@renderer/components/ui/textarea'
 import { cn } from '@renderer/lib/utils'
 import { extractAcceptanceCriteria, writeAcceptanceCriteria } from '@shared/acceptance-criteria'
-import type { UpdateIssueDraftRequest } from '@shared/ipc'
-import type { IssueDraft } from '@shared/types'
+import type { Repo, UpdateIssueDraftRequest } from '@shared/ipc'
+import type { IssueDraft, IssueDraftForReview, IssueDraftSourceNote } from '@shared/types'
 
 const DRAFT_TIMESTAMP_FORMATTER = new Intl.DateTimeFormat(undefined, {
   month: 'short',
@@ -81,14 +87,23 @@ function confidenceLabel(confidence: IssueDraft['confidence']): string {
   }
 }
 
-export function DraftReview(): React.JSX.Element {
-  const [drafts, setDrafts] = useState<IssueDraft[]>([])
+export function DraftReview({
+  onOpenSourceNote
+}: {
+  onOpenSourceNote: (noteId: string) => void
+}): React.JSX.Element {
+  const [drafts, setDrafts] = useState<IssueDraftForReview[]>([])
+  const [repos, setRepos] = useState<Repo[]>([])
   const [selectedDraftId, setSelectedDraftId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
   const fetchDrafts = useCallback(async (): Promise<void> => {
-    const result = await window.pilog.invoke('issue-drafts:list')
+    const [result, repoResult] = await Promise.all([
+      window.pilog.invoke('issue-drafts:list'),
+      window.pilog.invoke('repos:list')
+    ])
     setDrafts(result)
+    setRepos(repoResult)
     setSelectedDraftId((current) => {
       if (current && result.some((draft) => draft.id === current)) return current
       return result[0]?.id ?? null
@@ -109,6 +124,7 @@ export function DraftReview(): React.JSX.Element {
   useEffect(() => window.pilog.on('issue-drafts:invalidated', handleDraftsInvalidated), [])
 
   const selectedDraft = drafts.find((draft) => draft.id === selectedDraftId) ?? null
+  const reposById = useMemo(() => new Map(repos.map((repo) => [repo.id, repo])), [repos])
 
   return (
     <div className="flex h-full bg-background text-foreground">
@@ -181,7 +197,13 @@ export function DraftReview(): React.JSX.Element {
 
       <main className="min-w-0 flex-1 overflow-y-auto">
         {selectedDraft ? (
-          <DraftEditor key={selectedDraft.id} draft={selectedDraft} onSaved={fetchDrafts} />
+          <DraftEditor
+            key={selectedDraft.id}
+            draft={selectedDraft}
+            repoPath={reposById.get(selectedDraft.repoId)?.localPath ?? null}
+            onSaved={fetchDrafts}
+            onOpenSourceNote={onOpenSourceNote}
+          />
         ) : (
           <Empty className="h-full border-none bg-transparent shadow-none">
             <EmptyDescription>Select a draft to review and edit.</EmptyDescription>
@@ -194,9 +216,13 @@ export function DraftReview(): React.JSX.Element {
 
 function DraftEditor({
   draft,
+  repoPath,
+  onOpenSourceNote,
   onSaved
 }: {
-  draft: IssueDraft
+  draft: IssueDraftForReview
+  repoPath: string | null
+  onOpenSourceNote: (noteId: string) => void
   onSaved: () => Promise<void>
 }): React.JSX.Element {
   const [title, setTitle] = useState(draft.title)
@@ -205,6 +231,7 @@ function DraftEditor({
   const [criteria, setCriteria] = useState(extractAcceptanceCriteria(draft.body).join('\n'))
   const [saving, setSaving] = useState(false)
   const [savedAt, setSavedAt] = useState<string | null>(null)
+  const [pathMessages, setPathMessages] = useState<Record<string, string>>({})
 
   const parsedLabels = useMemo(() => parseLabels(labels), [labels])
   const parsedCriteria = useMemo(() => parseCriteriaLines(criteria), [criteria])
@@ -248,6 +275,26 @@ function DraftEditor({
   const handleSaveShortcut = useEffectEvent(() => {
     if (dirty && !saving) void handleSave()
   })
+
+  const handlePathAction = useCallback(
+    async (file: IssueDraft['affectedFiles'][number], action: 'copy' | 'reveal'): Promise<void> => {
+      const result = await window.pilog.invoke(action === 'copy' ? 'path:copy' : 'path:reveal', {
+        path: file.path,
+        repoPath
+      })
+      const message =
+        result.ok && action === 'copy'
+          ? 'Copied path.'
+          : result.ok
+            ? 'Opened in file explorer.'
+            : result.reason === 'missing'
+              ? 'File was not found on disk.'
+              : 'Could not use this path.'
+
+      setPathMessages((current) => ({ ...current, [file.path]: message }))
+    },
+    [repoPath]
+  )
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
@@ -381,17 +428,7 @@ function DraftEditor({
 
           <section className="flex flex-col gap-2">
             <h3 className="text-sm font-semibold">Source Notes</h3>
-            {draft.sourceNoteIds.length > 0 ? (
-              <ul className="flex flex-col gap-1">
-                {draft.sourceNoteIds.map((id) => (
-                  <li key={id} className="truncate font-mono text-xs text-muted-foreground">
-                    {id}
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-sm text-muted-foreground">No source notes recorded.</p>
-            )}
+            <SourceNotesList draft={draft} onOpenSourceNote={onOpenSourceNote} />
           </section>
 
           <Separator />
@@ -401,11 +438,39 @@ function DraftEditor({
             {draft.affectedFiles.length > 0 ? (
               <ul className="flex flex-col gap-2">
                 {draft.affectedFiles.map((file) => (
-                  <li key={`${file.path}:${file.reason}`} className="min-w-0">
-                    <p className="truncate font-mono text-xs">{file.path}</p>
+                  <li
+                    key={`${file.path}:${file.reason}`}
+                    className="min-w-0 rounded-md border bg-muted/30 p-2"
+                  >
+                    <p className="break-all font-mono text-xs">{file.path}</p>
                     <p className="line-clamp-2 text-xs leading-relaxed text-muted-foreground">
                       {file.reason}
                     </p>
+                    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="xs"
+                        onClick={() => void handlePathAction(file, 'copy')}
+                      >
+                        <HugeiconsIcon icon={Copy01Icon} data-icon="inline-start" aria-hidden />
+                        Copy
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="xs"
+                        onClick={() => void handlePathAction(file, 'reveal')}
+                      >
+                        <HugeiconsIcon icon={FolderOpenIcon} data-icon="inline-start" aria-hidden />
+                        Reveal
+                      </Button>
+                    </div>
+                    {pathMessages[file.path] ? (
+                      <p className="mt-1 text-xs text-muted-foreground" role="status">
+                        {pathMessages[file.path]}
+                      </p>
+                    ) : null}
                   </li>
                 ))}
               </ul>
@@ -416,5 +481,71 @@ function DraftEditor({
         </aside>
       </div>
     </article>
+  )
+}
+
+function SourceNotesList({
+  draft,
+  onOpenSourceNote
+}: {
+  draft: IssueDraftForReview
+  onOpenSourceNote: (noteId: string) => void
+}): React.JSX.Element {
+  const sourceNotesById = new Map(draft.sourceNotes.map((note) => [note.id, note]))
+
+  if (draft.sourceNoteIds.length === 0) {
+    return <p className="text-sm text-muted-foreground">No source notes recorded.</p>
+  }
+
+  return (
+    <ul className="flex flex-col gap-2">
+      {draft.sourceNoteIds.map((id) => {
+        const note = sourceNotesById.get(id)
+        return note ? (
+          <SourceNoteItem key={id} note={note} onOpenSourceNote={onOpenSourceNote} />
+        ) : (
+          <li key={id} className="rounded-md border bg-muted/30 p-2">
+            <p className="font-mono text-xs text-muted-foreground">{id}</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Source note is no longer available.
+            </p>
+          </li>
+        )
+      })}
+    </ul>
+  )
+}
+
+function SourceNoteItem({
+  note,
+  onOpenSourceNote
+}: {
+  note: IssueDraftSourceNote
+  onOpenSourceNote: (noteId: string) => void
+}): React.JSX.Element {
+  const preview = note.content.trim() || 'Untitled note'
+
+  return (
+    <li>
+      <button
+        type="button"
+        onClick={() => onOpenSourceNote(note.id)}
+        className={cn(
+          'flex w-full min-w-0 flex-col rounded-md border bg-muted/30 p-2 text-left transition-colors',
+          'hover:bg-muted/60 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30'
+        )}
+      >
+        <span className="flex min-w-0 flex-wrap items-center gap-1.5">
+          <Badge variant="secondary">{note.status}</Badge>
+          <span className="tabular text-xs text-muted-foreground">
+            {formatTimestamp(note.createdAt)}
+          </span>
+          <span className="truncate font-mono text-xs text-muted-foreground">
+            {note.id.slice(0, 8)}
+          </span>
+        </span>
+        <span className="mt-2 line-clamp-4 text-sm leading-relaxed">{preview}</span>
+      </button>
+    </li>
   )
 }

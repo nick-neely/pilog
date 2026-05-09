@@ -135,7 +135,12 @@ function App(): React.JSX.Element {
           onPaletteOpenChange={setPaletteOpen}
         />
       ) : route === 'draft-review' ? (
-        <DraftReview />
+        <DraftReview
+          onOpenSourceNote={(noteId) => {
+            setFocusedNoteId(noteId)
+            setAppRoute('inbox')
+          }}
+        />
       ) : (
         <AgentRuns
           focusRunId={focusedRunId}

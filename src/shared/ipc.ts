@@ -10,6 +10,7 @@ import type {
   PiModelOption,
   PiProviderOption,
   IssueDraft,
+  IssueDraftForReview,
   SearchProvider,
   SetAdvancedSettingsRequest,
   PiStatus
@@ -132,6 +133,13 @@ export type UpdateIssueDraftRequest = {
   labels: string[]
 }
 
+export type PathActionRequest = {
+  path: string
+  repoPath?: string | null
+}
+
+export type PathActionResult = { ok: true } | { ok: false; reason: 'missing' | 'unavailable' }
+
 export type IpcContract = {
   'note:create': { request: { content: string; repoId?: string | null }; response: Note }
   'note:list': { request: ListNotesRequest | void; response: Note[] }
@@ -186,11 +194,19 @@ export type IpcContract = {
   }
   'issue-drafts:list': {
     request: void
-    response: IssueDraft[]
+    response: IssueDraftForReview[]
   }
   'issue-drafts:update': {
     request: UpdateIssueDraftRequest
     response: IssueDraft | null
+  }
+  'path:copy': {
+    request: PathActionRequest
+    response: PathActionResult
+  }
+  'path:reveal': {
+    request: PathActionRequest
+    response: PathActionResult
   }
   'debug:seedIssueGenerationFixture': {
     request: { repoPath: string; notes: string[] }
