@@ -76,8 +76,22 @@ export type Repo = {
   localPath: string
   githubUrl: string | null
   defaultBranch: string | null
+  autoPublishEnabled: boolean
+  autoPublishMaxIssuesPerRun: number
+  autoPublishDefaultLabel: string
+  autoPublishDryRun: boolean
+  autoPublishRequireConfirmation: boolean
   createdAt: string
   updatedAt: string
+}
+
+export type UpdateRepoAutoPublishSettingsRequest = {
+  id: string
+  autoPublishEnabled: boolean
+  autoPublishMaxIssuesPerRun: number
+  autoPublishDefaultLabel: string
+  autoPublishDryRun: boolean
+  autoPublishRequireConfirmation: boolean
 }
 
 export type DetectLocalRepoResult =
@@ -187,6 +201,10 @@ export type IpcContract = {
   'repos:list': { request: void; response: Repo[] }
   'repos:detectLocal': { request: { localPath: string }; response: DetectLocalRepoResult }
   'repos:link': { request: LinkRepoRequest; response: Repo }
+  'repos:updateAutoPublishSettings': {
+    request: UpdateRepoAutoPublishSettingsRequest
+    response: Repo | null
+  }
   'repos:unlink': { request: { id: string }; response: boolean }
   'dialog:openDirectory': { request: void; response: string | null }
   'github:listLabels': {

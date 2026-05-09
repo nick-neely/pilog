@@ -43,6 +43,11 @@ describe('issue generation', () => {
         localPath: '/workspace/pilog',
         githubUrl: 'https://github.com/nick-neely/pilog',
         defaultBranch: 'main',
+        autoPublishEnabled: false,
+        autoPublishMaxIssuesPerRun: 5,
+        autoPublishDefaultLabel: 'triaged-by-pilog',
+        autoPublishDryRun: false,
+        autoPublishRequireConfirmation: true,
         createdAt: '2026-05-08T00:00:00.000Z',
         updatedAt: '2026-05-08T00:00:00.000Z'
       },

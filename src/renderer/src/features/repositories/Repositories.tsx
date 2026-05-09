@@ -21,6 +21,7 @@ import { Input } from '@renderer/components/ui/input'
 import { Label } from '@renderer/components/ui/label'
 import { ScrollArea } from '@renderer/components/ui/scroll-area'
 import { Skeleton } from '@renderer/components/ui/skeleton'
+import { Switch } from '@renderer/components/ui/switch'
 import { Toggle } from '@renderer/components/ui/toggle'
 import { cn } from '@renderer/lib/utils'
 import type {
@@ -28,7 +29,8 @@ import type {
   DetectLocalRepoResult,
   GitHubLabel,
   GitHubRepo,
-  Repo
+  Repo,
+  UpdateRepoAutoPublishSettingsRequest
 } from '@shared/ipc'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
@@ -512,42 +514,204 @@ function NewIssueDialog({
 
 function RepoRow({
   repo,
-  onUnlink
+  onUnlink,
+  onUpdated
 }: {
   repo: Repo
   onUnlink: (id: string) => void
+  onUpdated: (repo: Repo) => void
 }): React.JSX.Element {
   const [showNewIssue, setShowNewIssue] = useState(false)
 
   return (
     <>
       <Card size="sm" className="shadow-none ring-1 ring-border">
-        <CardContent className="flex flex-row items-center justify-between gap-4 py-4">
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium">
-              {repo.owner}/{repo.name}
-            </p>
-            <p className="mt-0.5 truncate font-mono text-xs text-muted-foreground">
-              {repo.localPath}
-            </p>
-            {repo.defaultBranch && (
-              <p className="text-xs text-muted-foreground">
-                Branch: <span className="font-mono">{repo.defaultBranch}</span>
+        <CardContent className="flex flex-col gap-4 py-4">
+          <div className="flex flex-row items-start justify-between gap-4">
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium">
+                {repo.owner}/{repo.name}
               </p>
-            )}
+              <p className="mt-0.5 truncate font-mono text-xs text-muted-foreground">
+                {repo.localPath}
+              </p>
+              {repo.defaultBranch && (
+                <p className="text-xs text-muted-foreground">
+                  Branch: <span className="font-mono">{repo.defaultBranch}</span>
+                </p>
+              )}
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
+              <Button size="sm" variant="outline" onClick={() => setShowNewIssue(true)}>
+                New Issue
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => onUnlink(repo.id)}>
+                Remove
+              </Button>
+            </div>
           </div>
-          <div className="flex shrink-0 items-center gap-2">
-            <Button size="sm" variant="outline" onClick={() => setShowNewIssue(true)}>
-              New Issue
-            </Button>
-            <Button variant="ghost" size="sm" onClick={() => onUnlink(repo.id)}>
-              Remove
-            </Button>
-          </div>
+          <AutoPublishSettings repo={repo} onUpdated={onUpdated} />
         </CardContent>
       </Card>
       <NewIssueDialog repo={repo} open={showNewIssue} onOpenChange={setShowNewIssue} />
     </>
+  )
+}
+
+function AutoPublishSettings({
+  repo,
+  onUpdated
+}: {
+  repo: Repo
+  onUpdated: (repo: Repo) => void
+}): React.JSX.Element {
+  const [enabled, setEnabled] = useState(repo.autoPublishEnabled)
+  const [maxIssues, setMaxIssues] = useState(String(repo.autoPublishMaxIssuesPerRun))
+  const [defaultLabel, setDefaultLabel] = useState(repo.autoPublishDefaultLabel)
+  const [dryRun, setDryRun] = useState(repo.autoPublishDryRun)
+  const [requireConfirmation, setRequireConfirmation] = useState(
+    repo.autoPublishRequireConfirmation
+  )
+  const [saving, setSaving] = useState(false)
+  const [message, setMessage] = useState<string | null>(null)
+
+  useEffect(() => {
+    setEnabled(repo.autoPublishEnabled)
+    setMaxIssues(String(repo.autoPublishMaxIssuesPerRun))
+    setDefaultLabel(repo.autoPublishDefaultLabel)
+    setDryRun(repo.autoPublishDryRun)
+    setRequireConfirmation(repo.autoPublishRequireConfirmation)
+    setMessage(null)
+  }, [repo])
+
+  const parsedMaxIssues = Number.parseInt(maxIssues, 10)
+  const safeMaxIssues = Number.isFinite(parsedMaxIssues) ? Math.max(1, parsedMaxIssues) : 1
+  const normalizedLabel = defaultLabel.trim() || 'triaged-by-pilog'
+  const isDirty =
+    enabled !== repo.autoPublishEnabled ||
+    safeMaxIssues !== repo.autoPublishMaxIssuesPerRun ||
+    normalizedLabel !== repo.autoPublishDefaultLabel ||
+    dryRun !== repo.autoPublishDryRun ||
+    requireConfirmation !== repo.autoPublishRequireConfirmation
+
+  const handleSave = async (): Promise<void> => {
+    setSaving(true)
+    setMessage(null)
+    const request: UpdateRepoAutoPublishSettingsRequest = {
+      id: repo.id,
+      autoPublishEnabled: enabled,
+      autoPublishMaxIssuesPerRun: safeMaxIssues,
+      autoPublishDefaultLabel: normalizedLabel,
+      autoPublishDryRun: dryRun,
+      autoPublishRequireConfirmation: requireConfirmation
+    }
+    const updated = await window.pilog.invoke('repos:updateAutoPublishSettings', request)
+    setSaving(false)
+    if (!updated) {
+      setMessage('Repository settings could not be saved.')
+      return
+    }
+    onUpdated(updated)
+    setMessage('Auto-publish settings saved.')
+  }
+
+  return (
+    <div className="border-t pt-4">
+      <div className="flex flex-col gap-4">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex max-w-[36rem] flex-col gap-1">
+            <p className="text-sm font-medium">Auto-publish guardrails</p>
+            <p className="text-sm leading-6 text-muted-foreground">
+              Applies only to {repo.owner}/{repo.name}. PiLog will use these limits before any
+              generated issue can be written to GitHub.
+            </p>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <Label htmlFor={`auto-publish-enabled-${repo.id}`} className="text-sm">
+              {enabled ? 'Enabled' : 'Disabled'}
+            </Label>
+            <Switch
+              id={`auto-publish-enabled-${repo.id}`}
+              checked={enabled}
+              onCheckedChange={setEnabled}
+              aria-label={`Auto-publish for ${repo.owner}/${repo.name}`}
+            />
+          </div>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-[minmax(0,0.6fr)_minmax(0,1fr)]">
+          <div className="flex flex-col gap-2">
+            <Label htmlFor={`auto-publish-max-${repo.id}`}>Max issues per run</Label>
+            <Input
+              id={`auto-publish-max-${repo.id}`}
+              type="number"
+              min={1}
+              max={50}
+              inputMode="numeric"
+              value={maxIssues}
+              onChange={(event) => setMaxIssues(event.target.value)}
+            />
+          </div>
+          <div className="flex flex-col gap-2">
+            <Label htmlFor={`auto-publish-label-${repo.id}`}>Default label</Label>
+            <Input
+              id={`auto-publish-label-${repo.id}`}
+              type="text"
+              value={defaultLabel}
+              onChange={(event) => setDefaultLabel(event.target.value)}
+              placeholder="triaged-by-pilog"
+            />
+          </div>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label
+            htmlFor={`auto-publish-dry-run-${repo.id}`}
+            className="flex cursor-pointer items-start justify-between gap-3 rounded-md bg-muted/40 p-3"
+          >
+            <span className="flex flex-col gap-1">
+              <span className="text-sm font-medium">Dry run</span>
+              <span className="text-xs leading-5 text-muted-foreground">
+                Generate the publish plan without creating GitHub issues.
+              </span>
+            </span>
+            <Switch
+              id={`auto-publish-dry-run-${repo.id}`}
+              checked={dryRun}
+              onCheckedChange={setDryRun}
+              size="sm"
+            />
+          </label>
+
+          <label
+            htmlFor={`auto-publish-confirm-${repo.id}`}
+            className="flex cursor-pointer items-start justify-between gap-3 rounded-md bg-muted/40 p-3"
+          >
+            <span className="flex flex-col gap-1">
+              <span className="text-sm font-medium">Require confirmation</span>
+              <span className="text-xs leading-5 text-muted-foreground">
+                Show the planned drafts before PiLog writes to GitHub.
+              </span>
+            </span>
+            <Switch
+              id={`auto-publish-confirm-${repo.id}`}
+              checked={requireConfirmation}
+              onCheckedChange={setRequireConfirmation}
+              size="sm"
+            />
+          </label>
+        </div>
+
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-xs text-muted-foreground" aria-live="polite">
+            {message ?? 'Defaults are disabled, 5 issues, triaged-by-pilog, confirmation on.'}
+          </p>
+          <Button size="sm" variant="outline" onClick={handleSave} disabled={!isDirty || saving}>
+            {saving ? 'Saving…' : 'Save guardrails'}
+          </Button>
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -557,6 +721,10 @@ export function Repositories({ onBack }: { onBack: () => void }): React.JSX.Elem
   const handleUnlink = async (id: string): Promise<void> => {
     await window.pilog.invoke('repos:unlink', { id })
     await reload()
+  }
+
+  const handleRepoUpdated = (): void => {
+    void reload()
   }
 
   return (
@@ -570,11 +738,16 @@ export function Repositories({ onBack }: { onBack: () => void }): React.JSX.Elem
       <div className="flex-1">
         <ScrollArea className="h-full">
           <div className="p-6">
-            <div className="mx-auto flex max-w-lg flex-col gap-6">
+            <div className="mx-auto flex max-w-3xl flex-col gap-6">
               {repos.length > 0 && (
                 <section className="flex flex-col gap-2">
                   {repos.map((repo) => (
-                    <RepoRow key={repo.id} repo={repo} onUnlink={handleUnlink} />
+                    <RepoRow
+                      key={repo.id}
+                      repo={repo}
+                      onUnlink={handleUnlink}
+                      onUpdated={handleRepoUpdated}
+                    />
                   ))}
                 </section>
               )}

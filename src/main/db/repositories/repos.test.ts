@@ -1,7 +1,13 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { createInMemoryDatabase, type PilogDatabase } from '../client'
 import { runMigrations } from '../migrations'
-import { createRepo, listRepos, getRepoById, deleteRepo } from './repos'
+import {
+  createRepo,
+  listRepos,
+  getRepoById,
+  deleteRepo,
+  updateRepoAutoPublishSettings
+} from './repos'
 
 describe('repos repository', () => {
   let db: PilogDatabase
@@ -28,8 +34,67 @@ describe('repos repository', () => {
     expect(repo.localPath).toBe('/home/user/projects/pilog')
     expect(repo.githubUrl).toBe('https://github.com/nick-neely/pilog')
     expect(repo.defaultBranch).toBe('main')
+    expect(repo.autoPublishEnabled).toBe(false)
+    expect(repo.autoPublishMaxIssuesPerRun).toBe(5)
+    expect(repo.autoPublishDefaultLabel).toBe('triaged-by-pilog')
+    expect(repo.autoPublishDryRun).toBe(false)
+    expect(repo.autoPublishRequireConfirmation).toBe(true)
     expect(repo.createdAt).toBeDefined()
     expect(repo.updatedAt).toBeDefined()
+  })
+
+  it('persists conservative auto-publish defaults', () => {
+    const created = createRepo(db, sampleInput)
+    const found = getRepoById(db, created.id)
+
+    expect(found).toMatchObject({
+      autoPublishEnabled: false,
+      autoPublishMaxIssuesPerRun: 5,
+      autoPublishDefaultLabel: 'triaged-by-pilog',
+      autoPublishDryRun: false,
+      autoPublishRequireConfirmation: true
+    })
+  })
+
+  it('updates auto-publish guardrails for one repo only', () => {
+    const first = createRepo(db, sampleInput)
+    const second = createRepo(db, { ...sampleInput, name: 'other', localPath: '/other' })
+
+    const updated = updateRepoAutoPublishSettings(db, first.id, {
+      autoPublishEnabled: true,
+      autoPublishMaxIssuesPerRun: 2,
+      autoPublishDefaultLabel: 'needs-triage',
+      autoPublishDryRun: true,
+      autoPublishRequireConfirmation: false
+    })
+
+    expect(updated).toMatchObject({
+      id: first.id,
+      autoPublishEnabled: true,
+      autoPublishMaxIssuesPerRun: 2,
+      autoPublishDefaultLabel: 'needs-triage',
+      autoPublishDryRun: true,
+      autoPublishRequireConfirmation: false
+    })
+    expect(getRepoById(db, second.id)).toMatchObject({
+      autoPublishEnabled: false,
+      autoPublishMaxIssuesPerRun: 5,
+      autoPublishDefaultLabel: 'triaged-by-pilog',
+      autoPublishDryRun: false,
+      autoPublishRequireConfirmation: true
+    })
+  })
+
+  it('returns null when updating auto-publish settings for a missing repo', () => {
+    const updated = updateRepoAutoPublishSettings(db, 'non-existent', {
+      autoPublishEnabled: true,
+      autoPublishMaxIssuesPerRun: 1,
+      autoPublishDefaultLabel: 'triaged-by-pilog',
+      autoPublishDryRun: false,
+      autoPublishRequireConfirmation: true
+    })
+
+    expect(updated).toBeNull()
   })
 
   it('lists all repos', () => {

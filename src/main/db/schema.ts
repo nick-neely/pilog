@@ -20,6 +20,12 @@ export const repos = sqliteTable('repos', {
   githubUrl: text('github_url'),
   defaultBranch: text('default_branch'),
   autoPublishEnabled: integer('auto_publish_enabled', { mode: 'boolean' }).notNull().default(false),
+  autoPublishMaxIssuesPerRun: integer('auto_publish_max_issues_per_run').notNull().default(5),
+  autoPublishDefaultLabel: text('auto_publish_default_label').notNull().default('triaged-by-pilog'),
+  autoPublishDryRun: integer('auto_publish_dry_run', { mode: 'boolean' }).notNull().default(false),
+  autoPublishRequireConfirmation: integer('auto_publish_require_confirmation', { mode: 'boolean' })
+    .notNull()
+    .default(true),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull()
 })

@@ -22,6 +22,10 @@ export function runMigrations(db: PilogDatabase): void {
       github_url TEXT,
       default_branch TEXT,
       auto_publish_enabled INTEGER NOT NULL DEFAULT 0,
+      auto_publish_max_issues_per_run INTEGER NOT NULL DEFAULT 5,
+      auto_publish_default_label TEXT NOT NULL DEFAULT 'triaged-by-pilog',
+      auto_publish_dry_run INTEGER NOT NULL DEFAULT 0,
+      auto_publish_require_confirmation INTEGER NOT NULL DEFAULT 1,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     )
@@ -63,6 +67,26 @@ export function runMigrations(db: PilogDatabase): void {
   `)
 
   addColumnIfMissing(db, 'notes', 'run_id', 'TEXT')
+  addColumnIfMissing(db, 'repos', 'auto_publish_enabled', 'INTEGER NOT NULL DEFAULT 0')
+  addColumnIfMissing(
+    db,
+    'repos',
+    'auto_publish_max_issues_per_run',
+    'INTEGER NOT NULL DEFAULT 5'
+  )
+  addColumnIfMissing(
+    db,
+    'repos',
+    'auto_publish_default_label',
+    "TEXT NOT NULL DEFAULT 'triaged-by-pilog'"
+  )
+  addColumnIfMissing(db, 'repos', 'auto_publish_dry_run', 'INTEGER NOT NULL DEFAULT 0')
+  addColumnIfMissing(
+    db,
+    'repos',
+    'auto_publish_require_confirmation',
+    'INTEGER NOT NULL DEFAULT 1'
+  )
   addColumnIfMissing(db, 'issue_drafts', 'grouping_reason', "TEXT NOT NULL DEFAULT ''")
   addColumnIfMissing(db, 'agent_runs', 'input_note_ids', "TEXT NOT NULL DEFAULT '[]'")
   addColumnIfMissing(db, 'agent_runs', 'output_draft_ids', "TEXT NOT NULL DEFAULT '[]'")

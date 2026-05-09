@@ -1,7 +1,7 @@
 import { ipcMain, dialog, BrowserWindow } from 'electron'
 import type { PilogDatabase } from '../db/client'
-import type { LinkRepoRequest } from '@shared/ipc'
-import { listRepos, deleteRepo } from '../db/repositories/repos'
+import type { LinkRepoRequest, UpdateRepoAutoPublishSettingsRequest } from '@shared/ipc'
+import { listRepos, deleteRepo, updateRepoAutoPublishSettings } from '../db/repositories/repos'
 import { detectLocalRepo, linkRepo } from '../repos/local-repo-service'
 
 export function registerRepoIpcHandlers(db: PilogDatabase): void {
@@ -16,6 +16,13 @@ export function registerRepoIpcHandlers(db: PilogDatabase): void {
   ipcMain.handle('repos:link', (_event, request: LinkRepoRequest) => {
     return linkRepo(db, request)
   })
+
+  ipcMain.handle(
+    'repos:updateAutoPublishSettings',
+    (_event, request: UpdateRepoAutoPublishSettingsRequest) => {
+      return updateRepoAutoPublishSettings(db, request.id, request)
+    }
+  )
 
   ipcMain.handle('repos:unlink', (_event, request: { id: string }) => {
     return deleteRepo(db, request.id)
