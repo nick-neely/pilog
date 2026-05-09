@@ -4,8 +4,10 @@ import { runMigrations } from '../migrations'
 import { createRepo } from './repos'
 import {
   createIssueDraft,
+  getIssueDraftById,
   listIssueDrafts,
   listIssueDraftsForReview,
+  markIssueDraftPublished,
   updateIssueDraft,
   updateIssueDraftStatus
 } from './issue-drafts'
@@ -174,5 +176,30 @@ describe('issue-drafts repository', () => {
 
   it('returns null when updating status for a missing draft', () => {
     expect(updateIssueDraftStatus(db, { id: 'missing', status: 'dismissed' })).toBeNull()
+  })
+
+  it('marks a draft as published with the edited content and GitHub URL', () => {
+    const draft = createIssueDraft(db, { repoId, draft: generatedDraft })
+
+    const published = markIssueDraftPublished(db, {
+      id: draft.id,
+      title: 'Edited publish title',
+      body: 'Edited markdown body',
+      labels: ['bug', 'ready'],
+      githubIssueUrl: 'https://github.com/nick-neely/pilog/issues/21'
+    })
+
+    expect(published).toMatchObject({
+      id: draft.id,
+      title: 'Edited publish title',
+      body: 'Edited markdown body',
+      labels: ['bug', 'ready'],
+      status: 'published',
+      githubIssueUrl: 'https://github.com/nick-neely/pilog/issues/21'
+    })
+    expect(getIssueDraftById(db, draft.id)).toMatchObject({
+      status: 'published',
+      githubIssueUrl: 'https://github.com/nick-neely/pilog/issues/21'
+    })
   })
 })

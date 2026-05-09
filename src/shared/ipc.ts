@@ -150,6 +150,8 @@ export type UpdateIssueDraftStatusRequest = {
   status: IssueDraftStatus
 }
 
+export type PublishIssueDraftRequest = UpdateIssueDraftRequest
+
 export type IpcContract = {
   'note:create': { request: { content: string; repoId?: string | null }; response: Note }
   'note:list': { request: ListNotesRequest | void; response: Note[] }
@@ -213,6 +215,10 @@ export type IpcContract = {
   'issue-drafts:updateStatus': {
     request: UpdateIssueDraftStatusRequest
     response: IssueDraft | null
+  }
+  'issue-drafts:publish': {
+    request: PublishIssueDraftRequest
+    response: IssueDraft
   }
   'path:copy': {
     request: PathActionRequest
