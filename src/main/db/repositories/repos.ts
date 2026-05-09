@@ -2,7 +2,12 @@ import { eq } from 'drizzle-orm'
 import { v4 as uuidv4 } from 'uuid'
 import type { PilogDatabase } from '../client'
 import { repos } from '../schema'
-import type { Repo, UpdateRepoAutoPublishSettingsRequest } from '@shared/ipc'
+import {
+  DEFAULT_REPO_AUTO_PUBLISH_SETTINGS,
+  normalizeRepoAutoPublishSettings,
+  type Repo,
+  type UpdateRepoAutoPublishSettingsRequest
+} from '@shared/ipc'
 
 const repoColumns = {
   id: repos.id,
@@ -41,11 +46,7 @@ export function createRepo(
       localPath: input.localPath,
       githubUrl: input.githubUrl ?? undefined,
       defaultBranch: input.defaultBranch ?? undefined,
-      autoPublishEnabled: false,
-      autoPublishMaxIssuesPerRun: 5,
-      autoPublishDefaultLabel: 'triaged-by-pilog',
-      autoPublishDryRun: false,
-      autoPublishRequireConfirmation: true,
+      ...DEFAULT_REPO_AUTO_PUBLISH_SETTINGS,
       createdAt: now,
       updatedAt: now
     })
@@ -58,11 +59,7 @@ export function createRepo(
     localPath: input.localPath,
     githubUrl: input.githubUrl,
     defaultBranch: input.defaultBranch,
-    autoPublishEnabled: false,
-    autoPublishMaxIssuesPerRun: 5,
-    autoPublishDefaultLabel: 'triaged-by-pilog',
-    autoPublishDryRun: false,
-    autoPublishRequireConfirmation: true,
+    ...DEFAULT_REPO_AUTO_PUBLISH_SETTINGS,
     createdAt: now,
     updatedAt: now
   }
@@ -83,16 +80,11 @@ export function updateRepoAutoPublishSettings(
   input: Omit<UpdateRepoAutoPublishSettingsRequest, 'id'>
 ): Repo | null {
   const now = new Date().toISOString()
-  const maxIssuesPerRun = Math.max(1, Math.floor(input.autoPublishMaxIssuesPerRun))
-  const defaultLabel = input.autoPublishDefaultLabel.trim() || 'triaged-by-pilog'
+  const settings = normalizeRepoAutoPublishSettings(input)
 
   db.update(repos)
     .set({
-      autoPublishEnabled: input.autoPublishEnabled,
-      autoPublishMaxIssuesPerRun: maxIssuesPerRun,
-      autoPublishDefaultLabel: defaultLabel,
-      autoPublishDryRun: input.autoPublishDryRun,
-      autoPublishRequireConfirmation: input.autoPublishRequireConfirmation,
+      ...settings,
       updatedAt: now
     })
     .where(eq(repos.id, id))

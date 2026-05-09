@@ -24,13 +24,15 @@ import { Skeleton } from '@renderer/components/ui/skeleton'
 import { Switch } from '@renderer/components/ui/switch'
 import { Toggle } from '@renderer/components/ui/toggle'
 import { cn } from '@renderer/lib/utils'
+import { DEFAULT_REPO_AUTO_PUBLISH_SETTINGS, normalizeRepoAutoPublishSettings } from '@shared/ipc'
 import type {
   CreateIssueRequest,
   DetectLocalRepoResult,
   GitHubLabel,
   GitHubRepo,
   Repo,
-  UpdateRepoAutoPublishSettingsRequest
+  UpdateRepoAutoPublishSettingsRequest,
+  RepoAutoPublishSettings
 } from '@shared/ipc'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
@@ -519,7 +521,7 @@ function RepoRow({
 }: {
   repo: Repo
   onUnlink: (id: string) => void
-  onUpdated: (repo: Repo) => void
+  onUpdated: () => void
 }): React.JSX.Element {
   const [showNewIssue, setShowNewIssue] = useState(false)
 
@@ -550,7 +552,7 @@ function RepoRow({
               </Button>
             </div>
           </div>
-          <AutoPublishSettings repo={repo} onUpdated={onUpdated} />
+          <AutoPublishSettings key={repo.updatedAt} repo={repo} onUpdated={onUpdated} />
         </CardContent>
       </Card>
       <NewIssueDialog repo={repo} open={showNewIssue} onOpenChange={setShowNewIssue} />
@@ -563,7 +565,7 @@ function AutoPublishSettings({
   onUpdated
 }: {
   repo: Repo
-  onUpdated: (repo: Repo) => void
+  onUpdated: () => void
 }): React.JSX.Element {
   const [enabled, setEnabled] = useState(repo.autoPublishEnabled)
   const [maxIssues, setMaxIssues] = useState(String(repo.autoPublishMaxIssuesPerRun))
@@ -575,35 +577,26 @@ function AutoPublishSettings({
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
 
-  useEffect(() => {
-    setEnabled(repo.autoPublishEnabled)
-    setMaxIssues(String(repo.autoPublishMaxIssuesPerRun))
-    setDefaultLabel(repo.autoPublishDefaultLabel)
-    setDryRun(repo.autoPublishDryRun)
-    setRequireConfirmation(repo.autoPublishRequireConfirmation)
-    setMessage(null)
-  }, [repo])
-
-  const parsedMaxIssues = Number.parseInt(maxIssues, 10)
-  const safeMaxIssues = Number.isFinite(parsedMaxIssues) ? Math.max(1, parsedMaxIssues) : 1
-  const normalizedLabel = defaultLabel.trim() || 'triaged-by-pilog'
+  const formSettings: RepoAutoPublishSettings = normalizeRepoAutoPublishSettings({
+    autoPublishEnabled: enabled,
+    autoPublishMaxIssuesPerRun: Number.parseInt(maxIssues, 10),
+    autoPublishDefaultLabel: defaultLabel,
+    autoPublishDryRun: dryRun,
+    autoPublishRequireConfirmation: requireConfirmation
+  })
   const isDirty =
-    enabled !== repo.autoPublishEnabled ||
-    safeMaxIssues !== repo.autoPublishMaxIssuesPerRun ||
-    normalizedLabel !== repo.autoPublishDefaultLabel ||
-    dryRun !== repo.autoPublishDryRun ||
-    requireConfirmation !== repo.autoPublishRequireConfirmation
+    formSettings.autoPublishEnabled !== repo.autoPublishEnabled ||
+    formSettings.autoPublishMaxIssuesPerRun !== repo.autoPublishMaxIssuesPerRun ||
+    formSettings.autoPublishDefaultLabel !== repo.autoPublishDefaultLabel ||
+    formSettings.autoPublishDryRun !== repo.autoPublishDryRun ||
+    formSettings.autoPublishRequireConfirmation !== repo.autoPublishRequireConfirmation
 
   const handleSave = async (): Promise<void> => {
     setSaving(true)
     setMessage(null)
     const request: UpdateRepoAutoPublishSettingsRequest = {
       id: repo.id,
-      autoPublishEnabled: enabled,
-      autoPublishMaxIssuesPerRun: safeMaxIssues,
-      autoPublishDefaultLabel: normalizedLabel,
-      autoPublishDryRun: dryRun,
-      autoPublishRequireConfirmation: requireConfirmation
+      ...formSettings
     }
     const updated = await window.pilog.invoke('repos:updateAutoPublishSettings', request)
     setSaving(false)
@@ -611,7 +604,7 @@ function AutoPublishSettings({
       setMessage('Repository settings could not be saved.')
       return
     }
-    onUpdated(updated)
+    onUpdated()
     setMessage('Auto-publish settings saved.')
   }
 
@@ -659,7 +652,7 @@ function AutoPublishSettings({
               type="text"
               value={defaultLabel}
               onChange={(event) => setDefaultLabel(event.target.value)}
-              placeholder="triaged-by-pilog"
+              placeholder={DEFAULT_REPO_AUTO_PUBLISH_SETTINGS.autoPublishDefaultLabel}
             />
           </div>
         </div>
@@ -704,7 +697,8 @@ function AutoPublishSettings({
 
         <div className="flex items-center justify-between gap-3">
           <p className="text-xs text-muted-foreground" aria-live="polite">
-            {message ?? 'Defaults are disabled, 5 issues, triaged-by-pilog, confirmation on.'}
+            {message ??
+              `Defaults are disabled, ${DEFAULT_REPO_AUTO_PUBLISH_SETTINGS.autoPublishMaxIssuesPerRun} issues, ${DEFAULT_REPO_AUTO_PUBLISH_SETTINGS.autoPublishDefaultLabel}, confirmation on.`}
           </p>
           <Button size="sm" variant="outline" onClick={handleSave} disabled={!isDirty || saving}>
             {saving ? 'Saving…' : 'Save guardrails'}

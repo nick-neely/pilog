@@ -85,14 +85,44 @@ export type Repo = {
   updatedAt: string
 }
 
+export type RepoAutoPublishSettings = Pick<
+  Repo,
+  | 'autoPublishEnabled'
+  | 'autoPublishMaxIssuesPerRun'
+  | 'autoPublishDefaultLabel'
+  | 'autoPublishDryRun'
+  | 'autoPublishRequireConfirmation'
+>
+
+export const DEFAULT_REPO_AUTO_PUBLISH_SETTINGS = {
+  autoPublishEnabled: false,
+  autoPublishMaxIssuesPerRun: 5,
+  autoPublishDefaultLabel: 'triaged-by-pilog',
+  autoPublishDryRun: false,
+  autoPublishRequireConfirmation: true
+} as const satisfies RepoAutoPublishSettings
+
+export function normalizeRepoAutoPublishSettings(
+  input: RepoAutoPublishSettings
+): RepoAutoPublishSettings {
+  const maxIssuesPerRun = Number.isFinite(input.autoPublishMaxIssuesPerRun)
+    ? Math.max(1, Math.floor(input.autoPublishMaxIssuesPerRun))
+    : 1
+
+  return {
+    autoPublishEnabled: input.autoPublishEnabled,
+    autoPublishMaxIssuesPerRun: maxIssuesPerRun,
+    autoPublishDefaultLabel:
+      input.autoPublishDefaultLabel.trim() ||
+      DEFAULT_REPO_AUTO_PUBLISH_SETTINGS.autoPublishDefaultLabel,
+    autoPublishDryRun: input.autoPublishDryRun,
+    autoPublishRequireConfirmation: input.autoPublishRequireConfirmation
+  }
+}
+
 export type UpdateRepoAutoPublishSettingsRequest = {
   id: string
-  autoPublishEnabled: boolean
-  autoPublishMaxIssuesPerRun: number
-  autoPublishDefaultLabel: string
-  autoPublishDryRun: boolean
-  autoPublishRequireConfirmation: boolean
-}
+} & RepoAutoPublishSettings
 
 export type DetectLocalRepoResult =
   | { state: 'unauthenticated' }
