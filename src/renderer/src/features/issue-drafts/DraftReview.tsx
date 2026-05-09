@@ -206,8 +206,22 @@ function failedRunSummary(run: AgentRunListItem): string {
 type PublishBlock = {
   title: string
   description: string
-  actionLabel?: string
-  action: 'settings' | 'repositories' | null
+} & (
+  | {
+      actionLabel: string
+      action: 'settings' | 'repositories'
+    }
+  | {
+      actionLabel?: never
+      action: null
+    }
+)
+
+type DraftReviewNavigation = {
+  onNavigateToInbox: () => void
+  onNavigateToAgentRuns: (runId?: string) => void
+  onNavigateToSettings: () => void
+  onNavigateToRepositories: () => void
 }
 
 function publishBlockForDraft(repo: Repo | null, githubStatus: GitHubStatus): PublishBlock | null {
@@ -251,6 +265,20 @@ function publishBlockForDraft(repo: Repo | null, githubStatus: GitHubStatus): Pu
   return null
 }
 
+function publishBlockActionHandler(
+  block: PublishBlock,
+  navigation: Pick<DraftReviewNavigation, 'onNavigateToSettings' | 'onNavigateToRepositories'>
+): (() => void) | undefined {
+  switch (block.action) {
+    case 'settings':
+      return navigation.onNavigateToSettings
+    case 'repositories':
+      return navigation.onNavigateToRepositories
+    case null:
+      return undefined
+  }
+}
+
 function parseGitHubRepoUrl(url: string): { owner: string; name: string } | null {
   try {
     const parsed = new URL(url)
@@ -277,11 +305,7 @@ export function DraftReview({
   onNavigateToSettings,
   onNavigateToRepositories,
   onOpenSourceNote
-}: {
-  onNavigateToInbox: () => void
-  onNavigateToAgentRuns: (runId?: string) => void
-  onNavigateToSettings: () => void
-  onNavigateToRepositories: () => void
+}: DraftReviewNavigation & {
   onOpenSourceNote: (noteId: string) => void
 }): React.JSX.Element {
   const [drafts, setDrafts] = useState<IssueDraftForReview[]>([])
@@ -374,7 +398,8 @@ export function DraftReview({
         <ScrollArea className="min-h-0 flex-1">
           <div className="p-3">
             {drafts.length === 0 ? (
-              <ReviewQueueEmptyState
+              <ReviewEmptyState
+                className="mt-10 p-6"
                 title={emptyTitle}
                 description={emptyDescription}
                 statusFilter={statusFilter}
@@ -447,7 +472,8 @@ export function DraftReview({
             onStatusChanged={fetchDrafts}
           />
         ) : (
-          <ReviewMainEmptyState
+          <ReviewEmptyState
+            className="h-full"
             title={emptyTitle}
             description={emptyDescription}
             statusFilter={statusFilter}
@@ -463,7 +489,8 @@ export function DraftReview({
   )
 }
 
-function ReviewQueueEmptyState({
+function ReviewEmptyState({
+  className,
   title,
   description,
   statusFilter,
@@ -473,6 +500,7 @@ function ReviewQueueEmptyState({
   onNavigateToAgentRuns,
   onSetStatusFilter
 }: {
+  className: string
   title: string
   description: string
   statusFilter: IssueDraftStatus
@@ -483,43 +511,7 @@ function ReviewQueueEmptyState({
   onSetStatusFilter: (status: IssueDraftStatus) => void
 }): React.JSX.Element {
   return (
-    <Empty className="mt-10 border-none bg-transparent p-6 shadow-none">
-      <EmptyHeader>
-        <EmptyTitle>{title}</EmptyTitle>
-        <EmptyDescription>{description}</EmptyDescription>
-      </EmptyHeader>
-      <ReviewEmptyActions
-        statusFilter={statusFilter}
-        statusCounts={statusCounts}
-        onNavigateToInbox={onNavigateToInbox}
-        onSetStatusFilter={onSetStatusFilter}
-      />
-      <FailedRunsNotice failedRuns={failedRuns} onNavigateToAgentRuns={onNavigateToAgentRuns} />
-    </Empty>
-  )
-}
-
-function ReviewMainEmptyState({
-  title,
-  description,
-  statusFilter,
-  statusCounts,
-  failedRuns,
-  onNavigateToInbox,
-  onNavigateToAgentRuns,
-  onSetStatusFilter
-}: {
-  title: string
-  description: string
-  statusFilter: IssueDraftStatus
-  statusCounts: Record<IssueDraftStatus, number>
-  failedRuns: AgentRunListItem[]
-  onNavigateToInbox: () => void
-  onNavigateToAgentRuns: (runId?: string) => void
-  onSetStatusFilter: (status: IssueDraftStatus) => void
-}): React.JSX.Element {
-  return (
-    <Empty className="h-full border-none bg-transparent shadow-none">
+    <Empty className={cn('border-none bg-transparent shadow-none', className)}>
       <EmptyHeader>
         <EmptyTitle>{title}</EmptyTitle>
         <EmptyDescription>{description}</EmptyDescription>
@@ -616,6 +608,40 @@ function FailedRunsNotice({
           All runs
         </Button>
       </div>
+    </div>
+  )
+}
+
+function PublishBlocker({
+  block,
+  onNavigateToSettings,
+  onNavigateToRepositories
+}: {
+  block: PublishBlock
+  onNavigateToSettings: () => void
+  onNavigateToRepositories: () => void
+}): React.JSX.Element {
+  const handleAction = publishBlockActionHandler(block, {
+    onNavigateToSettings,
+    onNavigateToRepositories
+  })
+
+  return (
+    <div
+      id="publish-blocker"
+      role="status"
+      aria-live="polite"
+      className="mt-3 flex max-w-2xl flex-wrap items-center justify-between gap-3 rounded-md border bg-muted/30 p-3 text-sm"
+    >
+      <div className="min-w-0">
+        <p className="font-medium">{block.title}</p>
+        <p className="mt-1 text-muted-foreground">{block.description}</p>
+      </div>
+      {block.actionLabel && handleAction ? (
+        <Button type="button" variant="outline" size="sm" onClick={handleAction}>
+          {block.actionLabel}
+        </Button>
+      ) : null}
     </div>
   )
 }
@@ -833,31 +859,11 @@ function DraftEditor({
           </p>
         ) : null}
         {publishBlock ? (
-          <div
-            id="publish-blocker"
-            role="status"
-            aria-live="polite"
-            className="mt-3 flex max-w-2xl flex-wrap items-center justify-between gap-3 rounded-md border bg-muted/30 p-3 text-sm"
-          >
-            <div className="min-w-0">
-              <p className="font-medium">{publishBlock.title}</p>
-              <p className="mt-1 text-muted-foreground">{publishBlock.description}</p>
-            </div>
-            {publishBlock.actionLabel ? (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={
-                  publishBlock.action === 'settings'
-                    ? onNavigateToSettings
-                    : onNavigateToRepositories
-                }
-              >
-                {publishBlock.actionLabel}
-              </Button>
-            ) : null}
-          </div>
+          <PublishBlocker
+            block={publishBlock}
+            onNavigateToSettings={onNavigateToSettings}
+            onNavigateToRepositories={onNavigateToRepositories}
+          />
         ) : null}
         {publishedUrl ? (
           <p
