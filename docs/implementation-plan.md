@@ -184,7 +184,7 @@ User can connect GitHub, link a real repo, type a title/body, and see the issue 
 **Goal:** Select notes + a linked repo → click a button → get structured `IssueDraft` JSON written to `issue_drafts`. No publishing yet; review UI is Phase 4.
 
 - ☑ **Embedding strategy** — resolved in [ADR-0005](./adr/0005-pi-embedding-strategy.md): in-process `pi-agent-core` + `pi-ai`, exit-tool pattern, `safeStorage`-backed `AuthStorage`, `MessagePortMain` streaming, curated read-only tool set.
-- ☑ **Pi runtime bridge** — `src/main/pi/runtime.ts` implements `runAgent(input): AsyncIterable<AgentEvent>` per ADR-0005 §1–4. Renderer subscribes via the `MessagePortMain` channel exposed by `window.pilog.runAgent`.
+- ☑ **Pi runtime bridge** — `src/main/pi/runtime.ts` implements `runAgent(input): AsyncIterable<AgentEvent>` per ADR-0005 §1–4. Preload consumes the `MessagePortMain` stream and exposes a cloneable `window.pilog.runAgent(input, onEvent): Promise<void>` renderer API.
 - ☑ **Pi config UX** — `Settings → Provider & Model`. Surfaces Pi's BYOK flow inside PiLog (PRD §7 BYOK). "Open advanced config" escape hatch.
 - ☑ **Issue generation** — `src/main/pi/issue-generation.ts` constructs the prompt per PRD §15, supplies repo path + selected notes, validates output against the `GeneratedIssueDraft` Zod schema (PRD §10), persists to `issue_drafts`.
 - ☑ **Agent runs view** — minimal list of past runs with input/output/error, useful for debugging prompts.

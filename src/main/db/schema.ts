@@ -3,6 +3,7 @@ import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core'
 export const notes = sqliteTable('notes', {
   id: text('id').primaryKey(),
   repoId: text('repo_id'),
+  runId: text('run_id'),
   content: text('content').notNull(),
   status: text('status', { enum: ['unprocessed', 'drafted', 'published', 'dismissed'] })
     .notNull()

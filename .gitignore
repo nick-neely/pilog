@@ -8,3 +8,4 @@ out
 *.log*
 test-results
 playwright-report
+.cursor/hooks/state/

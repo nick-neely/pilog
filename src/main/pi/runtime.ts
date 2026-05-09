@@ -89,8 +89,11 @@ export async function* runAgent(input: IssueGenerationInput): AsyncIterable<Agen
     toolExecution: 'parallel'
   })
 
-  input.signal?.addEventListener('abort', () => agent.abort(), { once: true })
-
+  const abortAgent = (): void => {
+    agent.abort()
+    queue.push(createAbortEvent(input.signal))
+    queue.close()
+  }
   agent.subscribe((event: PiAgentEvent) => {
     switch (event.type) {
       case 'turn_start': {
@@ -133,14 +136,19 @@ export async function* runAgent(input: IssueGenerationInput): AsyncIterable<Agen
     }
   })
 
-  void agent.prompt(prompt).catch((error) => {
-    queue.push({
-      type: 'error',
-      message: error instanceof Error ? error.message : String(error),
-      cause: input.signal?.aborted ? 'cancelled' : 'pi_internal'
+  if (input.signal?.aborted) {
+    abortAgent()
+  } else {
+    input.signal?.addEventListener('abort', abortAgent, { once: true })
+    void agent.prompt(prompt).catch((error) => {
+      queue.push({
+        type: 'error',
+        message: error instanceof Error ? error.message : String(error),
+        cause: input.signal?.aborted ? createAbortEvent(input.signal).cause : 'pi_internal'
+      })
+      queue.close()
     })
-    queue.close()
-  })
+  }
 
   for await (const event of queue) {
     yield event
@@ -150,7 +158,8 @@ export async function* runAgent(input: IssueGenerationInput): AsyncIterable<Agen
     agent.abort()
   }
 
-  if (turnBudgetExceeded) return
+  input.signal?.removeEventListener('abort', abortAgent)
+  if (input.signal?.aborted || turnBudgetExceeded) return
 
   assertProcessStateUnchanged(before)
 }
@@ -220,5 +229,16 @@ function createTurnBudgetExceededEvent(turnBudget: number): AgentEvent & {
     type: 'error',
     message: `Turn budget exceeded after ${turnBudget} turns.`,
     cause: 'turn_budget_exceeded'
+  }
+}
+
+function createAbortEvent(signal: AbortSignal | undefined): AgentEvent & { type: 'error' } {
+  const timedOut = signal?.reason === 'timeout'
+  return {
+    type: 'error',
+    message: timedOut
+      ? 'Generation timed out before Pi returned issue drafts.'
+      : 'Generation cancelled.',
+    cause: timedOut ? 'timeout' : 'cancelled'
   }
 }

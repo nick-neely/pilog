@@ -40,7 +40,10 @@ const pilog = {
   send: (action: IpcAction): void => {
     ipcRenderer.send(action)
   },
-  runAgent: async function* (input: GenerateDraftsRequest): AsyncIterable<AgentEvent> {
+  runAgent: async function (
+    input: GenerateDraftsRequest,
+    onEvent: (event: AgentEvent) => void | Promise<void>
+  ): Promise<void> {
     const { runId } = await ipcRenderer.invoke('pi:generateDrafts:start', input)
     const port = await getStreamPort(runId)
     const queue = createAsyncQueue<AgentEvent>()
@@ -53,7 +56,7 @@ const pilog = {
     port.start()
 
     for await (const event of queue) {
-      yield event
+      await onEvent(event)
     }
   }
 }

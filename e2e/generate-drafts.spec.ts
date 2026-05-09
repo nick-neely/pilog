@@ -1,7 +1,7 @@
-import { test, expect, _electron as electron, type ElectronApplication } from '@playwright/test'
+import { _electron as electron, expect, test, type ElectronApplication } from '@playwright/test'
 import { mkdtempSync, rmSync } from 'fs'
-import { join } from 'path'
 import { tmpdir } from 'os'
+import { join } from 'path'
 
 let userDataDir: string
 let repoDir: string
@@ -23,6 +23,10 @@ async function launchApp(): Promise<ElectronApplication> {
   })
   await app.evaluate(({ ipcMain }) => ipcMain.emit('tray:open-inbox'))
   return app
+}
+
+async function exitApp(app: ElectronApplication): Promise<void> {
+  await app.evaluate(({ app }) => app.exit(0))
 }
 
 test('Generate Drafts persists one issue draft from selected repo notes', async () => {
@@ -62,7 +66,7 @@ test('Generate Drafts persists one issue draft from selected repo notes', async 
   expect(drafts[0]?.body).toContain('save button needs loading state')
   expect(drafts[0]?.groupingReason).toBeTruthy()
 
-  await app.close()
+  await exitApp(app)
 })
 
 test('Pi config setup persists across restart and unblocks Generate Drafts', async () => {
@@ -87,7 +91,7 @@ test('Pi config setup persists across restart and unblocks Generate Drafts', asy
   const modifier = process.platform === 'darwin' ? 'Meta' : 'Control'
   await noteRows.nth(1).click({ modifiers: [modifier] })
 
-  await expect(page.getByRole('button', { name: 'Generate Drafts' })).toBeDisabled()
+  await expect(page.getByRole('button', { name: 'Generate Drafts', exact: true })).toBeDisabled()
   await page.getByRole('button', { name: 'Configure Pi to generate drafts' }).click()
 
   await expect(page.locator('[data-testid="pi-config-panel"]')).toBeVisible()
@@ -95,7 +99,7 @@ test('Pi config setup persists across restart and unblocks Generate Drafts', asy
   await page.locator('[data-testid="pi-save-config"]').click()
   await expect(page.getByText('Configured')).toBeVisible()
 
-  await app.close()
+  await exitApp(app)
 
   app = await launchApp()
   page = await app.firstWindow()
@@ -104,9 +108,9 @@ test('Pi config setup persists across restart and unblocks Generate Drafts', asy
   await noteRows.first().click()
   await noteRows.nth(1).click({ modifiers: [modifier] })
 
-  await expect(page.getByRole('button', { name: 'Generate Drafts' })).toBeEnabled()
+  await expect(page.getByRole('button', { name: 'Generate Drafts', exact: true })).toBeEnabled()
 
-  await app.close()
+  await exitApp(app)
 })
 
 test('Agent Runs shows live generation, detail transcript, and source note navigation', async () => {

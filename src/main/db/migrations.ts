@@ -62,6 +62,7 @@ export function runMigrations(db: PilogDatabase): void {
     )
   `)
 
+  addColumnIfMissing(db, 'notes', 'run_id', 'TEXT')
   addColumnIfMissing(db, 'issue_drafts', 'grouping_reason', "TEXT NOT NULL DEFAULT ''")
   addColumnIfMissing(db, 'agent_runs', 'input_note_ids', "TEXT NOT NULL DEFAULT '[]'")
   addColumnIfMissing(db, 'agent_runs', 'output_draft_ids', "TEXT NOT NULL DEFAULT '[]'")

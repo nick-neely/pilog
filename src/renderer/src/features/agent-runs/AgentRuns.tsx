@@ -5,11 +5,21 @@ import {
   CancelCircleIcon,
   Loading03Icon,
   Tick02Icon,
-  UnfoldMoreIcon
+  UnfoldMoreIcon,
+  ViewIcon,
+  ViewOffSlashIcon
 } from '@hugeicons/core-free-icons'
 import { Badge } from '@renderer/components/ui/badge'
 import { Button } from '@renderer/components/ui/button'
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger
+} from '@renderer/components/ui/collapsible'
 import { Empty, EmptyDescription } from '@renderer/components/ui/empty'
+import { ScrollArea, ScrollBar } from '@renderer/components/ui/scroll-area'
+import { Separator } from '@renderer/components/ui/separator'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@renderer/components/ui/tabs'
 import { cn } from '@renderer/lib/utils'
 import type { AgentRunDetail, AgentRunListItem, AgentRunStatus } from '@shared/ipc'
 
@@ -83,9 +93,11 @@ function outputDraftClassName(selected: boolean): string {
 }
 
 export function AgentRuns({
-  onOpenSourceNote
+  onOpenSourceNote,
+  focusRunId
 }: {
   onOpenSourceNote: (noteId: string) => void
+  focusRunId?: string | null
 }): React.JSX.Element {
   const [runs, setRuns] = useState<AgentRunListItem[]>([])
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null)
@@ -103,8 +115,12 @@ export function AgentRuns({
       limit: 200
     })
     setRuns(result)
-    setSelectedRunId((current) => current ?? result[0]?.id ?? null)
-  }, [statusFilter])
+    setSelectedRunId((current) => {
+      if (current) return current
+      if (focusRunId && result.some((r) => r.id === focusRunId)) return focusRunId
+      return result[0]?.id ?? null
+    })
+  }, [statusFilter, focusRunId])
 
   const fetchDetail = useCallback(async (runId: string): Promise<void> => {
     const id = ++detailFetchId.current
@@ -288,166 +304,240 @@ function RunDetail({
   onSelectDraft: (id: string) => void
   onOpenSourceNote: (noteId: string) => void
 }): React.JSX.Element {
+  const [activeTab, setActiveTab] = useState('drafts')
+
+  const summaryParts: string[] = []
+  summaryParts.push(formatDuration(run))
+  summaryParts.push(`${run.inputNoteCount} note${run.inputNoteCount === 1 ? '' : 's'}`)
+  summaryParts.push(`→ ${run.outputDraftCount} draft${run.outputDraftCount === 1 ? '' : 's'}`)
+  if (run.finishedAt) {
+    summaryParts.push(`Finished ${formatTimestamp(run.finishedAt)}`)
+  } else {
+    summaryParts.push('In progress')
+  }
+
   return (
-    <article className="mx-auto flex min-h-full max-w-6xl flex-col px-8 py-6">
-      <header className="border-b pb-5">
+    <article className="flex min-h-full flex-col">
+      {/* Header */}
+      <header className="shrink-0 border-b px-8 py-5">
         <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
+          <div className="min-w-0">
             <p className="tabular font-mono text-xs text-muted-foreground">{run.id}</p>
             <h2 className="mt-1 font-heading text-2xl font-medium tracking-tight">
               {formatTimestamp(run.startedAt)}
             </h2>
           </div>
-          <Badge variant="outline" className={`gap-1.5 ${statusTone(run.status)}`}>
+          <Badge variant="outline" className={`shrink-0 gap-1.5 ${statusTone(run.status)}`}>
             {statusIcon(run.status)}
             {run.status}
           </Badge>
         </div>
-        <dl className="mt-4 grid grid-cols-2 gap-3 text-sm md:grid-cols-4">
-          <Metric label="Duration" value={formatDuration(run)} />
-          <Metric label="Source notes" value={String(run.inputNoteCount)} />
-          <Metric label="Output drafts" value={String(run.outputDraftCount)} />
-          <Metric
-            label="Finished"
-            value={run.finishedAt ? formatTimestamp(run.finishedAt) : 'In progress'}
-          />
-        </dl>
+
+        <p className="mt-2 text-sm text-muted-foreground">{summaryParts.join(' · ')}</p>
+
         {run.status === 'failed' && (
-          <div className="mt-4 rounded-md border bg-destructive/10 p-3 text-sm text-destructive">
+          <div className="mt-3 rounded-md border bg-destructive/10 p-3 text-sm text-destructive">
             <p className="font-medium">{run.errorMessage ?? 'The agent run failed.'}</p>
-            <p className="mt-1 text-destructive/80">
-              Retry will be available in a later prompt-iteration slice.
-            </p>
           </div>
         )}
         {run.status === 'cancelled' && (
-          <div className="mt-4 rounded-md border bg-muted p-3 text-sm text-muted-foreground">
+          <div className="mt-3 rounded-md border bg-muted p-3 text-sm text-muted-foreground">
             This run was cancelled before it finished.
           </div>
         )}
       </header>
 
-      <section className="grid gap-6 py-6 xl:grid-cols-[minmax(18rem,0.75fr)_minmax(24rem,1fr)]">
-        <div className="space-y-6">
-          <Panel title="Source Notes">
-            <div className="space-y-2">
-              {run.sourceNotes.map((note) => (
-                <button
-                  key={note.id}
-                  type="button"
-                  data-testid="run-source-note"
-                  onClick={() => onOpenSourceNote(note.id)}
-                  className="w-full rounded-md border bg-background px-3 py-2.5 text-left hover:bg-muted/60 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30"
-                >
-                  <p className="line-clamp-3 text-sm leading-relaxed">
-                    {note.content.trim() || 'Untitled note'}
-                  </p>
-                  <p className="mt-1 tabular font-mono text-xs text-muted-foreground">
-                    {formatTimestamp(note.createdAt)}
-                  </p>
-                </button>
-              ))}
-              {run.sourceNotes.length === 0 && (
-                <p className="text-sm text-muted-foreground">No source notes were recorded.</p>
+      {/* Tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-1 flex-col">
+        <div className="shrink-0 border-b px-8 pt-4">
+          <TabsList variant="line">
+            <TabsTrigger value="drafts">
+              Drafts
+              {run.outputDrafts.length > 0 && (
+                <span className="tabular ml-1.5 text-xs text-muted-foreground">
+                  {run.outputDrafts.length}
+                </span>
               )}
-            </div>
-          </Panel>
-
-          <Panel title="Output Drafts">
-            <div className="space-y-2">
-              {run.outputDrafts.map((draft) => (
-                <button
-                  key={draft.id}
-                  type="button"
-                  data-testid="run-output-draft"
-                  onClick={() => onSelectDraft(draft.id)}
-                  className={outputDraftClassName(selectedDraftId === draft.id)}
-                >
-                  <span className="min-w-0">
-                    <span className="block truncate text-sm font-medium">{draft.title}</span>
-                    <span className="mt-1 block text-xs text-muted-foreground">
-                      {draft.confidence} confidence
-                    </span>
-                  </span>
-                  <HugeiconsIcon icon={ArrowRight01Icon} aria-hidden className="mt-0.5 shrink-0" />
-                </button>
-              ))}
-              {run.outputDrafts.length === 0 && (
-                <p className="text-sm text-muted-foreground">No drafts were produced.</p>
+            </TabsTrigger>
+            <TabsTrigger value="transcript">
+              Transcript
+              {run.eventStream.length > 0 && (
+                <span className="tabular ml-1.5 text-xs text-muted-foreground">
+                  {run.eventStream.length}
+                </span>
               )}
-            </div>
-          </Panel>
+            </TabsTrigger>
+          </TabsList>
         </div>
 
-        <div className="space-y-6">
-          <Panel title="Draft Detail">
-            {selectedDraft ? (
-              <div
-                data-testid="run-draft-detail"
-                className="prose prose-sm max-w-none text-foreground"
-              >
-                <h3 className="font-sans text-base font-semibold">{selectedDraft.title}</h3>
-                <p className="text-sm text-muted-foreground">{selectedDraft.groupingReason}</p>
-                <pre className="mt-3 whitespace-pre-wrap rounded-md border bg-muted p-3 font-mono text-xs leading-relaxed">
-                  {selectedDraft.body}
-                </pre>
+        <TabsContent value="drafts" className="flex-1 overflow-hidden">
+          <div className="grid h-full xl:grid-cols-[minmax(18rem,0.75fr)_minmax(24rem,1fr)]">
+            {/* Left: Source notes + Draft list */}
+            <ScrollArea className="h-full">
+              <div className="space-y-6 p-8">
+                {/* Source Notes */}
+                <section>
+                  <h3 className="mb-3 text-sm font-semibold">Source Notes</h3>
+                  {run.sourceNotes.length > 0 ? (
+                    <div className="space-y-2">
+                      {run.sourceNotes.map((note) => (
+                        <button
+                          key={note.id}
+                          type="button"
+                          data-testid="run-source-note"
+                          onClick={() => onOpenSourceNote(note.id)}
+                          className="w-full rounded-md border bg-background px-3 py-2.5 text-left transition-colors hover:bg-muted/60 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30"
+                        >
+                          <p className="line-clamp-3 text-sm leading-relaxed">
+                            {note.content.trim() || 'Untitled note'}
+                          </p>
+                          <p className="mt-1 tabular font-mono text-xs text-muted-foreground">
+                            {formatTimestamp(note.createdAt)}
+                          </p>
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No source notes were recorded.</p>
+                  )}
+                </section>
+
+                <Separator />
+
+                {/* Output Drafts */}
+                <section>
+                  <h3 className="mb-3 text-sm font-semibold">Output Drafts</h3>
+                  {run.outputDrafts.length > 0 ? (
+                    <div className="space-y-2">
+                      {run.outputDrafts.map((draft) => (
+                        <button
+                          key={draft.id}
+                          type="button"
+                          data-testid="run-output-draft"
+                          onClick={() => onSelectDraft(draft.id)}
+                          className={outputDraftClassName(selectedDraftId === draft.id)}
+                        >
+                          <span className="min-w-0 text-left">
+                            <span className="block truncate text-sm font-medium">
+                              {draft.title}
+                            </span>
+                            <span className="mt-1 block text-xs text-muted-foreground">
+                              {draft.confidence} confidence
+                            </span>
+                          </span>
+                          <HugeiconsIcon
+                            icon={ArrowRight01Icon}
+                            aria-hidden
+                            className="mt-0.5 shrink-0"
+                          />
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No drafts were produced.</p>
+                  )}
+                </section>
               </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">Select a draft to read it.</p>
-            )}
-          </Panel>
+              <ScrollBar />
+            </ScrollArea>
 
-          <Panel title="Pi Event Transcript">
-            <ol data-testid="run-event-transcript" className="space-y-2">
-              {run.eventStream.map((event, index) => {
-                const eventType =
-                  event && typeof event === 'object' && 'type' in event
-                    ? String((event as { type: unknown }).type)
-                    : `event ${index + 1}`
-                return (
-                  <li key={index} className="rounded-md border bg-background p-3">
-                    <p className="font-mono text-xs font-medium text-muted-foreground">
-                      {index + 1}. {eventType}
-                    </p>
-                    <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap font-mono text-xs leading-relaxed">
-                      {JSON.stringify(event, null, 2)}
+            {/* Right: Draft detail */}
+            <div className="h-full overflow-y-auto border-l bg-muted/20">
+              <div className="p-8">
+                {selectedDraft ? (
+                  <div
+                    data-testid="run-draft-detail"
+                    className="prose prose-sm max-w-none text-foreground"
+                  >
+                    <h3 className="font-sans text-base font-semibold">{selectedDraft.title}</h3>
+                    <p className="text-sm text-muted-foreground">{selectedDraft.groupingReason}</p>
+                    <pre className="mt-3 whitespace-pre-wrap rounded-md border bg-background p-3 font-mono text-xs leading-relaxed">
+                      {selectedDraft.body}
                     </pre>
-                  </li>
-                )
-              })}
-              {run.eventStream.length === 0 && (
-                <li className="text-sm text-muted-foreground">
-                  No events were persisted for this run.
-                </li>
+                  </div>
+                ) : (
+                  <Empty className="border-none bg-transparent shadow-none">
+                    <EmptyDescription>Select a draft to read it.</EmptyDescription>
+                  </Empty>
+                )}
+              </div>
+            </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="transcript" className="flex-1 overflow-hidden">
+          <ScrollArea className="h-full">
+            <div className="p-8">
+              {run.eventStream.length > 0 ? (
+                <div className="space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    {run.eventStream.length} event{run.eventStream.length === 1 ? '' : 's'} — debug
+                    data for this run.
+                  </p>
+                  <ol data-testid="run-event-transcript" className="space-y-2">
+                    {run.eventStream.map((event, index) => {
+                      const eventType =
+                        event && typeof event === 'object' && 'type' in event
+                          ? String((event as { type: unknown }).type)
+                          : `event ${index + 1}`
+                      return (
+                        <EventItem key={index} index={index} eventType={eventType} event={event} />
+                      )
+                    })}
+                  </ol>
+                </div>
+              ) : (
+                <Empty className="border-none bg-transparent shadow-none">
+                  <EmptyDescription>No events were persisted for this run.</EmptyDescription>
+                </Empty>
               )}
-            </ol>
-          </Panel>
-        </div>
-      </section>
+            </div>
+            <ScrollBar />
+          </ScrollArea>
+        </TabsContent>
+      </Tabs>
     </article>
   )
 }
 
-function Panel({
-  title,
-  children
+function EventItem({
+  index,
+  eventType,
+  event
 }: {
-  title: string
-  children: React.ReactNode
+  index: number
+  eventType: string
+  event: unknown
 }): React.JSX.Element {
-  return (
-    <section>
-      <h3 className="mb-3 text-sm font-semibold">{title}</h3>
-      {children}
-    </section>
-  )
-}
+  const [open, setOpen] = useState(false)
 
-function Metric({ label, value }: { label: string; value: string }): React.JSX.Element {
   return (
-    <div className="rounded-md bg-muted px-3 py-2">
-      <dt className="text-xs text-muted-foreground">{label}</dt>
-      <dd className="tabular mt-1 text-sm font-medium">{value}</dd>
-    </div>
+    <li className="rounded-md border bg-background">
+      <Collapsible open={open} onOpenChange={setOpen}>
+        <CollapsibleTrigger asChild>
+          <button
+            type="button"
+            className="flex w-full items-center justify-between px-3 py-2.5 text-left transition-colors hover:bg-muted/60 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30"
+          >
+            <span className="font-mono text-xs font-medium text-muted-foreground">
+              <span className="tabular mr-2 text-muted-foreground/60">{index + 1}.</span>
+              {eventType}
+            </span>
+            <HugeiconsIcon
+              icon={open ? ViewOffSlashIcon : ViewIcon}
+              aria-hidden
+              className="size-4 shrink-0 text-muted-foreground"
+            />
+          </button>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <div className="border-t px-3 py-2.5">
+            <pre className="max-h-72 overflow-auto whitespace-pre-wrap font-mono text-xs leading-relaxed text-muted-foreground">
+              {JSON.stringify(event, null, 2)}
+            </pre>
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
+    </li>
   )
 }

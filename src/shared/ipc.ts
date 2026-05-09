@@ -22,6 +22,7 @@ export type Note = {
   content: string
   status: NoteStatus
   repoId: string | null
+  runId: string | null
   createdAt: string
   updatedAt: string
 }

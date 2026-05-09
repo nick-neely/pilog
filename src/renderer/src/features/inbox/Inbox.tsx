@@ -141,11 +141,13 @@ function buildFilter(
 function getGenerateDraftsReason(input: {
   hasSelection: boolean
   selectedNotesShareRepo: boolean
+  selectedNotesAllUnprocessed: boolean
   piStatus: PiStatus
   generating: boolean
 }): string {
   if (input.generating) return 'Generating drafts for the selected notes.'
   if (!input.hasSelection) return 'Select one or more notes to generate drafts.'
+  if (!input.selectedNotesAllUnprocessed) return 'Selected notes have already been drafted.'
   if (!input.selectedNotesShareRepo) return 'Selected notes must share one linked repository.'
   if (!input.piStatus.configured) {
     if (input.piStatus.reason === 'missing-credential')
@@ -161,7 +163,8 @@ function NoteDetail({
   onSave,
   onDelete,
   onRepoChange,
-  onNavigateToRepositories
+  onNavigateToRepositories,
+  onNavigateToAgentRuns
 }: {
   note: Note
   repos: Repo[]
@@ -169,6 +172,7 @@ function NoteDetail({
   onDelete: (id: string) => Promise<void>
   onRepoChange: (id: string, repoId: string | null) => Promise<void>
   onNavigateToRepositories: () => void
+  onNavigateToAgentRuns: (runId?: string) => void
 }): React.JSX.Element {
   const [draft, setDraft] = useState(note.content)
   const dirty = draft !== note.content
@@ -193,9 +197,20 @@ function NoteDetail({
   return (
     <article className="flex h-full flex-col">
       <header className="flex min-h-14 shrink-0 items-center justify-between gap-3 border-b px-6 py-3">
-        <p className="tabular font-mono text-xs text-muted-foreground">
-          {formatNoteTimestamp(note.createdAt)}
-        </p>
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <p className="tabular font-mono text-xs text-muted-foreground">
+            {formatNoteTimestamp(note.createdAt)}
+          </p>
+          {note.runId && (
+            <button
+              type="button"
+              onClick={() => onNavigateToAgentRuns(note.runId!)}
+              className="text-left text-xs text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+            >
+              View run
+            </button>
+          )}
+        </div>
         <div className="flex items-center gap-2">
           <Button onClick={handleSave} disabled={!dirty} size="sm">
             Save
@@ -293,7 +308,7 @@ export function Inbox({
 }: {
   focusNoteId?: string | null
   onFocusNoteHandled?: () => void
-  onNavigateToAgentRuns: () => void
+  onNavigateToAgentRuns: (runId?: string) => void
   onNavigateToRepositories: () => void
   onNavigateToSettings: () => void
   /** Controlled by App so the global Cmd-K trigger in AppShell can open the palette. */
@@ -476,11 +491,17 @@ export function Inbox({
   )
   const selectedNotesShareRepo =
     selectedNotes.length > 0 && selectedRepoIds.size === 1 && !selectedRepoIds.has(null)
+  const selectedNotesAllUnprocessed = selectedNotes.every((note) => note.status === 'unprocessed')
   const canGenerateDrafts =
-    hasSelection && selectedNotesShareRepo && piStatus.configured && !generating
+    hasSelection &&
+    selectedNotesAllUnprocessed &&
+    selectedNotesShareRepo &&
+    piStatus.configured &&
+    !generating
   const generateDraftsReason = getGenerateDraftsReason({
     hasSelection,
     selectedNotesShareRepo,
+    selectedNotesAllUnprocessed,
     piStatus,
     generating
   })
@@ -553,7 +574,7 @@ export function Inbox({
     if (!canGenerateDrafts) return
     setGenerating(true)
     try {
-      for await (const event of window.pilog.runAgent({ noteIds: [...selectedIds] })) {
+      await window.pilog.runAgent({ noteIds: [...selectedIds] }, async (event) => {
         if (event.type === 'final') {
           await Promise.all([fetchNotes(), fetchStatusCounts()])
           clearSelection()
@@ -561,7 +582,7 @@ export function Inbox({
         if (event.type === 'error') {
           console.error(event.message)
         }
-      }
+      })
     } finally {
       setGenerating(false)
       window.pilog.invoke('pi:status').then(setPiStatus)
@@ -794,6 +815,7 @@ export function Inbox({
             onDelete={handleDelete}
             onRepoChange={handleRepoChange}
             onNavigateToRepositories={onNavigateToRepositories}
+            onNavigateToAgentRuns={onNavigateToAgentRuns}
           />
         ) : (
           <Empty className="h-full border-none bg-transparent shadow-none">

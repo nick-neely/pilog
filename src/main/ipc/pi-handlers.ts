@@ -1,9 +1,13 @@
 import { BrowserWindow, MessageChannelMain, ipcMain } from 'electron'
 import { existsSync, mkdirSync } from 'node:fs'
 import type { IpcRequest, IpcResponse } from '@shared/ipc'
-import type { AgentEvent } from '@shared/types'
+import type { AgentEvent, ErrorCause } from '@shared/types'
 import type { PilogDatabase } from '../db/client'
-import { createAgentRun, finalizeAgentRun } from '../db/repositories/agent-runs'
+import {
+  createAgentRun,
+  finalizeAgentRun,
+  updateAgentRunEventStream
+} from '../db/repositories/agent-runs'
 import { listIssueDrafts } from '../db/repositories/issue-drafts'
 import { createNote } from '../db/repositories/notes'
 import { createRepo } from '../db/repositories/repos'
@@ -37,12 +41,14 @@ type ActiveRun = {
 }
 
 const activeRuns = new Map<string, ActiveRun>()
+const DEFAULT_AGENT_RUN_TIMEOUT_MS = 10 * 60 * 1000
 
 export function registerPiIpcHandlers(
   db: PilogDatabase,
-  options?: { onDraftsGenerated?: () => void; runAgentImpl?: RunAgent }
+  options?: { onDraftsGenerated?: () => void; runAgentImpl?: RunAgent; runTimeoutMs?: number }
 ): void {
   const runAgentImpl = options?.runAgentImpl ?? runAgent
+  const runTimeoutMs = options?.runTimeoutMs ?? DEFAULT_AGENT_RUN_TIMEOUT_MS
 
   ipcMain.handle('pi:status', async (): Promise<IpcResponse<'pi:status'>> => {
     const provider = getSetting(db, 'pi.activeProvider')
@@ -137,6 +143,7 @@ export function registerPiIpcHandlers(
       const controller = new AbortController()
       const active: ActiveRun = { controller, finalized: false, eventStream: [] }
       activeRuns.set(run.id, active)
+      appendAgentEvent(db, run.id, active, { type: 'progress', phase: 'agent_start' })
 
       event.sender.postMessage('pi:agent-stream', { runId: run.id }, [port2])
       port1.start()
@@ -146,6 +153,9 @@ export function registerPiIpcHandlers(
         void cancelRun(db, run.id, 'Renderer window closed mid-run.')
       }
       webContents.once('destroyed', cancelIfDestroyed)
+      const runTimeout = setTimeout(() => {
+        if (!active.finalized) controller.abort('timeout')
+      }, runTimeoutMs)
 
       void (async () => {
         try {
@@ -160,18 +170,38 @@ export function registerPiIpcHandlers(
             webSearch: webSearch.enabled ? webSearch : undefined,
             signal: controller.signal
           })) {
-            active.eventStream.push(agentEvent)
-            if (controller.signal.aborted) break
+            if (active.finalized) break
+            appendAgentEvent(db, run.id, active, agentEvent)
 
             if (agentEvent.type === 'final') {
-              persistGeneratedIssueDrafts(db, {
-                runId: run.id,
-                repoId: repo.id,
-                selectedNoteIds: notes.map((note) => note.id),
-                drafts: agentEvent.drafts,
-                eventStream: active.eventStream
-              })
-              active.finalized = true
+              try {
+                persistGeneratedIssueDrafts(db, {
+                  runId: run.id,
+                  repoId: repo.id,
+                  selectedNoteIds: notes.map((note) => note.id),
+                  drafts: agentEvent.drafts,
+                  eventStream: active.eventStream
+                })
+                active.finalized = true
+              } catch (error) {
+                const message = error instanceof Error ? error.message : String(error)
+                const errorEvent: AgentEvent = {
+                  type: 'error',
+                  message,
+                  cause: 'persistence'
+                }
+                appendAgentEvent(db, run.id, active, errorEvent)
+                finalizeAgentRun(db, {
+                  id: run.id,
+                  status: 'failed',
+                  errorMessage: message,
+                  errorCause: 'persistence',
+                  eventStream: active.eventStream
+                })
+                active.finalized = true
+                port1.postMessage(errorEvent)
+                break
+              }
             }
 
             if (agentEvent.type === 'error' && !active.finalized) {
@@ -187,24 +217,51 @@ export function registerPiIpcHandlers(
 
             port1.postMessage(agentEvent)
           }
+
+          if (!active.finalized) {
+            const cause = getAbortCause(controller.signal) ?? 'pi_internal'
+            const errorEvent: AgentEvent = {
+              type: 'error',
+              message:
+                cause === 'timeout'
+                  ? `Generation timed out after ${formatDuration(runTimeoutMs)}.`
+                  : cause === 'cancelled'
+                    ? 'Generation cancelled.'
+                    : 'Pi ended without returning issue drafts.',
+              cause
+            }
+            appendAgentEvent(db, run.id, active, errorEvent)
+            finalizeAgentRun(db, {
+              id: run.id,
+              status: cause === 'cancelled' ? 'cancelled' : 'failed',
+              errorMessage: errorEvent.message,
+              errorCause: cause,
+              eventStream: active.eventStream
+            })
+            active.finalized = true
+            port1.postMessage(errorEvent)
+          }
         } catch (error) {
           if (!active.finalized) {
             const message = error instanceof Error ? error.message : String(error)
-            finalizeAgentRun(db, {
-              id: run.id,
-              status: controller.signal.aborted ? 'cancelled' : 'failed',
-              errorMessage: message,
-              errorCause: controller.signal.aborted ? 'cancelled' : 'unknown',
-              eventStream: active.eventStream
-            })
+            const cause = getAbortCause(controller.signal) ?? 'unknown'
             const errorEvent: AgentEvent = {
               type: 'error',
               message,
-              cause: controller.signal.aborted ? 'cancelled' : 'unknown'
+              cause
             }
+            appendAgentEvent(db, run.id, active, errorEvent)
+            finalizeAgentRun(db, {
+              id: run.id,
+              status: cause === 'cancelled' ? 'cancelled' : 'failed',
+              errorMessage: message,
+              errorCause: cause,
+              eventStream: active.eventStream
+            })
             port1.postMessage(errorEvent)
           }
         } finally {
+          clearTimeout(runTimeout)
           webContents.removeListener('destroyed', cancelIfDestroyed)
           activeRuns.delete(run.id)
           port1.close()
@@ -257,7 +314,8 @@ export function registerPiIpcHandlers(
 async function cancelRun(db: PilogDatabase, runId: string, message: string): Promise<void> {
   const active = activeRuns.get(runId)
   if (!active || active.finalized) return
-  active.controller.abort()
+  active.controller.abort('cancelled')
+  appendAgentEvent(db, runId, active, { type: 'error', message, cause: 'cancelled' })
   active.finalized = true
   finalizeAgentRun(db, {
     id: runId,
@@ -267,6 +325,29 @@ async function cancelRun(db: PilogDatabase, runId: string, message: string): Pro
     eventStream: active.eventStream
   })
   broadcastAgentRunsInvalidated()
+}
+
+function appendAgentEvent(
+  db: PilogDatabase,
+  runId: string,
+  active: ActiveRun,
+  agentEvent: AgentEvent
+): void {
+  active.eventStream.push(agentEvent)
+  updateAgentRunEventStream(db, { id: runId, eventStream: active.eventStream })
+  if (agentEvent.type !== 'partial') broadcastAgentRunsInvalidated()
+}
+
+function getAbortCause(signal: AbortSignal): Extract<ErrorCause, 'cancelled' | 'timeout'> | null {
+  if (!signal.aborted) return null
+  return signal.reason === 'timeout' ? 'timeout' : 'cancelled'
+}
+
+function formatDuration(ms: number): string {
+  const totalSeconds = Math.max(1, Math.round(ms / 1000))
+  if (totalSeconds < 60) return `${totalSeconds} seconds`
+  const minutes = Math.round(totalSeconds / 60)
+  return `${minutes} ${minutes === 1 ? 'minute' : 'minutes'}`
 }
 
 function broadcastAgentRunsInvalidated(): void {

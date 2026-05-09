@@ -1,10 +1,10 @@
-import { describe, expect, it } from 'vitest'
+import type { Note, Repo } from '@shared/ipc'
+import type { GeneratedIssueDraft } from '@shared/types'
 import { execFileSync } from 'node:child_process'
 import { cpSync, mkdtempSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import type { Note, Repo } from '@shared/ipc'
-import type { GeneratedIssueDraft } from '@shared/types'
+import { describe, expect, it } from 'vitest'
 
 const runIfEnabled = process.env.PILOG_INTEGRATION_AGENT === '1' ? describe : describe.skip
 
@@ -30,6 +30,7 @@ runIfEnabled('issue generation integration', () => {
       content: note.content,
       status: 'unprocessed',
       repoId: repo.id,
+      runId: null,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     }))

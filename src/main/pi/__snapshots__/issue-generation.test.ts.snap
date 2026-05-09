@@ -5,6 +5,7 @@ exports[`issue generation > assembles the PRD-guided prompt with repo path and s
 Use the local repository context to infer likely affected areas, but do not invent details.
 Group related small notes into one issue when they affect the same feature, page, component, or user flow.
 Split notes into separate issues when they affect unrelated systems or require separate implementation work.
+If one source note contains multiple unrelated tasks, split it into separate drafts and reference that same source note from each draft.
 Do not create one issue per note by default.
 Group related minor UX notes.
 Split unrelated or complex notes.

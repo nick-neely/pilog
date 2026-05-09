@@ -5,6 +5,7 @@ import icon from '../../resources/icon.png?asset'
 import { loadDotEnvFile } from './config/env'
 import { createDatabase } from './db/client'
 import { runMigrations } from './db/migrations'
+import { cancelRunningAgentRuns } from './db/repositories/agent-runs'
 import { getSetting, setSetting } from './db/repositories/settings'
 import { registerGlobalHotkeys, unregisterGlobalHotkeys } from './hotkeys/register-global-hotkeys'
 import { registerIpcHandlers } from './ipc/handlers'
@@ -36,6 +37,7 @@ app.whenReady().then(() => {
   const dbPath = join(app.getPath('userData'), 'pilog.sqlite')
   const db = createDatabase(dbPath)
   runMigrations(db)
+  cancelRunningAgentRuns(db, 'App restarted before generation finished.')
 
   // So the app opens to the inbox by default in development
   if (is.dev) {

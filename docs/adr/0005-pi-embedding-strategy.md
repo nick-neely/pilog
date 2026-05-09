@@ -78,7 +78,7 @@ The first implementation pass must verify that `ModelRegistry` accepts a custom 
 
 PiLog uses two distinct IPC primitives.
 
-**Per-invocation agent stream — `MessagePortMain`.** On `pi:generateDrafts:start`, main creates a `MessageChannelMain`, returns the `runId` to the caller via the normal `IpcContract` request/response, and posts the renderer-side port via `webContents.postMessage('pi:agent-stream', { runId }, [port])`. Preload listens for that channel, wraps each received port in a typed AsyncIterable, and exposes `window.pilog.runAgent(input): AsyncIterable<AgentEvent>` to the renderer. The iterator's lifetime equals the port's; closing the port (on `agent_end`, error, or cancel) ends the renderer's `for await`.
+**Per-invocation agent stream — `MessagePortMain`.** On `pi:generateDrafts:start`, main creates a `MessageChannelMain`, returns the `runId` to the caller via the normal `IpcContract` request/response, and posts the renderer-side port via `webContents.postMessage('pi:agent-stream', { runId }, [port])`. Preload listens for that channel, consumes the port as a typed event stream, and exposes `window.pilog.runAgent(input, onEvent): Promise<void>` to the renderer. The `MessagePortMain` lifecycle stays inside preload because Electron's `contextBridge` cannot clone AsyncIterator objects across the isolated-world boundary.
 
 **Cross-window invalidation — `webContents.send`.** When any agent-runs row changes status, main broadcasts `agent-runs:invalidated` to all open `BrowserWindow`s. The Agent Runs list (issue #15) re-fetches on receipt. This is intentionally one-bit; the runs view does not subscribe to its own per-run stream in MVP.
 
@@ -100,7 +100,7 @@ Rationale:
 - For one-bit cross-window broadcast (#15's list refresh), `webContents.send` is the right primitive. Using `MessagePortMain` for that case forces a per-subscriber broker.
 - Two primitives sounds inconsistent but each is used for what it is good at; ADR-0003's request/response contract is unchanged and `IpcContract` only grows by `pi:generateDrafts:start` and `pi:generateDrafts:cancel`.
 
-The first implementation pass must verify the preload glue: receiving a `MessagePortMain` across the `contextIsolation` boundary and exposing it as a typed AsyncIterable to renderer code.
+The first implementation pass must verify the preload glue: receiving a `MessagePortMain` across the `contextIsolation` boundary and exposing a cloneable callback-based stream API to renderer code.
 
 ### 5. Tool set: read-only by construction; opt-in `web_search`; no `bash`
 

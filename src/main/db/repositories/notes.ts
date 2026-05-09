@@ -15,6 +15,7 @@ const noteColumns = {
   content: notes.content,
   status: notes.status,
   repoId: notes.repoId,
+  runId: notes.runId,
   createdAt: notes.createdAt,
   updatedAt: notes.updatedAt
 } as const
@@ -43,6 +44,7 @@ export function createNote(
     content: input.content,
     status: 'unprocessed',
     repoId,
+    runId: null,
     createdAt: now,
     updatedAt: now
   }

@@ -21,6 +21,7 @@ const ERROR_CAUSES = [
   'turn_budget_exceeded',
   'schema_validation',
   'persistence',
+  'timeout',
   'cancelled'
 ] as const
 
@@ -110,6 +111,34 @@ export function finalizeAgentRun(
       eventStream: JSON.stringify(input.eventStream),
       finishedAt: now,
       updatedAt: now
+    })
+    .where(eq(agentRuns.id, input.id))
+    .run()
+}
+
+export function cancelRunningAgentRuns(db: PilogDatabase, message: string): void {
+  const now = new Date().toISOString()
+
+  db.update(agentRuns)
+    .set({
+      status: 'cancelled',
+      errorMessage: message,
+      errorCause: 'cancelled',
+      finishedAt: now,
+      updatedAt: now
+    })
+    .where(eq(agentRuns.status, 'running'))
+    .run()
+}
+
+export function updateAgentRunEventStream(
+  db: PilogDatabase,
+  input: { id: string; eventStream: unknown[] }
+): void {
+  db.update(agentRuns)
+    .set({
+      eventStream: JSON.stringify(input.eventStream),
+      updatedAt: new Date().toISOString()
     })
     .where(eq(agentRuns.id, input.id))
     .run()

@@ -1,5 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { GeneratedIssueDraftsSchema, type GeneratedIssueDraft } from '@shared/types'
 import { eq } from 'drizzle-orm'
+import { describe, expect, it } from 'vitest'
+import {
+    clarificationResponse,
+    singleDraftResponse,
+    threeDraftResponse
+} from '../../../fixtures/agent/fixture-responses'
 import { createInMemoryDatabase } from '../db/client'
 import { runMigrations } from '../db/migrations'
 import { createAgentRun } from '../db/repositories/agent-runs'
@@ -7,17 +13,11 @@ import { createNote, listNotes } from '../db/repositories/notes'
 import { createRepo } from '../db/repositories/repos'
 import { agentRuns, issueDrafts } from '../db/schema'
 import {
-  buildIssueGenerationPrompt,
-  persistGeneratedIssueDrafts,
-  createSubmitIssueDraftsTool,
-  assertNoSourceNoteCollisions
+    buildIssueGenerationPrompt,
+    createSubmitIssueDraftsTool,
+    persistGeneratedIssueDrafts,
+    validateAndCollectSourceNoteIds
 } from './issue-generation'
-import { GeneratedIssueDraftsSchema, type GeneratedIssueDraft } from '@shared/types'
-import {
-  clarificationResponse,
-  singleDraftResponse,
-  threeDraftResponse
-} from '../../../fixtures/agent/fixture-responses'
 
 const draft: GeneratedIssueDraft = {
   title: 'Fix mobile settings spacing',
@@ -52,6 +52,7 @@ describe('issue generation', () => {
           content: 'settings page spacing is weird on mobile',
           status: 'unprocessed',
           repoId: 'repo-1',
+          runId: null,
           createdAt: '2026-05-08T00:00:00.000Z',
           updatedAt: '2026-05-08T00:00:00.000Z'
         }
@@ -159,16 +160,62 @@ describe('issue generation', () => {
     ])
   })
 
-  it('rejects source-note collisions within one generated run', () => {
-    expect(() =>
-      assertNoSourceNoteCollisions(
+  it('persists split drafts that share one source note', () => {
+    const db = createInMemoryDatabase()
+    runMigrations(db)
+    const repo = createRepo(db, {
+      owner: 'nick-neely',
+      name: 'pilog',
+      localPath: '/workspace/pilog',
+      githubUrl: 'https://github.com/nick-neely/pilog',
+      defaultBranch: 'main'
+    })
+    const note = createNote(db, {
+      content: 'show avatar in settings; style settings scrollbar',
+      repoId: repo.id
+    })
+    const run = createAgentRun(db, { repoId: repo.id, inputNoteIds: [note.id] })
+
+    const draftIds = persistGeneratedIssueDrafts(db, {
+      runId: run.id,
+      repoId: repo.id,
+      selectedNoteIds: [note.id],
+      drafts: [
+        { ...draft, title: 'Show avatar in settings', sourceNoteIds: [note.id] },
+        { ...draft, title: 'Style settings scrollbar', sourceNoteIds: [note.id] }
+      ],
+      eventStream: [{ type: 'final' }]
+    })
+
+    const persistedDrafts = db.select().from(issueDrafts).all()
+
+    expect(draftIds).toHaveLength(2)
+    expect(persistedDrafts.map((persisted) => persisted.title)).toEqual([
+      'Show avatar in settings',
+      'Style settings scrollbar'
+    ])
+    expect(listNotes(db).map((persisted) => persisted.status)).toEqual(['drafted'])
+  })
+
+  it('allows a selected source note to back multiple generated drafts', () => {
+    expect(
+      validateAndCollectSourceNoteIds(
         ['note-1', 'note-2'],
         [
           { ...draft, sourceNoteIds: ['note-1'] },
           { ...draft, title: 'Second draft', sourceNoteIds: ['note-1'] }
         ]
       )
-    ).toThrow('appears in more than one generated draft')
+    ).toEqual(['note-1'])
+  })
+
+  it('rejects drafts that reference unselected source notes', () => {
+    expect(() =>
+      validateAndCollectSourceNoteIds(
+        ['note-1'],
+        [{ ...draft, sourceNoteIds: ['note-1', 'note-2'] }]
+      )
+    ).toThrow('references an unselected source note')
   })
 
   it('terminates the exit tool after the first valid submit call', async () => {

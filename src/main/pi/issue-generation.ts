@@ -1,17 +1,17 @@
-import { and, eq, inArray } from 'drizzle-orm'
 import type { AgentTool } from '@earendil-works/pi-agent-core'
-import type { PilogDatabase } from '../db/client'
-import { agentRuns, issueDrafts, notes } from '../db/schema'
-import { formatIssueDraftBody } from '../db/repositories/issue-drafts'
-import { getRepoById } from '../db/repositories/repos'
-import {
-  GeneratedIssueDraftsSchema,
-  SubmitIssueDraftsParameters,
-  type AgentEvent,
-  type GeneratedIssueDraft
-} from '@shared/types'
 import type { Note, Repo } from '@shared/ipc'
 import type { SearchProvider } from '@shared/types'
+import {
+    GeneratedIssueDraftsSchema,
+    SubmitIssueDraftsParameters,
+    type AgentEvent,
+    type GeneratedIssueDraft
+} from '@shared/types'
+import { and, eq, inArray } from 'drizzle-orm'
+import type { PilogDatabase } from '../db/client'
+import { formatIssueDraftBody } from '../db/repositories/issue-drafts'
+import { getRepoById } from '../db/repositories/repos'
+import { agentRuns, issueDrafts, notes } from '../db/schema'
 
 export type IssueGenerationInput = {
   runId: string
@@ -44,6 +44,7 @@ export function buildIssueGenerationPrompt(input: { repo: Repo; notes: Note[] })
     'Use the local repository context to infer likely affected areas, but do not invent details.',
     'Group related small notes into one issue when they affect the same feature, page, component, or user flow.',
     'Split notes into separate issues when they affect unrelated systems or require separate implementation work.',
+    'If one source note contains multiple unrelated tasks, split it into separate drafts and reference that same source note from each draft.',
     'Do not create one issue per note by default.',
     'Group related minor UX notes.',
     'Split unrelated or complex notes.',
@@ -121,6 +122,7 @@ export function getSelectedNotesForGeneration(
       content: row.content,
       status: row.status,
       repoId: row.repoId,
+      runId: row.runId ?? null,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt
     }))
@@ -143,7 +145,7 @@ export function persistGeneratedIssueDrafts(
     const now = new Date().toISOString()
     const draftIds: string[] = []
 
-    const sourceNoteIds = assertNoSourceNoteCollisions(input.selectedNoteIds, input.drafts)
+    const sourceNoteIds = validateAndCollectSourceNoteIds(input.selectedNoteIds, input.drafts)
 
     for (const draft of input.drafts) {
       const id = crypto.randomUUID()
@@ -168,7 +170,7 @@ export function persistGeneratedIssueDrafts(
     }
 
     tx.update(notes)
-      .set({ status: 'drafted', updatedAt: now })
+      .set({ status: 'drafted', runId: input.runId, updatedAt: now })
       .where(and(inArray(notes.id, sourceNoteIds), eq(notes.repoId, input.repoId)))
       .run()
 
@@ -187,26 +189,21 @@ export function persistGeneratedIssueDrafts(
   })
 }
 
-export function assertNoSourceNoteCollisions(
+export function validateAndCollectSourceNoteIds(
   selectedNoteIds: string[],
   drafts: GeneratedIssueDraft[]
 ): string[] {
   const selected = new Set(selectedNoteIds)
-  const seen = new Set<string>()
-  const ordered: string[] = []
+  const ordered = new Set<string>()
 
   for (const draft of drafts) {
     for (const noteId of draft.sourceNoteIds) {
       if (!selected.has(noteId)) {
         throw new Error(`Draft "${draft.title}" references an unselected source note: ${noteId}`)
       }
-      if (seen.has(noteId)) {
-        throw new Error(`Source note ${noteId} appears in more than one generated draft.`)
-      }
-      seen.add(noteId)
-      ordered.push(noteId)
+      ordered.add(noteId)
     }
   }
 
-  return ordered
+  return [...ordered]
 }

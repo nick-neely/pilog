@@ -30,6 +30,7 @@ const VIEW_TABS = [
 function App(): React.JSX.Element {
   const [route, setRoute] = useState<Route>('inbox')
   const [focusedNoteId, setFocusedNoteId] = useState<string | null>(null)
+  const [focusedRunId, setFocusedRunId] = useState<string | null>(null)
   // Lifted because the Cmd-K trigger now lives in the global top bar; the
   // palette dialog itself stays inside Inbox where the inbox-specific
   // commands are wired.
@@ -75,7 +76,10 @@ function App(): React.JSX.Element {
           onFocusNoteHandled={() => setFocusedNoteId(null)}
           // The Cmd-K palette still has an "Agent Runs" navigate command;
           // pass the route action through so it works from the inbox.
-          onNavigateToAgentRuns={() => setRoute('agent-runs')}
+          onNavigateToAgentRuns={(runId) => {
+            if (runId) setFocusedRunId(runId)
+            setRoute('agent-runs')
+          }}
           onNavigateToRepositories={() => setRoute('repositories')}
           onNavigateToSettings={() => setRoute('settings')}
           paletteOpen={paletteOpen}
@@ -83,6 +87,7 @@ function App(): React.JSX.Element {
         />
       ) : (
         <AgentRuns
+          focusRunId={focusedRunId}
           onOpenSourceNote={(noteId) => {
             setFocusedNoteId(noteId)
             setRoute('inbox')

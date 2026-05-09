@@ -72,6 +72,7 @@ export type ErrorCause =
   | 'turn_budget_exceeded'
   | 'schema_validation'
   | 'persistence'
+  | 'timeout'
   | 'cancelled'
 
 export type AgentEvent =

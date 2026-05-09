@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { EditorState } from '@codemirror/state'
-import { EditorView, keymap } from '@codemirror/view'
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
 import { markdown } from '@codemirror/lang-markdown'
-import { syntaxHighlighting, defaultHighlightStyle } from '@codemirror/language'
+import { defaultHighlightStyle, syntaxHighlighting } from '@codemirror/language'
+import { EditorState } from '@codemirror/state'
+import { EditorView, keymap } from '@codemirror/view'
+import { Tick02Icon } from '@hugeicons/core-free-icons'
+import { HugeiconsIcon } from '@hugeicons/react'
 import { Alert, AlertDescription } from '@renderer/components/ui/alert'
 import { Button } from '@renderer/components/ui/button'
 import { Card, CardContent } from '@renderer/components/ui/card'
@@ -20,6 +21,7 @@ import { Input } from '@renderer/components/ui/input'
 import { Label } from '@renderer/components/ui/label'
 import { Skeleton } from '@renderer/components/ui/skeleton'
 import { Toggle } from '@renderer/components/ui/toggle'
+import { cn } from '@renderer/lib/utils'
 import type {
   CreateIssueRequest,
   DetectLocalRepoResult,
@@ -27,16 +29,12 @@ import type {
   GitHubRepo,
   Repo
 } from '@shared/ipc'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
-/** Readable foreground on arbitrary GitHub label hex (warm ink / parchment). */
-function contrastLabelColor(hex: string): string {
-  const n = parseInt(hex, 16)
-  if (Number.isNaN(n)) return 'var(--foreground)'
-  const r = (n >> 16) & 255
-  const g = (n >> 8) & 255
-  const b = n & 255
-  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
-  return luminance > 0.55 ? 'oklch(0.22 0.012 60)' : 'oklch(0.97 0.005 75)'
+/** `#rrggbb` for inline swatch, or neutral fallback if GitHub sends an odd value */
+function githubLabelHex(color: string): string | undefined {
+  const hex = color.replace(/^#/, '')
+  return /^[0-9a-fA-F]{6}$/.test(hex) ? `#${hex}` : undefined
 }
 
 function useRepos(): {
@@ -396,59 +394,106 @@ function NewIssueDialog({
               </Alert>
             )}
 
-            <div className="flex flex-col gap-2">
-              <Label htmlFor={`issue-title-${repo.id}`}>
-                Title <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                id={`issue-title-${repo.id}`}
-                type="text"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                disabled={isSubmitting}
-                placeholder="Short, descriptive title"
-              />
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <Label>Body</Label>
-              <MarkdownEditor onChange={setBody} disabled={isSubmitting} />
-            </div>
-
-            {labels.length > 0 && (
+            <div className="flex flex-col gap-4">
               <div className="flex flex-col gap-2">
-                <span className="text-sm font-medium">Labels</span>
-                <div className="flex flex-wrap gap-1.5">
-                  {labels.map((label) => {
-                    const selected = selectedLabels.includes(label.name)
-                    return (
-                      <Toggle
-                        key={label.id}
-                        pressed={selected}
-                        onPressedChange={() => !isSubmitting && toggleLabel(label.name)}
-                        disabled={isSubmitting}
-                        size="sm"
-                        title={label.description ?? undefined}
-                        className="rounded-full border-0 px-2.5 py-0.5 text-xs font-medium opacity-90 hover:opacity-100 data-[state=on]:opacity-100 data-[state=on]:ring-2 data-[state=on]:ring-ring data-[state=on]:ring-offset-1"
-                        style={{
-                          backgroundColor: `#${label.color}`,
-                          color: contrastLabelColor(label.color)
-                        }}
-                      >
-                        {label.name}
-                      </Toggle>
-                    )
-                  })}
+                <Label htmlFor={`issue-title-${repo.id}`}>
+                  Title <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id={`issue-title-${repo.id}`}
+                  type="text"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  disabled={isSubmitting}
+                  placeholder="Short, descriptive title"
+                />
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <Label>Body</Label>
+                <MarkdownEditor onChange={setBody} disabled={isSubmitting} />
+              </div>
+
+              {labels.length > 0 && (
+                <div className="flex flex-col gap-2">
+                  <div className="flex flex-col gap-1">
+                    <span
+                      className="text-sm font-medium leading-none"
+                      id={`issue-labels-${repo.id}`}
+                    >
+                      Labels
+                    </span>
+                    <p className="text-xs leading-snug text-muted-foreground">
+                      Toggle any that apply. Selected labels show a check; repo colors appear as
+                      dots.
+                    </p>
+                  </div>
+                  <div
+                    role="group"
+                    aria-labelledby={`issue-labels-${repo.id}`}
+                    className="flex flex-wrap gap-2"
+                  >
+                    {labels.map((label) => {
+                      const selected = selectedLabels.includes(label.name)
+                      const swatch = githubLabelHex(label.color)
+                      return (
+                        <Toggle
+                          key={label.id}
+                          pressed={selected}
+                          onPressedChange={() => !isSubmitting && toggleLabel(label.name)}
+                          disabled={isSubmitting}
+                          variant="outline"
+                          size="sm"
+                          title={label.description ?? undefined}
+                          aria-label={
+                            selected ? `${label.name}, selected` : `${label.name}, not selected`
+                          }
+                          className={cn(
+                            'h-auto min-h-8 shrink-0 rounded-md px-2.5 py-1.5 text-xs font-normal transition-colors',
+                            'justify-start gap-2 border-border bg-background hover:bg-muted/70',
+                            'data-[state=on]:border-primary data-[state=on]:bg-muted data-[state=on]:text-foreground'
+                          )}
+                        >
+                          <span className="flex size-4 shrink-0 items-center justify-center">
+                            <HugeiconsIcon
+                              icon={Tick02Icon}
+                              strokeWidth={2}
+                              aria-hidden
+                              className={cn(
+                                'size-3.5 text-primary transition-opacity',
+                                selected ? 'opacity-100' : 'opacity-0'
+                              )}
+                            />
+                          </span>
+                          <span
+                            className={cn(
+                              'size-2.5 shrink-0 rounded-full ring-1 ring-foreground/15',
+                              !swatch && 'bg-muted-foreground/35'
+                            )}
+                            style={swatch ? { backgroundColor: swatch } : undefined}
+                            aria-hidden
+                          />
+                          <span className="min-w-0 text-left">{label.name}</span>
+                        </Toggle>
+                      )
+                    })}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {state.step === 'open' && state.labelsLoading && (
-              <div className="flex flex-col gap-2">
-                <Skeleton className="h-4 w-28" />
-                <Skeleton className="h-8 w-full max-w-md" />
-              </div>
-            )}
+              {state.step === 'open' && state.labelsLoading && (
+                <div className="flex flex-col gap-2">
+                  <Skeleton className="h-4 w-28" />
+                  <Skeleton className="h-3 w-full max-w-sm" />
+                  <div className="flex flex-wrap gap-2">
+                    <Skeleton className="h-8 w-24 rounded-md" />
+                    <Skeleton className="h-8 w-20 rounded-md" />
+                    <Skeleton className="h-8 w-28 rounded-md" />
+                    <Skeleton className="h-8 w-[4.5rem] rounded-md" />
+                  </div>
+                </div>
+              )}
+            </div>
 
             <DialogFooter className="gap-2 pt-1 sm:justify-end">
               <Button variant="ghost" size="sm" onClick={handleClose} disabled={isSubmitting}>

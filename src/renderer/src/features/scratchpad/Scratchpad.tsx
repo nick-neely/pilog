@@ -1,11 +1,8 @@
-import { useEffect, useRef, useCallback, useState } from 'react'
-import { EditorState } from '@codemirror/state'
-import { EditorView, keymap } from '@codemirror/view'
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
 import { markdown } from '@codemirror/lang-markdown'
-import { syntaxHighlighting, defaultHighlightStyle } from '@codemirror/language'
-import { shouldSave } from '@shared/scratchpad'
-import type { Repo } from '@shared/ipc'
+import { defaultHighlightStyle, syntaxHighlighting } from '@codemirror/language'
+import { EditorState } from '@codemirror/state'
+import { EditorView, keymap } from '@codemirror/view'
 import { Badge } from '@renderer/components/ui/badge'
 import {
   Select,
@@ -15,6 +12,9 @@ import {
   SelectTrigger,
   SelectValue
 } from '@renderer/components/ui/select'
+import type { Repo } from '@shared/ipc'
+import { shouldSave } from '@shared/scratchpad'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 const NOTE_REPO_NONE = '__none__'
 
@@ -108,7 +108,7 @@ export function Scratchpad(): React.JSX.Element {
         }),
         EditorView.theme({
           '&': {
-            height: '100vh',
+            height: '100%',
             fontSize: '14px'
           },
           '.cm-scroller': {
@@ -144,10 +144,9 @@ export function Scratchpad(): React.JSX.Element {
   }
 
   return (
-    <div className="relative h-screen w-screen bg-background">
-      <div ref={editorRef} className="h-full w-full" />
-      {/* Inline repo selector — top-right, compact, keyboard-reachable */}
-      <div className="absolute top-2 right-2 z-10">
+    <div className="flex h-screen w-screen flex-col bg-background">
+      {/* Own row so typing never runs underneath the repo control */}
+      <header className="flex shrink-0 items-center justify-end gap-2 border-b border-border/60 bg-background px-3 py-2">
         {repos.length === 0 ? (
           <Badge
             variant="outline"
@@ -178,7 +177,8 @@ export function Scratchpad(): React.JSX.Element {
             </SelectContent>
           </Select>
         )}
-      </div>
+      </header>
+      <div ref={editorRef} className="min-h-0 flex-1 overflow-hidden" />
     </div>
   )
 }

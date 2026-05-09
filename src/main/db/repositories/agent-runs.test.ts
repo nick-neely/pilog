@@ -4,7 +4,14 @@ import { runMigrations } from '../migrations'
 import { createIssueDraft } from './issue-drafts'
 import { createNote } from './notes'
 import { createRepo } from './repos'
-import { createAgentRun, finalizeAgentRun, getRunById, listRuns } from './agent-runs'
+import {
+  cancelRunningAgentRuns,
+  createAgentRun,
+  finalizeAgentRun,
+  getRunById,
+  listRuns,
+  updateAgentRunEventStream
+} from './agent-runs'
 import type { GeneratedIssueDraft } from '@shared/types'
 
 const draft: GeneratedIssueDraft = {
@@ -95,6 +102,43 @@ describe('agent-runs repository', () => {
     ])
     expect(detail?.eventStream).toEqual(eventStream)
     expect(detail?.durationMs).toEqual(expect.any(Number))
+  })
+
+  it('updates the event stream while a run is still running', () => {
+    const repo = createFixtureRepo(db)
+    const note = createNote(db, { content: 'first', repoId: repo.id })
+    const run = createAgentRun(db, { repoId: repo.id, inputNoteIds: [note.id] })
+
+    updateAgentRunEventStream(db, {
+      id: run.id,
+      eventStream: [{ type: 'progress', phase: 'agent_start' }]
+    })
+
+    expect(getRunById(db, run.id)?.eventStream).toEqual([
+      { type: 'progress', phase: 'agent_start' }
+    ])
+    expect(getRunById(db, run.id)?.status).toBe('running')
+  })
+
+  it('cancels running runs on startup recovery', () => {
+    const repo = createFixtureRepo(db)
+    const note = createNote(db, { content: 'first', repoId: repo.id })
+    const running = createAgentRun(db, { repoId: repo.id, inputNoteIds: [note.id] })
+    const finished = createAgentRun(db, { repoId: repo.id, inputNoteIds: [note.id] })
+    finalizeAgentRun(db, {
+      id: finished.id,
+      status: 'succeeded',
+      eventStream: [{ type: 'final' }]
+    })
+
+    cancelRunningAgentRuns(db, 'App restarted before generation finished.')
+
+    expect(getRunById(db, running.id)).toMatchObject({
+      status: 'cancelled',
+      errorMessage: 'App restarted before generation finished.',
+      errorCause: 'cancelled'
+    })
+    expect(getRunById(db, finished.id)?.status).toBe('succeeded')
   })
 })
 
