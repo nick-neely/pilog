@@ -2,7 +2,7 @@ import { desc, eq, inArray } from 'drizzle-orm'
 import { v4 as uuidv4 } from 'uuid'
 import type { PilogDatabase } from '../client'
 import { issueDrafts, notes, publishLog, repos } from '../schema'
-import type { PublishAuditLogEntry, PublishLogEntry, Repo } from '@shared/ipc'
+import type { PublishAuditLogEntry, PublishLogEntry } from '@shared/ipc'
 import type { IssueDraftSourceNote } from '@shared/types'
 
 const publishLogColumns = {
@@ -97,22 +97,17 @@ export function listPublishAuditLog(
     .orderBy(desc(publishLog.publishedAt))
     .all()
 
-  const sourceNoteIds = [
-    ...new Set(rows.flatMap((row) => parseJsonStringArray(row.sourceNoteIdsJson)))
-  ]
-  const sourceNotesById = new Map<string, IssueDraftSourceNote>()
+  const rowsWithSourceNoteIds = rows.map((row) => ({
+    ...row,
+    sourceNoteIds: parseJsonStringArray(row.sourceNoteIdsJson)
+  }))
+  const sourceNotesById = getSourceNotesById(
+    db,
+    rowsWithSourceNoteIds.flatMap((row) => row.sourceNoteIds)
+  )
 
-  if (sourceNoteIds.length > 0) {
-    const sourceNotes = db
-      .select(sourceNoteColumns)
-      .from(notes)
-      .where(inArray(notes.id, sourceNoteIds))
-      .all()
-    for (const note of sourceNotes) sourceNotesById.set(note.id, note)
-  }
-
-  return rows.map((row) => {
-    const sourceNotes = parseJsonStringArray(row.sourceNoteIdsJson)
+  return rowsWithSourceNoteIds.map((row) => {
+    const sourceNotes = row.sourceNoteIds
       .map((id) => sourceNotesById.get(id))
       .filter((note): note is IssueDraftSourceNote => note !== undefined)
 
@@ -122,7 +117,7 @@ export function listPublishAuditLog(
       repoId: row.repoId,
       githubIssueUrl: row.githubIssueUrl,
       publishedAt: row.publishedAt,
-      repo: row.repo as Repo,
+      repo: row.repo,
       draftTitle: row.draftTitle,
       sourceNotes
     }
@@ -140,4 +135,20 @@ function parseJsonStringArray(value: string | null): string[] {
   } catch {
     return []
   }
+}
+
+function getSourceNotesById(
+  db: PilogDatabase,
+  sourceNoteIds: string[]
+): Map<string, IssueDraftSourceNote> {
+  const uniqueSourceNoteIds = [...new Set(sourceNoteIds)]
+  if (uniqueSourceNoteIds.length === 0) return new Map()
+
+  const sourceNotes = db
+    .select(sourceNoteColumns)
+    .from(notes)
+    .where(inArray(notes.id, uniqueSourceNoteIds))
+    .all()
+
+  return new Map(sourceNotes.map((note) => [note.id, note]))
 }

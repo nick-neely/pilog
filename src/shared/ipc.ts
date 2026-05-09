@@ -10,6 +10,7 @@ import type {
   GenerateDraftsRequest,
   GenerateDraftsMode,
   GenerateDraftsStartResponse,
+  IssueDraftSourceNote,
   IssueDraft,
   IssueDraftForReview,
   IssueDraftStatus,
@@ -20,7 +21,6 @@ import type {
   SearchProvider,
   SetAdvancedSettingsRequest
 } from './types'
-import type { IssueDraftSourceNote } from './types'
 
 export type NoteStatus = 'unprocessed' | 'drafted' | 'published' | 'dismissed'
 

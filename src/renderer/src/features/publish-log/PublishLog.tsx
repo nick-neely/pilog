@@ -29,6 +29,18 @@ type PublishLogState =
   | { status: 'ready'; entries: PublishAuditLogEntry[] }
   | { status: 'error'; message: string }
 
+async function readPublishLog(): Promise<PublishLogState> {
+  try {
+    const entries = await window.pilog.invoke('publish-log:list')
+    return { status: 'ready', entries }
+  } catch (error) {
+    return {
+      status: 'error',
+      message: error instanceof Error ? error.message : 'Publish log could not be read.'
+    }
+  }
+}
+
 export function PublishLog({
   onOpenDraft,
   onOpenSourceNote
@@ -40,20 +52,20 @@ export function PublishLog({
 
   const load = useCallback(async () => {
     setState({ status: 'loading' })
-    try {
-      const entries = await window.pilog.invoke('publish-log:list')
-      setState({ status: 'ready', entries })
-    } catch (error) {
-      setState({
-        status: 'error',
-        message: error instanceof Error ? error.message : 'Publish log could not be read.'
-      })
-    }
+    setState(await readPublishLog())
   }, [])
 
   useEffect(() => {
-    void load()
-  }, [load])
+    let cancelled = false
+
+    void readPublishLog().then((nextState) => {
+      if (!cancelled) setState(nextState)
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   return (
     <div className="flex h-full flex-col bg-background text-foreground">
@@ -130,6 +142,7 @@ function PublishLogRow({
   onOpenSourceNote: (noteId: string) => void
 }): React.JSX.Element {
   const view = getPublishAuditEntryViewModel(entry)
+  const draftId = entry.draftId
   const githubLinkSafe = isSafeBrowserUrl(entry.githubIssueUrl)
 
   return (
@@ -149,12 +162,12 @@ function PublishLogRow({
             </p>
           </div>
           <div className="flex shrink-0 flex-wrap items-center gap-2">
-            {entry.draftId ? (
+            {draftId !== null ? (
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={() => onOpenDraft(entry.draftId as string)}
+                onClick={() => onOpenDraft(draftId)}
               >
                 <HugeiconsIcon icon={ViewIcon} data-icon="inline-start" aria-hidden />
                 Open draft
