@@ -1,5 +1,7 @@
 # PiLog
 
+[![React Doctor](https://www.react.doctor/share/badge?p=pilog&s=91&w=34&f=18)](https://www.react.doctor/share?p=pilog&s=91&w=34&f=18)
+
 PiLog is a local-first Electron app for capturing rough developer notes and turning them into GitHub-ready issue drafts. Use the global scratchpad to jot something down without leaving your current flow, then triage those notes later from the inbox.
 
 The app currently supports:
