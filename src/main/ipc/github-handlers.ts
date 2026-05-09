@@ -41,10 +41,7 @@ export function registerGitHubIpcHandlers(
       githubIssueUrl: result.url
     })
 
-    const scheme = new URL(result.url).protocol
-    if (scheme === 'https:' || scheme === 'http:') {
-      await shell.openExternal(result.url)
-    }
+    await openBrowserUrl(result.url)
 
     return result
   })
@@ -55,13 +52,15 @@ export function registerGitHubIpcHandlers(
     callbacks?.onIssueDraftsChanged?.()
     callbacks?.onNoteChanged?.()
 
-    if (published.githubIssueUrl) {
-      const scheme = new URL(published.githubIssueUrl).protocol
-      if (scheme === 'https:' || scheme === 'http:') {
-        await shell.openExternal(published.githubIssueUrl)
-      }
-    }
+    if (published.githubIssueUrl) await openBrowserUrl(published.githubIssueUrl)
 
     return published
   })
+}
+
+async function openBrowserUrl(url: string): Promise<void> {
+  const scheme = new URL(url).protocol
+  if (scheme === 'https:' || scheme === 'http:') {
+    await shell.openExternal(url)
+  }
 }

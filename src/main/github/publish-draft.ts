@@ -13,6 +13,12 @@ type CreateIssueClient = (
   payload: { title: string; body: string; labels?: string[] }
 ) => Promise<CreatedIssue>
 
+type ReviewedDraftPayload = {
+  title: string
+  body: string
+  labels: string[]
+}
+
 export async function publishReviewedDraft(
   db: PilogDatabase,
   request: PublishIssueDraftRequest,
@@ -25,48 +31,68 @@ export async function publishReviewedDraft(
   const repo = getRepoById(db, draft.repoId)
   if (!repo) throw new Error('Linked repository not found')
 
-  const title = request.title.trim() || 'Untitled draft'
-  const labels = request.labels
-  const createdIssue = await createIssue(repo.owner, repo.name, {
-    title,
+  const reviewedDraft: ReviewedDraftPayload = {
+    title: request.title.trim() || 'Untitled draft',
     body: request.body,
-    labels: labels.length > 0 ? labels : undefined
+    labels: request.labels
+  }
+  const createdIssue = await createIssue(repo.owner, repo.name, {
+    title: reviewedDraft.title,
+    body: reviewedDraft.body,
+    labels: reviewedDraft.labels.length > 0 ? reviewedDraft.labels : undefined
   })
 
-  db.transaction((tx) => {
-    const now = new Date().toISOString()
-
-    tx.update(issueDrafts)
-      .set({
-        title,
-        body: request.body,
-        labels: JSON.stringify(labels),
-        status: 'published',
-        githubIssueUrl: createdIssue.url,
-        updatedAt: now
-      })
-      .where(eq(issueDrafts.id, draft.id))
-      .run()
-
-    tx.insert(publishLog)
-      .values({
-        id: uuidv4(),
-        draftId: draft.id,
-        repoId: draft.repoId,
-        githubIssueUrl: createdIssue.url,
-        publishedAt: now
-      })
-      .run()
-
-    if (draft.sourceNoteIds.length > 0) {
-      tx.update(notes)
-        .set({ status: 'published', updatedAt: now })
-        .where(and(inArray(notes.id, draft.sourceNoteIds), eq(notes.repoId, draft.repoId)))
-        .run()
-    }
+  recordLocalPublishState(db, {
+    draft,
+    reviewedDraft,
+    githubIssueUrl: createdIssue.url
   })
 
   const published = getIssueDraftById(db, draft.id)
   if (!published) throw new Error('Published draft could not be loaded')
   return published
+}
+
+function recordLocalPublishState(
+  db: PilogDatabase,
+  input: {
+    draft: IssueDraft
+    reviewedDraft: ReviewedDraftPayload
+    githubIssueUrl: string
+  }
+): void {
+  db.transaction((tx) => {
+    const now = new Date().toISOString()
+
+    tx.update(issueDrafts)
+      .set({
+        title: input.reviewedDraft.title,
+        body: input.reviewedDraft.body,
+        labels: JSON.stringify(input.reviewedDraft.labels),
+        status: 'published',
+        githubIssueUrl: input.githubIssueUrl,
+        updatedAt: now
+      })
+      .where(eq(issueDrafts.id, input.draft.id))
+      .run()
+
+    tx.insert(publishLog)
+      .values({
+        id: uuidv4(),
+        draftId: input.draft.id,
+        repoId: input.draft.repoId,
+        githubIssueUrl: input.githubIssueUrl,
+        publishedAt: now
+      })
+      .run()
+
+    if (input.draft.sourceNoteIds.length > 0) {
+      tx.update(notes)
+        .set({ status: 'published', updatedAt: now })
+        .where(
+          and(inArray(notes.id, input.draft.sourceNoteIds), eq(notes.repoId, input.draft.repoId))
+        )
+        .run()
+    }
+  })
 }
