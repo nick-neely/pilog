@@ -2,10 +2,10 @@ import type { AgentTool } from '@earendil-works/pi-agent-core'
 import type { Note, Repo } from '@shared/ipc'
 import type { SearchProvider } from '@shared/types'
 import {
-    GeneratedIssueDraftsSchema,
-    SubmitIssueDraftsParameters,
-    type AgentEvent,
-    type GeneratedIssueDraft
+  GeneratedIssueDraftsSchema,
+  SubmitIssueDraftsParameters,
+  type AgentEvent,
+  type GeneratedIssueDraft
 } from '@shared/types'
 import { and, eq, inArray } from 'drizzle-orm'
 import type { PilogDatabase } from '../db/client'

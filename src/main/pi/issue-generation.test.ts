@@ -2,9 +2,9 @@ import { GeneratedIssueDraftsSchema, type GeneratedIssueDraft } from '@shared/ty
 import { eq } from 'drizzle-orm'
 import { describe, expect, it } from 'vitest'
 import {
-    clarificationResponse,
-    singleDraftResponse,
-    threeDraftResponse
+  clarificationResponse,
+  singleDraftResponse,
+  threeDraftResponse
 } from '../../../fixtures/agent/fixture-responses'
 import { createInMemoryDatabase } from '../db/client'
 import { runMigrations } from '../db/migrations'
@@ -13,10 +13,10 @@ import { createNote, listNotes } from '../db/repositories/notes'
 import { createRepo } from '../db/repositories/repos'
 import { agentRuns, issueDrafts } from '../db/schema'
 import {
-    buildIssueGenerationPrompt,
-    createSubmitIssueDraftsTool,
-    persistGeneratedIssueDrafts,
-    validateAndCollectSourceNoteIds
+  buildIssueGenerationPrompt,
+  createSubmitIssueDraftsTool,
+  persistGeneratedIssueDrafts,
+  validateAndCollectSourceNoteIds
 } from './issue-generation'
 
 const draft: GeneratedIssueDraft = {
