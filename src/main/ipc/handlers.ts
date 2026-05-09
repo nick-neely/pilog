@@ -4,6 +4,7 @@ import type { PilogDatabase } from '../db/client'
 import { getRunById, listRuns } from '../db/repositories/agent-runs'
 import {
   listIssueDraftsForReview,
+  mergeIssueDrafts,
   splitIssueDraft,
   updateIssueDraft,
   updateIssueDraftStatus
@@ -22,6 +23,7 @@ type DbChannel =
   | 'agent-runs:get'
   | 'agent-runs:list'
   | 'issue-drafts:list'
+  | 'issue-drafts:merge'
   | 'issue-drafts:split'
   | 'issue-drafts:update'
   | 'issue-drafts:updateStatus'
@@ -40,10 +42,18 @@ type Handler<C extends DbChannel> = (
   request: IpcRequest<C>
 ) => IpcResponse<C> | Promise<IpcResponse<C>>
 
+const ISSUE_DRAFT_CHANGE_CHANNELS = new Set<DbChannel>([
+  'issue-drafts:merge',
+  'issue-drafts:split',
+  'issue-drafts:update',
+  'issue-drafts:updateStatus'
+])
+
 const handlers: { [C in DbChannel]: Handler<C> } = {
   'agent-runs:get': (db, request) => getRunById(db, request.id),
   'agent-runs:list': (db, request) => listRuns(db, request ?? undefined),
   'issue-drafts:list': (db, request) => listIssueDraftsForReview(db, request ?? undefined),
+  'issue-drafts:merge': (db, request) => mergeIssueDrafts(db, request),
   'issue-drafts:split': (db, request) => splitIssueDraft(db, request),
   'issue-drafts:update': (db, request) => updateIssueDraft(db, request),
   'issue-drafts:updateStatus': (db, request) => updateIssueDraftStatus(db, request),
@@ -72,11 +82,7 @@ export function registerIpcHandlers(
       const handler = handlers[channel] as Handler<typeof channel>
       const result = handler(db, request)
       if (channel === 'note:create') options?.onNoteCreated?.()
-      if (
-        channel === 'issue-drafts:update' ||
-        channel === 'issue-drafts:updateStatus' ||
-        channel === 'issue-drafts:split'
-      ) {
+      if (ISSUE_DRAFT_CHANGE_CHANNELS.has(channel)) {
         options?.onIssueDraftsChanged?.()
       }
       return result

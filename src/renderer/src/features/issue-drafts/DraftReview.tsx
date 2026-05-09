@@ -4,6 +4,7 @@ import {
   CancelCircleIcon,
   Copy01Icon,
   FolderOpenIcon,
+  GitMergeIcon,
   SplitIcon,
   Tick02Icon,
   ViewIcon
@@ -16,6 +17,14 @@ import { Empty, EmptyDescription } from '@renderer/components/ui/empty'
 import { Input } from '@renderer/components/ui/input'
 import { ScrollArea, ScrollBar } from '@renderer/components/ui/scroll-area'
 import { Separator } from '@renderer/components/ui/separator'
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '@renderer/components/ui/select'
 import { Textarea } from '@renderer/components/ui/textarea'
 import { cn } from '@renderer/lib/utils'
 import { extractAcceptanceCriteria, writeAcceptanceCriteria } from '@shared/acceptance-criteria'
@@ -215,6 +224,15 @@ export function DraftReview({
   useEffect(() => window.pilog.on('issue-drafts:invalidated', handleDraftsInvalidated), [])
 
   const selectedDraft = drafts.find((draft) => draft.id === selectedDraftId) ?? null
+  const mergeCandidates = useMemo(
+    () =>
+      selectedDraft
+        ? drafts.filter(
+            (draft) => draft.id !== selectedDraft.id && draft.repoId === selectedDraft.repoId
+          )
+        : [],
+    [drafts, selectedDraft]
+  )
   const reposById = useMemo(() => new Map(repos.map((repo) => [repo.id, repo])), [repos])
   const emptyDescription = emptyDraftDescription(statusFilter, statusCounts)
 
@@ -324,6 +342,7 @@ export function DraftReview({
           <DraftEditor
             key={selectedDraft.id}
             draft={selectedDraft}
+            mergeCandidates={mergeCandidates}
             repoPath={reposById.get(selectedDraft.repoId)?.localPath ?? null}
             onSaved={fetchDrafts}
             onOpenSourceNote={onOpenSourceNote}
@@ -345,6 +364,7 @@ export function DraftReview({
 
 function DraftEditor({
   draft,
+  mergeCandidates,
   repoPath,
   onOpenSourceNote,
   onSaved,
@@ -352,6 +372,7 @@ function DraftEditor({
   onSplitComplete
 }: {
   draft: IssueDraftForReview
+  mergeCandidates: IssueDraftForReview[]
   repoPath: string | null
   onOpenSourceNote: (noteId: string) => void
   onSaved: () => Promise<void>
@@ -373,6 +394,10 @@ function DraftEditor({
   const [splitSourceNoteIds, setSplitSourceNoteIds] = useState<string[]>([])
   const [splitting, setSplitting] = useState(false)
   const [splitError, setSplitError] = useState<string | null>(null)
+  const [selectedMergeSourceId, setSelectedMergeSourceId] = useState<string>('')
+  const [merging, setMerging] = useState(false)
+  const [mergeMessage, setMergeMessage] = useState<string | null>(null)
+  const [mergeError, setMergeError] = useState<string | null>(null)
 
   const parsedLabels = useMemo(() => parseLabels(labels), [labels])
   const parsedCriteria = useMemo(() => parseCriteriaLines(criteria), [criteria])
@@ -399,6 +424,10 @@ function DraftEditor({
     !publishing &&
     splitSourceNoteIds.length > 0 &&
     draft.sourceNoteIds.length - splitSourceNoteIds.length > 0
+  const canMerge = draft.status === 'draft' && mergeCandidates.length > 0
+  const mergeSourceId = mergeCandidates.some((candidate) => candidate.id === selectedMergeSourceId)
+    ? selectedMergeSourceId
+    : (mergeCandidates[0]?.id ?? '')
 
   const handleSave = useCallback(async (): Promise<void> => {
     if (!dirty || saving || isPublished) return
@@ -465,6 +494,55 @@ function DraftEditor({
     },
     [draft.id, draft.status, onStatusChanged, publishing, updatingStatus]
   )
+
+  const handleMerge = useCallback(async (): Promise<void> => {
+    if (!mergeSourceId || merging || saving || publishing || !canMerge) return
+
+    setMerging(true)
+    setMergeError(null)
+    setMergeMessage(null)
+    try {
+      if (dirty) {
+        await window.pilog.invoke('issue-drafts:update', {
+          id: draft.id,
+          title: editedDraft.title,
+          body: editedDraft.body,
+          labels: editedDraft.labels
+        })
+      }
+
+      const merged = await window.pilog.invoke('issue-drafts:merge', {
+        targetId: draft.id,
+        sourceId: mergeSourceId
+      })
+
+      if (merged) {
+        setTitle(merged.title)
+        setBody(merged.body)
+        setLabels(formatLabels(merged.labels))
+        setCriteria(extractAcceptanceCriteria(merged.body).join('\n'))
+        setSavedAt(formatTimestamp(merged.updatedAt))
+        setMergeMessage('Merged into this draft. The other draft was moved to Dismissed.')
+        await onSaved()
+      }
+    } catch (err) {
+      setMergeError(err instanceof Error ? err.message : 'Merge failed. Please try again.')
+    } finally {
+      setMerging(false)
+    }
+  }, [
+    canMerge,
+    dirty,
+    draft.id,
+    editedDraft.body,
+    editedDraft.labels,
+    editedDraft.title,
+    mergeSourceId,
+    merging,
+    onSaved,
+    publishing,
+    saving
+  ])
 
   const handleSaveShortcut = useEffectEvent(() => {
     if (dirty && !saving) void handleSave()
@@ -741,6 +819,21 @@ function DraftEditor({
 
           <Separator />
 
+          <MergeDraftSection
+            draft={draft}
+            mergeCandidates={mergeCandidates}
+            mergeSourceId={mergeSourceId}
+            merging={merging}
+            mergeMessage={mergeMessage}
+            mergeError={mergeError}
+            saving={saving}
+            publishing={publishing}
+            onMergeSourceChange={setSelectedMergeSourceId}
+            onMerge={handleMerge}
+          />
+
+          <Separator />
+
           <section className="flex flex-col gap-2">
             <h3 className="text-sm font-semibold">Affected Files</h3>
             {draft.affectedFiles.length > 0 ? (
@@ -789,6 +882,86 @@ function DraftEditor({
         </aside>
       </div>
     </article>
+  )
+}
+
+function MergeDraftSection({
+  draft,
+  mergeCandidates,
+  mergeSourceId,
+  merging,
+  mergeMessage,
+  mergeError,
+  saving,
+  publishing,
+  onMergeSourceChange,
+  onMerge
+}: {
+  draft: IssueDraftForReview
+  mergeCandidates: IssueDraftForReview[]
+  mergeSourceId: string
+  merging: boolean
+  mergeMessage: string | null
+  mergeError: string | null
+  saving: boolean
+  publishing: boolean
+  onMergeSourceChange: (sourceId: string) => void
+  onMerge: () => Promise<void>
+}): React.JSX.Element {
+  const canChooseSource = draft.status === 'draft' && mergeCandidates.length > 0
+  const unavailableMessage =
+    draft.status === 'draft'
+      ? 'No other active drafts are available in this repo.'
+      : 'Only active drafts can be merged.'
+
+  return (
+    <section className="flex flex-col gap-2">
+      <h3 className="text-sm font-semibold">Merge Draft</h3>
+      {canChooseSource ? (
+        <div className="flex flex-col gap-2">
+          <Select value={mergeSourceId} onValueChange={onMergeSourceChange}>
+            <SelectTrigger className="w-full rounded-md" aria-label="Draft to merge">
+              <SelectValue placeholder="Choose a draft" />
+            </SelectTrigger>
+            <SelectContent className="rounded-md">
+              <SelectGroup>
+                {mergeCandidates.map((candidate) => (
+                  <SelectItem key={candidate.id} value={candidate.id} className="rounded-md">
+                    {candidate.title}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            This saves current edits, appends the chosen draft, unions notes, labels, and files,
+            then moves the other draft to Dismissed.
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={!mergeSourceId || merging || saving || publishing}
+            onClick={() => void onMerge()}
+          >
+            <HugeiconsIcon icon={GitMergeIcon} data-icon="inline-start" aria-hidden />
+            {merging ? 'Merging' : 'Merge into this draft'}
+          </Button>
+          {mergeMessage ? (
+            <p className="text-xs leading-relaxed text-muted-foreground" role="status">
+              {mergeMessage}
+            </p>
+          ) : null}
+          {mergeError ? (
+            <p className="text-xs leading-relaxed text-destructive" role="alert">
+              {mergeError}
+            </p>
+          ) : null}
+        </div>
+      ) : (
+        <p className="text-sm text-muted-foreground">{unavailableMessage}</p>
+      )}
+    </section>
   )
 }
 

@@ -240,6 +240,65 @@ function uniqueInOriginalOrder(originalIds: string[], selectedIds: string[]): st
   return originalIds.filter((id) => selected.has(id))
 }
 
+export function mergeIssueDrafts(
+  db: PilogDatabase,
+  input: { targetId: string; sourceId: string }
+): IssueDraft | null {
+  if (input.targetId === input.sourceId) throw new Error('Choose two different drafts to merge.')
+
+  return db.transaction((tx) => {
+    const rows = tx
+      .select(issueDraftColumns)
+      .from(issueDrafts)
+      .where(inArray(issueDrafts.id, [input.targetId, input.sourceId]))
+      .all()
+    const draftsById = new Map(rows.map((row) => [row.id, mapIssueDraft(row)]))
+    const target = draftsById.get(input.targetId)
+    const source = draftsById.get(input.sourceId)
+
+    if (!target || !source) return null
+    if (target.repoId !== source.repoId) {
+      throw new Error('Drafts from different repositories cannot be merged.')
+    }
+    if (target.status !== 'draft' || source.status !== 'draft') {
+      throw new Error('Only active drafts can be merged.')
+    }
+
+    const latestUpdatedAt = [target.updatedAt, source.updatedAt].sort().at(-1) ?? target.updatedAt
+    const now = nextUpdatedAt(latestUpdatedAt)
+
+    tx.update(issueDrafts)
+      .set({
+        body: mergeDraftBodies(target, source),
+        labels: JSON.stringify(mergeUnique(target.labels, source.labels)),
+        sourceNoteIds: JSON.stringify(mergeUnique(target.sourceNoteIds, source.sourceNoteIds)),
+        affectedFilesJson: JSON.stringify(
+          mergeAffectedFiles(target.affectedFiles, source.affectedFiles)
+        ),
+        status: 'draft',
+        updatedAt: now
+      })
+      .where(eq(issueDrafts.id, target.id))
+      .run()
+
+    tx.update(issueDrafts)
+      .set({
+        status: 'dismissed',
+        updatedAt: now
+      })
+      .where(eq(issueDrafts.id, source.id))
+      .run()
+
+    const merged = tx
+      .select(issueDraftColumns)
+      .from(issueDrafts)
+      .where(eq(issueDrafts.id, target.id))
+      .get()
+
+    return merged ? mapIssueDraft(merged) : null
+  })
+}
+
 function getIssueDraftUpdatedAt(db: PilogDatabase, id: string): string | null {
   const row = db
     .select({ updatedAt: issueDrafts.updatedAt })
@@ -304,6 +363,40 @@ function mapIssueDraft(row: typeof issueDrafts.$inferSelect): IssueDraft {
     createdAt: row.createdAt,
     updatedAt: row.updatedAt
   }
+}
+
+function mergeDraftBodies(target: IssueDraft, source: IssueDraft): string {
+  return [target.body.trim(), `## Merged draft: ${source.title}`, source.body.trim()]
+    .filter(Boolean)
+    .join('\n\n')
+}
+
+function mergeUnique<T>(targetItems: T[], sourceItems: T[]): T[] {
+  return [...new Set([...targetItems, ...sourceItems])]
+}
+
+function mergeAffectedFiles(
+  targetFiles: IssueDraft['affectedFiles'],
+  sourceFiles: IssueDraft['affectedFiles']
+): IssueDraft['affectedFiles'] {
+  const filesByPath = new Map<string, IssueDraft['affectedFiles'][number]>()
+
+  for (const file of [...targetFiles, ...sourceFiles]) {
+    const existing = filesByPath.get(file.path)
+    if (!existing) {
+      filesByPath.set(file.path, file)
+      continue
+    }
+
+    if (file.reason && !existing.reason.includes(file.reason)) {
+      filesByPath.set(file.path, {
+        ...existing,
+        reason: `${existing.reason}; ${file.reason}`
+      })
+    }
+  }
+
+  return [...filesByPath.values()]
 }
 
 export function formatIssueDraftBody(draft: GeneratedIssueDraft): string {
