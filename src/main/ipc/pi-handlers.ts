@@ -1,7 +1,7 @@
 import { BrowserWindow, MessageChannelMain, ipcMain } from 'electron'
 import { existsSync, mkdirSync } from 'node:fs'
-import type { IpcRequest, IpcResponse } from '@shared/ipc'
-import type { AgentEvent, ErrorCause } from '@shared/types'
+import type { IpcRequest, IpcResponse, Repo } from '@shared/ipc'
+import type { AgentEvent, ErrorCause, GenerateDraftsMode } from '@shared/types'
 import type { PilogDatabase } from '../db/client'
 import {
   createAgentRun,
@@ -45,6 +45,23 @@ type ActiveRun = {
 
 const activeRuns = new Map<string, ActiveRun>()
 const DEFAULT_AGENT_RUN_TIMEOUT_MS = 10 * 60 * 1000
+
+function prepareAgentEventForMode(
+  agentEvent: AgentEvent,
+  mode: GenerateDraftsMode,
+  repo: Repo
+): AgentEvent {
+  if (agentEvent.type !== 'final' || mode !== 'auto-publish-preview') {
+    return agentEvent
+  }
+
+  const plan = planAutoPublishPreviewDrafts({ repo, drafts: agentEvent.drafts })
+  return {
+    type: 'final',
+    drafts: plan.drafts,
+    autoPublishPreview: plan.summary
+  }
+}
 
 export function registerPiIpcHandlers(
   db: PilogDatabase,
@@ -178,17 +195,7 @@ export function registerPiIpcHandlers(
             signal: controller.signal
           })) {
             if (active.finalized) break
-            const eventForRenderer =
-              agentEvent.type === 'final' && mode === 'auto-publish-preview'
-                ? (() => {
-                    const plan = planAutoPublishPreviewDrafts({ repo, drafts: agentEvent.drafts })
-                    return {
-                      type: 'final' as const,
-                      drafts: plan.drafts,
-                      autoPublishPreview: plan.summary
-                    }
-                  })()
-                : agentEvent
+            const eventForRenderer = prepareAgentEventForMode(agentEvent, mode, repo)
             appendAgentEvent(db, run.id, active, eventForRenderer)
 
             if (eventForRenderer.type === 'final') {

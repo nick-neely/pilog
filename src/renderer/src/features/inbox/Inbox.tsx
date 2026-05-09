@@ -34,6 +34,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@renderer/components/ui
 import type { RunNavigationOrigin } from '@renderer/features/agent-runs/navigation'
 import { cn } from '@renderer/lib/utils'
 import type {
+  GenerateDraftsMode,
   ListNotesRequest,
   Note,
   NoteStatus,
@@ -110,6 +111,13 @@ type NoteDraftLink = {
   title: string
   status: IssueDraftStatus
   updatedAt: string
+}
+
+type AutoPublishPreviewState = {
+  open: boolean
+  summary: AutoPublishPreviewSummary | null
+  drafts: GeneratedIssueDraft[]
+  sourceNotes: Note[]
 }
 
 function encodeRepoFilter(f: string | null | undefined): string {
@@ -481,13 +489,12 @@ export function Inbox({
   const [repos, setRepos] = useState<Repo[]>([])
   const [piStatus, setPiStatus] = useState<PiStatus>({ configured: false })
   const [generating, setGenerating] = useState(false)
-  const [autoPublishPreviewOpen, setAutoPublishPreviewOpen] = useState(false)
-  const [autoPublishPreviewSummary, setAutoPublishPreviewSummary] =
-    useState<AutoPublishPreviewSummary | null>(null)
-  const [autoPublishPreviewDrafts, setAutoPublishPreviewDrafts] = useState<GeneratedIssueDraft[]>(
-    []
-  )
-  const [autoPublishPreviewNotes, setAutoPublishPreviewNotes] = useState<Note[]>([])
+  const [autoPublishPreview, setAutoPublishPreview] = useState<AutoPublishPreviewState>({
+    open: false,
+    summary: null,
+    drafts: [],
+    sourceNotes: []
+  })
   const [statusFilter, setStatusFilter] = useState<NoteStatus | undefined>()
   const [repoFilter, setRepoFilter] = useState<string | null | undefined>(undefined)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -730,7 +737,7 @@ export function Inbox({
       : 'No notes yet. Capture a thought from the footer below.'
   }, [statusFilter, repoFilter])
 
-  const handleGenerateDrafts = async (mode: 'review' | 'auto-publish-preview'): Promise<void> => {
+  const handleGenerateDrafts = async (mode: GenerateDraftsMode): Promise<void> => {
     if (!canGenerateDrafts) return
     if (mode === 'auto-publish-preview' && !canGenerateAndPublish) return
     const selectedNoteSnapshot = [...selectedNotes]
@@ -742,10 +749,12 @@ export function Inbox({
           if (!mountedRef.current) return
           await Promise.all([fetchNotes(), fetchStatusCounts(), fetchDraftLinks()])
           if (mode === 'auto-publish-preview' && event.autoPublishPreview) {
-            setAutoPublishPreviewSummary(event.autoPublishPreview)
-            setAutoPublishPreviewDrafts(event.drafts)
-            setAutoPublishPreviewNotes(selectedNoteSnapshot)
-            setAutoPublishPreviewOpen(true)
+            setAutoPublishPreview({
+              open: true,
+              summary: event.autoPublishPreview,
+              drafts: event.drafts,
+              sourceNotes: selectedNoteSnapshot
+            })
           } else {
             clearSelection()
             onNavigateToDraftReview()
@@ -1038,13 +1047,13 @@ export function Inbox({
         )}
       </section>
       <AutoPublishPreviewDialog
-        open={autoPublishPreviewOpen}
-        summary={autoPublishPreviewSummary}
-        drafts={autoPublishPreviewDrafts}
-        sourceNotes={autoPublishPreviewNotes}
-        onOpenChange={setAutoPublishPreviewOpen}
+        open={autoPublishPreview.open}
+        summary={autoPublishPreview.summary}
+        drafts={autoPublishPreview.drafts}
+        sourceNotes={autoPublishPreview.sourceNotes}
+        onOpenChange={(open) => setAutoPublishPreview((prev) => ({ ...prev, open }))}
         onOpenDrafts={() => {
-          setAutoPublishPreviewOpen(false)
+          setAutoPublishPreview((prev) => ({ ...prev, open: false }))
           clearSelection()
           onNavigateToDraftReview()
         }}
