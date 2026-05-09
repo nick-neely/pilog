@@ -136,6 +136,34 @@ export function getSelectedNotesForGeneration(
   return { repo, notes: orderedNotes }
 }
 
+export function getCurrentInboxNotesForGeneration(
+  db: PilogDatabase,
+  repoId: string
+): { repo: Repo; notes: Note[] } {
+  const repo = getRepoById(db, repoId)
+  if (!repo) throw new Error('The linked repository no longer exists.')
+
+  const rows = db
+    .select()
+    .from(notes)
+    .where(and(eq(notes.repoId, repoId), eq(notes.status, 'unprocessed')))
+    .orderBy(notes.createdAt)
+    .all()
+
+  return {
+    repo,
+    notes: rows.map((row) => ({
+      id: row.id,
+      content: row.content,
+      status: row.status,
+      repoId: row.repoId,
+      runId: row.runId ?? null,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt
+    }))
+  }
+}
+
 export function persistGeneratedIssueDrafts(
   db: PilogDatabase,
   input: {

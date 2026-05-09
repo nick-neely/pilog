@@ -1,6 +1,6 @@
 import { GeneratedIssueDraftsSchema, type GeneratedIssueDraft } from '@shared/types'
 import { eq } from 'drizzle-orm'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
   clarificationResponse,
   singleDraftResponse,
@@ -9,14 +9,16 @@ import {
 import { createInMemoryDatabase } from '../db/client'
 import { runMigrations } from '../db/migrations'
 import { createAgentRun } from '../db/repositories/agent-runs'
-import { createNote, listNotes } from '../db/repositories/notes'
+import { createNote, listNotes, updateNoteStatus } from '../db/repositories/notes'
 import { listPublishLog } from '../db/repositories/publish-log'
 import { createRepo } from '../db/repositories/repos'
 import { agentRuns, issueDrafts } from '../db/schema'
+import { publishAutoPublishRun } from '../github/publish-draft'
 import {
   planAutoPublishPreviewDrafts,
   buildIssueGenerationPrompt,
   createSubmitIssueDraftsTool,
+  getCurrentInboxNotesForGeneration,
   persistGeneratedIssueDrafts,
   validateAndCollectSourceNoteIds
 } from './issue-generation'
@@ -239,6 +241,134 @@ describe('issue generation', () => {
       ['ux', 'triaged-by-pilog']
     ])
     expect(listPublishLog(db, { repoId: repo.id })).toEqual([])
+  })
+
+  it('selects only eligible current-inbox notes for one repo', () => {
+    const db = createInMemoryDatabase()
+    runMigrations(db)
+    const repo = createRepo(db, {
+      owner: 'nick-neely',
+      name: 'pilog',
+      localPath: '/workspace/pilog',
+      githubUrl: 'https://github.com/nick-neely/pilog',
+      defaultBranch: 'main'
+    })
+    const otherRepo = createRepo(db, {
+      owner: 'nick-neely',
+      name: 'other',
+      localPath: '/workspace/other',
+      githubUrl: 'https://github.com/nick-neely/other',
+      defaultBranch: 'main'
+    })
+    const eligible = createNote(db, { content: 'process this note', repoId: repo.id })
+    const drafted = createNote(db, { content: 'already drafted', repoId: repo.id })
+    const published = createNote(db, { content: 'already published', repoId: repo.id })
+    const dismissed = createNote(db, { content: 'dismissed', repoId: repo.id })
+    createNote(db, { content: 'unlinked' })
+    createNote(db, { content: 'other repo', repoId: otherRepo.id })
+    updateNoteStatus(db, drafted.id, 'drafted')
+    updateNoteStatus(db, published.id, 'published')
+    updateNoteStatus(db, dismissed.id, 'dismissed')
+
+    const result = getCurrentInboxNotesForGeneration(db, repo.id)
+
+    expect(result.repo.id).toBe(repo.id)
+    expect(result.notes.map((note) => note.id)).toEqual([eligible.id])
+  })
+
+  it('returns no eligible current-inbox notes without creating a run', () => {
+    const db = createInMemoryDatabase()
+    runMigrations(db)
+    const repo = createRepo(db, {
+      owner: 'nick-neely',
+      name: 'pilog',
+      localPath: '/workspace/pilog',
+      githubUrl: 'https://github.com/nick-neely/pilog',
+      defaultBranch: 'main'
+    })
+    const drafted = createNote(db, { content: 'already drafted', repoId: repo.id })
+    createNote(db, { content: 'unlinked' })
+    updateNoteStatus(db, drafted.id, 'drafted')
+
+    const result = getCurrentInboxNotesForGeneration(db, repo.id)
+
+    expect(result.notes).toEqual([])
+    expect(db.select().from(agentRuns).all()).toEqual([])
+  })
+
+  it('lets a current-inbox preview run reuse the confirmed publish flow', async () => {
+    const db = createInMemoryDatabase()
+    runMigrations(db)
+    const repo = createRepo(db, {
+      owner: 'nick-neely',
+      name: 'pilog',
+      localPath: '/workspace/pilog',
+      githubUrl: 'https://github.com/nick-neely/pilog',
+      defaultBranch: 'main'
+    })
+    const first = createNote(db, { content: 'save button needs loading', repoId: repo.id })
+    const second = createNote(db, { content: 'settings spacing breaks', repoId: repo.id })
+    const { notes } = getCurrentInboxNotesForGeneration(db, repo.id)
+    const run = createAgentRun(db, { repoId: repo.id, inputNoteIds: notes.map((note) => note.id) })
+    const plan = planAutoPublishPreviewDrafts({
+      runId: run.id,
+      repo: {
+        ...repo,
+        autoPublishEnabled: true,
+        autoPublishMaxIssuesPerRun: 5,
+        autoPublishDefaultLabel: 'triaged-by-pilog',
+        autoPublishDryRun: false,
+        autoPublishRequireConfirmation: true
+      },
+      drafts: [
+        {
+          ...draft,
+          title: 'Add loading state to save button',
+          sourceNoteIds: [first.id],
+          suggestedLabels: []
+        },
+        {
+          ...draft,
+          title: 'Fix settings spacing',
+          sourceNoteIds: [second.id],
+          suggestedLabels: ['ux']
+        }
+      ]
+    })
+    persistGeneratedIssueDrafts(db, {
+      runId: run.id,
+      repoId: repo.id,
+      selectedNoteIds: notes.map((note) => note.id),
+      drafts: plan.drafts,
+      eventStream: [{ type: 'final', drafts: plan.drafts, autoPublishPreview: plan.summary }]
+    })
+    const createIssue = vi
+      .fn()
+      .mockResolvedValueOnce({
+        url: 'https://github.com/nick-neely/pilog/issues/51',
+        number: 51
+      })
+      .mockResolvedValueOnce({
+        url: 'https://github.com/nick-neely/pilog/issues/52',
+        number: 52
+      })
+
+    const report = await publishAutoPublishRun(db, { runId: run.id }, createIssue)
+
+    expect(report).toMatchObject({
+      runId: run.id,
+      repoId: repo.id,
+      successCount: 2,
+      failureCount: 0
+    })
+    expect(createIssue).toHaveBeenCalledTimes(2)
+    expect(listPublishLog(db, { repoId: repo.id })).toHaveLength(2)
+    expect(listNotes(db).map((note) => [note.id, note.status])).toEqual(
+      expect.arrayContaining([
+        [first.id, 'published'],
+        [second.id, 'published']
+      ])
+    )
   })
 
   it('persists split drafts that share one source note', () => {

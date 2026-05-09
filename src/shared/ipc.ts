@@ -7,6 +7,8 @@ import type {
   AgentRunStatusCounts,
   AutoPublishPublishReport,
   AutoPublishPreviewSummary,
+  GenerateCurrentInboxDraftsRequest,
+  GenerateCurrentInboxDraftsStartResponse,
   GenerateDraftsRequest,
   GenerateDraftsMode,
   GenerateDraftsStartResponse,
@@ -266,6 +268,10 @@ export type IpcContract = {
     request: GenerateDraftsRequest
     response: GenerateDraftsStartResponse
   }
+  'pi:generateCurrentInboxDrafts:start': {
+    request: GenerateCurrentInboxDraftsRequest
+    response: GenerateCurrentInboxDraftsStartResponse
+  }
   'pi:generateDrafts:cancel': { request: { runId: string }; response: void }
   'agent-runs:list': {
     request: { status?: AgentRunStatus; limit?: number } | undefined
@@ -347,6 +353,8 @@ export type {
   AgentRunStatusCounts,
   AutoPublishPublishReport,
   AutoPublishPreviewSummary,
+  GenerateCurrentInboxDraftsRequest,
+  GenerateCurrentInboxDraftsStartResponse,
   GenerateDraftsRequest,
   GenerateDraftsMode,
   IssueDraftStatus,

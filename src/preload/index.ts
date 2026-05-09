@@ -3,6 +3,8 @@ import { electronAPI } from '@electron-toolkit/preload'
 import { createAsyncQueue } from '@shared/async-queue'
 import type {
   AgentEvent,
+  GenerateCurrentInboxDraftsRequest,
+  GenerateCurrentInboxDraftsStartResponse,
   GenerateDraftsRequest,
   IpcAction,
   IpcChannel,
@@ -45,19 +47,19 @@ const pilog = {
     onEvent: (event: AgentEvent) => void | Promise<void>
   ): Promise<void> {
     const { runId } = await ipcRenderer.invoke('pi:generateDrafts:start', input)
-    const port = await getStreamPort(runId)
-    const queue = createAsyncQueue<AgentEvent>()
-
-    port.onmessage = (event): void => {
-      const agentEvent = event.data as AgentEvent
-      queue.push(agentEvent)
-      if (agentEvent.type === 'final' || agentEvent.type === 'error') queue.close()
-    }
-    port.start()
-
-    for await (const event of queue) {
-      await onEvent(event)
-    }
+    await consumeAgentStream(runId, onEvent)
+  },
+  runCurrentInboxAgent: async function (
+    input: GenerateCurrentInboxDraftsRequest,
+    onEvent: (event: AgentEvent) => void | Promise<void>
+  ): Promise<GenerateCurrentInboxDraftsStartResponse> {
+    const start = (await ipcRenderer.invoke(
+      'pi:generateCurrentInboxDrafts:start',
+      input
+    )) as GenerateCurrentInboxDraftsStartResponse
+    if ('skipped' in start) return start
+    await consumeAgentStream(start.runId, onEvent)
+    return start
   }
 }
 
@@ -87,4 +89,23 @@ function getStreamPort(runId: string): Promise<MessagePort> {
   return new Promise((resolve) => {
     streamWaiters.set(runId, resolve)
   })
+}
+
+async function consumeAgentStream(
+  runId: string,
+  onEvent: (event: AgentEvent) => void | Promise<void>
+): Promise<void> {
+  const port = await getStreamPort(runId)
+  const queue = createAsyncQueue<AgentEvent>()
+
+  port.onmessage = (event): void => {
+    const agentEvent = event.data as AgentEvent
+    queue.push(agentEvent)
+    if (agentEvent.type === 'final' || agentEvent.type === 'error') queue.close()
+  }
+  port.start()
+
+  for await (const event of queue) {
+    await onEvent(event)
+  }
 }
