@@ -1,10 +1,10 @@
 # ISSUES
 
-Here are the open issues in the repo:
+Here are the open issues in the repo (JSON from the host `gh` CLI; issue `body` is the full description; `labels` are GitHub label objects):
 
 <issues-json>
 
-!`gh issue list --state open --label ready-for-agent --json number,title,body,labels,comments --jq '[.[] | {number, title, body, labels: [.labels[].name], comments: [.comments[].body]}]'`
+{{ISSUES_JSON}}
 
 </issues-json>
 

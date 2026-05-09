@@ -155,6 +155,37 @@ function executionModelLabel(issue: PlannedIssue): string {
   return implementationModelFor(issue)
 }
 
+/**
+ * Lists `ready-for-agent` issues on the **host** via `gh` and returns JSON.
+ * The plan prompt used to run this inside the sandbox with `!`shell`; Sandcastle
+ * applies a 30s timeout there, which breaks when GitHub is slow or the payload
+ * (especially all comment bodies) is large.
+ */
+function fetchReadyForAgentIssuesJson(): string {
+  try {
+    return execFileSync(
+      'gh',
+      [
+        'issue',
+        'list',
+        '--state',
+        'open',
+        '--label',
+        'ready-for-agent',
+        '--json',
+        'number,title,body,labels'
+      ],
+      { encoding: 'utf-8', maxBuffer: 50 * 1024 * 1024 }
+    ).trim()
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    throw new Error(
+      `Sandcastle planner could not list GitHub issues via \`gh\` on the host. ` +
+        `Install the GitHub CLI, run \`gh auth login\`, and use this command from the repo root.\n${msg}`
+    )
+  }
+}
+
 function needsOpusForMerge(branches: string[]): boolean {
   if (branches.length === 0) {
     return false
@@ -224,6 +255,7 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
   //
   // It outputs a <plan> JSON block — we parse that to drive Phase 2.
   // -------------------------------------------------------------------------
+  const issuesJson = fetchReadyForAgentIssuesJson()
   const plan = await sandcastle.run({
     hooks,
     sandbox: sandboxProvider(),
@@ -234,6 +266,7 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
     agent: agent('sonnet'),
     promptFile: './.sandcastle/plan-prompt.md',
     promptArgs: {
+      ISSUES_JSON: issuesJson,
       IMPLEMENTATION_SELECTION_POLICY: useCodex
         ? `Set "implementationModel" to "${CODEX_MODEL}" for every issue (single-model Codex mode).`
         : 'Use "sonnet" by default. Use "opus" only when the issue is architecturally risky, cross-cutting, security-sensitive, likely to touch unfamiliar core abstractions, likely to require a data migration, or explicitly asks for deeper implementation reasoning.',
