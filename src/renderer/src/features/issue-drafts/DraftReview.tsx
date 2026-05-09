@@ -10,6 +10,7 @@ import { Separator } from '@renderer/components/ui/separator'
 import { Textarea } from '@renderer/components/ui/textarea'
 import { cn } from '@renderer/lib/utils'
 import { extractAcceptanceCriteria, writeAcceptanceCriteria } from '@shared/acceptance-criteria'
+import type { UpdateIssueDraftRequest } from '@shared/ipc'
 import type { IssueDraft } from '@shared/types'
 
 const DRAFT_TIMESTAMP_FORMATTER = new Intl.DateTimeFormat(undefined, {
@@ -44,6 +45,21 @@ function parseCriteriaLines(value: string): string[] {
     .split('\n')
     .map((line) => line.replace(/^\s*(?:[-*+]\s+|\d+[.)]\s+)/, '').trim())
     .filter(Boolean)
+}
+
+function normalizeDraftTitle(title: string): string {
+  return title.trim() || 'Untitled draft'
+}
+
+function hasDraftChanges(
+  draft: IssueDraft,
+  next: Pick<UpdateIssueDraftRequest, 'title' | 'body' | 'labels'>
+): boolean {
+  return (
+    next.title !== draft.title ||
+    next.body !== draft.body ||
+    formatLabels(next.labels) !== formatLabels(draft.labels)
+  )
 }
 
 function draftCardClassName(selected: boolean): string {
@@ -81,7 +97,9 @@ export function DraftReview(): React.JSX.Element {
   }, [])
 
   useEffect(() => {
-    void fetchDrafts()
+    queueMicrotask(() => {
+      void fetchDrafts()
+    })
   }, [fetchDrafts])
 
   const handleDraftsInvalidated = useEffectEvent(() => {
@@ -194,29 +212,37 @@ function DraftEditor({
     () => writeAcceptanceCriteria(body, parsedCriteria),
     [body, parsedCriteria]
   )
-  const dirty =
-    title !== draft.title ||
-    bodyForSave !== draft.body ||
-    formatLabels(parsedLabels) !== formatLabels(draft.labels)
+  const editedDraft = useMemo(
+    () => ({
+      title,
+      body: bodyForSave,
+      labels: parsedLabels
+    }),
+    [bodyForSave, parsedLabels, title]
+  )
+  const dirty = hasDraftChanges(draft, editedDraft)
 
   const handleSave = useCallback(async (): Promise<void> => {
     if (!dirty || saving) return
     setSaving(true)
-    const updated = await window.pilog.invoke('issue-drafts:update', {
-      id: draft.id,
-      title: title.trim() || 'Untitled draft',
-      body: bodyForSave,
-      labels: parsedLabels
-    })
-    if (updated) {
-      setTitle(updated.title)
-      setBody(updated.body)
-      setLabels(formatLabels(updated.labels))
-      setCriteria(extractAcceptanceCriteria(updated.body).join('\n'))
-      setSavedAt(formatTimestamp(updated.updatedAt))
-      await onSaved()
+    try {
+      const updated = await window.pilog.invoke('issue-drafts:update', {
+        id: draft.id,
+        title: normalizeDraftTitle(title),
+        body: bodyForSave,
+        labels: parsedLabels
+      })
+      if (updated) {
+        setTitle(updated.title)
+        setBody(updated.body)
+        setLabels(formatLabels(updated.labels))
+        setCriteria(extractAcceptanceCriteria(updated.body).join('\n'))
+        setSavedAt(formatTimestamp(updated.updatedAt))
+        await onSaved()
+      }
+    } finally {
+      setSaving(false)
     }
-    setSaving(false)
   }, [bodyForSave, dirty, draft.id, onSaved, parsedLabels, saving, title])
 
   const handleSaveShortcut = useEffectEvent(() => {

@@ -7,6 +7,7 @@ import { AgentRuns } from './features/agent-runs/AgentRuns'
 import { DraftReview } from './features/issue-drafts/DraftReview'
 
 type Route = 'inbox' | 'draft-review' | 'settings' | 'repositories' | 'agent-runs'
+type ViewTabValue = 'inbox' | 'drafts' | 'runs'
 
 let currentRoute: Route = 'inbox'
 const routeListeners = new Set<() => void>()
@@ -58,6 +59,31 @@ const VIEW_TABS = [
   }
 ]
 
+function routeToActiveTab(route: Route): ViewTabValue {
+  switch (route) {
+    case 'inbox':
+      return 'inbox'
+    case 'draft-review':
+      return 'drafts'
+    case 'agent-runs':
+    case 'repositories':
+    case 'settings':
+      return 'runs'
+  }
+}
+
+function tabToRoute(tab: string): Route {
+  switch (tab) {
+    case 'inbox':
+      return 'inbox'
+    case 'drafts':
+      return 'draft-review'
+    case 'runs':
+    default:
+      return 'agent-runs'
+  }
+}
+
 function App(): React.JSX.Element {
   const route = useSyncExternalStore(subscribeRoute, getRouteSnapshot)
   const [focusedNoteId, setFocusedNoteId] = useState<string | null>(null)
@@ -80,15 +106,13 @@ function App(): React.JSX.Element {
     return <Repositories onBack={() => setAppRoute('settings')} />
   }
 
-  const activeTab = route === 'inbox' ? 'inbox' : route === 'draft-review' ? 'drafts' : 'runs'
+  const activeTab = routeToActiveTab(route)
 
   return (
     <AppShell
       tabs={VIEW_TABS}
       activeTab={activeTab}
-      onTabChange={(next) =>
-        setAppRoute(next === 'inbox' ? 'inbox' : next === 'drafts' ? 'draft-review' : 'agent-runs')
-      }
+      onTabChange={(next) => setAppRoute(tabToRoute(next))}
       onNavigateToSettings={() => setAppRoute('settings')}
       // Cmd-K lives in Inbox's command surface today; only show the
       // chrome trigger when the active view actually has a palette.

@@ -2,6 +2,12 @@ const ACCEPTANCE_HEADING = /^##\s+Acceptance Criteria\s*$/i
 const NEXT_SECTION_HEADING = /^##\s+\S/
 const LIST_ITEM = /^\s*(?:[-*+]\s+|\d+[.)]\s+)(.+?)\s*$/
 
+type MarkdownSection = {
+  headingIndex: number
+  contentStart: number
+  contentEnd: number
+}
+
 export function extractAcceptanceCriteria(body: string): string[] {
   const lines = body.split('\n')
   const section = findAcceptanceCriteriaSection(lines)
@@ -20,8 +26,7 @@ export function writeAcceptanceCriteria(body: string, items: string[]): string {
   const section = findAcceptanceCriteriaSection(lines)
 
   if (!section) {
-    const prefix = body.trimEnd()
-    return [prefix, '', ...nextSection].filter((line, index) => index !== 0 || line).join('\n')
+    return appendAcceptanceCriteriaSection(body, nextSection)
   }
 
   const before = lines.slice(0, section.headingIndex)
@@ -34,9 +39,14 @@ export function writeAcceptanceCriteria(body: string, items: string[]): string {
   )
 }
 
-function findAcceptanceCriteriaSection(
-  lines: string[]
-): { headingIndex: number; contentStart: number; contentEnd: number } | null {
+function appendAcceptanceCriteriaSection(body: string, sectionLines: string[]): string {
+  const prefix = body.trimEnd()
+  if (!prefix) return sectionLines.join('\n')
+
+  return [prefix, '', ...sectionLines].join('\n')
+}
+
+function findAcceptanceCriteriaSection(lines: string[]): MarkdownSection | null {
   const headingIndex = lines.findIndex((line) => ACCEPTANCE_HEADING.test(line))
   if (headingIndex === -1) return null
 

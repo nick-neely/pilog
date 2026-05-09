@@ -83,10 +83,7 @@ export function updateIssueDraft(
 
   if (!existing) return null
 
-  const nowDate = new Date()
-  const previousDate = new Date(existing.updatedAt)
-  if (nowDate <= previousDate) nowDate.setTime(previousDate.getTime() + 1)
-  const now = nowDate.toISOString()
+  const now = nextUpdatedAt(existing.updatedAt)
 
   db.update(issueDrafts)
     .set({
@@ -105,6 +102,14 @@ export function updateIssueDraft(
     .get()
 
   return row ? mapIssueDraft(row) : null
+}
+
+function nextUpdatedAt(previousUpdatedAt: string): string {
+  const now = new Date()
+  const previous = new Date(previousUpdatedAt)
+  if (now <= previous) now.setTime(previous.getTime() + 1)
+
+  return now.toISOString()
 }
 
 function mapIssueDraft(row: typeof issueDrafts.$inferSelect): IssueDraft {
