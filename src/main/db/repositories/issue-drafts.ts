@@ -77,15 +77,10 @@ export function updateIssueDraft(
   db: PilogDatabase,
   input: { id: string; title: string; body: string; labels: string[] }
 ): IssueDraft | null {
-  const existing = db
-    .select({ updatedAt: issueDrafts.updatedAt })
-    .from(issueDrafts)
-    .where(eq(issueDrafts.id, input.id))
-    .get()
+  const previousUpdatedAt = getIssueDraftUpdatedAt(db, input.id)
+  if (!previousUpdatedAt) return null
 
-  if (!existing) return null
-
-  const now = nextUpdatedAt(existing.updatedAt)
+  const now = nextUpdatedAt(previousUpdatedAt)
 
   db.update(issueDrafts)
     .set({
@@ -97,28 +92,17 @@ export function updateIssueDraft(
     .where(eq(issueDrafts.id, input.id))
     .run()
 
-  const row = db
-    .select(issueDraftColumns)
-    .from(issueDrafts)
-    .where(eq(issueDrafts.id, input.id))
-    .get()
-
-  return row ? mapIssueDraft(row) : null
+  return getIssueDraftById(db, input.id)
 }
 
 export function updateIssueDraftStatus(
   db: PilogDatabase,
   input: { id: string; status: IssueDraftStatus }
 ): IssueDraft | null {
-  const existing = db
-    .select({ updatedAt: issueDrafts.updatedAt })
-    .from(issueDrafts)
-    .where(eq(issueDrafts.id, input.id))
-    .get()
+  const previousUpdatedAt = getIssueDraftUpdatedAt(db, input.id)
+  if (!previousUpdatedAt) return null
 
-  if (!existing) return null
-
-  const now = nextUpdatedAt(existing.updatedAt)
+  const now = nextUpdatedAt(previousUpdatedAt)
 
   db.update(issueDrafts)
     .set({
@@ -128,11 +112,21 @@ export function updateIssueDraftStatus(
     .where(eq(issueDrafts.id, input.id))
     .run()
 
+  return getIssueDraftById(db, input.id)
+}
+
+function getIssueDraftUpdatedAt(db: PilogDatabase, id: string): string | null {
   const row = db
-    .select(issueDraftColumns)
+    .select({ updatedAt: issueDrafts.updatedAt })
     .from(issueDrafts)
-    .where(eq(issueDrafts.id, input.id))
+    .where(eq(issueDrafts.id, id))
     .get()
+
+  return row?.updatedAt ?? null
+}
+
+function getIssueDraftById(db: PilogDatabase, id: string): IssueDraft | null {
+  const row = db.select(issueDraftColumns).from(issueDrafts).where(eq(issueDrafts.id, id)).get()
 
   return row ? mapIssueDraft(row) : null
 }

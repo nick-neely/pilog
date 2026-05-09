@@ -18,17 +18,13 @@ import { extractAcceptanceCriteria, writeAcceptanceCriteria } from '@shared/acce
 import type { UpdateIssueDraftRequest } from '@shared/ipc'
 import type { IssueDraft, IssueDraftStatus } from '@shared/types'
 
-const REVIEW_STATUS_FILTERS: Array<{ value: IssueDraftStatus; label: string }> = [
-  { value: 'draft', label: 'Active' },
-  { value: 'dismissed', label: 'Dismissed' },
-  { value: 'published', label: 'Published' }
-]
-
 const EMPTY_STATUS_COUNTS: Record<IssueDraftStatus, number> = {
   draft: 0,
   dismissed: 0,
   published: 0
 }
+
+const ISSUE_DRAFT_STATUSES: readonly IssueDraftStatus[] = ['draft', 'dismissed', 'published']
 
 const DRAFT_TIMESTAMP_FORMATTER = new Intl.DateTimeFormat(undefined, {
   month: 'short',
@@ -99,7 +95,42 @@ function confidenceLabel(confidence: IssueDraft['confidence']): string {
 }
 
 function statusLabel(status: IssueDraftStatus): string {
-  return REVIEW_STATUS_FILTERS.find((filter) => filter.value === status)?.label ?? status
+  switch (status) {
+    case 'draft':
+      return 'Active'
+    case 'dismissed':
+      return 'Dismissed'
+    case 'published':
+      return 'Published'
+  }
+}
+
+function countDraftsByStatus(drafts: IssueDraft[]): Record<IssueDraftStatus, number> {
+  const counts = { ...EMPTY_STATUS_COUNTS }
+  for (const draft of drafts) {
+    counts[draft.status] += 1
+  }
+  return counts
+}
+
+function emptyDraftDescription(
+  statusFilter: IssueDraftStatus,
+  statusCounts: Record<IssueDraftStatus, number>
+): string {
+  if (statusFilter !== 'draft') {
+    return `No ${statusLabel(statusFilter).toLowerCase()} drafts.`
+  }
+
+  if (statusCounts.dismissed > 0) {
+    return 'No active drafts. Dismissed drafts stay local and can be inspected from the Dismissed filter.'
+  }
+
+  return 'No active drafts yet. Generate drafts from selected inbox notes to review them here.'
+}
+
+function formatDraftCount(count: number, status: IssueDraftStatus): string {
+  const label = statusLabel(status).toLowerCase()
+  return `${count} ${label} draft${count === 1 ? '' : 's'}`
 }
 
 export function DraftReview(): React.JSX.Element {
@@ -111,21 +142,14 @@ export function DraftReview(): React.JSX.Element {
   const [loading, setLoading] = useState(true)
 
   const fetchDrafts = useCallback(async (): Promise<void> => {
-    const [result, activeDrafts, dismissedDrafts, publishedDrafts] = await Promise.all([
-      window.pilog.invoke('issue-drafts:list', { status: statusFilter }),
-      window.pilog.invoke('issue-drafts:list', { status: 'draft' }),
-      window.pilog.invoke('issue-drafts:list', { status: 'dismissed' }),
-      window.pilog.invoke('issue-drafts:list', { status: 'published' })
-    ])
-    setDrafts(result)
-    setStatusCounts({
-      draft: activeDrafts.length,
-      dismissed: dismissedDrafts.length,
-      published: publishedDrafts.length
-    })
+    const allDrafts = await window.pilog.invoke('issue-drafts:list', { status: 'all' })
+    const filteredDrafts = allDrafts.filter((draft) => draft.status === statusFilter)
+
+    setDrafts(filteredDrafts)
+    setStatusCounts(countDraftsByStatus(allDrafts))
     setSelectedDraftId((current) => {
-      if (current && result.some((draft) => draft.id === current)) return current
-      return result[0]?.id ?? null
+      if (current && filteredDrafts.some((draft) => draft.id === current)) return current
+      return filteredDrafts[0]?.id ?? null
     })
     setLoading(false)
   }, [statusFilter])
@@ -143,12 +167,7 @@ export function DraftReview(): React.JSX.Element {
   useEffect(() => window.pilog.on('issue-drafts:invalidated', handleDraftsInvalidated), [])
 
   const selectedDraft = drafts.find((draft) => draft.id === selectedDraftId) ?? null
-  const emptyDescription =
-    statusFilter === 'draft' && statusCounts.dismissed > 0
-      ? 'No active drafts. Dismissed drafts stay local and can be inspected from the Dismissed filter.'
-      : statusFilter === 'draft'
-        ? 'No active drafts yet. Generate drafts from selected inbox notes to review them here.'
-        : `No ${statusLabel(statusFilter).toLowerCase()} drafts.`
+  const emptyDescription = emptyDraftDescription(statusFilter, statusCounts)
 
   return (
     <div className="flex h-full bg-background text-foreground">
@@ -156,32 +175,28 @@ export function DraftReview(): React.JSX.Element {
         <div className="flex shrink-0 flex-col gap-3 border-b px-6 py-3">
           <div className="flex items-center justify-between gap-3">
             <p className="text-sm text-muted-foreground">
-              {loading
-                ? 'Loading drafts'
-                : `${drafts.length} ${statusLabel(statusFilter).toLowerCase()} draft${
-                    drafts.length === 1 ? '' : 's'
-                  }`}
+              {loading ? 'Loading drafts' : formatDraftCount(drafts.length, statusFilter)}
             </p>
             <Badge variant="outline" className="shrink-0">
               Review queue
             </Badge>
           </div>
           <div className="grid grid-cols-3 gap-1" aria-label="Draft status filter">
-            {REVIEW_STATUS_FILTERS.map((filter) => {
-              const active = statusFilter === filter.value
+            {ISSUE_DRAFT_STATUSES.map((status) => {
+              const active = statusFilter === status
               return (
                 <Button
-                  key={filter.value}
+                  key={status}
                   type="button"
                   variant={active ? 'secondary' : 'ghost'}
                   size="sm"
                   className="h-8 justify-between px-2"
                   aria-pressed={active}
-                  onClick={() => setStatusFilter(filter.value)}
+                  onClick={() => setStatusFilter(status)}
                 >
-                  <span>{filter.label}</span>
+                  <span>{statusLabel(status)}</span>
                   <span className="tabular font-mono text-xs text-muted-foreground">
-                    {statusCounts[filter.value]}
+                    {statusCounts[status]}
                   </span>
                 </Button>
               )
@@ -338,12 +353,10 @@ function DraftEditor({
           id: draft.id,
           status
         })
+      } finally {
         setUpdatingStatus(false)
-        await onStatusChanged()
-      } catch (error) {
-        setUpdatingStatus(false)
-        throw error
       }
+      await onStatusChanged()
     },
     [draft.id, draft.status, onStatusChanged, updatingStatus]
   )
