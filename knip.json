@@ -1,0 +1,20 @@
+{
+  "$schema": "https://unpkg.com/knip@latest/schema.json",
+  "entry": [
+    "electron.vite.config.ts",
+    "src/main/index.ts",
+    "src/preload/index.ts",
+    "src/renderer/src/main.tsx",
+    "src/renderer/src/scratchpad-main.tsx",
+    "src/renderer/src/App.tsx",
+    "e2e/**/*.ts"
+  ],
+  "project": ["src/**/*.{ts,tsx}", "e2e/**/*.ts", "electron.vite.config.ts"],
+  "ignore": [
+    "fixtures/**",
+    "src/renderer/src/components/ui/**",
+    "src/renderer/src/hooks/use-mobile.ts",
+    "src/**/*.d.ts",
+    "e2e/**/*.d.ts"
+  ]
+}

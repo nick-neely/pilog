@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
   ArrowRight01Icon,
@@ -32,15 +32,16 @@ const STATUS_FILTERS: { value: AgentRunStatus; label: string }[] = [
 
 const ROW_HEIGHT = 88
 const OVERSCAN = 6
+const RUN_TIMESTAMP_FORMATTER = new Intl.DateTimeFormat(undefined, {
+  month: 'short',
+  day: 'numeric',
+  hour: 'numeric',
+  minute: '2-digit',
+  second: '2-digit'
+})
 
 function formatTimestamp(iso: string): string {
-  return new Intl.DateTimeFormat(undefined, {
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-    second: '2-digit'
-  }).format(new Date(iso))
+  return RUN_TIMESTAMP_FORMATTER.format(new Date(iso))
 }
 
 function formatDuration(run: AgentRunListItem): string {
@@ -124,10 +125,11 @@ export function AgentRuns({
 
   const fetchDetail = useCallback(async (runId: string): Promise<void> => {
     const id = ++detailFetchId.current
-    const result = await window.pilog.invoke('agent-runs:get', { id: runId })
-    if (id !== detailFetchId.current) return
-    setDetail(result)
-    setSelectedDraftId(result?.outputDrafts[0]?.id ?? null)
+    await window.pilog.invoke('agent-runs:get', { id: runId }).then((result) => {
+      if (id !== detailFetchId.current) return
+      setDetail(result)
+      setSelectedDraftId(result?.outputDrafts[0]?.id ?? null)
+    })
   }, [])
 
   useEffect(() => {
@@ -136,12 +138,12 @@ export function AgentRuns({
     })
   }, [fetchRuns])
 
-  useEffect(() => {
-    return window.pilog.on('agent-runs:invalidated', () => {
-      void fetchRuns()
-      if (selectedRunId) void fetchDetail(selectedRunId)
-    })
-  }, [fetchDetail, fetchRuns, selectedRunId])
+  const handleRunsInvalidated = useEffectEvent(() => {
+    void fetchRuns()
+    if (selectedRunId) void fetchDetail(selectedRunId)
+  })
+
+  useEffect(() => window.pilog.on('agent-runs:invalidated', handleRunsInvalidated), [])
 
   useEffect(() => {
     if (!selectedRunId) {
@@ -203,7 +205,7 @@ export function AgentRuns({
                   <span
                     aria-hidden
                     className={
-                      'h-1.5 w-1.5 rounded-full ' + (active ? 'bg-primary' : 'bg-transparent')
+                      'size-1.5 rounded-full ' + (active ? 'bg-primary' : 'bg-transparent')
                     }
                   />
                   {chip.label}
@@ -471,7 +473,7 @@ function RunDetail({
               {run.eventStream.length > 0 ? (
                 <div className="space-y-3">
                   <p className="text-sm text-muted-foreground">
-                    {run.eventStream.length} event{run.eventStream.length === 1 ? '' : 's'} — debug
+                    {run.eventStream.length} event{run.eventStream.length === 1 ? '' : 's'}: debug
                     data for this run.
                   </p>
                   <ol data-testid="run-event-transcript" className="space-y-2">

@@ -168,15 +168,17 @@ function usePiConfig(): PiConfigState {
   const modelFetchIdRef = useRef(0)
   const mountedRef = useRef(false)
 
-  const refresh = useCallback(async () => {
-    const [nextActive, nextProviders] = await Promise.all([
+  const refresh = useCallback((): Promise<void> => {
+    if (!mountedRef.current) return Promise.resolve()
+    return Promise.all([
       window.pilog.invoke('pi:getActiveConfig'),
       window.pilog.invoke('pi:listProviders')
-    ])
-    if (!mountedRef.current) return
-    setActive(nextActive)
-    setProviders(nextProviders)
-    setSelectedProviderState(nextActive.provider ?? nextProviders[0]?.id ?? '')
+    ]).then(([nextActive, nextProviders]) => {
+      if (!mountedRef.current) return
+      setActive(nextActive)
+      setProviders(nextProviders)
+      setSelectedProviderState(nextActive.provider ?? nextProviders[0]?.id ?? '')
+    })
   }, [])
 
   useEffect(() => {
@@ -270,12 +272,14 @@ function useAdvancedSettings(): AdvancedSettingsState {
   const [savingKey, setSavingKey] = useState(false)
   const mountedRef = useRef(false)
 
-  const refresh = useCallback(async () => {
-    const next = await window.pilog.invoke('settings:getAdvanced')
-    if (!mountedRef.current) return
-    setSettings(next)
-    setTurnBudgetDraftState(String(next.turnBudget))
-    setTurnBudgetError(null)
+  const refresh = useCallback((): Promise<void> => {
+    if (!mountedRef.current) return Promise.resolve()
+    return window.pilog.invoke('settings:getAdvanced').then((next) => {
+      if (!mountedRef.current) return
+      setSettings(next)
+      setTurnBudgetDraftState(String(next.turnBudget))
+      setTurnBudgetError(null)
+    })
   }, [])
 
   useEffect(() => {
@@ -443,7 +447,7 @@ export function Settings({
         </Button>
         <h1 className="text-xl font-semibold">Settings</h1>
       </header>
-      <div className="flex-1 overflow-y-auto px-6 py-6">
+      <div className="flex-1 overflow-y-auto p-6">
         <div className="mx-auto flex max-w-lg flex-col gap-8">
           <section className="flex flex-col gap-3">
             <h2 className="text-sm font-medium text-foreground">GitHub</h2>

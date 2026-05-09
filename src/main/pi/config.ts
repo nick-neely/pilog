@@ -89,18 +89,19 @@ export async function listPiProviders(): Promise<PiProviderOption[]> {
 }
 
 export async function listPiModels(provider?: string): Promise<PiModelOption[]> {
-  return (await createModelRegistry())
-    .getAll()
-    .filter((model) => !provider || model.provider === provider)
-    .map((model) => ({ id: model.id, name: model.name ?? model.id, provider: model.provider }))
-    .sort((a, b) => a.name.localeCompare(b.name))
+  const models: PiModelOption[] = []
+  for (const model of (await createModelRegistry()).getAll()) {
+    if (provider && model.provider !== provider) continue
+    models.push({ id: model.id, name: model.name ?? model.id, provider: model.provider })
+  }
+  return models.sort((a, b) => a.name.localeCompare(b.name))
 }
 
 export async function importExistingPiConfig(db: PilogDatabase): Promise<PiActiveConfig> {
+  const activeProvider = getSetting(db, 'pi.activeProvider')
   const importedProviders = await importAuthJsonIntoSafeStorage(EXISTING_PI_AUTH_PATH)
-  const active = await getActivePiConfig(db)
 
-  if (!active.provider && importedProviders.length > 0) {
+  if (!activeProvider && importedProviders.length > 0) {
     const provider = importedProviders[0]
     const model = (await listPiModels(provider))[0]
     if (model) {

@@ -255,8 +255,7 @@ function MarkdownEditor({
   useEffect(() => {
     const view = viewRef.current
     if (!view) return
-    view.dom.style.pointerEvents = disabled ? 'none' : ''
-    view.dom.style.opacity = disabled ? '0.5' : ''
+    view.dom.style.cssText = disabled ? 'pointer-events: none; opacity: 0.5;' : ''
   }, [disabled])
 
   return (
@@ -381,7 +380,7 @@ function NewIssueDialog({
           <>
             <DialogHeader>
               <DialogTitle className="font-heading text-lg font-medium">
-                New issue — {repo.owner}/{repo.name}
+                New issue: {repo.owner}/{repo.name}
               </DialogTitle>
               <DialogDescription className="sr-only">
                 Create a new GitHub issue from PiLog.
@@ -567,7 +566,7 @@ export function Repositories({ onBack }: { onBack: () => void }): React.JSX.Elem
         </Button>
         <h1 className="text-xl font-semibold">Repositories</h1>
       </header>
-      <div className="flex-1 overflow-y-auto px-6 py-6">
+      <div className="flex-1 overflow-y-auto p-6">
         <div className="mx-auto flex max-w-lg flex-col gap-6">
           {repos.length > 0 && (
             <section className="flex flex-col gap-2">

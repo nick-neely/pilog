@@ -187,17 +187,18 @@ export function createGrepTool(repoPath: string): AgentTool<typeof GrepParameter
         throw new Error(result.stderr || `ripgrep exited with status ${result.status}`)
       }
 
-      const matches = result.stdout
-        .split('\n')
-        .filter(Boolean)
-        .map((line) => JSON.parse(line) as RipgrepEvent)
-        .filter((event) => event.type === 'match')
-        .map((event) => ({
+      const matches: Array<{ path: string; lineNumber: number; lines: string }> = []
+      for (const line of result.stdout.split('\n')) {
+        if (!line) continue
+        const event = JSON.parse(line) as RipgrepEvent
+        if (event.type !== 'match') continue
+        matches.push({
           path: sandbox.assertResolvedPath(event.data.path.text),
           lineNumber: event.data.line_number,
           lines: String(event.data.lines.text).trimEnd()
-        }))
-        .slice(0, MAX_GREP_MATCHES)
+        })
+        if (matches.length >= MAX_GREP_MATCHES) break
+      }
 
       return textResult({ matches, truncated: matches.length >= MAX_GREP_MATCHES })
     }
@@ -256,14 +257,12 @@ export function createGitLogTool(repoPath: string): AgentTool<typeof GitLogParam
       ]
       if (input.path) args.push('--', sandbox.assertResolvedPath(sandbox.resolvePath(input.path)))
       const output = await simpleGit({ baseDir: sandbox.root }).raw(args)
-      const commits = output
-        .trim()
-        .split('\n')
-        .filter(Boolean)
-        .map((line) => {
-          const [hash, author, date, ...subjectParts] = line.split('\t')
-          return { hash, author, date, subject: subjectParts.join('\t').slice(0, 200) }
-        })
+      const commits: Array<{ hash: string; author: string; date: string; subject: string }> = []
+      for (const line of output.trim().split('\n')) {
+        if (!line) continue
+        const [hash, author, date, ...subjectParts] = line.split('\t')
+        commits.push({ hash, author, date, subject: subjectParts.join('\t').slice(0, 200) })
+      }
       return textResult({ commits })
     }
   }
@@ -327,8 +326,10 @@ function loadGitignorePatterns(root: string): string[] {
   const gitignorePath = path.join(root, '.gitignore')
   if (!existsSync(gitignorePath)) return []
 
-  return readFileSync(gitignorePath, 'utf8')
-    .split('\n')
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0 && !line.startsWith('#'))
+  const patterns: string[] = []
+  for (const line of readFileSync(gitignorePath, 'utf8').split('\n')) {
+    const pattern = line.trim()
+    if (pattern.length > 0 && !pattern.startsWith('#')) patterns.push(pattern)
+  }
+  return patterns
 }

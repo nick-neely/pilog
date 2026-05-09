@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState, useSyncExternalStore } from 'react'
 import { AppShell } from './components/AppShell'
 import { Inbox } from './features/inbox/Inbox'
 import { Settings } from './features/settings/Settings'
@@ -6,6 +6,30 @@ import { Repositories } from './features/repositories/Repositories'
 import { AgentRuns } from './features/agent-runs/AgentRuns'
 
 type Route = 'inbox' | 'settings' | 'repositories' | 'agent-runs'
+
+let currentRoute: Route = 'inbox'
+const routeListeners = new Set<() => void>()
+
+function setAppRoute(next: Route): void {
+  if (currentRoute === next) return
+  currentRoute = next
+  routeListeners.forEach((listener) => listener())
+}
+
+function subscribeRoute(listener: () => void): () => void {
+  routeListeners.add(listener)
+  const unsubInbox = window.pilog.on('navigate:inbox', () => setAppRoute('inbox'))
+  const unsubSettings = window.pilog.on('navigate:settings', () => setAppRoute('settings'))
+  return () => {
+    routeListeners.delete(listener)
+    unsubInbox()
+    unsubSettings()
+  }
+}
+
+function getRouteSnapshot(): Route {
+  return currentRoute
+}
 
 // View descriptors live at app level so the AppShell's tabs map 1:1 to
 // our route values. Adding a new tab is one entry here plus a handler
@@ -28,7 +52,7 @@ const VIEW_TABS = [
 ]
 
 function App(): React.JSX.Element {
-  const [route, setRoute] = useState<Route>('inbox')
+  const route = useSyncExternalStore(subscribeRoute, getRouteSnapshot)
   const [focusedNoteId, setFocusedNoteId] = useState<string | null>(null)
   const [focusedRunId, setFocusedRunId] = useState<string | null>(null)
   // Lifted because the Cmd-K trigger now lives in the global top bar; the
@@ -36,26 +60,17 @@ function App(): React.JSX.Element {
   // commands are wired.
   const [paletteOpen, setPaletteOpen] = useState(false)
 
-  useEffect(() => {
-    const unsubInbox = window.pilog.on('navigate:inbox', () => setRoute('inbox'))
-    const unsubSettings = window.pilog.on('navigate:settings', () => setRoute('settings'))
-    return () => {
-      unsubInbox()
-      unsubSettings()
-    }
-  }, [])
-
   if (route === 'settings') {
     return (
       <Settings
-        onBack={() => setRoute('inbox')}
-        onNavigateRepositories={() => setRoute('repositories')}
+        onBack={() => setAppRoute('inbox')}
+        onNavigateRepositories={() => setAppRoute('repositories')}
       />
     )
   }
 
   if (route === 'repositories') {
-    return <Repositories onBack={() => setRoute('settings')} />
+    return <Repositories onBack={() => setAppRoute('settings')} />
   }
 
   const activeTab = route === 'inbox' ? 'inbox' : 'runs'
@@ -64,8 +79,8 @@ function App(): React.JSX.Element {
     <AppShell
       tabs={VIEW_TABS}
       activeTab={activeTab}
-      onTabChange={(next) => setRoute(next === 'inbox' ? 'inbox' : 'agent-runs')}
-      onNavigateToSettings={() => setRoute('settings')}
+      onTabChange={(next) => setAppRoute(next === 'inbox' ? 'inbox' : 'agent-runs')}
+      onNavigateToSettings={() => setAppRoute('settings')}
       // Cmd-K lives in Inbox's command surface today; only show the
       // chrome trigger when the active view actually has a palette.
       onOpenCommandPalette={route === 'inbox' ? () => setPaletteOpen(true) : undefined}
@@ -78,10 +93,10 @@ function App(): React.JSX.Element {
           // pass the route action through so it works from the inbox.
           onNavigateToAgentRuns={(runId) => {
             if (runId) setFocusedRunId(runId)
-            setRoute('agent-runs')
+            setAppRoute('agent-runs')
           }}
-          onNavigateToRepositories={() => setRoute('repositories')}
-          onNavigateToSettings={() => setRoute('settings')}
+          onNavigateToRepositories={() => setAppRoute('repositories')}
+          onNavigateToSettings={() => setAppRoute('settings')}
           paletteOpen={paletteOpen}
           onPaletteOpenChange={setPaletteOpen}
         />
@@ -90,7 +105,7 @@ function App(): React.JSX.Element {
           focusRunId={focusedRunId}
           onOpenSourceNote={(noteId) => {
             setFocusedNoteId(noteId)
-            setRoute('inbox')
+            setAppRoute('inbox')
           }}
         />
       )}

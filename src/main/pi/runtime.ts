@@ -198,8 +198,10 @@ async function* runFixtureAgent(input: IssueGenerationInput): AsyncIterable<Agen
       {
         title: 'Triage selected PiLog notes',
         summary: input.notes
-          .map((note) => note.content.trim())
-          .filter(Boolean)
+          .flatMap((note) => {
+            const content = note.content.trim()
+            return content ? [content] : []
+          })
           .join('\n'),
         context: `Generated from ${input.notes.length} selected notes for ${input.repo.owner}/${input.repo.name}.`,
         sourceNoteIds: input.notes.map((note) => note.id),

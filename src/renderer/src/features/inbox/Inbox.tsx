@@ -1,56 +1,56 @@
 import {
-    Activity01Icon,
-    Add01Icon,
-    Cancel01Icon,
-    CancelCircleIcon,
-    Settings02Icon,
-    SparklesIcon
+  Activity01Icon,
+  Add01Icon,
+  Cancel01Icon,
+  CancelCircleIcon,
+  Settings02Icon,
+  SparklesIcon
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-    AlertDialogTrigger
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger
 } from '@renderer/components/ui/alert-dialog'
 import { Badge } from '@renderer/components/ui/badge'
 import { Button } from '@renderer/components/ui/button'
 import {
-    CommandDialog,
-    CommandEmpty,
-    CommandGroup,
-    CommandInput,
-    CommandItem,
-    CommandList,
-    CommandSeparator,
-    CommandShortcut
+  CommandDialog,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  CommandSeparator,
+  CommandShortcut
 } from '@renderer/components/ui/command'
 import { Empty, EmptyDescription } from '@renderer/components/ui/empty'
 import {
-    Select,
-    SelectContent,
-    SelectGroup,
-    SelectItem,
-    SelectTrigger,
-    SelectValue
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
 } from '@renderer/components/ui/select'
 import { Textarea } from '@renderer/components/ui/textarea'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@renderer/components/ui/tooltip'
 import { cn } from '@renderer/lib/utils'
 import type {
-    ListNotesRequest,
-    Note,
-    NoteStatus,
-    NoteStatusCounts,
-    PiStatus,
-    Repo
+  ListNotesRequest,
+  Note,
+  NoteStatus,
+  NoteStatusCounts,
+  PiStatus,
+  Repo
 } from '@shared/ipc'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
 import { StatusFilter } from './StatusFilter'
 
 // Status filter rows. Order matches the inbox lifecycle (capture →
@@ -80,20 +80,28 @@ const EMPTY_STATUS_COUNTS: NoteStatusCounts = {
 const IS_MAC = typeof navigator !== 'undefined' && navigator.platform.toUpperCase().includes('MAC')
 const META_KEY = IS_MAC ? '⌘' : 'Ctrl'
 
+const CURRENT_YEAR = new Date().getFullYear()
+const SHORT_NOTE_TIMESTAMP_FORMATTER = new Intl.DateTimeFormat(undefined, {
+  month: 'short',
+  day: 'numeric',
+  hour: 'numeric',
+  minute: '2-digit'
+})
+const YEAR_NOTE_TIMESTAMP_FORMATTER = new Intl.DateTimeFormat(undefined, {
+  month: 'short',
+  day: 'numeric',
+  year: 'numeric',
+  hour: 'numeric',
+  minute: '2-digit'
+})
+
 // Humanise the timestamp for inbox metadata: same year stays short
 // ("May 7, 9:18 PM"), prior years fall back to a year-bearing form. Pairs
 // with `.tabular` so digits don't shimmy as the list updates.
 function formatNoteTimestamp(iso: string): string {
   const date = new Date(iso)
-  const now = new Date()
-  const sameYear = date.getFullYear() === now.getFullYear()
-  return new Intl.DateTimeFormat(undefined, {
-    month: 'short',
-    day: 'numeric',
-    year: sameYear ? undefined : 'numeric',
-    hour: 'numeric',
-    minute: '2-digit'
-  }).format(date)
+  const sameYear = date.getFullYear() === CURRENT_YEAR
+  return (sameYear ? SHORT_NOTE_TIMESTAMP_FORMATTER : YEAR_NOTE_TIMESTAMP_FORMATTER).format(date)
 }
 
 // repoFilter encoding for Select values (non-empty strings for Radix Select items).
@@ -171,6 +179,9 @@ function NoteDetail({
   const handleSave = useCallback(async (): Promise<void> => {
     await onSave(note.id, draft)
   }, [draft, note.id, onSave])
+  const handleSaveShortcut = useEffectEvent(() => {
+    if (dirty) void handleSave()
+  })
 
   // Mod+S saves, matching the Scratchpad's editor convention. Keyboard-first
   // is a system promise; the visible Save button is a courtesy, not the path.
@@ -179,11 +190,11 @@ function NoteDetail({
       const isSave = (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's'
       if (!isSave) return
       e.preventDefault()
-      if (dirty) void handleSave()
+      handleSaveShortcut()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [dirty, handleSave])
+  }, [])
 
   return (
     <article className="flex h-full flex-col">
@@ -235,11 +246,10 @@ function NoteDetail({
           aria-label="Note content"
           // Body line length capped at 72ch per DESIGN.md; mono editor body
           // pairs with the rest of the system (file paths, code blocks).
-          className="block min-h-full w-full max-w-[72ch] mx-auto rounded-none border-0 bg-transparent px-6 py-6 font-mono text-sm leading-relaxed text-foreground shadow-none field-sizing-content focus-visible:ring-0"
+          className="mx-auto block min-h-full w-full max-w-[72ch] rounded-none border-0 bg-transparent p-6 font-mono text-sm leading-relaxed text-foreground shadow-none field-sizing-content focus-visible:ring-0"
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           placeholder="Capture a thought…"
-          autoFocus
         />
       </div>
       {/* Repo association — below the content area */}
@@ -248,7 +258,7 @@ function NoteDetail({
           <span className="text-xs font-medium text-muted-foreground">Repo</span>
           {repos.length === 0 ? (
             <span className="text-xs text-muted-foreground">
-              No repos linked —{' '}
+              No repos linked:{' '}
               <Button
                 type="button"
                 variant="link"
@@ -330,17 +340,17 @@ export function Inbox({
 
   const fetchNotes = useCallback(async (): Promise<void> => {
     const id = ++fetchIdRef.current
-    const result = await window.pilog.invoke(
-      'note:list',
-      buildFilter(statusFilter, '', repoFilter)
-    )
-    if (id !== fetchIdRef.current) return
-    setNotes(result)
-    setSelectedIds((prev) => {
-      const validIds = new Set(result.map((n) => n.id))
-      const next = new Set([...prev].filter((rid) => validIds.has(rid)))
-      return next.size === prev.size ? prev : next
-    })
+    await window.pilog
+      .invoke('note:list', buildFilter(statusFilter, '', repoFilter))
+      .then((result) => {
+        if (id !== fetchIdRef.current) return
+        setNotes(result)
+        setSelectedIds((prev) => {
+          const validIds = new Set(result.map((n) => n.id))
+          const next = new Set([...prev].filter((rid) => validIds.has(rid)))
+          return next.size === prev.size ? prev : next
+        })
+      })
   }, [statusFilter, repoFilter])
 
   // Status counts honour the repo filter but not the status filter itself;
@@ -349,12 +359,12 @@ export function Inbox({
   // refetch counts that didn't change.
   const fetchStatusCounts = useCallback(async (): Promise<void> => {
     const id = ++countsFetchIdRef.current
-    const result = await window.pilog.invoke(
-      'note:counts',
-      repoFilter !== undefined ? { repoId: repoFilter } : undefined
-    )
-    if (id !== countsFetchIdRef.current) return
-    setStatusCounts(result)
+    await window.pilog
+      .invoke('note:counts', repoFilter !== undefined ? { repoId: repoFilter } : undefined)
+      .then((result) => {
+        if (id !== countsFetchIdRef.current) return
+        setStatusCounts(result)
+      })
   }, [repoFilter])
 
   useEffect(() => {
@@ -365,6 +375,10 @@ export function Inbox({
     fetchStatusCounts()
   }, [fetchStatusCounts])
 
+  const handleFocusNoteHandled = useEffectEvent(() => {
+    onFocusNoteHandled?.()
+  })
+
   useEffect(() => {
     if (!focusNoteId) return
     queueMicrotask(() => {
@@ -373,16 +387,16 @@ export function Inbox({
       setPaletteQuery('')
       setSelectedIds(new Set([focusNoteId]))
       lastClickedIndex.current = null
-      onFocusNoteHandled?.()
+      handleFocusNoteHandled()
     })
-  }, [focusNoteId, onFocusNoteHandled])
+  }, [focusNoteId])
 
-  useEffect(() => {
-    return window.pilog.on('note:created', () => {
-      fetchNotes()
-      fetchStatusCounts()
-    })
-  }, [fetchNotes, fetchStatusCounts])
+  const handleNoteCreated = useEffectEvent(() => {
+    void fetchNotes()
+    void fetchStatusCounts()
+  })
+
+  useEffect(() => window.pilog.on('note:created', handleNoteCreated), [])
 
   const handleNewNote = useCallback(async (): Promise<void> => {
     // Capture-before-triage: a new note opens empty so the editor is waiting,
@@ -507,37 +521,33 @@ export function Inbox({
   // capture on `document` so key events still reach us when a control stops
   // propagation before `window`; we skip handling when the repo Select menu
   // is open so Esc can close that surface first.
-  const paletteOpenRef = useRef(paletteOpen)
-  const hasNoteSelectionRef = useRef(selectedIds.size > 0)
+  const handleInboxKeydown = useEffectEvent((e: KeyboardEvent): void => {
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+      e.preventDefault()
+      setPaletteOpen(!paletteOpen)
+      return
+    }
+    if (e.key !== 'Escape' || selectedIds.size === 0 || paletteOpen) {
+      return
+    }
+    if (document.querySelector('[data-slot="select-content"][data-state="open"]')) {
+      return
+    }
+    const t = e.target
+    const el = t instanceof HTMLElement ? t : null
+    const tag = el?.tagName?.toLowerCase()
+    const typingSurface =
+      tag === 'input' || tag === 'textarea' || tag === 'select' || el?.isContentEditable === true
+    if (typingSurface) return
+    e.preventDefault()
+    clearSelection()
+  })
 
   useEffect(() => {
-    paletteOpenRef.current = paletteOpen
-    hasNoteSelectionRef.current = selectedIds.size > 0
-
-    const onKey = (e: KeyboardEvent): void => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
-        e.preventDefault()
-        setPaletteOpen(!paletteOpenRef.current)
-        return
-      }
-      if (e.key !== 'Escape' || !hasNoteSelectionRef.current || paletteOpenRef.current) {
-        return
-      }
-      if (document.querySelector('[data-slot="select-content"][data-state="open"]')) {
-        return
-      }
-      const t = e.target
-      const el = t instanceof HTMLElement ? t : null
-      const tag = el?.tagName?.toLowerCase()
-      const typingSurface =
-        tag === 'input' || tag === 'textarea' || tag === 'select' || el?.isContentEditable === true
-      if (typingSurface) return
-      e.preventDefault()
-      clearSelection()
-    }
+    const onKey = (e: KeyboardEvent): void => handleInboxKeydown(e)
     document.addEventListener('keydown', onKey, { capture: true })
     return () => document.removeEventListener('keydown', onKey, { capture: true })
-  }, [paletteOpen, selectedIds.size, setPaletteOpen, clearSelection])
+  }, [])
 
   const paletteJumpNotes = useMemo(() => {
     const q = paletteQuery.trim().toLowerCase()
@@ -695,33 +705,35 @@ export function Inbox({
                 const preview = note.content.trim() || 'Untitled note'
                 const repo = note.repoId ? reposById.get(note.repoId) : undefined
                 return (
-                  <li
-                    key={note.id}
-                    data-testid="note-row"
-                    onClick={(e) => handleNoteClick(note.id, index, e)}
-                    className={
-                      'flex cursor-pointer items-start gap-3 rounded-md border px-3 py-2.5 transition-colors select-none ' +
-                      (isSelected
-                        ? 'border-border bg-muted'
-                        : 'border-transparent hover:bg-muted/60')
-                    }
-                  >
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm leading-snug">{preview}</p>
-                      <div className="mt-1 flex items-center gap-2 text-xs">
-                        <Badge variant="secondary" className="font-medium text-foreground/80">
-                          {STATUS_LABEL[note.status]}
-                        </Badge>
-                        {repo && (
-                          <span className="truncate font-mono text-xs text-muted-foreground/70">
-                            {repo.owner}/{repo.name}
+                  <li key={note.id}>
+                    <button
+                      type="button"
+                      data-testid="note-row"
+                      onClick={(e) => handleNoteClick(note.id, index, e)}
+                      className={
+                        'flex w-full cursor-pointer items-start gap-3 rounded-md border px-3 py-2.5 text-left transition-colors select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30 ' +
+                        (isSelected
+                          ? 'border-border bg-muted'
+                          : 'border-transparent hover:bg-muted/60')
+                      }
+                    >
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm leading-snug">{preview}</span>
+                        <span className="mt-1 flex items-center gap-2 text-xs">
+                          <Badge variant="secondary" className="font-medium text-foreground/80">
+                            {STATUS_LABEL[note.status]}
+                          </Badge>
+                          {repo && (
+                            <span className="truncate font-mono text-xs text-muted-foreground/70">
+                              {repo.owner}/{repo.name}
+                            </span>
+                          )}
+                          <span className="tabular text-muted-foreground">
+                            {formatNoteTimestamp(note.createdAt)}
                           </span>
-                        )}
-                        <span className="tabular text-muted-foreground">
-                          {formatNoteTimestamp(note.createdAt)}
                         </span>
-                      </div>
-                    </div>
+                      </span>
+                    </button>
                   </li>
                 )
               })}
@@ -920,8 +932,7 @@ export function Inbox({
                   <span
                     aria-hidden
                     className={
-                      'h-1.5 w-1.5 rounded-full ' +
-                      (active ? 'bg-primary' : 'bg-muted-foreground/40')
+                      'size-1.5 rounded-full ' + (active ? 'bg-primary' : 'bg-muted-foreground/40')
                     }
                   />
                   <span>{`Show ${row.label.toLowerCase()}`}</span>
@@ -931,7 +942,7 @@ export function Inbox({
             })}
             {statusFilter && (
               <CommandItem onSelect={() => runCommand(clearStatusFilter)}>
-                <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40" />
+                <span aria-hidden className="size-1.5 rounded-full bg-muted-foreground/40" />
                 <span>Clear status filter</span>
               </CommandItem>
             )}

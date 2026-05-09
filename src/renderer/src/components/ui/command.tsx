@@ -79,7 +79,7 @@ function CommandInput({
     >
       <HugeiconsIcon
         icon={Search01Icon}
-        className="mr-2 h-4 w-4 shrink-0 text-muted-foreground"
+        className="mr-2 size-4 shrink-0 text-muted-foreground"
         aria-hidden
       />
       <CommandPrimitive.Input

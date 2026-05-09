@@ -14,7 +14,7 @@ import {
 } from '@renderer/components/ui/select'
 import type { Repo } from '@shared/ipc'
 import { shouldSave } from '@shared/scratchpad'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useEffectEvent, useRef, useState } from 'react'
 
 const NOTE_REPO_NONE = '__none__'
 
@@ -135,9 +135,9 @@ export function Scratchpad(): React.JSX.Element {
     return () => view.destroy()
   }, [save, saveAndHide])
 
-  useEffect(() => {
-    return window.pilog.on('scratchpad:reset', resetEditor)
-  }, [resetEditor])
+  const handleResetEditor = useEffectEvent(resetEditor)
+
+  useEffect(() => window.pilog.on('scratchpad:reset', handleResetEditor), [])
 
   const handleRepoChange = (value: string): void => {
     setSelectedRepoId(value === NOTE_REPO_NONE ? null : value)
