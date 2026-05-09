@@ -1,50 +1,50 @@
 import {
-    Cancel01Icon,
-    CancelCircleIcon,
-    Copy01Icon,
-    FolderOpenIcon,
-    GitMergeIcon,
-    InformationCircleIcon,
-    SplitIcon,
-    Tick02Icon,
-    ViewIcon
+  Cancel01Icon,
+  CancelCircleIcon,
+  Copy01Icon,
+  FolderOpenIcon,
+  GitMergeIcon,
+  InformationCircleIcon,
+  SplitIcon,
+  Tick02Icon,
+  ViewIcon
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { Badge } from '@renderer/components/ui/badge'
 import { Button } from '@renderer/components/ui/button'
 import { Checkbox } from '@renderer/components/ui/checkbox'
 import {
-    Empty,
-    EmptyContent,
-    EmptyDescription,
-    EmptyHeader,
-    EmptyTitle
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyTitle
 } from '@renderer/components/ui/empty'
 import { Input } from '@renderer/components/ui/input'
 import { ScrollArea } from '@renderer/components/ui/scroll-area'
 import {
-    Select,
-    SelectContent,
-    SelectGroup,
-    SelectItem,
-    SelectTrigger,
-    SelectValue
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
 } from '@renderer/components/ui/select'
 import { Textarea } from '@renderer/components/ui/textarea'
 import type { RunNavigationOrigin } from '@renderer/features/agent-runs/navigation'
 import { cn } from '@renderer/lib/utils'
 import type {
-    AgentRunListItem,
-    GitHubStatus,
-    PathActionResult,
-    Repo,
-    UpdateIssueDraftRequest
+  AgentRunListItem,
+  GitHubStatus,
+  PathActionResult,
+  Repo,
+  UpdateIssueDraftRequest
 } from '@shared/ipc'
 import type {
-    IssueDraft,
-    IssueDraftForReview,
-    IssueDraftSourceNote,
-    IssueDraftStatus
+  IssueDraft,
+  IssueDraftForReview,
+  IssueDraftSourceNote,
+  IssueDraftStatus
 } from '@shared/types'
 import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
 

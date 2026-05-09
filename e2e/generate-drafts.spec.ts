@@ -39,63 +39,65 @@ test('Generate Drafts persists one issue draft from selected repo notes', async 
   const app = await launchApp()
   const page = await app.firstWindow()
 
-  await page.evaluate(
-    async ({ repoPath }) => {
-      await window.pilog.invoke('debug:seedIssueGenerationFixture', {
-        repoPath,
-        notes: ['save button needs loading state', 'settings spacing is odd on mobile']
+  try {
+    await page.evaluate(
+      async ({ repoPath }) => {
+        await window.pilog.invoke('debug:seedIssueGenerationFixture', {
+          repoPath,
+          notes: ['save button needs loading state', 'settings spacing is odd on mobile']
+        })
+      },
+      { repoPath: repoDir }
+    )
+    await page.reload()
+
+    const noteRows = page.locator('[data-testid="note-row"]')
+    await expect(noteRows).toHaveCount(2)
+
+    await noteRows.first().click()
+    const modifier = process.platform === 'darwin' ? 'Meta' : 'Control'
+    await noteRows.nth(1).click({ modifiers: [modifier] })
+
+    const generate = page.locator('button:has-text("Generate Drafts")')
+    await expect(generate).toBeEnabled()
+    await generate.click()
+
+    await expect
+      .poll(async () => {
+        return page.evaluate(async () => window.pilog.invoke('debug:listIssueDrafts'))
       })
-    },
-    { repoPath: repoDir }
-  )
-  await page.reload()
+      .toHaveLength(1)
 
-  const noteRows = page.locator('[data-testid="note-row"]')
-  await expect(noteRows).toHaveCount(2)
+    const drafts = await page.evaluate(async () => window.pilog.invoke('debug:listIssueDrafts'))
+    expect(drafts[0]?.title).toBeTruthy()
+    expect(drafts[0]?.body).toContain('save button needs loading state')
+    expect(drafts[0]?.groupingReason).toBeTruthy()
 
-  await noteRows.first().click()
-  const modifier = process.platform === 'darwin' ? 'Meta' : 'Control'
-  await noteRows.nth(1).click({ modifiers: [modifier] })
+    const draftTabTrigger = page.locator('[data-testid="view-tab-drafts-trigger"]')
+    if ((await draftTabTrigger.count()) > 0) {
+      await draftTabTrigger.click()
+    }
+    await expect(page.locator('[data-testid="draft-row"]')).toHaveCount(1)
+    await page.getByRole('button', { name: 'Dismiss', exact: true }).click()
 
-  const generate = page.locator('button:has-text("Generate Drafts")')
-  await expect(generate).toBeEnabled()
-  await generate.click()
+    await expect
+      .poll(async () => {
+        const reloadedDrafts = await page.evaluate(async () =>
+          window.pilog.invoke('debug:listIssueDrafts')
+        )
+        return reloadedDrafts[0]?.status
+      })
+      .toBe('dismissed')
 
-  await expect
-    .poll(async () => {
-      return page.evaluate(async () => window.pilog.invoke('debug:listIssueDrafts'))
-    })
-    .toHaveLength(1)
-
-  const drafts = await page.evaluate(async () => window.pilog.invoke('debug:listIssueDrafts'))
-  expect(drafts[0]?.title).toBeTruthy()
-  expect(drafts[0]?.body).toContain('save button needs loading state')
-  expect(drafts[0]?.groupingReason).toBeTruthy()
-
-  const draftTabTrigger = page.locator('[data-testid="view-tab-drafts-trigger"]')
-  if ((await draftTabTrigger.count()) > 0) {
-    await draftTabTrigger.click()
+    await page.reload()
+    await page.locator('[data-testid="view-tab-drafts-trigger"]').click()
+    await expect(page.locator('[data-testid="draft-row"]')).toHaveCount(0)
+    await page.locator('[data-testid="filter-dismissed"]').click()
+    await expect(page.locator('[data-testid="draft-row"]')).toHaveCount(1)
+    await expect(page.getByRole('button', { name: 'Restore' })).toBeVisible()
+  } finally {
+    await exitApp(app)
   }
-  await expect(page.locator('[data-testid="draft-row"]')).toHaveCount(1)
-  await page.getByRole('button', { name: 'Dismiss', exact: true }).click()
-
-  await expect
-    .poll(async () => {
-      const reloadedDrafts = await page.evaluate(async () =>
-        window.pilog.invoke('debug:listIssueDrafts')
-      )
-      return reloadedDrafts[0]?.status
-    })
-    .toBe('dismissed')
-
-  await page.reload()
-  await page.locator('[data-testid="view-tab-drafts-trigger"]').click()
-  await expect(page.locator('[data-testid="draft-row"]')).toHaveCount(0)
-  await page.getByRole('button', { name: 'Show dismissed drafts' }).click()
-  await expect(page.locator('[data-testid="draft-row"]')).toHaveCount(1)
-  await expect(page.getByRole('button', { name: 'Restore' })).toBeVisible()
-
-  await exitApp(app)
 })
 
 test('Draft Review explains an empty queue and returns to Inbox', async () => {
@@ -197,46 +199,57 @@ test('Agent Runs shows live generation, detail transcript, and source note navig
   const app = await launchApp()
   const page = await app.firstWindow()
 
-  await page.evaluate(
-    async ({ repoPath }) => {
-      await window.pilog.invoke('debug:seedIssueGenerationFixture', {
-        repoPath,
-        notes: ['save button needs loading state', 'settings spacing is odd on mobile']
+  try {
+    await page.evaluate(
+      async ({ repoPath }) => {
+        await window.pilog.invoke('debug:seedIssueGenerationFixture', {
+          repoPath,
+          notes: ['save button needs loading state', 'settings spacing is odd on mobile']
+        })
+      },
+      { repoPath: repoDir }
+    )
+    await page.reload()
+
+    const noteRows = page.locator('[data-testid="note-row"]')
+    await expect(noteRows).toHaveCount(2)
+    await noteRows.first().click()
+    const modifier = process.platform === 'darwin' ? 'Meta' : 'Control'
+    await noteRows.nth(1).click({ modifiers: [modifier] })
+
+    await page.locator('button:has-text("Generate Drafts")').click()
+
+    await expect
+      .poll(async () => {
+        const runs = await page.evaluate(async () => window.pilog.invoke('agent-runs:list'))
+        return runs[0]?.status === 'succeeded' && runs[0]?.outputDraftCount === 1
       })
-    },
-    { repoPath: repoDir }
-  )
-  await page.reload()
+      .toBe(true)
 
-  const noteRows = page.locator('[data-testid="note-row"]')
-  await expect(noteRows).toHaveCount(2)
-  await noteRows.first().click()
-  const modifier = process.platform === 'darwin' ? 'Meta' : 'Control'
-  await noteRows.nth(1).click({ modifiers: [modifier] })
+    await page.locator('[data-testid="open-command"]').click()
+    await expect(page.locator('[data-testid="cmd-agent-runs"]')).toBeVisible()
+    await page.locator('[data-testid="cmd-agent-runs"]').click()
 
-  await page.locator('button:has-text("Generate Drafts")').click()
-  await page.locator('[data-testid="open-command"]').click()
-  await expect(page.locator('[data-testid="cmd-agent-runs"]')).toBeVisible()
-  await page.locator('[data-testid="cmd-agent-runs"]').click()
+    const runRows = page.locator('[data-testid="agent-run-row"]')
+    await expect(runRows.first()).toContainText('1 drafts')
+    await expect(runRows.first()).toContainText('Succeeded')
 
-  const runRows = page.locator('[data-testid="agent-run-row"]')
-  await expect(runRows.first()).toContainText('1 drafts')
-  await expect(runRows.first()).toContainText('Succeeded')
+    await runRows.first().click()
+    await expect(page.locator('[data-testid="run-output-draft"]')).toContainText(
+      'Triage selected PiLog notes'
+    )
+    await page.getByRole('tab', { name: /Transcript/ }).click()
+    await expect(page.locator('[data-testid="run-event-transcript"]')).toContainText('final')
+    await page.getByRole('tab', { name: /Drafts/ }).click()
 
-  await runRows.first().click()
-  await expect(page.locator('[data-testid="run-output-draft"]')).toContainText(
-    'Triage selected PiLog notes'
-  )
-  await page.getByRole('tab', { name: /Transcript/ }).click()
-  await expect(page.locator('[data-testid="run-event-transcript"]')).toContainText('final')
-
-  await page.locator('[data-testid="run-source-note"]').first().click()
-  await expect(page.locator('h1')).toHaveText('Inbox')
-  await expect(page.locator('textarea[aria-label="Note content"]')).toHaveValue(
-    'settings spacing is odd on mobile'
-  )
-
-  await exitApp(app)
+    await page.locator('[data-testid="run-source-note"]').first().click()
+    await expect(page.locator('h1')).toHaveText('Inbox')
+    await expect(page.locator('textarea[aria-label="Note content"]')).toHaveValue(
+      'settings spacing is odd on mobile'
+    )
+  } finally {
+    await exitApp(app)
+  }
 })
 
 test('Advanced Turn Budget stops draft generation when exceeded', async () => {
