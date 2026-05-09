@@ -161,9 +161,23 @@ export type GenerateDraftsRequest = {
   mode?: GenerateDraftsMode
 }
 
+export type GenerateCurrentInboxDraftsRequest = {
+  repoId: string
+  mode?: GenerateDraftsMode
+}
+
 export type GenerateDraftsStartResponse = {
   runId: string
 }
+
+export type GenerateCurrentInboxDraftsStartResponse =
+  | GenerateDraftsStartResponse
+  | {
+      skipped: true
+      repoId: string
+      eligibleNoteCount: 0
+      reason: string
+    }
 
 export const DEFAULT_TURN_BUDGET = 20
 export const MIN_TURN_BUDGET = 1

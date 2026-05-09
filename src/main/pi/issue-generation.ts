@@ -122,18 +122,42 @@ export function getSelectedNotesForGeneration(
 
   const order = new Map(noteIds.map((id, index) => [id, index]))
   const orderedNotes = rows
-    .map((row) => ({
-      id: row.id,
-      content: row.content,
-      status: row.status,
-      repoId: row.repoId,
-      runId: row.runId ?? null,
-      createdAt: row.createdAt,
-      updatedAt: row.updatedAt
-    }))
+    .map(mapNoteRowForGeneration)
     .sort((a, b) => order.get(a.id)! - order.get(b.id)!)
 
   return { repo, notes: orderedNotes }
+}
+
+export function getCurrentInboxNotesForGeneration(
+  db: PilogDatabase,
+  repoId: string
+): { repo: Repo; notes: Note[] } {
+  const repo = getRepoById(db, repoId)
+  if (!repo) throw new Error('The linked repository no longer exists.')
+
+  const rows = db
+    .select()
+    .from(notes)
+    .where(and(eq(notes.repoId, repoId), eq(notes.status, 'unprocessed')))
+    .orderBy(notes.createdAt)
+    .all()
+
+  return {
+    repo,
+    notes: rows.map(mapNoteRowForGeneration)
+  }
+}
+
+function mapNoteRowForGeneration(row: typeof notes.$inferSelect): Note {
+  return {
+    id: row.id,
+    content: row.content,
+    status: row.status,
+    repoId: row.repoId,
+    runId: row.runId ?? null,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt
+  }
 }
 
 export function persistGeneratedIssueDrafts(

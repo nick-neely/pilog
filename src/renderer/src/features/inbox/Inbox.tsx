@@ -201,6 +201,33 @@ function getGenerateAndPublishReason(input: {
   return 'Generate planned drafts for review before GitHub writes.'
 }
 
+function getProcessCurrentInboxReason(input: {
+  repo: Repo | null
+  piStatus: PiStatus
+  generating: boolean
+}): string {
+  if (!input.repo) return 'Filter the inbox to one linked repository first.'
+  if (input.generating) return 'Planning current inbox drafts.'
+  if (!input.piStatus.configured) return 'Configure Pi credentials in Settings.'
+
+  return getGenerateAndPublishReason({
+    canGenerateDrafts: true,
+    generateDraftsReason: 'Ready to process current inbox.',
+    repo: input.repo
+  })
+}
+
+function getDetailEmptyDescription(input: {
+  currentInboxMessage: string | null
+  selectionCount: number
+}): string {
+  if (input.currentInboxMessage) return input.currentInboxMessage
+  if (input.selectionCount > 1) {
+    return `${input.selectionCount} notes selected. Triage actions live in the sidebar footer; press Esc to clear.`
+  }
+  return 'Select a note to read or edit.'
+}
+
 function NoteDetail({
   note,
   repos,
@@ -628,6 +655,7 @@ export function Inbox({
   const [statusFilter, setStatusFilter] = useState<NoteStatus | undefined>()
   const [repoFilter, setRepoFilter] = useState<string | null | undefined>(undefined)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [currentInboxMessage, setCurrentInboxMessage] = useState<string | null>(null)
   const lastClickedIndex = useRef<number | null>(null)
   const fetchIdRef = useRef(0)
   const countsFetchIdRef = useRef(0)
@@ -813,6 +841,8 @@ export function Inbox({
     selectedNotesShareRepo && selectedNotes[0]?.repoId
       ? (reposById.get(selectedNotes[0].repoId) ?? null)
       : null
+  const currentInboxRepo =
+    typeof repoFilter === 'string' ? (reposById.get(repoFilter) ?? null) : null
   const canGenerateDrafts =
     hasSelection &&
     selectedNotesAllUnprocessed &&
@@ -827,10 +857,24 @@ export function Inbox({
     generating
   })
   const canGenerateAndPublish = canGenerateDrafts && selectedRepo?.autoPublishEnabled === true
+  const canProcessCurrentInbox =
+    !hasSelection &&
+    Boolean(currentInboxRepo?.autoPublishEnabled) &&
+    piStatus.configured &&
+    !generating
   const generateAndPublishReason = getGenerateAndPublishReason({
     canGenerateDrafts,
     generateDraftsReason,
     repo: selectedRepo
+  })
+  const processCurrentInboxReason = getProcessCurrentInboxReason({
+    repo: currentInboxRepo,
+    piStatus,
+    generating
+  })
+  const detailEmptyDescription = getDetailEmptyDescription({
+    currentInboxMessage,
+    selectionCount
   })
 
   // Esc clears note selection. The listener uses
@@ -897,6 +941,50 @@ export function Inbox({
           console.error(event.message)
         }
       })
+    } finally {
+      if (mountedRef.current) {
+        setGenerating(false)
+        window.pilog.invoke('pi:status').then(setPiStatus)
+      }
+    }
+  }
+
+  const handleProcessCurrentInbox = async (): Promise<void> => {
+    if (!currentInboxRepo || !canProcessCurrentInbox) return
+    setCurrentInboxMessage(null)
+    const sourceNoteSnapshot = await window.pilog.invoke('note:list', {
+      repoId: currentInboxRepo.id,
+      status: 'unprocessed'
+    })
+    setGenerating(true)
+    try {
+      const start = await window.pilog.runCurrentInboxAgent(
+        { repoId: currentInboxRepo.id, mode: 'auto-publish-preview' },
+        async (event) => {
+          if (event.type === 'final') {
+            if (!mountedRef.current) return
+            await Promise.all([fetchNotes(), fetchStatusCounts(), fetchDraftLinks()])
+            if (event.autoPublishPreview) {
+              setAutoPublishPreview({
+                open: true,
+                summary: event.autoPublishPreview,
+                drafts: event.drafts,
+                sourceNotes: sourceNoteSnapshot,
+                report: null,
+                publishing: false,
+                publishError: null
+              })
+            }
+          }
+          if (event.type === 'error') {
+            console.error(event.message)
+          }
+        }
+      )
+      if ('skipped' in start && mountedRef.current) {
+        setCurrentInboxMessage(start.reason)
+        await Promise.all([fetchNotes(), fetchStatusCounts(), fetchDraftLinks()])
+      }
     } finally {
       if (mountedRef.current) {
         setGenerating(false)
@@ -1005,6 +1093,7 @@ export function Inbox({
             onValueChange={(v) => {
               setRepoFilter(decodeRepoFilter(v))
               setSelectedIds(new Set())
+              setCurrentInboxMessage(null)
               lastClickedIndex.current = null
             }}
             disabled={repos.length === 0}
@@ -1163,15 +1252,40 @@ export function Inbox({
               )}
             </div>
           ) : (
-            <Button
-              onClick={handleNewNote}
-              size="sm"
-              className="w-full justify-center"
-              data-testid="new-note-footer"
-            >
-              <HugeiconsIcon icon={Add01Icon} data-icon="inline-start" aria-hidden />
-              New note
-            </Button>
+            <div className="flex w-full flex-col gap-1.5">
+              {currentInboxRepo ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span>
+                      <Button
+                        size="sm"
+                        variant={canProcessCurrentInbox ? 'default' : 'outline'}
+                        disabled={!canProcessCurrentInbox}
+                        title={processCurrentInboxReason}
+                        className="w-full justify-center"
+                        onClick={() => void handleProcessCurrentInbox()}
+                      >
+                        <HugeiconsIcon icon={GithubIcon} data-icon="inline-start" aria-hidden />
+                        {generating ? 'Planning' : 'Process Current Inbox'}
+                      </Button>
+                    </span>
+                  </TooltipTrigger>
+                  {!canProcessCurrentInbox && (
+                    <TooltipContent>{processCurrentInboxReason}</TooltipContent>
+                  )}
+                </Tooltip>
+              ) : null}
+              <Button
+                onClick={handleNewNote}
+                size="sm"
+                variant={currentInboxRepo ? 'outline' : 'default'}
+                className="w-full justify-center"
+                data-testid="new-note-footer"
+              >
+                <HugeiconsIcon icon={Add01Icon} data-icon="inline-start" aria-hidden />
+                New note
+              </Button>
+            </div>
           )}
         </footer>
       </div>
@@ -1196,11 +1310,7 @@ export function Inbox({
           />
         ) : (
           <Empty className="h-full border-none bg-transparent shadow-none">
-            <EmptyDescription className="max-w-[36ch]">
-              {selectionCount > 1
-                ? `${selectionCount} notes selected. Triage actions live in the sidebar footer; press Esc to clear.`
-                : 'Select a note to read or edit.'}
-            </EmptyDescription>
+            <EmptyDescription className="max-w-[36ch]">{detailEmptyDescription}</EmptyDescription>
           </Empty>
         )}
       </section>

@@ -1,6 +1,6 @@
-import { BrowserWindow, MessageChannelMain, ipcMain } from 'electron'
+import { BrowserWindow, MessageChannelMain, ipcMain, type IpcMainInvokeEvent } from 'electron'
 import { existsSync, mkdirSync } from 'node:fs'
-import type { IpcRequest, IpcResponse, Repo } from '@shared/ipc'
+import type { IpcRequest, IpcResponse, Note, Repo } from '@shared/ipc'
 import type { AgentEvent, ErrorCause, GenerateDraftsMode } from '@shared/types'
 import type { PilogDatabase } from '../db/client'
 import {
@@ -30,6 +30,7 @@ import {
   setAdvancedSettings
 } from '../pi/advanced-config'
 import {
+  getCurrentInboxNotesForGeneration,
   getSelectedNotesForGeneration,
   planAutoPublishPreviewDrafts,
   persistGeneratedIssueDrafts,
@@ -70,6 +71,164 @@ export function registerPiIpcHandlers(
 ): void {
   const runAgentImpl = options?.runAgentImpl ?? runAgent
   const runTimeoutMs = options?.runTimeoutMs ?? DEFAULT_AGENT_RUN_TIMEOUT_MS
+  const startGenerationRun = async (
+    event: IpcMainInvokeEvent,
+    input: { repo: Repo; notes: Note[]; mode: GenerateDraftsMode }
+  ): Promise<IpcResponse<'pi:generateDrafts:start'>> => {
+    const { repo, notes, mode } = input
+    if (!existsSync(repo.localPath)) throw new Error('The linked repository path no longer exists.')
+    if (mode === 'auto-publish-preview' && !repo.autoPublishEnabled) {
+      throw new Error('Auto-publish is not enabled for this repository.')
+    }
+
+    const provider = getSetting(db, 'pi.activeProvider')
+    const model = getSetting(db, 'pi.activeModel')
+    if (!provider || !model)
+      throw new Error('Configure Pi provider and model before generating drafts.')
+
+    const authStorage = await createSafeStorageAuthStorage()
+    if (!authStorage.hasAuth(provider))
+      throw new Error('Configure Pi credentials before generating drafts.')
+
+    const run = createAgentRun(db, {
+      repoId: repo.id,
+      inputNoteIds: notes.map((note) => note.id)
+    })
+    broadcastAgentRunsInvalidated()
+    const { port1, port2 } = new MessageChannelMain()
+    const controller = new AbortController()
+    const active: ActiveRun = { controller, finalized: false, eventStream: [] }
+    activeRuns.set(run.id, active)
+    appendAgentEvent(db, run.id, active, { type: 'progress', phase: 'agent_start' })
+
+    event.sender.postMessage('pi:agent-stream', { runId: run.id }, [port2])
+    port1.start()
+
+    const webContents = event.sender
+    const cancelIfDestroyed = (): void => {
+      void cancelRun(db, run.id, 'Renderer window closed mid-run.')
+    }
+    webContents.once('destroyed', cancelIfDestroyed)
+    const runTimeout = setTimeout(() => {
+      if (!active.finalized) controller.abort('timeout')
+    }, runTimeoutMs)
+
+    void (async () => {
+      try {
+        const webSearch = await getWebSearchConfig(db)
+        for await (const agentEvent of runAgentImpl({
+          runId: run.id,
+          repo,
+          notes,
+          provider,
+          model,
+          turnBudget: getTurnBudget(db),
+          webSearch: webSearch.enabled ? webSearch : undefined,
+          signal: controller.signal
+        })) {
+          if (active.finalized) break
+          const eventForRenderer = prepareAgentEventForMode(agentEvent, mode, run.id, repo)
+          appendAgentEvent(db, run.id, active, eventForRenderer)
+
+          if (eventForRenderer.type === 'final') {
+            try {
+              persistGeneratedIssueDrafts(db, {
+                runId: run.id,
+                repoId: repo.id,
+                selectedNoteIds: notes.map((note) => note.id),
+                drafts: eventForRenderer.drafts,
+                eventStream: active.eventStream
+              })
+              active.finalized = true
+            } catch (error) {
+              const message = error instanceof Error ? error.message : String(error)
+              const errorEvent: AgentEvent = {
+                type: 'error',
+                message,
+                cause: 'persistence'
+              }
+              appendAgentEvent(db, run.id, active, errorEvent)
+              finalizeAgentRun(db, {
+                id: run.id,
+                status: 'failed',
+                errorMessage: message,
+                errorCause: 'persistence',
+                eventStream: active.eventStream
+              })
+              active.finalized = true
+              port1.postMessage(errorEvent)
+              break
+            }
+          }
+
+          if (eventForRenderer.type === 'error' && !active.finalized) {
+            finalizeAgentRun(db, {
+              id: run.id,
+              status: eventForRenderer.cause === 'cancelled' ? 'cancelled' : 'failed',
+              errorMessage: eventForRenderer.message,
+              errorCause: eventForRenderer.cause,
+              eventStream: active.eventStream
+            })
+            active.finalized = true
+          }
+
+          port1.postMessage(eventForRenderer)
+        }
+
+        if (!active.finalized) {
+          const cause = getAbortCause(controller.signal) ?? 'pi_internal'
+          const errorEvent: AgentEvent = {
+            type: 'error',
+            message:
+              cause === 'timeout'
+                ? `Generation timed out after ${formatDuration(runTimeoutMs)}.`
+                : cause === 'cancelled'
+                  ? 'Generation cancelled.'
+                  : 'Pi ended without returning issue drafts.',
+            cause
+          }
+          appendAgentEvent(db, run.id, active, errorEvent)
+          finalizeAgentRun(db, {
+            id: run.id,
+            status: cause === 'cancelled' ? 'cancelled' : 'failed',
+            errorMessage: errorEvent.message,
+            errorCause: cause,
+            eventStream: active.eventStream
+          })
+          active.finalized = true
+          port1.postMessage(errorEvent)
+        }
+      } catch (error) {
+        if (!active.finalized) {
+          const message = error instanceof Error ? error.message : String(error)
+          const cause = getAbortCause(controller.signal) ?? 'unknown'
+          const errorEvent: AgentEvent = {
+            type: 'error',
+            message,
+            cause
+          }
+          appendAgentEvent(db, run.id, active, errorEvent)
+          finalizeAgentRun(db, {
+            id: run.id,
+            status: cause === 'cancelled' ? 'cancelled' : 'failed',
+            errorMessage: message,
+            errorCause: cause,
+            eventStream: active.eventStream
+          })
+          port1.postMessage(errorEvent)
+        }
+      } finally {
+        clearTimeout(runTimeout)
+        webContents.removeListener('destroyed', cancelIfDestroyed)
+        activeRuns.delete(run.id)
+        port1.close()
+        options?.onDraftsGenerated?.()
+        broadcastAgentRunsInvalidated()
+      }
+    })()
+
+    return { runId: run.id }
+  }
 
   ipcMain.handle('pi:status', async (): Promise<IpcResponse<'pi:status'>> => {
     const provider = getSetting(db, 'pi.activeProvider')
@@ -144,159 +303,31 @@ export function registerPiIpcHandlers(
     ): Promise<IpcResponse<'pi:generateDrafts:start'>> => {
       const { repo, notes } = getSelectedNotesForGeneration(db, request.noteIds)
       const mode = request.mode ?? 'review'
-      if (!existsSync(repo.localPath))
-        throw new Error('The linked repository path no longer exists.')
-      if (mode === 'auto-publish-preview' && !repo.autoPublishEnabled) {
-        throw new Error('Auto-publish is not enabled for this repository.')
-      }
+      return startGenerationRun(event, { repo, notes, mode })
+    }
+  )
 
-      const provider = getSetting(db, 'pi.activeProvider')
-      const model = getSetting(db, 'pi.activeModel')
-      if (!provider || !model)
-        throw new Error('Configure Pi provider and model before generating drafts.')
-
-      const authStorage = await createSafeStorageAuthStorage()
-      if (!authStorage.hasAuth(provider))
-        throw new Error('Configure Pi credentials before generating drafts.')
-
-      const run = createAgentRun(db, {
-        repoId: repo.id,
-        inputNoteIds: notes.map((note) => note.id)
-      })
-      broadcastAgentRunsInvalidated()
-      const { port1, port2 } = new MessageChannelMain()
-      const controller = new AbortController()
-      const active: ActiveRun = { controller, finalized: false, eventStream: [] }
-      activeRuns.set(run.id, active)
-      appendAgentEvent(db, run.id, active, { type: 'progress', phase: 'agent_start' })
-
-      event.sender.postMessage('pi:agent-stream', { runId: run.id }, [port2])
-      port1.start()
-
-      const webContents = event.sender
-      const cancelIfDestroyed = (): void => {
-        void cancelRun(db, run.id, 'Renderer window closed mid-run.')
-      }
-      webContents.once('destroyed', cancelIfDestroyed)
-      const runTimeout = setTimeout(() => {
-        if (!active.finalized) controller.abort('timeout')
-      }, runTimeoutMs)
-
-      void (async () => {
-        try {
-          const webSearch = await getWebSearchConfig(db)
-          for await (const agentEvent of runAgentImpl({
-            runId: run.id,
-            repo,
-            notes,
-            provider,
-            model,
-            turnBudget: getTurnBudget(db),
-            webSearch: webSearch.enabled ? webSearch : undefined,
-            signal: controller.signal
-          })) {
-            if (active.finalized) break
-            const eventForRenderer = prepareAgentEventForMode(agentEvent, mode, run.id, repo)
-            appendAgentEvent(db, run.id, active, eventForRenderer)
-
-            if (eventForRenderer.type === 'final') {
-              try {
-                persistGeneratedIssueDrafts(db, {
-                  runId: run.id,
-                  repoId: repo.id,
-                  selectedNoteIds: notes.map((note) => note.id),
-                  drafts: eventForRenderer.drafts,
-                  eventStream: active.eventStream
-                })
-                active.finalized = true
-              } catch (error) {
-                const message = error instanceof Error ? error.message : String(error)
-                const errorEvent: AgentEvent = {
-                  type: 'error',
-                  message,
-                  cause: 'persistence'
-                }
-                appendAgentEvent(db, run.id, active, errorEvent)
-                finalizeAgentRun(db, {
-                  id: run.id,
-                  status: 'failed',
-                  errorMessage: message,
-                  errorCause: 'persistence',
-                  eventStream: active.eventStream
-                })
-                active.finalized = true
-                port1.postMessage(errorEvent)
-                break
-              }
-            }
-
-            if (eventForRenderer.type === 'error' && !active.finalized) {
-              finalizeAgentRun(db, {
-                id: run.id,
-                status: eventForRenderer.cause === 'cancelled' ? 'cancelled' : 'failed',
-                errorMessage: eventForRenderer.message,
-                errorCause: eventForRenderer.cause,
-                eventStream: active.eventStream
-              })
-              active.finalized = true
-            }
-
-            port1.postMessage(eventForRenderer)
-          }
-
-          if (!active.finalized) {
-            const cause = getAbortCause(controller.signal) ?? 'pi_internal'
-            const errorEvent: AgentEvent = {
-              type: 'error',
-              message:
-                cause === 'timeout'
-                  ? `Generation timed out after ${formatDuration(runTimeoutMs)}.`
-                  : cause === 'cancelled'
-                    ? 'Generation cancelled.'
-                    : 'Pi ended without returning issue drafts.',
-              cause
-            }
-            appendAgentEvent(db, run.id, active, errorEvent)
-            finalizeAgentRun(db, {
-              id: run.id,
-              status: cause === 'cancelled' ? 'cancelled' : 'failed',
-              errorMessage: errorEvent.message,
-              errorCause: cause,
-              eventStream: active.eventStream
-            })
-            active.finalized = true
-            port1.postMessage(errorEvent)
-          }
-        } catch (error) {
-          if (!active.finalized) {
-            const message = error instanceof Error ? error.message : String(error)
-            const cause = getAbortCause(controller.signal) ?? 'unknown'
-            const errorEvent: AgentEvent = {
-              type: 'error',
-              message,
-              cause
-            }
-            appendAgentEvent(db, run.id, active, errorEvent)
-            finalizeAgentRun(db, {
-              id: run.id,
-              status: cause === 'cancelled' ? 'cancelled' : 'failed',
-              errorMessage: message,
-              errorCause: cause,
-              eventStream: active.eventStream
-            })
-            port1.postMessage(errorEvent)
-          }
-        } finally {
-          clearTimeout(runTimeout)
-          webContents.removeListener('destroyed', cancelIfDestroyed)
-          activeRuns.delete(run.id)
-          port1.close()
-          options?.onDraftsGenerated?.()
-          broadcastAgentRunsInvalidated()
+  ipcMain.handle(
+    'pi:generateCurrentInboxDrafts:start',
+    async (
+      event,
+      request: IpcRequest<'pi:generateCurrentInboxDrafts:start'>
+    ): Promise<IpcResponse<'pi:generateCurrentInboxDrafts:start'>> => {
+      const { repo, notes } = getCurrentInboxNotesForGeneration(db, request.repoId)
+      if (notes.length === 0) {
+        return {
+          skipped: true,
+          repoId: repo.id,
+          eligibleNoteCount: 0,
+          reason:
+            'No unprocessed notes are linked to this repository. Drafted, published, dismissed, and unassigned notes were left untouched.'
         }
-      })()
-
-      return { runId: run.id }
+      }
+      return startGenerationRun(event, {
+        repo,
+        notes,
+        mode: request.mode ?? 'auto-publish-preview'
+      })
     }
   )
 
