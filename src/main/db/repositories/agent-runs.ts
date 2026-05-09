@@ -1,14 +1,15 @@
-import { desc, eq, inArray, sql } from 'drizzle-orm'
-import { v4 as uuidv4 } from 'uuid'
-import type { PilogDatabase } from '../client'
-import { agentRuns, issueDrafts, notes } from '../schema'
 import type {
   AgentRunDetail,
   AgentRunListItem,
   AgentRunStatus,
+  AgentRunStatusCounts,
   ErrorCause,
   IssueDraft
 } from '@shared/types'
+import { desc, eq, inArray, sql } from 'drizzle-orm'
+import { v4 as uuidv4 } from 'uuid'
+import type { PilogDatabase } from '../client'
+import { agentRuns, issueDrafts, notes } from '../schema'
 
 const ERROR_CAUSES = [
   'auth_invalid',
@@ -157,6 +158,29 @@ export function listRuns(
     .limit(limit)
     .all()
     .map(mapRunListItem)
+}
+
+/**
+ * Totals per status for the runs sidebar filter; every status is included
+ * even when zero (matches inbox / drafts status filter contract).
+ */
+export function countRunsByStatus(db: PilogDatabase): AgentRunStatusCounts {
+  const grouped = db
+    .select({ status: agentRuns.status, count: sql<number>`count(*)` })
+    .from(agentRuns)
+    .groupBy(agentRuns.status)
+    .all()
+
+  const counts: AgentRunStatusCounts = {
+    running: 0,
+    succeeded: 0,
+    failed: 0,
+    cancelled: 0
+  }
+  for (const row of grouped) {
+    counts[row.status as AgentRunStatus] = Number(row.count)
+  }
+  return counts
 }
 
 export function getRunById(db: PilogDatabase, id: string): AgentRunDetail | null {

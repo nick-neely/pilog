@@ -1,20 +1,21 @@
 import type {
+  AdvancedSettings,
   AgentEvent,
   AgentRunDetail,
   AgentRunListItem,
   AgentRunStatus,
-  AdvancedSettings,
+  AgentRunStatusCounts,
   GenerateDraftsRequest,
   GenerateDraftsStartResponse,
-  PiActiveConfig,
-  PiModelOption,
-  PiProviderOption,
   IssueDraft,
   IssueDraftForReview,
   IssueDraftStatus,
+  PiActiveConfig,
+  PiModelOption,
+  PiProviderOption,
+  PiStatus,
   SearchProvider,
-  SetAdvancedSettingsRequest,
-  PiStatus
+  SetAdvancedSettingsRequest
 } from './types'
 
 export type NoteStatus = 'unprocessed' | 'drafted' | 'published' | 'dismissed'
@@ -169,8 +170,8 @@ export type PublishIssueDraftRequest = UpdateIssueDraftRequest
 
 export type IpcContract = {
   'note:create': { request: { content: string; repoId?: string | null }; response: Note }
-  'note:list': { request: ListNotesRequest | void; response: Note[] }
-  'note:counts': { request: CountNotesRequest | void; response: NoteStatusCounts }
+  'note:list': { request: ListNotesRequest | undefined; response: Note[] }
+  'note:counts': { request: CountNotesRequest | undefined; response: NoteStatusCounts }
   'note:update': {
     request: { id: string; content: string; repoId?: string | null }
     response: Note | null
@@ -203,7 +204,7 @@ export type IpcContract = {
     response: PiActiveConfig
   }
   'pi:listProviders': { request: void; response: PiProviderOption[] }
-  'pi:listModels': { request: { provider?: string } | void; response: PiModelOption[] }
+  'pi:listModels': { request: { provider?: string } | undefined; response: PiModelOption[] }
   'pi:importExistingPiConfig': { request: void; response: PiActiveConfig }
   'pi:resetConfig': { request: void; response: PiActiveConfig }
   'pi:generateDrafts:start': {
@@ -212,15 +213,16 @@ export type IpcContract = {
   }
   'pi:generateDrafts:cancel': { request: { runId: string }; response: void }
   'agent-runs:list': {
-    request: { status?: AgentRunStatus; limit?: number } | void
+    request: { status?: AgentRunStatus; limit?: number } | undefined
     response: AgentRunListItem[]
   }
+  'agent-runs:counts': { request: void; response: AgentRunStatusCounts }
   'agent-runs:get': {
     request: { id: string }
     response: AgentRunDetail | null
   }
   'issue-drafts:list': {
-    request: ListIssueDraftsRequest | void
+    request: ListIssueDraftsRequest | undefined
     response: IssueDraftForReview[]
   }
   'issue-drafts:update': {
@@ -277,17 +279,18 @@ export type IpcEvent =
 export type IpcAction = 'scratchpad:hide'
 
 export type {
+  AdvancedSettings,
   AgentEvent,
   AgentRunDetail,
   AgentRunListItem,
   AgentRunStatus,
+  AgentRunStatusCounts,
   GenerateDraftsRequest,
-  AdvancedSettings,
+  IssueDraftStatus,
   PiActiveConfig,
   PiModelOption,
   PiProviderOption,
   PiStatus,
-  IssueDraftStatus,
   SearchProvider,
   SetAdvancedSettingsRequest
 }

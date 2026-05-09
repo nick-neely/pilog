@@ -1,5 +1,3 @@
-import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
-import { HugeiconsIcon } from '@hugeicons/react'
 import {
   ArrowRight01Icon,
   CancelCircleIcon,
@@ -9,8 +7,8 @@ import {
   ViewIcon,
   ViewOffSlashIcon
 } from '@hugeicons/core-free-icons'
+import { HugeiconsIcon } from '@hugeicons/react'
 import { Badge } from '@renderer/components/ui/badge'
-import { Button } from '@renderer/components/ui/button'
 import {
   Collapsible,
   CollapsibleContent,
@@ -21,7 +19,22 @@ import { ScrollArea, ScrollBar } from '@renderer/components/ui/scroll-area'
 import { Separator } from '@renderer/components/ui/separator'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@renderer/components/ui/tabs'
 import { cn } from '@renderer/lib/utils'
-import type { AgentRunDetail, AgentRunListItem, AgentRunStatus } from '@shared/ipc'
+import type {
+  AgentRunDetail,
+  AgentRunListItem,
+  AgentRunStatus,
+  AgentRunStatusCounts
+} from '@shared/ipc'
+import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
+
+const EMPTY_RUN_STATUS_COUNTS: AgentRunStatusCounts = {
+  running: 0,
+  succeeded: 0,
+  failed: 0,
+  cancelled: 0
+}
+
+// Order matches lifecycle: active → outcomes (success / failure → terminal cancelled).
 
 const STATUS_FILTERS: { value: AgentRunStatus; label: string }[] = [
   { value: 'running', label: 'Running' },
@@ -30,7 +43,12 @@ const STATUS_FILTERS: { value: AgentRunStatus; label: string }[] = [
   { value: 'cancelled', label: 'Cancelled' }
 ]
 
-const ROW_HEIGHT = 88
+const RUN_STATUS_ROW_LABEL = STATUS_FILTERS.reduce(
+  (acc, row) => ({ ...acc, [row.value]: row.label }),
+  {} as Record<AgentRunStatus, string>
+)
+
+const ROW_HEIGHT = 92
 const OVERSCAN = 6
 const RUN_TIMESTAMP_FORMATTER = new Intl.DateTimeFormat(undefined, {
   month: 'short',
@@ -81,7 +99,7 @@ function statusTone(status: AgentRunStatus): string {
 
 function runRowClassName(selected: boolean): string {
   return cn(
-    'mb-1 flex h-[84px] w-full min-w-0 flex-col rounded-md border px-3 py-2.5 text-left transition-colors',
+    'mb-1 flex h-[92px] w-full min-w-0 flex-col overflow-hidden rounded-md border px-3 py-2.5 text-left transition-colors',
     selected ? 'border-border bg-muted' : 'border-transparent hover:bg-muted/60'
   )
 }
@@ -104,6 +122,9 @@ export function AgentRuns({
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null)
   const [detail, setDetail] = useState<AgentRunDetail | null>(null)
   const [statusFilter, setStatusFilter] = useState<AgentRunStatus | undefined>()
+  const [statusCounts, setStatusCounts] = useState<AgentRunStatusCounts>(() => ({
+    ...EMPTY_RUN_STATUS_COUNTS
+  }))
   const [selectedDraftId, setSelectedDraftId] = useState<string | null>(null)
   const [scrollTop, setScrollTop] = useState(0)
   const [viewportHeight, setViewportHeight] = useState(1)
@@ -111,11 +132,15 @@ export function AgentRuns({
   const detailFetchId = useRef(0)
 
   const fetchRuns = useCallback(async (): Promise<void> => {
-    const result = await window.pilog.invoke('agent-runs:list', {
-      status: statusFilter,
-      limit: 200
-    })
+    const [result, counts] = await Promise.all([
+      window.pilog.invoke('agent-runs:list', {
+        status: statusFilter,
+        limit: 200
+      }),
+      window.pilog.invoke('agent-runs:counts')
+    ])
     setRuns(result)
+    setStatusCounts(counts)
     setSelectedRunId((current) => {
       if (current) return current
       if (focusRunId && result.some((r) => r.id === focusRunId)) return focusRunId
@@ -178,46 +203,57 @@ export function AgentRuns({
 
   return (
     <div className="flex h-full bg-background text-foreground">
-      {/* View nav lives in AppShell's top bar; this surface is just the
-          run list + detail. The visible-count caption that used to sit
-          in the title strip moves into the status filter row, where it
-          reads as "scope of what's listed below" without needing chrome
-          of its own. */}
-      <aside className="flex w-[27rem] min-w-0 shrink-0 flex-col overflow-hidden border-r">
-        <div className="flex shrink-0 items-center justify-between gap-3 border-b px-6 py-2.5">
-          <div className="flex flex-wrap gap-x-1.5 gap-y-1">
-            {STATUS_FILTERS.map((chip) => {
-              const active = statusFilter === chip.value
-              return (
-                <Button
-                  key={chip.value}
-                  type="button"
-                  variant={active ? 'secondary' : 'ghost'}
-                  size="xs"
-                  data-testid={`run-filter-${chip.value}`}
-                  onClick={() => {
-                    setStatusFilter((prev) => (prev === chip.value ? undefined : chip.value))
-                    setSelectedRunId(null)
-                  }}
-                  aria-pressed={active}
-                  className="rounded-full gap-1.5 font-medium"
+      <aside className="flex w-80 min-w-0 shrink-0 flex-col overflow-hidden border-r">
+        <div
+          className="grid shrink-0 grid-cols-2 gap-x-1 gap-y-0.5 border-b px-2.5 py-2"
+          role="group"
+          aria-label="Filter runs by status"
+        >
+          {STATUS_FILTERS.map((row) => {
+            const active = statusFilter === row.value
+            const count = statusCounts[row.value]
+            return (
+              <button
+                key={row.value}
+                type="button"
+                data-testid={`run-filter-${row.value}`}
+                aria-pressed={active}
+                onClick={() => {
+                  setStatusFilter((prev) => (prev === row.value ? undefined : row.value))
+                  setSelectedRunId(null)
+                }}
+                className={cn(
+                  'group/status-row flex h-7 min-w-0 cursor-pointer items-center gap-1.5 rounded-md px-1.5',
+                  'text-xs transition-colors',
+                  'focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/30',
+                  active
+                    ? 'bg-muted font-medium text-foreground'
+                    : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
+                )}
+              >
+                <span
+                  aria-hidden
+                  className={cn(
+                    'size-1.5 shrink-0 rounded-full transition-colors',
+                    active ? 'bg-primary' : 'border border-muted-foreground/40'
+                  )}
+                />
+                <span className="flex-1 truncate text-left">{row.label}</span>
+                <span
+                  aria-hidden
+                  className={cn(
+                    'tabular shrink-0 text-[10px]',
+                    active ? 'text-foreground/70' : 'text-muted-foreground/60'
+                  )}
                 >
-                  <span
-                    aria-hidden
-                    className={
-                      'size-1.5 rounded-full ' + (active ? 'bg-primary' : 'bg-transparent')
-                    }
-                  />
-                  {chip.label}
-                </Button>
-              )
-            })}
-          </div>
-          {runs.length > 0 ? (
-            <span className="tabular shrink-0 self-center text-xs text-muted-foreground">
-              {runs.length}
-            </span>
-          ) : null}
+                  {count}
+                </span>
+                <span className="sr-only">
+                  {count} {count === 1 ? 'run' : 'runs'}
+                </span>
+              </button>
+            )
+          })}
         </div>
 
         <div
@@ -243,19 +279,21 @@ export function AgentRuns({
                       onClick={() => setSelectedRunId(run.id)}
                       className={runRowClassName(selected)}
                     >
-                      <span className="flex min-w-0 items-center justify-between gap-3">
-                        <span className="tabular truncate font-mono text-xs text-muted-foreground">
+                      <span className="truncate text-sm leading-snug text-foreground">
+                        {formatDuration(run)} · {run.inputNoteCount} notes · {run.outputDraftCount}{' '}
+                        drafts
+                      </span>
+                      <span className="mt-1 flex min-w-0 items-center justify-between gap-2 text-xs">
+                        <Badge
+                          variant="outline"
+                          className={`shrink-0 gap-1.5 font-normal ${statusTone(run.status)}`}
+                        >
+                          {statusIcon(run.status)}
+                          {RUN_STATUS_ROW_LABEL[run.status]}
+                        </Badge>
+                        <span className="tabular shrink-0 whitespace-nowrap text-muted-foreground">
                           {formatTimestamp(run.startedAt)}
                         </span>
-                        <Badge variant="outline" className={`gap-1.5 ${statusTone(run.status)}`}>
-                          {statusIcon(run.status)}
-                          {run.status}
-                        </Badge>
-                      </span>
-                      <span className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                        <span className="tabular">{formatDuration(run)}</span>
-                        <span className="tabular">{run.inputNoteCount} notes</span>
-                        <span className="tabular">{run.outputDraftCount} drafts</span>
                       </span>
                       {run.status === 'failed' && run.errorMessage && (
                         <span className="mt-1 truncate text-xs text-destructive">

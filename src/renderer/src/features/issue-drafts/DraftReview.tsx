@@ -1,6 +1,5 @@
-import { useCallback, useEffect, useEffectEvent, useMemo, useState } from 'react'
 import {
-  ArrowRight01Icon,
+  Cancel01Icon,
   CancelCircleIcon,
   Copy01Icon,
   FolderOpenIcon,
@@ -22,8 +21,6 @@ import {
   EmptyTitle
 } from '@renderer/components/ui/empty'
 import { Input } from '@renderer/components/ui/input'
-import { ScrollArea, ScrollBar } from '@renderer/components/ui/scroll-area'
-import { Separator } from '@renderer/components/ui/separator'
 import {
   Select,
   SelectContent,
@@ -34,7 +31,6 @@ import {
 } from '@renderer/components/ui/select'
 import { Textarea } from '@renderer/components/ui/textarea'
 import { cn } from '@renderer/lib/utils'
-import { extractAcceptanceCriteria, writeAcceptanceCriteria } from '@shared/acceptance-criteria'
 import type {
   AgentRunListItem,
   GitHubStatus,
@@ -48,6 +44,7 @@ import type {
   IssueDraftSourceNote,
   IssueDraftStatus
 } from '@shared/types'
+import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
 
 const EMPTY_STATUS_COUNTS: Record<IssueDraftStatus, number> = {
   draft: 0,
@@ -68,29 +65,6 @@ function formatTimestamp(iso: string): string {
   return DRAFT_TIMESTAMP_FORMATTER.format(new Date(iso))
 }
 
-function formatLabels(labels: string[]): string {
-  return labels.join(', ')
-}
-
-function parseLabels(value: string): string[] {
-  const seen = new Set<string>()
-  const labels: string[] = []
-  for (const part of value.split(',')) {
-    const label = part.trim()
-    if (!label || seen.has(label)) continue
-    seen.add(label)
-    labels.push(label)
-  }
-  return labels
-}
-
-function parseCriteriaLines(value: string): string[] {
-  return value
-    .split('\n')
-    .map((line) => line.replace(/^\s*(?:[-*+]\s+|\d+[.)]\s+)/, '').trim())
-    .filter(Boolean)
-}
-
 function normalizeDraftTitle(title: string): string {
   return title.trim() || 'Untitled draft'
 }
@@ -99,16 +73,14 @@ function hasDraftChanges(
   draft: IssueDraft,
   next: Pick<UpdateIssueDraftRequest, 'title' | 'body' | 'labels'>
 ): boolean {
-  return (
-    next.title !== draft.title ||
-    next.body !== draft.body ||
-    formatLabels(next.labels) !== formatLabels(draft.labels)
-  )
+  if (next.title !== draft.title || next.body !== draft.body) return true
+  if (next.labels.length !== draft.labels.length) return true
+  return next.labels.some((label, i) => label !== draft.labels[i])
 }
 
 function draftCardClassName(selected: boolean): string {
   return cn(
-    'flex w-full min-w-0 flex-col rounded-md border px-3 py-3 text-left transition-colors',
+    'flex w-full min-w-0 flex-col rounded-md border px-3 py-2.5 text-left transition-colors',
     'focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30',
     selected ? 'border-border bg-muted' : 'border-transparent hover:bg-muted/60'
   )
@@ -169,14 +141,14 @@ function countDraftsByStatus(drafts: IssueDraft[]): Record<IssueDraftStatus, num
 }
 
 function emptyDraftDescription(
-  statusFilter: IssueDraftStatus,
+  statusFilter: IssueDraftStatus | undefined,
   statusCounts: Record<IssueDraftStatus, number>
 ): string {
   if (totalDraftCount(statusCounts) === 0) {
     return 'Generate drafts from selected inbox notes.'
   }
 
-  if (statusFilter !== 'draft') {
+  if (statusFilter === 'published' || statusFilter === 'dismissed') {
     return `No ${statusLabel(statusFilter).toLowerCase()} drafts.`
   }
 
@@ -192,21 +164,18 @@ function emptyDraftDescription(
 }
 
 function emptyDraftTitle(
-  statusFilter: IssueDraftStatus,
+  statusFilter: IssueDraftStatus | undefined,
   statusCounts: Record<IssueDraftStatus, number>
 ): string {
   if (totalDraftCount(statusCounts) === 0) return 'No drafts yet'
-  if (statusFilter === 'draft') return 'Review queue is clear'
-  return `No ${statusLabel(statusFilter).toLowerCase()} drafts`
+  if (statusFilter === 'published' || statusFilter === 'dismissed') {
+    return `No ${statusLabel(statusFilter).toLowerCase()} drafts`
+  }
+  return 'Review queue is clear'
 }
 
 function totalDraftCount(statusCounts: Record<IssueDraftStatus, number>): number {
   return statusCounts.draft + statusCounts.dismissed + statusCounts.published
-}
-
-function formatDraftCount(count: number, status: IssueDraftStatus): string {
-  const label = statusLabel(status).toLowerCase()
-  return `${count} ${label} draft${count === 1 ? '' : 's'}`
 }
 
 function publishButtonLabel(input: { publishing: boolean; published: boolean }): string {
@@ -296,6 +265,88 @@ function publishBlockActionHandler(
   }
 }
 
+function LabelInput({
+  labels,
+  onChange,
+  disabled
+}: {
+  labels: string[]
+  onChange: (labels: string[]) => void
+  disabled?: boolean
+}): React.JSX.Element {
+  const [value, setValue] = useState('')
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  const addLabel = useCallback(
+    (raw: string) => {
+      const label = raw.trim()
+      if (!label || labels.includes(label)) return
+      onChange([...labels, label])
+    },
+    [labels, onChange]
+  )
+
+  const removeLabel = useCallback(
+    (index: number) => {
+      onChange(labels.filter((_, i) => i !== index))
+    },
+    [labels, onChange]
+  )
+
+  const handleKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLInputElement>) => {
+      if (event.key === 'Enter' || event.key === 'Tab' || event.key === ',') {
+        event.preventDefault()
+        addLabel(value)
+        setValue('')
+      } else if (event.key === 'Backspace' && value === '' && labels.length > 0) {
+        event.preventDefault()
+        removeLabel(labels.length - 1)
+      }
+    },
+    [addLabel, labels.length, removeLabel, value]
+  )
+
+  return (
+    <div
+      className={cn(
+        'flex min-h-9 flex-wrap items-center gap-1.5 rounded-md border border-transparent bg-input/50 px-2 py-1.5 transition-[color,box-shadow,background-color] focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/30',
+        disabled && 'pointer-events-none cursor-not-allowed opacity-50'
+      )}
+      onClick={() => inputRef.current?.focus()}
+    >
+      {labels.map((label, index) => (
+        <Badge key={label} variant="secondary" className="gap-1 pr-1">
+          {label}
+          {!disabled && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                removeLabel(index)
+              }}
+              className="inline-flex items-center justify-center rounded-sm opacity-60 hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              aria-label={`Remove label ${label}`}
+            >
+              <HugeiconsIcon icon={Cancel01Icon} className="size-3" aria-hidden />
+            </button>
+          )}
+        </Badge>
+      ))}
+      <input
+        ref={inputRef}
+        type="text"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onKeyDown={handleKeyDown}
+        disabled={disabled}
+        className="min-w-[4rem] flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+        placeholder={labels.length === 0 ? 'Type and press Enter' : ''}
+      />
+    </div>
+  )
+}
+
 function parseGitHubRepoUrl(url: string): { owner: string; name: string } | null {
   try {
     const parsed = new URL(url)
@@ -329,11 +380,10 @@ export function DraftReview({
   const [repos, setRepos] = useState<Repo[]>([])
   const [githubStatus, setGithubStatus] = useState<GitHubStatus>({ connected: false })
   const [failedRuns, setFailedRuns] = useState<AgentRunListItem[]>([])
-  const [statusFilter, setStatusFilter] = useState<IssueDraftStatus>('draft')
+  const [statusFilter, setStatusFilter] = useState<IssueDraftStatus | undefined>(undefined)
   const [statusCounts, setStatusCounts] =
     useState<Record<IssueDraftStatus, number>>(EMPTY_STATUS_COUNTS)
   const [selectedDraftId, setSelectedDraftId] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
 
   const fetchDrafts = useCallback(async (): Promise<void> => {
     const [allDrafts, repoResult, githubResult, failedRunResult] = await Promise.all([
@@ -342,7 +392,10 @@ export function DraftReview({
       window.pilog.invoke('github:status'),
       window.pilog.invoke('agent-runs:list', { status: 'failed', limit: 3 })
     ])
-    const filteredDrafts = allDrafts.filter((draft) => draft.status === statusFilter)
+    const filteredDrafts =
+      statusFilter === undefined
+        ? [...allDrafts].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))
+        : allDrafts.filter((draft) => draft.status === statusFilter)
 
     setDrafts(filteredDrafts)
     setRepos(repoResult)
@@ -353,7 +406,6 @@ export function DraftReview({
       if (current && filteredDrafts.some((draft) => draft.id === current)) return current
       return filteredDrafts[0]?.id ?? null
     })
-    setLoading(false)
   }, [statusFilter])
 
   useEffect(() => {
@@ -388,100 +440,111 @@ export function DraftReview({
 
   return (
     <div className="flex h-full bg-background text-foreground">
-      <aside className="flex w-[27rem] min-w-0 shrink-0 flex-col overflow-hidden border-r">
-        <div className="flex shrink-0 flex-col gap-3 border-b px-6 py-3">
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-sm text-muted-foreground">
-              {loading ? 'Loading drafts' : formatDraftCount(drafts.length, statusFilter)}
-            </p>
-            <Badge variant="outline" className="shrink-0">
-              Review queue
-            </Badge>
-          </div>
-          <div className="grid grid-cols-3 gap-1" aria-label="Draft status filter">
+      <aside className="flex w-80 min-w-0 shrink-0 flex-col overflow-hidden border-r">
+        <div className="shrink-0 border-b px-2.5 py-2">
+          <div
+            className="grid grid-cols-2 gap-x-1 gap-y-0.5"
+            role="group"
+            aria-label="Filter by status"
+          >
             {ISSUE_DRAFT_STATUSES.map((status) => {
               const active = statusFilter === status
               return (
-                <Button
+                <button
                   key={status}
                   type="button"
-                  variant={active ? 'secondary' : 'ghost'}
-                  size="sm"
-                  className="h-8 justify-between px-2"
+                  data-testid={`filter-${status}`}
                   aria-pressed={active}
-                  onClick={() => setStatusFilter(status)}
+                  onClick={() => setStatusFilter((prev) => (prev === status ? undefined : status))}
+                  className={cn(
+                    'group/status-row flex h-7 min-w-0 cursor-pointer items-center gap-1.5 rounded-md px-1.5',
+                    'text-xs transition-colors',
+                    'focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/30',
+                    active
+                      ? 'bg-muted font-medium text-foreground'
+                      : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
+                  )}
                 >
-                  <span>{statusLabel(status)}</span>
-                  <span className="tabular font-mono text-xs text-muted-foreground">
+                  <span
+                    aria-hidden
+                    className={cn(
+                      'size-1.5 shrink-0 rounded-full transition-colors',
+                      active ? 'bg-primary' : 'border border-muted-foreground/40'
+                    )}
+                  />
+                  <span className="flex-1 truncate text-left">{statusLabel(status)}</span>
+                  <span
+                    aria-hidden
+                    className={cn(
+                      'tabular shrink-0 text-[10px]',
+                      active ? 'text-foreground/70' : 'text-muted-foreground/60'
+                    )}
+                  >
                     {statusCounts[status]}
                   </span>
-                </Button>
+                  <span className="sr-only">
+                    {statusCounts[status]} {statusCounts[status] === 1 ? 'draft' : 'drafts'}
+                  </span>
+                </button>
               )
             })}
+            {/* Balance the 2×2 grid (three filters) so the rail matches Inbox / Runs. */}
+            <div className="min-h-7" aria-hidden />
           </div>
         </div>
 
-        <ScrollArea className="min-h-0 flex-1">
-          <div className="p-3">
-            {drafts.length === 0 ? (
-              <ReviewEmptyState
-                className="mt-10 p-6"
-                title={emptyTitle}
-                description={emptyDescription}
-                statusFilter={statusFilter}
-                statusCounts={statusCounts}
-                failedRuns={failedRuns}
-                onNavigateToInbox={onNavigateToInbox}
-                onNavigateToAgentRuns={onNavigateToAgentRuns}
-                onSetStatusFilter={setStatusFilter}
-              />
-            ) : (
-              <ul className="flex flex-col gap-1">
-                {drafts.map((draft) => (
-                  <li key={draft.id}>
-                    <button
-                      type="button"
-                      data-testid="draft-row"
-                      onClick={() => setSelectedDraftId(draft.id)}
-                      className={draftCardClassName(selectedDraftId === draft.id)}
-                    >
-                      <span className="flex min-w-0 items-start justify-between gap-3">
-                        <span className="min-w-0">
-                          <span className="line-clamp-2 block text-sm font-medium">
-                            {draft.title}
-                          </span>
-                          <span className="mt-1 line-clamp-2 block text-xs leading-relaxed text-muted-foreground">
-                            {draft.body}
-                          </span>
-                        </span>
-                        <HugeiconsIcon
-                          icon={ArrowRight01Icon}
-                          aria-hidden
-                          className="mt-0.5 shrink-0"
-                        />
+        <main className="min-h-0 flex-1 overflow-y-auto p-3">
+          {drafts.length === 0 ? (
+            <ReviewEmptyState
+              className="mt-10 p-6"
+              title={emptyTitle}
+              description={emptyDescription}
+              statusFilter={statusFilter}
+              statusCounts={statusCounts}
+              failedRuns={failedRuns}
+              onNavigateToInbox={onNavigateToInbox}
+              onNavigateToAgentRuns={onNavigateToAgentRuns}
+              onSetStatusFilter={setStatusFilter}
+            />
+          ) : (
+            <ul className="flex flex-col gap-1">
+              {drafts.map((draft) => (
+                <li key={draft.id}>
+                  <button
+                    type="button"
+                    data-testid="draft-row"
+                    onClick={() => setSelectedDraftId(draft.id)}
+                    className={draftCardClassName(selectedDraftId === draft.id)}
+                  >
+                    <span className="flex min-w-0 flex-col gap-1">
+                      <span className="block truncate text-sm leading-snug">
+                        {normalizeDraftTitle(draft.title)}
                       </span>
-
-                      <span className="mt-2 flex flex-wrap items-center gap-1.5">
-                        <Badge variant="secondary">{statusLabel(draft.status)}</Badge>
-                        <Badge variant="outline">{confidenceLabel(draft.confidence)}</Badge>
-                        {draft.labels.slice(0, 3).map((label) => (
-                          <Badge key={label} variant="outline">
-                            {label}
+                      <span className="flex min-w-0 items-center justify-between gap-2 text-xs">
+                        <span className="flex min-w-0 flex-wrap items-center gap-1">
+                          <Badge variant="secondary" className="font-medium text-foreground/80">
+                            {statusLabel(draft.status)}
                           </Badge>
-                        ))}
+                          <Badge variant="outline" className="font-normal">
+                            {confidenceLabel(draft.confidence)}
+                          </Badge>
+                          {draft.labels.slice(0, 2).map((label) => (
+                            <Badge key={label} variant="outline" className="font-normal">
+                              {label}
+                            </Badge>
+                          ))}
+                        </span>
+                        <span className="tabular shrink-0 whitespace-nowrap text-muted-foreground">
+                          {formatTimestamp(draft.updatedAt)}
+                        </span>
                       </span>
-
-                      <span className="mt-2 line-clamp-2 text-xs leading-relaxed text-muted-foreground">
-                        {draft.groupingReason || 'No grouping reason recorded.'}
-                      </span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-          <ScrollBar />
-        </ScrollArea>
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </main>
       </aside>
 
       <main className="min-w-0 flex-1 overflow-y-auto">
@@ -534,12 +597,12 @@ function ReviewEmptyState({
   className: string
   title: string
   description: string
-  statusFilter: IssueDraftStatus
+  statusFilter: IssueDraftStatus | undefined
   statusCounts: Record<IssueDraftStatus, number>
   failedRuns: AgentRunListItem[]
   onNavigateToInbox: () => void
   onNavigateToAgentRuns: (runId?: string) => void
-  onSetStatusFilter: (status: IssueDraftStatus) => void
+  onSetStatusFilter: (status: IssueDraftStatus | undefined) => void
 }): React.JSX.Element {
   return (
     <Empty className={cn('border-none bg-transparent shadow-none', className)}>
@@ -564,17 +627,17 @@ function ReviewEmptyActions({
   onNavigateToInbox,
   onSetStatusFilter
 }: {
-  statusFilter: IssueDraftStatus
+  statusFilter: IssueDraftStatus | undefined
   statusCounts: Record<IssueDraftStatus, number>
   onNavigateToInbox: () => void
-  onSetStatusFilter: (status: IssueDraftStatus) => void
+  onSetStatusFilter: (status: IssueDraftStatus | undefined) => void
 }): React.JSX.Element {
   const noDrafts = totalDraftCount(statusCounts) === 0
 
   return (
     <EmptyContent className="gap-2">
       <div className="flex flex-wrap justify-center gap-2">
-        {(noDrafts || statusFilter === 'draft') && (
+        {(noDrafts || statusFilter === 'draft' || statusFilter === undefined) && (
           <Button type="button" size="sm" onClick={onNavigateToInbox}>
             Open Inbox
           </Button>
@@ -702,8 +765,7 @@ function DraftEditor({
 }): React.JSX.Element {
   const [title, setTitle] = useState(draft.title)
   const [body, setBody] = useState(draft.body)
-  const [labels, setLabels] = useState(formatLabels(draft.labels))
-  const [criteria, setCriteria] = useState(extractAcceptanceCriteria(draft.body).join('\n'))
+  const [labels, setLabels] = useState(draft.labels)
   const [saving, setSaving] = useState(false)
   const [updatingStatus, setUpdatingStatus] = useState(false)
   const [publishing, setPublishing] = useState(false)
@@ -720,19 +782,13 @@ function DraftEditor({
   const [mergeMessage, setMergeMessage] = useState<string | null>(null)
   const [mergeError, setMergeError] = useState<string | null>(null)
 
-  const parsedLabels = useMemo(() => parseLabels(labels), [labels])
-  const parsedCriteria = useMemo(() => parseCriteriaLines(criteria), [criteria])
-  const bodyForSave = useMemo(
-    () => writeAcceptanceCriteria(body, parsedCriteria),
-    [body, parsedCriteria]
-  )
   const editedDraft = useMemo(
     () => ({
       title: normalizeDraftTitle(title),
-      body: bodyForSave,
-      labels: parsedLabels
+      body,
+      labels
     }),
-    [bodyForSave, parsedLabels, title]
+    [body, labels, title]
   )
   const dirty = hasDraftChanges(draft, editedDraft)
   const isPublished = draft.status === 'published'
@@ -757,21 +813,20 @@ function DraftEditor({
       const updated = await window.pilog.invoke('issue-drafts:update', {
         id: draft.id,
         title: editedDraft.title,
-        body: bodyForSave,
-        labels: parsedLabels
+        body: editedDraft.body,
+        labels: editedDraft.labels
       })
       if (updated) {
         setTitle(updated.title)
         setBody(updated.body)
-        setLabels(formatLabels(updated.labels))
-        setCriteria(extractAcceptanceCriteria(updated.body).join('\n'))
+        setLabels(updated.labels)
         setSavedAt(formatTimestamp(updated.updatedAt))
         await onSaved()
       }
     } finally {
       setSaving(false)
     }
-  }, [bodyForSave, dirty, draft.id, editedDraft.title, isPublished, onSaved, parsedLabels, saving])
+  }, [dirty, draft.id, editedDraft, isPublished, onSaved, saving])
 
   const handlePublish = useCallback(async (): Promise<void> => {
     if (publishBlock) {
@@ -791,8 +846,7 @@ function DraftEditor({
       })
       setTitle(published.title)
       setBody(published.body)
-      setLabels(formatLabels(published.labels))
-      setCriteria(extractAcceptanceCriteria(published.body).join('\n'))
+      setLabels(published.labels)
       setSavedAt(formatTimestamp(published.updatedAt))
       setPublishedUrl(published.githubIssueUrl)
       await onSaved()
@@ -844,8 +898,7 @@ function DraftEditor({
       if (merged) {
         setTitle(merged.title)
         setBody(merged.body)
-        setLabels(formatLabels(merged.labels))
-        setCriteria(extractAcceptanceCriteria(merged.body).join('\n'))
+        setLabels(merged.labels)
         setSavedAt(formatTimestamp(merged.updatedAt))
         setMergeMessage('Merged into this draft. The other draft was moved to Dismissed.')
         await onSaved()
@@ -923,16 +976,18 @@ function DraftEditor({
   }, [])
 
   return (
-    <article className="mx-auto flex min-h-full max-w-5xl flex-col">
-      <header className="shrink-0 border-b px-8 py-5">
-        <div className="flex flex-wrap items-start justify-between gap-4">
+    <article className="flex min-h-full flex-col">
+      <header className="shrink-0 border-b px-6 py-4">
+        <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
           <div className="min-w-0 flex-1">
             <p className="tabular font-mono text-xs text-muted-foreground">
               Updated {formatTimestamp(draft.updatedAt)}
             </p>
-            <h2 className="mt-1 font-heading text-2xl font-medium tracking-tight">Draft Review</h2>
+            <h2 className="mt-1 text-balance font-heading text-2xl font-medium leading-snug tracking-tight">
+              Draft Review
+            </h2>
           </div>
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="flex min-w-0 shrink-0 flex-wrap items-center justify-end gap-x-2 gap-y-2 sm:flex-nowrap">
             {savedAt ? (
               <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <HugeiconsIcon icon={Tick02Icon} aria-hidden />
@@ -1006,7 +1061,7 @@ function DraftEditor({
         ) : null}
       </header>
 
-      <div className="grid flex-1 gap-8 px-8 py-6 xl:grid-cols-[minmax(0,1fr)_18rem]">
+      <div className="grid flex-1 gap-6 px-6 py-5 lg:grid-cols-[1fr_20rem] xl:grid-cols-[1fr_22rem]">
         <form className="flex min-w-0 flex-col gap-5" onSubmit={(event) => event.preventDefault()}>
           <div className="flex flex-col gap-2">
             <label htmlFor="draft-title" className="text-sm font-medium">
@@ -1025,70 +1080,37 @@ function DraftEditor({
             <label htmlFor="draft-labels" className="text-sm font-medium">
               Labels
             </label>
-            <Input
-              id="draft-labels"
-              value={labels}
-              onChange={(event) => setLabels(event.target.value)}
-              aria-describedby="draft-labels-help"
-              disabled={isPublished}
-            />
-            <p id="draft-labels-help" className="text-xs text-muted-foreground">
-              Separate labels with commas.
-            </p>
+            <LabelInput labels={labels} onChange={setLabels} disabled={isPublished} />
           </div>
 
-          <div className="grid gap-5 lg:grid-cols-2">
-            <div className="flex min-w-0 flex-col gap-2">
-              <label htmlFor="draft-body" className="text-sm font-medium">
-                Body
-              </label>
-              <Textarea
-                id="draft-body"
-                value={body}
-                onChange={(event) => setBody(event.target.value)}
-                className="min-h-96 font-mono text-sm leading-relaxed"
-                disabled={isPublished}
-              />
-            </div>
-
-            <div className="flex min-w-0 flex-col gap-2">
-              <label htmlFor="draft-criteria" className="text-sm font-medium">
-                Acceptance Criteria
-              </label>
-              <Textarea
-                id="draft-criteria"
-                value={criteria}
-                onChange={(event) => setCriteria(event.target.value)}
-                className="min-h-96 font-mono text-sm leading-relaxed"
-                aria-describedby="draft-criteria-help"
-                disabled={isPublished}
-              />
-              <p id="draft-criteria-help" className="text-xs text-muted-foreground">
-                One item per line. Saving writes this list back into the markdown body.
-              </p>
-            </div>
+          <div className="flex min-w-0 flex-col gap-2">
+            <label htmlFor="draft-body" className="text-sm font-medium">
+              Body
+            </label>
+            <Textarea
+              id="draft-body"
+              value={body}
+              onChange={(event) => setBody(event.target.value)}
+              className="min-h-[28rem] font-mono text-sm leading-relaxed"
+              disabled={isPublished}
+            />
           </div>
         </form>
 
-        <aside className="flex min-w-0 flex-col gap-5">
+        <aside className="flex min-w-0 flex-col gap-6">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant="secondary">{statusLabel(draft.status)}</Badge>
+            <Badge variant="outline">{confidenceLabel(draft.confidence)}</Badge>
+          </div>
+
           <section className="flex flex-col gap-2">
-            <h3 className="text-sm font-semibold">Readiness</h3>
-            <div className="flex flex-wrap gap-1.5">
-              <Badge variant="secondary">{statusLabel(draft.status)}</Badge>
-              <Badge variant="outline">{confidenceLabel(draft.confidence)}</Badge>
+            <h3 className="text-sm font-semibold">Why this grouping</h3>
+            <div className="rounded-md bg-muted/30 p-3">
+              <p className="text-sm leading-relaxed text-muted-foreground">
+                {draft.groupingReason || 'No grouping reason recorded.'}
+              </p>
             </div>
           </section>
-
-          <Separator />
-
-          <section className="flex flex-col gap-2">
-            <h3 className="text-sm font-semibold">Grouping Reason</h3>
-            <p className="text-sm leading-relaxed text-muted-foreground">
-              {draft.groupingReason || 'No grouping reason recorded.'}
-            </p>
-          </section>
-
-          <Separator />
 
           <section className="flex flex-col gap-2">
             <div className="flex items-center justify-between gap-3">
@@ -1150,7 +1172,53 @@ function DraftEditor({
             />
           </section>
 
-          <Separator />
+          <section className="flex flex-col gap-2">
+            <h3 className="text-sm font-semibold">Affected Files</h3>
+            {draft.affectedFiles.length > 0 ? (
+              <ul className="flex flex-col divide-y divide-border">
+                {draft.affectedFiles.map((file) => (
+                  <li
+                    key={`${file.path}:${file.reason}`}
+                    className="group flex min-w-0 flex-col gap-1 py-2.5"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="break-all font-mono text-xs">{file.path}</p>
+                      <div className="flex shrink-0 items-center gap-0.5">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-xs"
+                          onClick={() => void handlePathAction(file, 'copy')}
+                          title="Copy path"
+                        >
+                          <HugeiconsIcon icon={Copy01Icon} className="size-3.5" aria-hidden />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-xs"
+                          onClick={() => void handlePathAction(file, 'reveal')}
+                          title="Reveal in explorer"
+                        >
+                          <HugeiconsIcon icon={FolderOpenIcon} className="size-3.5" aria-hidden />
+                        </Button>
+                      </div>
+                    </div>
+                    <p className="line-clamp-2 text-xs leading-relaxed text-muted-foreground">
+                      {file.reason}
+                    </p>
+                    {pathMessages[file.path] ? (
+                      <p className="text-xs text-muted-foreground" role="status">
+                        {pathMessages[file.path]}
+                      </p>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-muted-foreground">No affected files recorded.</p>
+            )}
+          </section>
 
           <MergeDraftSection
             draft={draft}
@@ -1164,54 +1232,6 @@ function DraftEditor({
             onMergeSourceChange={setSelectedMergeSourceId}
             onMerge={handleMerge}
           />
-
-          <Separator />
-
-          <section className="flex flex-col gap-2">
-            <h3 className="text-sm font-semibold">Affected Files</h3>
-            {draft.affectedFiles.length > 0 ? (
-              <ul className="flex flex-col gap-2">
-                {draft.affectedFiles.map((file) => (
-                  <li
-                    key={`${file.path}:${file.reason}`}
-                    className="min-w-0 rounded-md border bg-muted/30 p-2"
-                  >
-                    <p className="break-all font-mono text-xs">{file.path}</p>
-                    <p className="line-clamp-2 text-xs leading-relaxed text-muted-foreground">
-                      {file.reason}
-                    </p>
-                    <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="xs"
-                        onClick={() => void handlePathAction(file, 'copy')}
-                      >
-                        <HugeiconsIcon icon={Copy01Icon} data-icon="inline-start" aria-hidden />
-                        Copy
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="xs"
-                        onClick={() => void handlePathAction(file, 'reveal')}
-                      >
-                        <HugeiconsIcon icon={FolderOpenIcon} data-icon="inline-start" aria-hidden />
-                        Reveal
-                      </Button>
-                    </div>
-                    {pathMessages[file.path] ? (
-                      <p className="mt-1 text-xs text-muted-foreground" role="status">
-                        {pathMessages[file.path]}
-                      </p>
-                    ) : null}
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-sm text-muted-foreground">No affected files recorded.</p>
-            )}
-          </section>
         </aside>
       </div>
     </article>
@@ -1362,12 +1382,7 @@ function SourceNoteItem({
 
   if (splitMode) {
     return (
-      <li
-        className={cn(
-          'flex min-w-0 items-start gap-2 rounded-md border bg-muted/30 p-2',
-          selected && 'bg-muted'
-        )}
-      >
+      <li className={cn('flex min-w-0 items-start gap-2 py-2', selected && 'bg-muted/40')}>
         <Checkbox
           id={`split-source-note-${note.id}`}
           checked={selected}
@@ -1377,7 +1392,9 @@ function SourceNoteItem({
         />
         <label htmlFor={`split-source-note-${note.id}`} className="min-w-0 flex-1 cursor-pointer">
           <span className="flex min-w-0 flex-wrap items-center gap-1.5">
-            <Badge variant="secondary">{note.status}</Badge>
+            <Badge variant="secondary" className="text-xs">
+              {note.status}
+            </Badge>
             <span className="tabular text-xs text-muted-foreground">
               {formatTimestamp(note.createdAt)}
             </span>
@@ -1385,7 +1402,9 @@ function SourceNoteItem({
               {note.id.slice(0, 8)}
             </span>
           </span>
-          <span className="mt-2 line-clamp-4 text-sm leading-relaxed">{preview}</span>
+          <span className="mt-1.5 line-clamp-3 text-sm leading-relaxed text-foreground/90">
+            {preview}
+          </span>
         </label>
       </li>
     )
@@ -1397,12 +1416,14 @@ function SourceNoteItem({
         type="button"
         onClick={() => onOpenSourceNote(note.id)}
         className={cn(
-          'flex w-full min-w-0 flex-col rounded-md border bg-muted/30 p-2 text-left transition-colors',
-          'hover:bg-muted/60 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30'
+          'flex w-full min-w-0 flex-col py-2 text-left transition-colors',
+          'hover:bg-muted/40 focus-visible:rounded-md focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30'
         )}
       >
         <span className="flex min-w-0 flex-wrap items-center gap-1.5">
-          <Badge variant="secondary">{note.status}</Badge>
+          <Badge variant="secondary" className="text-xs">
+            {note.status}
+          </Badge>
           <span className="tabular text-xs text-muted-foreground">
             {formatTimestamp(note.createdAt)}
           </span>
@@ -1410,7 +1431,9 @@ function SourceNoteItem({
             {note.id.slice(0, 8)}
           </span>
         </span>
-        <span className="mt-2 line-clamp-4 text-sm leading-relaxed">{preview}</span>
+        <span className="mt-1.5 line-clamp-3 text-sm leading-relaxed text-foreground/90">
+          {preview}
+        </span>
       </button>
     </li>
   )
@@ -1429,12 +1452,7 @@ function UnavailableSourceNoteItem({
 }): React.JSX.Element {
   if (splitMode) {
     return (
-      <li
-        className={cn(
-          'flex min-w-0 items-start gap-2 rounded-md border bg-muted/30 p-2',
-          selected && 'bg-muted'
-        )}
-      >
+      <li className={cn('flex min-w-0 items-start gap-2 py-2', selected && 'bg-muted/40')}>
         <Checkbox
           id={`split-source-note-${id}`}
           checked={selected}
@@ -1453,7 +1471,7 @@ function UnavailableSourceNoteItem({
   }
 
   return (
-    <li className="rounded-md border bg-muted/30 p-2">
+    <li className="py-2">
       <p className="font-mono text-xs text-muted-foreground">{id}</p>
       <p className="mt-1 text-xs text-muted-foreground">Source note is no longer available.</p>
     </li>

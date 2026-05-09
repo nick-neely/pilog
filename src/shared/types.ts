@@ -83,6 +83,9 @@ export type AgentEvent =
 
 export type AgentRunStatus = 'running' | 'succeeded' | 'failed' | 'cancelled'
 
+/** Sidebar filter totals; every status appears even when zero. */
+export type AgentRunStatusCounts = Record<AgentRunStatus, number>
+
 export type AgentRunListItem = {
   id: string
   repoId: string | null

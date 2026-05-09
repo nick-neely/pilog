@@ -722,16 +722,18 @@ export function Inbox({
                     >
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm leading-snug">{preview}</span>
-                        <span className="mt-1 flex items-center gap-2 text-xs">
-                          <Badge variant="secondary" className="font-medium text-foreground/80">
-                            {STATUS_LABEL[note.status]}
-                          </Badge>
-                          {repo && (
-                            <span className="truncate font-mono text-xs text-muted-foreground/70">
-                              {repo.owner}/{repo.name}
-                            </span>
-                          )}
-                          <span className="tabular text-muted-foreground">
+                        <span className="mt-1 flex min-w-0 items-center justify-between gap-2 text-xs">
+                          <span className="flex min-w-0 items-center gap-2">
+                            <Badge variant="secondary" className="font-medium text-foreground/80">
+                              {STATUS_LABEL[note.status]}
+                            </Badge>
+                            {repo && (
+                              <span className="truncate font-mono text-muted-foreground/70">
+                                {repo.owner}/{repo.name}
+                              </span>
+                            )}
+                          </span>
+                          <span className="tabular shrink-0 whitespace-nowrap text-muted-foreground">
                             {formatNoteTimestamp(note.createdAt)}
                           </span>
                         </span>

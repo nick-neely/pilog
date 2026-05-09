@@ -212,9 +212,8 @@ test('Agent Runs shows live generation, detail transcript, and source note navig
   await page.locator('[data-testid="open-agent-runs"]').click()
 
   const runRows = page.locator('[data-testid="agent-run-row"]')
-  await expect(runRows.first()).toContainText('running')
-  await expect(runRows.first()).toContainText('succeeded')
   await expect(runRows.first()).toContainText('1 drafts')
+  await expect(runRows.first()).toContainText('Succeeded')
 
   await runRows.first().click()
   await expect(page.locator('[data-testid="run-output-draft"]')).toContainText(

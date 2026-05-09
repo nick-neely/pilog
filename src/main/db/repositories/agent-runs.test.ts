@@ -1,18 +1,19 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import type { GeneratedIssueDraft } from '@shared/types'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { createInMemoryDatabase, type PilogDatabase } from '../client'
 import { runMigrations } from '../migrations'
-import { createIssueDraft } from './issue-drafts'
-import { createNote } from './notes'
-import { createRepo } from './repos'
 import {
   cancelRunningAgentRuns,
+  countRunsByStatus,
   createAgentRun,
   finalizeAgentRun,
   getRunById,
   listRuns,
   updateAgentRunEventStream
 } from './agent-runs'
-import type { GeneratedIssueDraft } from '@shared/types'
+import { createIssueDraft } from './issue-drafts'
+import { createNote } from './notes'
+import { createRepo } from './repos'
 
 const draft: GeneratedIssueDraft = {
   title: 'Add loading state',
@@ -34,6 +35,25 @@ describe('agent-runs repository', () => {
   beforeEach(() => {
     db = createInMemoryDatabase()
     runMigrations(db)
+  })
+
+  it('counts runs grouped by terminal and running states', () => {
+    const repo = createFixtureRepo(db)
+    const note = createNote(db, { content: 'note', repoId: repo.id })
+    createAgentRun(db, { repoId: repo.id, inputNoteIds: [note.id] })
+    const succeeded = createAgentRun(db, { repoId: repo.id, inputNoteIds: [note.id] })
+    finalizeAgentRun(db, {
+      id: succeeded.id,
+      status: 'succeeded',
+      eventStream: [{ type: 'final' }]
+    })
+
+    expect(countRunsByStatus(db)).toEqual({
+      running: 1,
+      succeeded: 1,
+      failed: 0,
+      cancelled: 0
+    })
   })
 
   it('lists runs newest-first and filters by cancelled status', () => {
