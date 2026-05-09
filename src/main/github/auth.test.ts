@@ -10,7 +10,7 @@ vi.mock('electron', () => ({
   app: { getPath: vi.fn().mockReturnValue('/tmp/pilog-auth-test') }
 }))
 
-import { parseOAuthCallback } from './auth'
+import { parseOAuthCallback, startOAuthFlow } from './auth'
 
 describe('parseOAuthCallback', () => {
   it('extracts code and state from a valid callback URL', () => {
@@ -39,6 +39,14 @@ describe('parseOAuthCallback', () => {
       'xyz'
     )
     expect(result).toEqual({ error: 'access_denied' })
+  })
+})
+
+describe('startOAuthFlow', () => {
+  it('fails before opening GitHub when OAuth credentials are missing', async () => {
+    await expect(startOAuthFlow('', 'secret')).rejects.toThrow(
+      'GitHub OAuth is not configured. Set GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET in .env.'
+    )
   })
 })
 

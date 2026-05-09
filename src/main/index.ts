@@ -2,6 +2,7 @@ import { electronApp, is, optimizer } from '@electron-toolkit/utils'
 import { app, BrowserWindow, ipcMain, Menu } from 'electron'
 import { join } from 'path'
 import icon from '../../resources/icon.png?asset'
+import { loadDotEnvFile } from './config/env'
 import { createDatabase } from './db/client'
 import { runMigrations } from './db/migrations'
 import { getSetting, setSetting } from './db/repositories/settings'
@@ -18,6 +19,8 @@ import {
   showMainWindowOnRoute
 } from './window/create-main-window'
 import { hideScratchpad, openScratchpad } from './window/create-scratchpad-window'
+
+loadDotEnvFile()
 
 if (process.env.PILOG_USER_DATA) {
   app.setPath('userData', process.env.PILOG_USER_DATA)
@@ -49,8 +52,8 @@ app.whenReady().then(() => {
 
   registerGitHubIpcHandlers(
     {
-      clientId: process.env.GITHUB_CLIENT_ID ?? '',
-      clientSecret: process.env.GITHUB_CLIENT_SECRET ?? ''
+      clientId: process.env.GITHUB_CLIENT_ID?.trim() ?? '',
+      clientSecret: process.env.GITHUB_CLIENT_SECRET?.trim() ?? ''
     },
     db
   )

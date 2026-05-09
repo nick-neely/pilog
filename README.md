@@ -1,45 +1,59 @@
 # PiLog
 
-PiLog is a **local-first Electron desktop app** for developers who want to **capture rough markdown notes on a hotkey** and **triage them in an inbox** before they become GitHub issues. Today the repo implements the capture pipeline (scratchpad, tray, SQLite persistence, typed IPC) and GitHub sign-in from Settings—set `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` in `.env` (see **Environment variables**). The integrated Pi agent for draft issues is **planned**—see `docs/pilog_prd.md` and `docs/implementation-plan.md`.
+PiLog is a local-first Electron app for capturing rough developer notes and turning them into GitHub-ready issue drafts. Use the global scratchpad to jot something down without leaving your current flow, then triage those notes later from the inbox.
 
-**Why:** Writing the note is easy; turning half-formed thoughts into good issues without leaving your editor flow is hard. PiLog separates _capture_ from _triage_ so you can dump thoughts instantly and shape them later.
+The app currently supports:
 
-**How:** The **main process** owns the database, windows, and hotkeys; the **renderer** talks to it only through a typed **`window.pilog`** API exposed from the preload script. Notes live in SQLite under the app user data directory.
+- Global hotkey scratchpad with markdown editing
+- Local SQLite persistence across restarts
+- Inbox search, filters, multi-select, note editing, and repo assignment
+- GitHub sign-in, local repository linking, and manual issue publishing
+- Embedded Pi draft generation from selected notes and linked repo context
+- Agent run history for inspecting generated drafts, errors, and transcripts
+
+Publishing generated drafts is still Phase 4 work; today the Pi agent stores structured issue drafts locally for review.
 
 ## Requirements
 
 - [Volta](https://volta.sh/) for pinned Node.js and pnpm versions
 - Node.js 22.21.1 and pnpm 10.30.3 are pinned in `package.json`
 
-After installing Volta, open a new WSL shell in the repo and verify:
+Verify the toolchain from the repo root:
 
 ```bash
 node --version
 pnpm --version
 ```
 
-## Install
+## Setup
 
 ```bash
 pnpm install
+cp .env.example .env
 ```
 
-Native deps are intentionally split by runtime:
+The `.env` file is only needed for GitHub OAuth. You can launch the app without filling it in, but GitHub sign-in will not work until `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` are set.
 
-- The repo root installs development and test dependencies for Node-based tooling such as Vitest.
-- `app/` installs Electron runtime dependencies and is rebuilt by `pnpm run app:rebuild` during `postinstall`.
+For GitHub sign-in, create a GitHub OAuth App with this callback URL:
 
-This keeps native modules such as `better-sqlite3` from bouncing between the Node ABI used by tests and the Electron ABI used by the app.
+```text
+http://127.0.0.1/callback
+```
 
-## Environment variables
+Then add the credentials to `.env`:
 
-Put a `.env` file in the repo root ([electron-vite](https://electron-vite.org/guide/env-and-mode.html) loads it for the main process). Start from `.env.example`.
+```bash
+GITHUB_CLIENT_ID=...
+GITHUB_CLIENT_SECRET=...
+```
 
-**GitHub:** Create an [OAuth App](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/creating-an-oauth-app). Authorization callback URL: `http://127.0.0.1/callback`. Add the client ID and client secret to `.env` as `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET`.
+Optional development setting:
 
-In development, if Electron `safeStorage` is unavailable (common in WSL2 without a Linux keyring), PiLog falls back to a plaintext `secrets.dev.json` file in Electron `userData` so GitHub sign-in still works. Packaged builds never use this fallback.
+```bash
+PILOG_USER_DATA=/tmp/pilog-dev-profile
+```
 
-**Optional:** `PILOG_USER_DATA` — custom Electron `userData` directory (used in e2e tests).
+In WSL2, Electron `safeStorage` may be unavailable without a Linux keyring. In development only, PiLog falls back to a plaintext `secrets.dev.json` file in Electron `userData` so GitHub and Pi credential flows can still be exercised. Packaged builds do not use that fallback.
 
 ## Development
 
@@ -47,29 +61,41 @@ In development, if Electron `safeStorage` is unavailable (common in WSL2 without
 pnpm dev
 ```
 
-Runs the app in development with HMR via [electron-vite](https://electron-vite.org/).
+Native runtime dependencies live in `app/` and are installed/rebuilt by the root `postinstall` script. This keeps Electron native modules such as `better-sqlite3` separate from the Node tooling ABI used by tests.
+
+## Pi Draft Generation
+
+Draft generation requires:
+
+1. A linked local repository in Settings → Repositories.
+2. A Pi provider, model, and API key in Settings → Provider & Model.
+3. One or more selected inbox notes that all belong to the same linked repo.
+
+Select the notes in the inbox and click **Generate Drafts**. PiLog persists the run, generated drafts, source-note links, affected files, confidence, and grouping reason locally. Use the Agent Runs view to inspect outputs and errors.
 
 ## Build
-
-Full check and bundle (runs TypeScript checks, then `electron-vite build` into `app/out`):
 
 ```bash
 pnpm build
 ```
 
-Platform installers via [electron-builder](https://www.electron.build/):
+Platform builds:
 
 ```bash
-pnpm build:win    # runs `pnpm build`, then Windows target
-pnpm build:mac    # bundles then macOS target (run `pnpm build` first if you want a typechecked bundle)
-pnpm build:linux  # bundles then Linux target (same note as macOS)
+pnpm build:win
+pnpm build:mac
+pnpm build:linux
 ```
 
-### Windows builds from WSL2
+Create an unpacked directory build:
 
-`pnpm build:win` works from WSL2, but electron-builder needs Wine with 32-bit support so it can run Windows resource tools such as `rcedit`.
+```bash
+pnpm build:unpack
+```
 
-On a fresh WSL install:
+### Windows Builds From WSL2
+
+`pnpm build:win` works from WSL2, but electron-builder needs Wine with 32-bit support for Windows resource tools such as `rcedit`.
 
 ```bash
 sudo dpkg --add-architecture i386
@@ -80,29 +106,26 @@ wineboot --init
 pnpm build:win
 ```
 
-After building in WSL, run the generated Windows installer/executable from Windows proper to test the real Windows experience.
+After building in WSL, run the generated Windows installer or executable from Windows proper to test the real Windows experience.
 
-Unpack a directory build without an installer:
-
-```bash
-pnpm build:unpack
-```
-
-## Quality checks
+## Quality Checks
 
 ```bash
 pnpm typecheck
 pnpm lint
-pnpm test        # Vitest (unit)
-pnpm test:e2e    # Playwright against the built app
+pnpm test
+pnpm test:e2e
 ```
+
+`pnpm test:e2e` runs Playwright against the app. Some GitHub/Pi paths depend on local credentials and are skipped when the required environment is missing.
 
 ## Documentation
 
 | Doc                           | Contents                               |
 | ----------------------------- | -------------------------------------- |
+| `PRODUCT.md`                  | Product strategy and positioning       |
+| `DESIGN.md`                   | Visual system and UX constraints       |
+| `CONTEXT.md`                  | Domain vocabulary and glossary         |
 | `docs/pilog_prd.md`           | Product requirements and flows         |
 | `docs/implementation-plan.md` | Phased roadmap and acceptance criteria |
-| `CONTEXT.md`                  | Domain vocabulary and glossary         |
-
-Editor tooling: ESLint and Prettier configs are included for contributors using VS Code or similar.
+| `docs/adr/`                   | Architecture decision records          |

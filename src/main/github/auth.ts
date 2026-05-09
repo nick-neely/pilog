@@ -96,6 +96,12 @@ export async function startOAuthFlow(
   clientId: string,
   clientSecret: string
 ): Promise<GitHubStatus> {
+  if (!clientId.trim() || !clientSecret.trim()) {
+    throw new Error(
+      'GitHub OAuth is not configured. Set GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET in .env.'
+    )
+  }
+
   const state = randomBytes(16).toString('hex')
 
   return new Promise<GitHubStatus>((resolve, reject) => {

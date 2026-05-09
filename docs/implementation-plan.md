@@ -63,7 +63,7 @@ Set up once; reused by every phase.
 | ----- | --------------------------- | ------------------------------------------------------------------------ | :----: |
 | 1     | Desktop shell + local notes | Hotkey → scratchpad → inbox; persists across restarts                    |   ☑    |
 | 2     | GitHub + repo setup         | Connect GitHub, link a local repo, manually create a test issue          |   ☑    |
-| 3     | Pi agent runtime            | Selected notes + repo path → structured `IssueDraft` JSON stored locally |   ☐    |
+| 3     | Pi agent runtime            | Selected notes + repo path → structured `IssueDraft` JSON stored locally |   ☑    |
 | 4     | Review mode                 | Draft cards: edit, split, merge, dismiss, publish to GitHub              |   ☐    |
 | 5     | Auto-publish mode           | One click: generate + publish, with safety rails and a publish report    |   ☐    |
 | 6     | Polish                      | Issue templates, label matching, prompt tuning, error states, packaging  |   ☐    |
@@ -184,16 +184,16 @@ User can connect GitHub, link a real repo, type a title/body, and see the issue 
 **Goal:** Select notes + a linked repo → click a button → get structured `IssueDraft` JSON written to `issue_drafts`. No publishing yet; review UI is Phase 4.
 
 - ☑ **Embedding strategy** — resolved in [ADR-0005](./adr/0005-pi-embedding-strategy.md): in-process `pi-agent-core` + `pi-ai`, exit-tool pattern, `safeStorage`-backed `AuthStorage`, `MessagePortMain` streaming, curated read-only tool set.
-- ☐ **Pi runtime bridge** — `src/main/pi/runtime.ts` implements `runAgent(input): AsyncIterable<AgentEvent>` per ADR-0005 §1–4. Renderer subscribes via the `MessagePortMain` channel exposed by `window.pilog.runAgent`.
-- ☐ **Pi config UX** — `Settings → Provider & Model`. Surfaces Pi's BYOK flow inside PiLog (PRD §7 BYOK). "Open advanced config" escape hatch.
-- ☐ **Issue generation** — `src/main/pi/issue-generation.ts` constructs the prompt per PRD §15, supplies repo path + selected notes, validates output against the `GeneratedIssueDraft` Zod schema (PRD §10), persists to `issue_drafts`.
-- ☐ **Agent runs view** — minimal list of past runs with input/output/error, useful for debugging prompts.
-- ☐ **Inbox button wires up** — _Generate Draft Issues_ now does something for selected notes.
-- ☐ **Tests** — unit tests for prompt assembly and JSON validation (using fixture LLM responses); integration test runs the agent against a tiny fixture repo.
+- ☑ **Pi runtime bridge** — `src/main/pi/runtime.ts` implements `runAgent(input): AsyncIterable<AgentEvent>` per ADR-0005 §1–4. Renderer subscribes via the `MessagePortMain` channel exposed by `window.pilog.runAgent`.
+- ☑ **Pi config UX** — `Settings → Provider & Model`. Surfaces Pi's BYOK flow inside PiLog (PRD §7 BYOK). "Open advanced config" escape hatch.
+- ☑ **Issue generation** — `src/main/pi/issue-generation.ts` constructs the prompt per PRD §15, supplies repo path + selected notes, validates output against the `GeneratedIssueDraft` Zod schema (PRD §10), persists to `issue_drafts`.
+- ☑ **Agent runs view** — minimal list of past runs with input/output/error, useful for debugging prompts.
+- ☑ **Inbox button wires up** — _Generate Draft Issues_ now does something for selected notes.
+- ☑ **Tests** — unit tests for prompt assembly and JSON validation (using fixture LLM responses); integration test runs the agent against a tiny fixture repo.
 
 ### Phase 3 acceptance
 
-5 rough notes about a real local repo → 1–3 drafts visible in the DB, each with non-empty `affectedFiles`, `acceptanceCriteria`, and a non-trivial `groupingReason`.
+☑ 5 rough notes about a real local repo → 1–3 drafts visible in the DB, each with non-empty `affectedFiles`, `acceptanceCriteria`, and a non-trivial `groupingReason`.
 
 ---
 
