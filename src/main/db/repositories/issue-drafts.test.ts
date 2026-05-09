@@ -8,6 +8,7 @@ import {
   listIssueDrafts,
   listIssueDraftsForReview,
   markIssueDraftPublished,
+  mergeIssueDrafts,
   updateIssueDraft,
   updateIssueDraftStatus
 } from './issue-drafts'
@@ -176,6 +177,73 @@ describe('issue-drafts repository', () => {
 
   it('returns null when updating status for a missing draft', () => {
     expect(updateIssueDraftStatus(db, { id: 'missing', status: 'dismissed' })).toBeNull()
+  })
+
+  it('merges two same-repo drafts into one editable active draft', () => {
+    const target = createIssueDraft(db, {
+      repoId,
+      draft: {
+        ...generatedDraft,
+        title: 'Add loading state',
+        sourceNoteIds: ['note-1', 'note-2'],
+        suggestedLabels: ['bug', 'settings'],
+        affectedFiles: [{ path: 'src/save.ts', reason: 'Likely save flow' }]
+      }
+    })
+    const source = createIssueDraft(db, {
+      repoId,
+      draft: {
+        ...generatedDraft,
+        title: 'Prevent double-submit',
+        summary: 'Settings submit can double-fire.',
+        context: 'A rough note mentioned the settings form.',
+        sourceNoteIds: ['note-2', 'note-3'],
+        suggestedLabels: ['settings', 'regression'],
+        affectedFiles: [
+          { path: 'src/save.ts', reason: 'Shared pending state' },
+          { path: 'src/settings.tsx', reason: 'Settings submit handler' }
+        ],
+        acceptanceCriteria: ['Submit cannot fire twice']
+      }
+    })
+
+    const merged = mergeIssueDrafts(db, { targetId: target.id, sourceId: source.id })
+
+    expect(merged).toMatchObject({
+      id: target.id,
+      title: 'Add loading state',
+      labels: ['bug', 'settings', 'regression'],
+      sourceNoteIds: ['note-1', 'note-2', 'note-3'],
+      affectedFiles: [
+        { path: 'src/save.ts', reason: 'Likely save flow; Shared pending state' },
+        { path: 'src/settings.tsx', reason: 'Settings submit handler' }
+      ],
+      status: 'draft',
+      githubIssueUrl: null
+    })
+    expect(merged?.body).toContain('The save button needs a loading state.')
+    expect(merged?.body).toContain('Settings submit can double-fire.')
+    expect(merged?.body).toContain('Merged draft: Prevent double-submit')
+    expect(getIssueDraftById(db, source.id)).toMatchObject({ status: 'dismissed' })
+    expect(listIssueDrafts(db).map((draft) => draft.id)).toEqual([target.id])
+  })
+
+  it('blocks merging drafts across repositories', () => {
+    const otherRepoId = createRepo(db, {
+      name: 'other',
+      owner: 'nick-neely',
+      localPath: '/tmp/other',
+      githubUrl: 'https://github.com/nick-neely/other',
+      defaultBranch: 'main'
+    }).id
+    const target = createIssueDraft(db, { repoId, draft: generatedDraft })
+    const source = createIssueDraft(db, { repoId: otherRepoId, draft: generatedDraft })
+
+    expect(() => mergeIssueDrafts(db, { targetId: target.id, sourceId: source.id })).toThrow(
+      'Drafts from different repositories cannot be merged.'
+    )
+    expect(getIssueDraftById(db, target.id)).toMatchObject({ status: 'draft' })
+    expect(getIssueDraftById(db, source.id)).toMatchObject({ status: 'draft' })
   })
 
   it('marks a draft as published with the edited content and GitHub URL', () => {

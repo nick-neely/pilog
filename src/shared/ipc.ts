@@ -150,6 +150,11 @@ export type UpdateIssueDraftStatusRequest = {
   status: IssueDraftStatus
 }
 
+export type MergeIssueDraftsRequest = {
+  targetId: string
+  sourceId: string
+}
+
 export type PublishIssueDraftRequest = UpdateIssueDraftRequest
 
 export type IpcContract = {
@@ -214,6 +219,10 @@ export type IpcContract = {
   }
   'issue-drafts:updateStatus': {
     request: UpdateIssueDraftStatusRequest
+    response: IssueDraft | null
+  }
+  'issue-drafts:merge': {
+    request: MergeIssueDraftsRequest
     response: IssueDraft | null
   }
   'issue-drafts:publish': {

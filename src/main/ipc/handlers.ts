@@ -4,6 +4,7 @@ import type { PilogDatabase } from '../db/client'
 import { getRunById, listRuns } from '../db/repositories/agent-runs'
 import {
   listIssueDraftsForReview,
+  mergeIssueDrafts,
   updateIssueDraft,
   updateIssueDraftStatus
 } from '../db/repositories/issue-drafts'
@@ -21,6 +22,7 @@ type DbChannel =
   | 'agent-runs:get'
   | 'agent-runs:list'
   | 'issue-drafts:list'
+  | 'issue-drafts:merge'
   | 'issue-drafts:update'
   | 'issue-drafts:updateStatus'
   | 'note:create'
@@ -42,6 +44,7 @@ const handlers: { [C in DbChannel]: Handler<C> } = {
   'agent-runs:get': (db, request) => getRunById(db, request.id),
   'agent-runs:list': (db, request) => listRuns(db, request ?? undefined),
   'issue-drafts:list': (db, request) => listIssueDraftsForReview(db, request ?? undefined),
+  'issue-drafts:merge': (db, request) => mergeIssueDrafts(db, request),
   'issue-drafts:update': (db, request) => updateIssueDraft(db, request),
   'issue-drafts:updateStatus': (db, request) => updateIssueDraftStatus(db, request),
   'note:create': (db, request) => createNote(db, request),
@@ -69,7 +72,11 @@ export function registerIpcHandlers(
       const handler = handlers[channel] as Handler<typeof channel>
       const result = handler(db, request)
       if (channel === 'note:create') options?.onNoteCreated?.()
-      if (channel === 'issue-drafts:update' || channel === 'issue-drafts:updateStatus') {
+      if (
+        channel === 'issue-drafts:update' ||
+        channel === 'issue-drafts:updateStatus' ||
+        channel === 'issue-drafts:merge'
+      ) {
         options?.onIssueDraftsChanged?.()
       }
       return result
