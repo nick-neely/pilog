@@ -204,7 +204,10 @@ function DraftEditor({
   const [labels, setLabels] = useState(formatLabels(draft.labels))
   const [criteria, setCriteria] = useState(extractAcceptanceCriteria(draft.body).join('\n'))
   const [saving, setSaving] = useState(false)
+  const [publishing, setPublishing] = useState(false)
   const [savedAt, setSavedAt] = useState<string | null>(null)
+  const [publishError, setPublishError] = useState<string | null>(null)
+  const [publishedUrl, setPublishedUrl] = useState<string | null>(draft.githubIssueUrl)
 
   const parsedLabels = useMemo(() => parseLabels(labels), [labels])
   const parsedCriteria = useMemo(() => parseCriteriaLines(criteria), [criteria])
@@ -214,21 +217,22 @@ function DraftEditor({
   )
   const editedDraft = useMemo(
     () => ({
-      title,
+      title: normalizeDraftTitle(title),
       body: bodyForSave,
       labels: parsedLabels
     }),
     [bodyForSave, parsedLabels, title]
   )
   const dirty = hasDraftChanges(draft, editedDraft)
+  const isPublished = draft.status === 'published'
 
   const handleSave = useCallback(async (): Promise<void> => {
-    if (!dirty || saving) return
+    if (!dirty || saving || isPublished) return
     setSaving(true)
     try {
       const updated = await window.pilog.invoke('issue-drafts:update', {
         id: draft.id,
-        title: normalizeDraftTitle(title),
+        title: editedDraft.title,
         body: bodyForSave,
         labels: parsedLabels
       })
@@ -243,7 +247,33 @@ function DraftEditor({
     } finally {
       setSaving(false)
     }
-  }, [bodyForSave, dirty, draft.id, onSaved, parsedLabels, saving, title])
+  }, [bodyForSave, dirty, draft.id, editedDraft.title, isPublished, onSaved, parsedLabels, saving])
+
+  const handlePublish = useCallback(async (): Promise<void> => {
+    if (publishing || saving || isPublished) return
+
+    setPublishing(true)
+    setPublishError(null)
+    try {
+      const published = await window.pilog.invoke('issue-drafts:publish', {
+        id: draft.id,
+        title: editedDraft.title,
+        body: editedDraft.body,
+        labels: editedDraft.labels
+      })
+      setTitle(published.title)
+      setBody(published.body)
+      setLabels(formatLabels(published.labels))
+      setCriteria(extractAcceptanceCriteria(published.body).join('\n'))
+      setSavedAt(formatTimestamp(published.updatedAt))
+      setPublishedUrl(published.githubIssueUrl)
+      await onSaved()
+    } catch (err) {
+      setPublishError(err instanceof Error ? err.message : 'Publish failed. Please try again.')
+    } finally {
+      setPublishing(false)
+    }
+  }, [draft.id, editedDraft, isPublished, onSaved, publishing, saving])
 
   const handleSaveShortcut = useEffectEvent(() => {
     if (dirty && !saving) void handleSave()
@@ -280,16 +310,16 @@ function DraftEditor({
               type="button"
               variant="outline"
               size="sm"
-              disabled
-              title="Publishing lands in issue 21"
+              disabled={publishing || saving || isPublished}
+              onClick={() => void handlePublish()}
             >
               <HugeiconsIcon icon={ViewIcon} data-icon="inline-start" aria-hidden />
-              Publish later
+              {publishing ? 'Publishing' : isPublished ? 'Published' : 'Publish'}
             </Button>
             <Button
               type="button"
               size="sm"
-              disabled={!dirty || saving}
+              disabled={!dirty || saving || publishing || isPublished}
               onClick={() => void handleSave()}
             >
               <HugeiconsIcon icon={Tick02Icon} data-icon="inline-start" aria-hidden />
@@ -297,6 +327,19 @@ function DraftEditor({
             </Button>
           </div>
         </div>
+        {publishError ? (
+          <p className="mt-3 max-w-2xl text-sm leading-relaxed text-destructive" role="alert">
+            {publishError}
+          </p>
+        ) : null}
+        {publishedUrl ? (
+          <p
+            className="mt-3 max-w-2xl truncate font-mono text-xs text-muted-foreground"
+            aria-live="polite"
+          >
+            Published to {publishedUrl}
+          </p>
+        ) : null}
       </header>
 
       <div className="grid flex-1 gap-8 px-8 py-6 xl:grid-cols-[minmax(0,1fr)_18rem]">
@@ -310,6 +353,7 @@ function DraftEditor({
               value={title}
               onChange={(event) => setTitle(event.target.value)}
               aria-label="Draft title"
+              disabled={isPublished}
             />
           </div>
 
@@ -322,6 +366,7 @@ function DraftEditor({
               value={labels}
               onChange={(event) => setLabels(event.target.value)}
               aria-describedby="draft-labels-help"
+              disabled={isPublished}
             />
             <p id="draft-labels-help" className="text-xs text-muted-foreground">
               Separate labels with commas.
@@ -338,6 +383,7 @@ function DraftEditor({
                 value={body}
                 onChange={(event) => setBody(event.target.value)}
                 className="min-h-96 font-mono text-sm leading-relaxed"
+                disabled={isPublished}
               />
             </div>
 
@@ -351,6 +397,7 @@ function DraftEditor({
                 onChange={(event) => setCriteria(event.target.value)}
                 className="min-h-96 font-mono text-sm leading-relaxed"
                 aria-describedby="draft-criteria-help"
+                disabled={isPublished}
               />
               <p id="draft-criteria-help" className="text-xs text-muted-foreground">
                 One item per line. Saving writes this list back into the markdown body.

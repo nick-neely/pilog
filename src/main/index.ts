@@ -66,7 +66,11 @@ app.whenReady().then(() => {
       clientId: process.env.GITHUB_CLIENT_ID?.trim() ?? '',
       clientSecret: process.env.GITHUB_CLIENT_SECRET?.trim() ?? ''
     },
-    db
+    db,
+    {
+      onIssueDraftsChanged: broadcastIssueDraftsInvalidated,
+      onNoteChanged: broadcastNoteCreated
+    }
   )
 
   registerRepoIpcHandlers(db)

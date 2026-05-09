@@ -4,10 +4,12 @@ import { resetClient, listLabels, createIssue } from '../github/client'
 import type { PilogDatabase } from '../db/client'
 import type { CreateIssueRequest } from '@shared/ipc'
 import { recordPublish } from '../db/repositories/publish-log'
+import { publishReviewedDraft } from '../github/publish-draft'
 
 export function registerGitHubIpcHandlers(
   options: { clientId: string; clientSecret: string },
-  db: PilogDatabase
+  db: PilogDatabase,
+  callbacks?: { onIssueDraftsChanged?: () => void; onNoteChanged?: () => void }
 ): void {
   ipcMain.handle('github:connect', async () => {
     return startOAuthFlow(options.clientId, options.clientSecret)
@@ -45,5 +47,21 @@ export function registerGitHubIpcHandlers(
     }
 
     return result
+  })
+
+  ipcMain.handle('issue-drafts:publish', async (_event, request) => {
+    const published = await publishReviewedDraft(db, request, createIssue)
+
+    callbacks?.onIssueDraftsChanged?.()
+    callbacks?.onNoteChanged?.()
+
+    if (published.githubIssueUrl) {
+      const scheme = new URL(published.githubIssueUrl).protocol
+      if (scheme === 'https:' || scheme === 'http:') {
+        await shell.openExternal(published.githubIssueUrl)
+      }
+    }
+
+    return published
   })
 }

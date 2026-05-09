@@ -71,6 +71,11 @@ export function listIssueDrafts(db: PilogDatabase): IssueDraft[] {
     .map(mapIssueDraft)
 }
 
+export function getIssueDraftById(db: PilogDatabase, id: string): IssueDraft | null {
+  const row = db.select(issueDraftColumns).from(issueDrafts).where(eq(issueDrafts.id, id)).get()
+  return row ? mapIssueDraft(row) : null
+}
+
 export function updateIssueDraft(
   db: PilogDatabase,
   input: { id: string; title: string; body: string; labels: string[] }
@@ -102,6 +107,41 @@ export function updateIssueDraft(
     .get()
 
   return row ? mapIssueDraft(row) : null
+}
+
+export function markIssueDraftPublished(
+  db: PilogDatabase,
+  input: {
+    id: string
+    title: string
+    body: string
+    labels: string[]
+    githubIssueUrl: string
+  }
+): IssueDraft | null {
+  const existing = db
+    .select({ updatedAt: issueDrafts.updatedAt })
+    .from(issueDrafts)
+    .where(eq(issueDrafts.id, input.id))
+    .get()
+
+  if (!existing) return null
+
+  const now = nextUpdatedAt(existing.updatedAt)
+
+  db.update(issueDrafts)
+    .set({
+      title: input.title,
+      body: input.body,
+      labels: JSON.stringify(input.labels),
+      status: 'published',
+      githubIssueUrl: input.githubIssueUrl,
+      updatedAt: now
+    })
+    .where(eq(issueDrafts.id, input.id))
+    .run()
+
+  return getIssueDraftById(db, input.id)
 }
 
 function nextUpdatedAt(previousUpdatedAt: string): string {

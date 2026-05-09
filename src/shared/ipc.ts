@@ -132,6 +132,8 @@ export type UpdateIssueDraftRequest = {
   labels: string[]
 }
 
+export type PublishIssueDraftRequest = UpdateIssueDraftRequest
+
 export type IpcContract = {
   'note:create': { request: { content: string; repoId?: string | null }; response: Note }
   'note:list': { request: ListNotesRequest | void; response: Note[] }
@@ -191,6 +193,10 @@ export type IpcContract = {
   'issue-drafts:update': {
     request: UpdateIssueDraftRequest
     response: IssueDraft | null
+  }
+  'issue-drafts:publish': {
+    request: PublishIssueDraftRequest
+    response: IssueDraft
   }
   'debug:seedIssueGenerationFixture': {
     request: { repoPath: string; notes: string[] }

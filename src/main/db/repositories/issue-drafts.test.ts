@@ -2,7 +2,13 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { createInMemoryDatabase, type PilogDatabase } from '../client'
 import { runMigrations } from '../migrations'
 import { createRepo } from './repos'
-import { createIssueDraft, listIssueDrafts, updateIssueDraft } from './issue-drafts'
+import {
+  createIssueDraft,
+  getIssueDraftById,
+  listIssueDrafts,
+  markIssueDraftPublished,
+  updateIssueDraft
+} from './issue-drafts'
 import type { GeneratedIssueDraft } from '@shared/types'
 
 const generatedDraft: GeneratedIssueDraft = {
@@ -93,5 +99,30 @@ describe('issue-drafts repository', () => {
         labels: []
       })
     ).toBeNull()
+  })
+
+  it('marks a draft as published with the edited content and GitHub URL', () => {
+    const draft = createIssueDraft(db, { repoId, draft: generatedDraft })
+
+    const published = markIssueDraftPublished(db, {
+      id: draft.id,
+      title: 'Edited publish title',
+      body: 'Edited markdown body',
+      labels: ['bug', 'ready'],
+      githubIssueUrl: 'https://github.com/nick-neely/pilog/issues/21'
+    })
+
+    expect(published).toMatchObject({
+      id: draft.id,
+      title: 'Edited publish title',
+      body: 'Edited markdown body',
+      labels: ['bug', 'ready'],
+      status: 'published',
+      githubIssueUrl: 'https://github.com/nick-neely/pilog/issues/21'
+    })
+    expect(getIssueDraftById(db, draft.id)).toMatchObject({
+      status: 'published',
+      githubIssueUrl: 'https://github.com/nick-neely/pilog/issues/21'
+    })
   })
 })
