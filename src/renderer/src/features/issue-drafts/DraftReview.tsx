@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useEffectEvent, useMemo, useState } from 'react'
-import { ArrowRight01Icon, Tick02Icon, ViewIcon } from '@hugeicons/core-free-icons'
+import {
+  ArrowRight01Icon,
+  CancelCircleIcon,
+  Tick02Icon,
+  ViewIcon
+} from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { Badge } from '@renderer/components/ui/badge'
 import { Button } from '@renderer/components/ui/button'
@@ -11,7 +16,19 @@ import { Textarea } from '@renderer/components/ui/textarea'
 import { cn } from '@renderer/lib/utils'
 import { extractAcceptanceCriteria, writeAcceptanceCriteria } from '@shared/acceptance-criteria'
 import type { UpdateIssueDraftRequest } from '@shared/ipc'
-import type { IssueDraft } from '@shared/types'
+import type { IssueDraft, IssueDraftStatus } from '@shared/types'
+
+const REVIEW_STATUS_FILTERS: Array<{ value: IssueDraftStatus; label: string }> = [
+  { value: 'draft', label: 'Active' },
+  { value: 'dismissed', label: 'Dismissed' },
+  { value: 'published', label: 'Published' }
+]
+
+const EMPTY_STATUS_COUNTS: Record<IssueDraftStatus, number> = {
+  draft: 0,
+  dismissed: 0,
+  published: 0
+}
 
 const DRAFT_TIMESTAMP_FORMATTER = new Intl.DateTimeFormat(undefined, {
   month: 'short',
@@ -81,20 +98,37 @@ function confidenceLabel(confidence: IssueDraft['confidence']): string {
   }
 }
 
+function statusLabel(status: IssueDraftStatus): string {
+  return REVIEW_STATUS_FILTERS.find((filter) => filter.value === status)?.label ?? status
+}
+
 export function DraftReview(): React.JSX.Element {
   const [drafts, setDrafts] = useState<IssueDraft[]>([])
+  const [statusFilter, setStatusFilter] = useState<IssueDraftStatus>('draft')
+  const [statusCounts, setStatusCounts] =
+    useState<Record<IssueDraftStatus, number>>(EMPTY_STATUS_COUNTS)
   const [selectedDraftId, setSelectedDraftId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
   const fetchDrafts = useCallback(async (): Promise<void> => {
-    const result = await window.pilog.invoke('issue-drafts:list')
+    const [result, activeDrafts, dismissedDrafts, publishedDrafts] = await Promise.all([
+      window.pilog.invoke('issue-drafts:list', { status: statusFilter }),
+      window.pilog.invoke('issue-drafts:list', { status: 'draft' }),
+      window.pilog.invoke('issue-drafts:list', { status: 'dismissed' }),
+      window.pilog.invoke('issue-drafts:list', { status: 'published' })
+    ])
     setDrafts(result)
+    setStatusCounts({
+      draft: activeDrafts.length,
+      dismissed: dismissedDrafts.length,
+      published: publishedDrafts.length
+    })
     setSelectedDraftId((current) => {
       if (current && result.some((draft) => draft.id === current)) return current
       return result[0]?.id ?? null
     })
     setLoading(false)
-  }, [])
+  }, [statusFilter])
 
   useEffect(() => {
     queueMicrotask(() => {
@@ -109,26 +143,68 @@ export function DraftReview(): React.JSX.Element {
   useEffect(() => window.pilog.on('issue-drafts:invalidated', handleDraftsInvalidated), [])
 
   const selectedDraft = drafts.find((draft) => draft.id === selectedDraftId) ?? null
+  const emptyDescription =
+    statusFilter === 'draft' && statusCounts.dismissed > 0
+      ? 'No active drafts. Dismissed drafts stay local and can be inspected from the Dismissed filter.'
+      : statusFilter === 'draft'
+        ? 'No active drafts yet. Generate drafts from selected inbox notes to review them here.'
+        : `No ${statusLabel(statusFilter).toLowerCase()} drafts.`
 
   return (
     <div className="flex h-full bg-background text-foreground">
       <aside className="flex w-[27rem] min-w-0 shrink-0 flex-col overflow-hidden border-r">
-        <div className="flex shrink-0 items-center justify-between gap-3 border-b px-6 py-3">
-          <p className="text-sm text-muted-foreground">
-            {loading ? 'Loading drafts' : `${drafts.length} draft${drafts.length === 1 ? '' : 's'}`}
-          </p>
-          <Badge variant="outline" className="shrink-0">
-            Review queue
-          </Badge>
+        <div className="flex shrink-0 flex-col gap-3 border-b px-6 py-3">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm text-muted-foreground">
+              {loading
+                ? 'Loading drafts'
+                : `${drafts.length} ${statusLabel(statusFilter).toLowerCase()} draft${
+                    drafts.length === 1 ? '' : 's'
+                  }`}
+            </p>
+            <Badge variant="outline" className="shrink-0">
+              Review queue
+            </Badge>
+          </div>
+          <div className="grid grid-cols-3 gap-1" aria-label="Draft status filter">
+            {REVIEW_STATUS_FILTERS.map((filter) => {
+              const active = statusFilter === filter.value
+              return (
+                <Button
+                  key={filter.value}
+                  type="button"
+                  variant={active ? 'secondary' : 'ghost'}
+                  size="sm"
+                  className="h-8 justify-between px-2"
+                  aria-pressed={active}
+                  onClick={() => setStatusFilter(filter.value)}
+                >
+                  <span>{filter.label}</span>
+                  <span className="tabular font-mono text-xs text-muted-foreground">
+                    {statusCounts[filter.value]}
+                  </span>
+                </Button>
+              )
+            })}
+          </div>
         </div>
 
         <ScrollArea className="min-h-0 flex-1">
           <div className="p-3">
             {drafts.length === 0 ? (
               <Empty className="mt-12 border-none bg-transparent p-8 shadow-none">
-                <EmptyDescription>
-                  No drafts yet. Generate drafts from selected inbox notes to review them here.
-                </EmptyDescription>
+                <EmptyDescription>{emptyDescription}</EmptyDescription>
+                {statusFilter === 'draft' && statusCounts.dismissed > 0 ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="mt-4"
+                    onClick={() => setStatusFilter('dismissed')}
+                  >
+                    Show dismissed drafts
+                  </Button>
+                ) : null}
               </Empty>
             ) : (
               <ul className="flex flex-col gap-1">
@@ -157,7 +233,7 @@ export function DraftReview(): React.JSX.Element {
                       </span>
 
                       <span className="mt-2 flex flex-wrap items-center gap-1.5">
-                        <Badge variant="secondary">{draft.status}</Badge>
+                        <Badge variant="secondary">{statusLabel(draft.status)}</Badge>
                         <Badge variant="outline">{confidenceLabel(draft.confidence)}</Badge>
                         {draft.labels.slice(0, 3).map((label) => (
                           <Badge key={label} variant="outline">
@@ -181,7 +257,12 @@ export function DraftReview(): React.JSX.Element {
 
       <main className="min-w-0 flex-1 overflow-y-auto">
         {selectedDraft ? (
-          <DraftEditor key={selectedDraft.id} draft={selectedDraft} onSaved={fetchDrafts} />
+          <DraftEditor
+            key={selectedDraft.id}
+            draft={selectedDraft}
+            onSaved={fetchDrafts}
+            onStatusChanged={fetchDrafts}
+          />
         ) : (
           <Empty className="h-full border-none bg-transparent shadow-none">
             <EmptyDescription>Select a draft to review and edit.</EmptyDescription>
@@ -194,16 +275,19 @@ export function DraftReview(): React.JSX.Element {
 
 function DraftEditor({
   draft,
-  onSaved
+  onSaved,
+  onStatusChanged
 }: {
   draft: IssueDraft
   onSaved: () => Promise<void>
+  onStatusChanged: () => Promise<void>
 }): React.JSX.Element {
   const [title, setTitle] = useState(draft.title)
   const [body, setBody] = useState(draft.body)
   const [labels, setLabels] = useState(formatLabels(draft.labels))
   const [criteria, setCriteria] = useState(extractAcceptanceCriteria(draft.body).join('\n'))
   const [saving, setSaving] = useState(false)
+  const [updatingStatus, setUpdatingStatus] = useState(false)
   const [savedAt, setSavedAt] = useState<string | null>(null)
 
   const parsedLabels = useMemo(() => parseLabels(labels), [labels])
@@ -244,6 +328,25 @@ function DraftEditor({
       setSaving(false)
     }
   }, [bodyForSave, dirty, draft.id, onSaved, parsedLabels, saving, title])
+
+  const handleStatusChange = useCallback(
+    async (status: IssueDraftStatus): Promise<void> => {
+      if (updatingStatus || draft.status === status) return
+      setUpdatingStatus(true)
+      try {
+        await window.pilog.invoke('issue-drafts:updateStatus', {
+          id: draft.id,
+          status
+        })
+        setUpdatingStatus(false)
+        await onStatusChanged()
+      } catch (error) {
+        setUpdatingStatus(false)
+        throw error
+      }
+    },
+    [draft.id, draft.status, onStatusChanged, updatingStatus]
+  )
 
   const handleSaveShortcut = useEffectEvent(() => {
     if (dirty && !saving) void handleSave()
@@ -286,6 +389,29 @@ function DraftEditor({
               <HugeiconsIcon icon={ViewIcon} data-icon="inline-start" aria-hidden />
               Publish later
             </Button>
+            {draft.status === 'dismissed' ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={updatingStatus}
+                onClick={() => void handleStatusChange('draft')}
+              >
+                <HugeiconsIcon icon={Tick02Icon} data-icon="inline-start" aria-hidden />
+                Restore
+              </Button>
+            ) : draft.status === 'draft' ? (
+              <Button
+                type="button"
+                variant="destructive"
+                size="sm"
+                disabled={updatingStatus}
+                onClick={() => void handleStatusChange('dismissed')}
+              >
+                <HugeiconsIcon icon={CancelCircleIcon} data-icon="inline-start" aria-hidden />
+                Dismiss
+              </Button>
+            ) : null}
             <Button
               type="button"
               size="sm"
@@ -363,7 +489,7 @@ function DraftEditor({
           <section className="flex flex-col gap-2">
             <h3 className="text-sm font-semibold">Readiness</h3>
             <div className="flex flex-wrap gap-1.5">
-              <Badge variant="secondary">{draft.status}</Badge>
+              <Badge variant="secondary">{statusLabel(draft.status)}</Badge>
               <Badge variant="outline">{confidenceLabel(draft.confidence)}</Badge>
             </div>
           </section>

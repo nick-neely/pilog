@@ -176,6 +176,8 @@ export type PiModelOption = {
   provider: string
 }
 
+export type IssueDraftStatus = 'draft' | 'published' | 'dismissed'
+
 export type IssueDraft = {
   id: string
   repoId: string
@@ -186,7 +188,7 @@ export type IssueDraft = {
   affectedFiles: Array<{ path: string; reason: string }>
   confidence: 'low' | 'medium' | 'high'
   groupingReason: string
-  status: 'draft' | 'published' | 'dismissed'
+  status: IssueDraftStatus
   githubIssueUrl: string | null
   createdAt: string
   updatedAt: string

@@ -2,7 +2,7 @@ import { desc, eq } from 'drizzle-orm'
 import { v4 as uuidv4 } from 'uuid'
 import type { PilogDatabase } from '../client'
 import { issueDrafts } from '../schema'
-import type { GeneratedIssueDraft, IssueDraft } from '@shared/types'
+import type { GeneratedIssueDraft, IssueDraft, IssueDraftStatus } from '@shared/types'
 
 const issueDraftColumns = {
   id: issueDrafts.id,
@@ -62,13 +62,15 @@ export function createIssueDraft(
   }
 }
 
-export function listIssueDrafts(db: PilogDatabase): IssueDraft[] {
-  return db
-    .select(issueDraftColumns)
-    .from(issueDrafts)
-    .orderBy(desc(issueDrafts.createdAt))
-    .all()
-    .map(mapIssueDraft)
+export function listIssueDrafts(
+  db: PilogDatabase,
+  filter: { status?: IssueDraftStatus | 'all' } = {}
+): IssueDraft[] {
+  const status = filter.status ?? 'draft'
+  const query = db.select(issueDraftColumns).from(issueDrafts)
+  const filtered = status === 'all' ? query : query.where(eq(issueDrafts.status, status))
+
+  return filtered.orderBy(desc(issueDrafts.createdAt)).all().map(mapIssueDraft)
 }
 
 export function updateIssueDraft(
@@ -90,6 +92,37 @@ export function updateIssueDraft(
       title: input.title,
       body: input.body,
       labels: JSON.stringify(input.labels),
+      updatedAt: now
+    })
+    .where(eq(issueDrafts.id, input.id))
+    .run()
+
+  const row = db
+    .select(issueDraftColumns)
+    .from(issueDrafts)
+    .where(eq(issueDrafts.id, input.id))
+    .get()
+
+  return row ? mapIssueDraft(row) : null
+}
+
+export function updateIssueDraftStatus(
+  db: PilogDatabase,
+  input: { id: string; status: IssueDraftStatus }
+): IssueDraft | null {
+  const existing = db
+    .select({ updatedAt: issueDrafts.updatedAt })
+    .from(issueDrafts)
+    .where(eq(issueDrafts.id, input.id))
+    .get()
+
+  if (!existing) return null
+
+  const now = nextUpdatedAt(existing.updatedAt)
+
+  db.update(issueDrafts)
+    .set({
+      status: input.status,
       updatedAt: now
     })
     .where(eq(issueDrafts.id, input.id))

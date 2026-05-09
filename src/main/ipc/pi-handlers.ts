@@ -307,7 +307,7 @@ export function registerPiIpcHandlers(
       }
     )
 
-    ipcMain.handle('debug:listIssueDrafts', () => listIssueDrafts(db))
+    ipcMain.handle('debug:listIssueDrafts', () => listIssueDrafts(db, { status: 'all' }))
   }
 }
 

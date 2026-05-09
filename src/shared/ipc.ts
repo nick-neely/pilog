@@ -10,6 +10,7 @@ import type {
   PiModelOption,
   PiProviderOption,
   IssueDraft,
+  IssueDraftStatus,
   SearchProvider,
   SetAdvancedSettingsRequest,
   PiStatus
@@ -132,6 +133,15 @@ export type UpdateIssueDraftRequest = {
   labels: string[]
 }
 
+export type ListIssueDraftsRequest = {
+  status?: IssueDraftStatus | 'all'
+}
+
+export type UpdateIssueDraftStatusRequest = {
+  id: string
+  status: IssueDraftStatus
+}
+
 export type IpcContract = {
   'note:create': { request: { content: string; repoId?: string | null }; response: Note }
   'note:list': { request: ListNotesRequest | void; response: Note[] }
@@ -185,11 +195,15 @@ export type IpcContract = {
     response: AgentRunDetail | null
   }
   'issue-drafts:list': {
-    request: void
+    request: ListIssueDraftsRequest | void
     response: IssueDraft[]
   }
   'issue-drafts:update': {
     request: UpdateIssueDraftRequest
+    response: IssueDraft | null
+  }
+  'issue-drafts:updateStatus': {
+    request: UpdateIssueDraftStatusRequest
     response: IssueDraft | null
   }
   'debug:seedIssueGenerationFixture': {
@@ -224,6 +238,7 @@ export type {
   PiModelOption,
   PiProviderOption,
   PiStatus,
+  IssueDraftStatus,
   SearchProvider,
   SetAdvancedSettingsRequest
 }
