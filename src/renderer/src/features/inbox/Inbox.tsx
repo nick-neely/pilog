@@ -386,25 +386,15 @@ function AutoPublishPreviewDialog({
     () => new Map(sourceNotes.map((note) => [note.id, note])),
     [sourceNotes]
   )
-  const showReport = report !== null
+  const title = getAutoPublishDialogTitle(summary, report)
+  const description = getAutoPublishDialogDescription(summary, report)
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent className="max-h-[min(42rem,calc(100vh-4rem))] max-w-3xl">
         <AlertDialogHeader>
-          <AlertDialogTitle>
-            {showReport
-              ? 'Publish report'
-              : summary?.dryRun
-                ? 'Dry-run publish plan'
-                : 'Review planned GitHub issues'}
-          </AlertDialogTitle>
-          <AlertDialogDescription>
-            {report
-              ? `${report.successCount} published, ${report.failureCount} failed.`
-              : (summary?.message ??
-                'PiLog planned these drafts for review before any GitHub writes.')}
-          </AlertDialogDescription>
+          <AlertDialogTitle>{title}</AlertDialogTitle>
+          <AlertDialogDescription>{description}</AlertDialogDescription>
         </AlertDialogHeader>
         {publishError ? (
           <div role="alert" className="rounded-md border bg-muted/50 px-3 py-2 text-sm">
@@ -448,21 +438,11 @@ function AutoPublishPreviewDialog({
                     <div className="grid gap-3 md:grid-cols-2">
                       <div className="flex flex-col gap-1">
                         <p className="text-xs font-medium text-muted-foreground">Source notes</p>
-                        <ul className="flex flex-col gap-1">
-                          {draft.sourceNoteIds.map((noteId) => {
-                            const note = sourceNotesById.get(noteId)
-                            const preview = note?.content.trim() || noteId
-                            return (
-                              <li
-                                key={noteId}
-                                className="line-clamp-2 text-sm leading-relaxed"
-                                title={preview}
-                              >
-                                {preview}
-                              </li>
-                            )
-                          })}
-                        </ul>
+                        <SourceNoteList
+                          noteIds={draft.sourceNoteIds}
+                          sourceNotesById={sourceNotesById}
+                          itemClassName="line-clamp-2 text-sm leading-relaxed"
+                        />
                       </div>
                       <div className="flex flex-col gap-1">
                         <p className="text-xs font-medium text-muted-foreground">Affected files</p>
@@ -499,6 +479,26 @@ function AutoPublishPreviewDialog({
       </AlertDialogContent>
     </AlertDialog>
   )
+}
+
+function getAutoPublishDialogTitle(
+  summary: AutoPublishPreviewSummary | null,
+  report: AutoPublishPublishReport | null
+): string {
+  if (report) return 'Publish report'
+  if (summary?.dryRun) return 'Dry-run publish plan'
+  return 'Review planned GitHub issues'
+}
+
+function getAutoPublishDialogDescription(
+  summary: AutoPublishPreviewSummary | null,
+  report: AutoPublishPublishReport | null
+): string {
+  if (report) {
+    return `${report.successCount} published, ${report.failureCount} failed.`
+  }
+
+  return summary?.message ?? 'PiLog planned these drafts for review before any GitHub writes.'
 }
 
 function AutoPublishReport({
@@ -552,21 +552,11 @@ function AutoPublishReport({
                       <p className="font-mono text-xs text-muted-foreground">
                         Draft {item.draftId}
                       </p>
-                      <ul className="flex flex-col gap-1">
-                        {item.sourceNoteIds.map((noteId) => {
-                          const note = sourceNotesById.get(noteId)
-                          const preview = note?.content.trim() || noteId
-                          return (
-                            <li
-                              key={noteId}
-                              className="line-clamp-2 text-xs leading-relaxed"
-                              title={preview}
-                            >
-                              {preview}
-                            </li>
-                          )
-                        })}
-                      </ul>
+                      <SourceNoteList
+                        noteIds={item.sourceNoteIds}
+                        sourceNotesById={sourceNotesById}
+                        itemClassName="line-clamp-2 text-xs leading-relaxed"
+                      />
                     </div>
                   </div>
                 </li>
@@ -576,6 +566,30 @@ function AutoPublishReport({
         ) : null}
       </div>
     </ScrollArea>
+  )
+}
+
+function SourceNoteList({
+  noteIds,
+  sourceNotesById,
+  itemClassName
+}: {
+  noteIds: string[]
+  sourceNotesById: Map<string, Note>
+  itemClassName: string
+}): React.JSX.Element {
+  return (
+    <ul className="flex flex-col gap-1">
+      {noteIds.map((noteId) => {
+        const note = sourceNotesById.get(noteId)
+        const preview = note?.content.trim() || noteId
+        return (
+          <li key={noteId} className={itemClassName} title={preview}>
+            {preview}
+          </li>
+        )
+      })}
+    </ul>
   )
 }
 

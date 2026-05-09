@@ -165,9 +165,16 @@ function recordLocalPublishState(
 }
 
 function formatPublishError(error: unknown): string {
-  const status =
-    typeof error === 'object' && error !== null ? (error as { status?: unknown }).status : undefined
+  const status = getErrorStatus(error)
   const statusText = typeof status === 'number' ? `GitHub ${status}: ` : ''
   const message = error instanceof Error ? error.message : String(error)
   return `${statusText}${message || 'Publish failed.'}`
+}
+
+function getErrorStatus(error: unknown): number | undefined {
+  if (typeof error !== 'object' || error === null || !('status' in error)) {
+    return undefined
+  }
+
+  return typeof error.status === 'number' ? error.status : undefined
 }
