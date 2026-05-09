@@ -1,50 +1,50 @@
 import {
-  Cancel01Icon,
-  CancelCircleIcon,
-  Copy01Icon,
-  FolderOpenIcon,
-  GitMergeIcon,
-  InformationCircleIcon,
-  SplitIcon,
-  Tick02Icon,
-  ViewIcon
+    Cancel01Icon,
+    CancelCircleIcon,
+    Copy01Icon,
+    FolderOpenIcon,
+    GitMergeIcon,
+    InformationCircleIcon,
+    SplitIcon,
+    Tick02Icon,
+    ViewIcon
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { Badge } from '@renderer/components/ui/badge'
 import { Button } from '@renderer/components/ui/button'
 import { Checkbox } from '@renderer/components/ui/checkbox'
 import {
-  Empty,
-  EmptyContent,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyTitle
+    Empty,
+    EmptyContent,
+    EmptyDescription,
+    EmptyHeader,
+    EmptyTitle
 } from '@renderer/components/ui/empty'
 import { Input } from '@renderer/components/ui/input'
 import { ScrollArea } from '@renderer/components/ui/scroll-area'
 import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
+    Select,
+    SelectContent,
+    SelectGroup,
+    SelectItem,
+    SelectTrigger,
+    SelectValue
 } from '@renderer/components/ui/select'
 import { Textarea } from '@renderer/components/ui/textarea'
 import type { RunNavigationOrigin } from '@renderer/features/agent-runs/navigation'
 import { cn } from '@renderer/lib/utils'
 import type {
-  AgentRunListItem,
-  GitHubStatus,
-  PathActionResult,
-  Repo,
-  UpdateIssueDraftRequest
+    AgentRunListItem,
+    GitHubStatus,
+    PathActionResult,
+    Repo,
+    UpdateIssueDraftRequest
 } from '@shared/ipc'
 import type {
-  IssueDraft,
-  IssueDraftForReview,
-  IssueDraftSourceNote,
-  IssueDraftStatus
+    IssueDraft,
+    IssueDraftForReview,
+    IssueDraftSourceNote,
+    IssueDraftStatus
 } from '@shared/types'
 import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
 
@@ -69,6 +69,15 @@ function formatTimestamp(iso: string): string {
 
 function normalizeDraftTitle(title: string): string {
   return title.trim() || 'Untitled draft'
+}
+
+function isSafeBrowserUrl(url: string): boolean {
+  try {
+    const u = new URL(url)
+    return u.protocol === 'https:' || u.protocol === 'http:'
+  } catch {
+    return false
+  }
 }
 
 function hasDraftChanges(
@@ -572,16 +581,25 @@ export function DraftReview({
                               </span>
                             </span>
                             <span
-                              className="line-clamp-2 min-w-0 break-words text-xs leading-snug text-muted-foreground"
+                              className="line-clamp-2 min-w-0 break-words text-xs leading-snug"
                               title={
                                 draft.labels.length > 0
                                   ? `${confidenceLabel(draft.confidence)} · ${draft.labels.join(', ')}`
                                   : confidenceLabel(draft.confidence)
                               }
                             >
-                              {draft.labels.length > 0
-                                ? `${confidenceSidebarShort(draft.confidence)} · ${draft.labels.join(' · ')}`
-                                : confidenceSidebarShort(draft.confidence)}
+                              <span
+                                className="mr-1.5 inline-flex align-middle items-center rounded border border-border/55 bg-muted/40 px-1 py-px text-[11px] font-medium leading-tight text-foreground/75"
+                                aria-hidden
+                              >
+                                {confidenceSidebarShort(draft.confidence)}
+                              </span>
+                              <span className="sr-only">{confidenceLabel(draft.confidence)}</span>
+                              {draft.labels.length > 0 ? (
+                                <span className="align-middle text-muted-foreground">
+                                  {draft.labels.join(' · ')}
+                                </span>
+                              ) : null}
                             </span>
                           </span>
                         </button>
@@ -1108,10 +1126,22 @@ function DraftEditor({
         ) : null}
         {publishedUrl ? (
           <p
-            className="mt-3 max-w-2xl truncate font-mono text-xs text-muted-foreground"
+            className="mt-3 flex min-w-0 max-w-2xl flex-wrap items-baseline gap-x-1 gap-y-0.5 text-xs leading-relaxed text-muted-foreground"
             aria-live="polite"
           >
-            Published to {publishedUrl}
+            <span className="shrink-0">Published to</span>
+            {isSafeBrowserUrl(publishedUrl) ? (
+              <a
+                href={publishedUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="min-w-0 max-w-full truncate font-mono text-primary underline-offset-2 hover:underline focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+              >
+                {publishedUrl}
+              </a>
+            ) : (
+              <span className="min-w-0 max-w-full truncate font-mono">{publishedUrl}</span>
+            )}
           </p>
         ) : null}
       </header>
