@@ -5,6 +5,7 @@ import {
   Copy01Icon,
   FolderOpenIcon,
   GitMergeIcon,
+  InformationCircleIcon,
   SplitIcon,
   Tick02Icon,
   ViewIcon
@@ -13,7 +14,13 @@ import { HugeiconsIcon } from '@hugeicons/react'
 import { Badge } from '@renderer/components/ui/badge'
 import { Button } from '@renderer/components/ui/button'
 import { Checkbox } from '@renderer/components/ui/checkbox'
-import { Empty, EmptyDescription } from '@renderer/components/ui/empty'
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyTitle
+} from '@renderer/components/ui/empty'
 import { Input } from '@renderer/components/ui/input'
 import { ScrollArea, ScrollBar } from '@renderer/components/ui/scroll-area'
 import { Separator } from '@renderer/components/ui/separator'
@@ -28,7 +35,13 @@ import {
 import { Textarea } from '@renderer/components/ui/textarea'
 import { cn } from '@renderer/lib/utils'
 import { extractAcceptanceCriteria, writeAcceptanceCriteria } from '@shared/acceptance-criteria'
-import type { PathActionResult, Repo, UpdateIssueDraftRequest } from '@shared/ipc'
+import type {
+  AgentRunListItem,
+  GitHubStatus,
+  PathActionResult,
+  Repo,
+  UpdateIssueDraftRequest
+} from '@shared/ipc'
 import type {
   IssueDraft,
   IssueDraftForReview,
@@ -159,8 +172,16 @@ function emptyDraftDescription(
   statusFilter: IssueDraftStatus,
   statusCounts: Record<IssueDraftStatus, number>
 ): string {
+  if (totalDraftCount(statusCounts) === 0) {
+    return 'Generate drafts from selected inbox notes.'
+  }
+
   if (statusFilter !== 'draft') {
     return `No ${statusLabel(statusFilter).toLowerCase()} drafts.`
+  }
+
+  if (statusCounts.published > 0 && statusCounts.dismissed === 0) {
+    return 'No active drafts. Published drafts stay in the Published filter for audit.'
   }
 
   if (statusCounts.dismissed > 0) {
@@ -168,6 +189,19 @@ function emptyDraftDescription(
   }
 
   return 'No active drafts yet. Generate drafts from selected inbox notes to review them here.'
+}
+
+function emptyDraftTitle(
+  statusFilter: IssueDraftStatus,
+  statusCounts: Record<IssueDraftStatus, number>
+): string {
+  if (totalDraftCount(statusCounts) === 0) return 'No drafts yet'
+  if (statusFilter === 'draft') return 'Review queue is clear'
+  return `No ${statusLabel(statusFilter).toLowerCase()} drafts`
+}
+
+function totalDraftCount(statusCounts: Record<IssueDraftStatus, number>): number {
+  return statusCounts.draft + statusCounts.dismissed + statusCounts.published
 }
 
 function formatDraftCount(count: number, status: IssueDraftStatus): string {
@@ -181,13 +215,120 @@ function publishButtonLabel(input: { publishing: boolean; published: boolean }):
   return 'Publish'
 }
 
+function failedRunSummary(run: AgentRunListItem): string {
+  const cause = run.errorCause ? ` (${run.errorCause.replaceAll('_', ' ')})` : ''
+  return run.errorMessage ? `${run.errorMessage}${cause}` : `Generation failed${cause}.`
+}
+
+type PublishBlock = {
+  title: string
+  description: string
+} & (
+  | {
+      actionLabel: string
+      action: 'settings' | 'repositories'
+    }
+  | {
+      actionLabel?: never
+      action: null
+    }
+)
+
+type DraftReviewNavigation = {
+  onNavigateToInbox: () => void
+  onNavigateToAgentRuns: (runId?: string) => void
+  onNavigateToSettings: () => void
+  onNavigateToRepositories: () => void
+}
+
+function publishBlockForDraft(repo: Repo | null, githubStatus: GitHubStatus): PublishBlock | null {
+  if (!githubStatus.connected) {
+    return {
+      title: 'GitHub is not connected.',
+      description: 'Connect GitHub before publishing this draft.',
+      actionLabel: 'Open Settings',
+      action: 'settings'
+    }
+  }
+
+  if (!repo) {
+    return {
+      title: 'The linked repo is missing.',
+      description: 'Reconnect the local repository before publishing this draft.',
+      actionLabel: 'Open Repositories',
+      action: 'repositories'
+    }
+  }
+
+  if (!repo.githubUrl) {
+    return {
+      title: 'This repo is not linked to GitHub.',
+      description: 'Link the local repo to a GitHub repository before publishing.',
+      actionLabel: 'Open Repositories',
+      action: 'repositories'
+    }
+  }
+
+  const githubRepo = parseGitHubRepoUrl(repo.githubUrl)
+  if (githubRepo && (githubRepo.owner !== repo.owner || githubRepo.name !== repo.name)) {
+    return {
+      title: 'The linked GitHub repo does not match this draft.',
+      description: `This draft is for ${repo.owner}/${repo.name}, but the linked URL points to ${githubRepo.owner}/${githubRepo.name}.`,
+      actionLabel: 'Open Repositories',
+      action: 'repositories'
+    }
+  }
+
+  return null
+}
+
+function publishBlockActionHandler(
+  block: PublishBlock,
+  navigation: Pick<DraftReviewNavigation, 'onNavigateToSettings' | 'onNavigateToRepositories'>
+): (() => void) | undefined {
+  switch (block.action) {
+    case 'settings':
+      return navigation.onNavigateToSettings
+    case 'repositories':
+      return navigation.onNavigateToRepositories
+    case null:
+      return undefined
+  }
+}
+
+function parseGitHubRepoUrl(url: string): { owner: string; name: string } | null {
+  try {
+    const parsed = new URL(url)
+    if (parsed.hostname !== 'github.com') return null
+    const [owner, rawName] = parsed.pathname.split('/').filter(Boolean)
+    if (!owner || !rawName) return null
+    return { owner, name: rawName.replace(/\.git$/, '') }
+  } catch {
+    return null
+  }
+}
+
+function formatPublishError(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error)
+  if (/\b422\b/.test(message) || /validation failed/i.test(message)) {
+    return 'GitHub rejected this issue as invalid. Review the title, body, and labels, then try Publish again.'
+  }
+  return message || 'Publish failed. Your edits are still here. Please try again.'
+}
+
 export function DraftReview({
+  onNavigateToInbox,
+  onNavigateToAgentRuns,
+  onNavigateToSettings,
+  onNavigateToRepositories,
   onOpenSourceNote
-}: {
+}: DraftReviewNavigation & {
   onOpenSourceNote: (noteId: string) => void
 }): React.JSX.Element {
   const [drafts, setDrafts] = useState<IssueDraftForReview[]>([])
   const [repos, setRepos] = useState<Repo[]>([])
+  const [githubStatus, setGithubStatus] = useState<GitHubStatus>({ connected: false })
+  const [failedRuns, setFailedRuns] = useState<AgentRunListItem[]>([])
   const [statusFilter, setStatusFilter] = useState<IssueDraftStatus>('draft')
   const [statusCounts, setStatusCounts] =
     useState<Record<IssueDraftStatus, number>>(EMPTY_STATUS_COUNTS)
@@ -195,14 +336,18 @@ export function DraftReview({
   const [loading, setLoading] = useState(true)
 
   const fetchDrafts = useCallback(async (): Promise<void> => {
-    const [allDrafts, repoResult] = await Promise.all([
+    const [allDrafts, repoResult, githubResult, failedRunResult] = await Promise.all([
       window.pilog.invoke('issue-drafts:list', { status: 'all' }),
-      window.pilog.invoke('repos:list')
+      window.pilog.invoke('repos:list'),
+      window.pilog.invoke('github:status'),
+      window.pilog.invoke('agent-runs:list', { status: 'failed', limit: 3 })
     ])
     const filteredDrafts = allDrafts.filter((draft) => draft.status === statusFilter)
 
     setDrafts(filteredDrafts)
     setRepos(repoResult)
+    setGithubStatus(githubResult)
+    setFailedRuns(failedRunResult)
     setStatusCounts(countDraftsByStatus(allDrafts))
     setSelectedDraftId((current) => {
       if (current && filteredDrafts.some((draft) => draft.id === current)) return current
@@ -234,7 +379,12 @@ export function DraftReview({
     [drafts, selectedDraft]
   )
   const reposById = useMemo(() => new Map(repos.map((repo) => [repo.id, repo])), [repos])
+  const selectedDraftRepo = selectedDraft ? (reposById.get(selectedDraft.repoId) ?? null) : null
+  const selectedDraftPublishBlock = selectedDraft
+    ? publishBlockForDraft(selectedDraftRepo, githubStatus)
+    : null
   const emptyDescription = emptyDraftDescription(statusFilter, statusCounts)
+  const emptyTitle = emptyDraftTitle(statusFilter, statusCounts)
 
   return (
     <div className="flex h-full bg-background text-foreground">
@@ -274,20 +424,17 @@ export function DraftReview({
         <ScrollArea className="min-h-0 flex-1">
           <div className="p-3">
             {drafts.length === 0 ? (
-              <Empty className="mt-12 border-none bg-transparent p-8 shadow-none">
-                <EmptyDescription>{emptyDescription}</EmptyDescription>
-                {statusFilter === 'draft' && statusCounts.dismissed > 0 ? (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="mt-4"
-                    onClick={() => setStatusFilter('dismissed')}
-                  >
-                    Show dismissed drafts
-                  </Button>
-                ) : null}
-              </Empty>
+              <ReviewEmptyState
+                className="mt-10 p-6"
+                title={emptyTitle}
+                description={emptyDescription}
+                statusFilter={statusFilter}
+                statusCounts={statusCounts}
+                failedRuns={failedRuns}
+                onNavigateToInbox={onNavigateToInbox}
+                onNavigateToAgentRuns={onNavigateToAgentRuns}
+                onSetStatusFilter={setStatusFilter}
+              />
             ) : (
               <ul className="flex flex-col gap-1">
                 {drafts.map((draft) => (
@@ -343,8 +490,11 @@ export function DraftReview({
             key={selectedDraft.id}
             draft={selectedDraft}
             mergeCandidates={mergeCandidates}
-            repoPath={reposById.get(selectedDraft.repoId)?.localPath ?? null}
+            repoPath={selectedDraftRepo?.localPath ?? null}
+            publishBlock={selectedDraftPublishBlock}
             onSaved={fetchDrafts}
+            onNavigateToSettings={onNavigateToSettings}
+            onNavigateToRepositories={onNavigateToRepositories}
             onOpenSourceNote={onOpenSourceNote}
             onStatusChanged={fetchDrafts}
             onSplitComplete={async (newDraftId) => {
@@ -353,11 +503,176 @@ export function DraftReview({
             }}
           />
         ) : (
-          <Empty className="h-full border-none bg-transparent shadow-none">
-            <EmptyDescription>Select a draft to review and edit.</EmptyDescription>
-          </Empty>
+          <ReviewEmptyState
+            className="h-full"
+            title={emptyTitle}
+            description={emptyDescription}
+            statusFilter={statusFilter}
+            statusCounts={statusCounts}
+            failedRuns={failedRuns}
+            onNavigateToInbox={onNavigateToInbox}
+            onNavigateToAgentRuns={onNavigateToAgentRuns}
+            onSetStatusFilter={setStatusFilter}
+          />
         )}
       </main>
+    </div>
+  )
+}
+
+function ReviewEmptyState({
+  className,
+  title,
+  description,
+  statusFilter,
+  statusCounts,
+  failedRuns,
+  onNavigateToInbox,
+  onNavigateToAgentRuns,
+  onSetStatusFilter
+}: {
+  className: string
+  title: string
+  description: string
+  statusFilter: IssueDraftStatus
+  statusCounts: Record<IssueDraftStatus, number>
+  failedRuns: AgentRunListItem[]
+  onNavigateToInbox: () => void
+  onNavigateToAgentRuns: (runId?: string) => void
+  onSetStatusFilter: (status: IssueDraftStatus) => void
+}): React.JSX.Element {
+  return (
+    <Empty className={cn('border-none bg-transparent shadow-none', className)}>
+      <EmptyHeader>
+        <EmptyTitle>{title}</EmptyTitle>
+        <EmptyDescription>{description}</EmptyDescription>
+      </EmptyHeader>
+      <ReviewEmptyActions
+        statusFilter={statusFilter}
+        statusCounts={statusCounts}
+        onNavigateToInbox={onNavigateToInbox}
+        onSetStatusFilter={onSetStatusFilter}
+      />
+      <FailedRunsNotice failedRuns={failedRuns} onNavigateToAgentRuns={onNavigateToAgentRuns} />
+    </Empty>
+  )
+}
+
+function ReviewEmptyActions({
+  statusFilter,
+  statusCounts,
+  onNavigateToInbox,
+  onSetStatusFilter
+}: {
+  statusFilter: IssueDraftStatus
+  statusCounts: Record<IssueDraftStatus, number>
+  onNavigateToInbox: () => void
+  onSetStatusFilter: (status: IssueDraftStatus) => void
+}): React.JSX.Element {
+  const noDrafts = totalDraftCount(statusCounts) === 0
+
+  return (
+    <EmptyContent className="gap-2">
+      <div className="flex flex-wrap justify-center gap-2">
+        {(noDrafts || statusFilter === 'draft') && (
+          <Button type="button" size="sm" onClick={onNavigateToInbox}>
+            Open Inbox
+          </Button>
+        )}
+        {statusFilter === 'draft' && statusCounts.dismissed > 0 ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => onSetStatusFilter('dismissed')}
+          >
+            Show dismissed drafts
+          </Button>
+        ) : null}
+        {statusFilter === 'draft' && statusCounts.published > 0 ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => onSetStatusFilter('published')}
+          >
+            Show published drafts
+          </Button>
+        ) : null}
+      </div>
+    </EmptyContent>
+  )
+}
+
+function FailedRunsNotice({
+  failedRuns,
+  onNavigateToAgentRuns
+}: {
+  failedRuns: AgentRunListItem[]
+  onNavigateToAgentRuns: (runId?: string) => void
+}): React.JSX.Element | null {
+  if (failedRuns.length === 0) return null
+
+  const latest = failedRuns[0]
+
+  return (
+    <div className="mt-2 flex w-full max-w-sm flex-col gap-2 rounded-md border bg-muted/30 p-3 text-left">
+      <div className="flex items-start gap-2">
+        <HugeiconsIcon icon={InformationCircleIcon} aria-hidden className="mt-0.5 shrink-0" />
+        <div className="min-w-0">
+          <p className="text-sm font-medium">Recent generation failed</p>
+          <p className="mt-1 line-clamp-3 text-xs leading-relaxed text-muted-foreground">
+            {failedRunSummary(latest)}
+          </p>
+        </div>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => onNavigateToAgentRuns(latest.id)}
+        >
+          Inspect run
+        </Button>
+        <Button type="button" variant="ghost" size="sm" onClick={() => onNavigateToAgentRuns()}>
+          All runs
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+function PublishBlocker({
+  block,
+  onNavigateToSettings,
+  onNavigateToRepositories
+}: {
+  block: PublishBlock
+  onNavigateToSettings: () => void
+  onNavigateToRepositories: () => void
+}): React.JSX.Element {
+  const handleAction = publishBlockActionHandler(block, {
+    onNavigateToSettings,
+    onNavigateToRepositories
+  })
+
+  return (
+    <div
+      id="publish-blocker"
+      role="status"
+      aria-live="polite"
+      className="mt-3 flex max-w-2xl flex-wrap items-center justify-between gap-3 rounded-md border bg-muted/30 p-3 text-sm"
+    >
+      <div className="min-w-0">
+        <p className="font-medium">{block.title}</p>
+        <p className="mt-1 text-muted-foreground">{block.description}</p>
+      </div>
+      {block.actionLabel && handleAction ? (
+        <Button type="button" variant="outline" size="sm" onClick={handleAction}>
+          {block.actionLabel}
+        </Button>
+      ) : null}
     </div>
   )
 }
@@ -366,16 +681,22 @@ function DraftEditor({
   draft,
   mergeCandidates,
   repoPath,
+  publishBlock,
   onOpenSourceNote,
   onSaved,
+  onNavigateToSettings,
+  onNavigateToRepositories,
   onStatusChanged,
   onSplitComplete
 }: {
   draft: IssueDraftForReview
   mergeCandidates: IssueDraftForReview[]
   repoPath: string | null
+  publishBlock: PublishBlock | null
   onOpenSourceNote: (noteId: string) => void
   onSaved: () => Promise<void>
+  onNavigateToSettings: () => void
+  onNavigateToRepositories: () => void
   onStatusChanged: () => Promise<void>
   onSplitComplete: (newDraftId: string) => Promise<void>
 }): React.JSX.Element {
@@ -415,7 +736,7 @@ function DraftEditor({
   )
   const dirty = hasDraftChanges(draft, editedDraft)
   const isPublished = draft.status === 'published'
-  const canPublish = draft.status === 'draft'
+  const canPublish = draft.status === 'draft' && !publishBlock
   const canEnterSplit = draft.status === 'draft' && draft.sourceNoteIds.length > 1
   const canSubmitSplit =
     canEnterSplit &&
@@ -453,6 +774,10 @@ function DraftEditor({
   }, [bodyForSave, dirty, draft.id, editedDraft.title, isPublished, onSaved, parsedLabels, saving])
 
   const handlePublish = useCallback(async (): Promise<void> => {
+    if (publishBlock) {
+      setPublishError(publishBlock.description)
+      return
+    }
     if (publishing || saving || !canPublish) return
 
     setPublishing(true)
@@ -472,11 +797,11 @@ function DraftEditor({
       setPublishedUrl(published.githubIssueUrl)
       await onSaved()
     } catch (err) {
-      setPublishError(err instanceof Error ? err.message : 'Publish failed. Please try again.')
+      setPublishError(formatPublishError(err))
     } finally {
       setPublishing(false)
     }
-  }, [canPublish, draft.id, editedDraft, onSaved, publishing, saving])
+  }, [canPublish, draft.id, editedDraft, onSaved, publishBlock, publishing, saving])
 
   const handleStatusChange = useCallback(
     async (status: IssueDraftStatus): Promise<void> => {
@@ -619,6 +944,7 @@ function DraftEditor({
               variant="outline"
               size="sm"
               disabled={publishing || saving || !canPublish}
+              aria-describedby={publishBlock ? 'publish-blocker' : undefined}
               onClick={() => void handlePublish()}
             >
               <HugeiconsIcon icon={ViewIcon} data-icon="inline-start" aria-hidden />
@@ -662,6 +988,13 @@ function DraftEditor({
           <p className="mt-3 max-w-2xl text-sm leading-relaxed text-destructive" role="alert">
             {publishError}
           </p>
+        ) : null}
+        {publishBlock ? (
+          <PublishBlocker
+            block={publishBlock}
+            onNavigateToSettings={onNavigateToSettings}
+            onNavigateToRepositories={onNavigateToRepositories}
+          />
         ) : null}
         {publishedUrl ? (
           <p

@@ -93,6 +93,56 @@ test('Generate Drafts persists one issue draft from selected repo notes', async 
   await exitApp(app)
 })
 
+test('Draft Review explains an empty queue and returns to Inbox', async () => {
+  const app = await launchApp()
+  const page = await app.firstWindow()
+
+  await page.locator('[data-testid="view-tab-drafts-trigger"]').click()
+
+  await expect(page.getByRole('heading', { name: 'No drafts yet' }).first()).toBeVisible()
+  await expect(page.getByText('Generate drafts from selected inbox notes.').first()).toBeVisible()
+
+  await page.getByRole('button', { name: 'Open Inbox' }).first().click()
+  await expect(page.locator('h1')).toHaveText('Inbox')
+
+  await exitApp(app)
+})
+
+test('Draft Review blocks publish when GitHub is not connected', async () => {
+  const app = await launchApp()
+  const page = await app.firstWindow()
+
+  await page.evaluate(
+    async ({ repoPath }) => {
+      await window.pilog.invoke('debug:seedIssueGenerationFixture', {
+        repoPath,
+        notes: ['save button needs loading state', 'settings spacing is odd on mobile']
+      })
+    },
+    { repoPath: repoDir }
+  )
+  await page.reload()
+
+  const noteRows = page.locator('[data-testid="note-row"]')
+  await noteRows.first().click()
+  const modifier = process.platform === 'darwin' ? 'Meta' : 'Control'
+  await noteRows.nth(1).click({ modifiers: [modifier] })
+  await page.locator('button:has-text("Generate Drafts")').click()
+
+  await expect
+    .poll(async () => page.evaluate(async () => window.pilog.invoke('debug:listIssueDrafts')))
+    .toHaveLength(1)
+
+  await page.evaluate(async () => window.pilog.invoke('github:signOut'))
+  await page.locator('[data-testid="view-tab-drafts-trigger"]').click()
+
+  await expect(page.getByRole('button', { name: 'Publish' })).toBeDisabled()
+  await expect(page.getByRole('status')).toContainText('GitHub is not connected.')
+  await expect(page.getByText('Connect GitHub before publishing this draft.')).toBeVisible()
+
+  await exitApp(app)
+})
+
 test('Pi config setup persists across restart and unblocks Generate Drafts', async () => {
   let app = await launchApp()
   let page = await app.firstWindow()
