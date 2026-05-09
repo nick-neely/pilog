@@ -20,6 +20,7 @@ import type {
   SearchProvider,
   SetAdvancedSettingsRequest
 } from './types'
+import type { IssueDraftSourceNote } from './types'
 
 export type NoteStatus = 'unprocessed' | 'drafted' | 'published' | 'dismissed'
 
@@ -175,6 +176,12 @@ export type PublishLogEntry = {
   publishedAt: string
 }
 
+export type PublishAuditLogEntry = PublishLogEntry & {
+  repo: Repo
+  draftTitle: string | null
+  sourceNotes: IssueDraftSourceNote[]
+}
+
 export type UpdateIssueDraftRequest = {
   id: string
   title: string
@@ -303,6 +310,10 @@ export type IpcContract = {
   'issue-drafts:publishAutoPublishRun': {
     request: PublishAutoPublishRunRequest
     response: AutoPublishPublishReport
+  }
+  'publish-log:list': {
+    request: { repoId?: string } | undefined
+    response: PublishAuditLogEntry[]
   }
   'path:copy': {
     request: PathActionRequest

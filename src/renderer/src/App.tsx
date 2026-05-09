@@ -14,9 +14,10 @@ import { Settings } from './features/settings/Settings'
 import { Repositories } from './features/repositories/Repositories'
 import { AgentRuns } from './features/agent-runs/AgentRuns'
 import { DraftReview } from './features/issue-drafts/DraftReview'
+import { PublishLog } from './features/publish-log/PublishLog'
 import type { RunNavigationOrigin } from './features/agent-runs/navigation'
 
-type Route = 'inbox' | 'draft-review' | 'settings' | 'repositories' | 'agent-runs'
+type Route = 'inbox' | 'draft-review' | 'settings' | 'repositories' | 'agent-runs' | 'publish-log'
 type ViewTabValue = 'inbox' | 'drafts'
 
 let currentRoute: Route = 'inbox'
@@ -68,6 +69,7 @@ function routeToActiveTab(route: Route): ViewTabValue | null {
     case 'draft-review':
       return 'drafts'
     case 'agent-runs':
+    case 'publish-log':
     case 'repositories':
     case 'settings':
       return null
@@ -259,6 +261,7 @@ function App(): React.JSX.Element {
           onBack={openInbox}
           onNavigateRepositories={() => setAppRoute('repositories')}
           onNavigateRunHistory={openRunHistory}
+          onNavigatePublishLog={() => setAppRoute('publish-log')}
         />
         <GlobalCommandPalette
           open={paletteOpen}
@@ -309,6 +312,24 @@ function App(): React.JSX.Element {
         onOpenDraft={openDraft}
       />
     ) : undefined
+  const publishLogBreadcrumbs =
+    route === 'publish-log' ? (
+      <Breadcrumb>
+        <BreadcrumbList>
+          <BreadcrumbItem>
+            <BreadcrumbLink asChild>
+              <button type="button" onClick={openSettings}>
+                Settings
+              </button>
+            </BreadcrumbLink>
+          </BreadcrumbItem>
+          <BreadcrumbSeparator />
+          <BreadcrumbItem>
+            <BreadcrumbPage>Publish log</BreadcrumbPage>
+          </BreadcrumbItem>
+        </BreadcrumbList>
+      </Breadcrumb>
+    ) : undefined
 
   return (
     <AppShell
@@ -316,7 +337,7 @@ function App(): React.JSX.Element {
       activeTab={activeTab ?? undefined}
       onTabChange={(next) => setAppRoute(tabToRoute(next))}
       onNavigateToSettings={openSettings}
-      navigationSlot={runBreadcrumbs}
+      navigationSlot={runBreadcrumbs ?? publishLogBreadcrumbs}
       onOpenCommandPalette={() => setPaletteOpen(true)}
     >
       {route === 'inbox' ? (
@@ -341,6 +362,8 @@ function App(): React.JSX.Element {
           onNavigateToRepositories={() => setAppRoute('repositories')}
           onOpenSourceNote={openNote}
         />
+      ) : route === 'publish-log' ? (
+        <PublishLog onOpenDraft={openDraft} onOpenSourceNote={openNote} />
       ) : (
         <AgentRuns focusRunId={focusedRunId} onOpenSourceNote={openNote} />
       )}

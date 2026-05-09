@@ -8,6 +8,7 @@ import {
   Delete02Icon,
   EyeIcon,
   FileKeyIcon,
+  GithubIcon,
   Search01Icon
 } from '@hugeicons/core-free-icons'
 import { Avatar, AvatarFallback } from '@renderer/components/ui/avatar'
@@ -379,11 +380,13 @@ function comboItemsEqual(a: ComboItem, b: ComboItem): boolean {
 export function Settings({
   onBack,
   onNavigateRepositories,
-  onNavigateRunHistory
+  onNavigateRunHistory,
+  onNavigatePublishLog
 }: {
   onBack: () => void
   onNavigateRepositories?: () => void
   onNavigateRunHistory?: () => void
+  onNavigatePublishLog?: () => void
 }): React.JSX.Element {
   const [hotkey, setHotkey] = useSetting('hotkey.scratchpad')
   const [openAtLogin, setOpenAtLogin] = useSetting('openInboxAtLogin')
@@ -695,7 +698,7 @@ export function Settings({
                       are stored in OS-backed safe storage, separate from model credentials.
                     </p>
                     {onNavigateRunHistory && (
-                      <div>
+                      <div className="flex flex-wrap gap-2">
                         <Button
                           type="button"
                           variant="outline"
@@ -709,6 +712,17 @@ export function Settings({
                           />
                           Run history
                         </Button>
+                        {onNavigatePublishLog && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={onNavigatePublishLog}
+                          >
+                            <HugeiconsIcon icon={GithubIcon} data-icon="inline-start" aria-hidden />
+                            Publish log
+                          </Button>
+                        )}
                       </div>
                     )}
 

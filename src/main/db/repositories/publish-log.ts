@@ -1,8 +1,9 @@
-import { desc, eq } from 'drizzle-orm'
+import { desc, eq, inArray } from 'drizzle-orm'
 import { v4 as uuidv4 } from 'uuid'
 import type { PilogDatabase } from '../client'
-import { publishLog } from '../schema'
-import type { PublishLogEntry } from '@shared/ipc'
+import { issueDrafts, notes, publishLog, repos } from '../schema'
+import type { PublishAuditLogEntry, PublishLogEntry, Repo } from '@shared/ipc'
+import type { IssueDraftSourceNote } from '@shared/types'
 
 const publishLogColumns = {
   id: publishLog.id,
@@ -10,6 +11,32 @@ const publishLogColumns = {
   repoId: publishLog.repoId,
   githubIssueUrl: publishLog.githubIssueUrl,
   publishedAt: publishLog.publishedAt
+} as const
+
+const repoColumns = {
+  id: repos.id,
+  name: repos.name,
+  owner: repos.owner,
+  localPath: repos.localPath,
+  githubUrl: repos.githubUrl,
+  defaultBranch: repos.defaultBranch,
+  autoPublishEnabled: repos.autoPublishEnabled,
+  autoPublishMaxIssuesPerRun: repos.autoPublishMaxIssuesPerRun,
+  autoPublishDefaultLabel: repos.autoPublishDefaultLabel,
+  autoPublishDryRun: repos.autoPublishDryRun,
+  autoPublishRequireConfirmation: repos.autoPublishRequireConfirmation,
+  createdAt: repos.createdAt,
+  updatedAt: repos.updatedAt
+} as const
+
+const sourceNoteColumns = {
+  id: notes.id,
+  content: notes.content,
+  status: notes.status,
+  repoId: notes.repoId,
+  runId: notes.runId,
+  createdAt: notes.createdAt,
+  updatedAt: notes.updatedAt
 } as const
 
 export function recordPublish(
@@ -45,4 +72,72 @@ export function listPublishLog(db: PilogDatabase, filter: { repoId: string }): P
     .where(eq(publishLog.repoId, filter.repoId))
     .orderBy(desc(publishLog.publishedAt))
     .all()
+}
+
+export function listPublishAuditLog(
+  db: PilogDatabase,
+  filter: { repoId?: string } = {}
+): PublishAuditLogEntry[] {
+  const baseQuery = db
+    .select({
+      id: publishLog.id,
+      draftId: publishLog.draftId,
+      repoId: publishLog.repoId,
+      githubIssueUrl: publishLog.githubIssueUrl,
+      publishedAt: publishLog.publishedAt,
+      repo: repoColumns,
+      draftTitle: issueDrafts.title,
+      sourceNoteIdsJson: issueDrafts.sourceNoteIds
+    })
+    .from(publishLog)
+    .innerJoin(repos, eq(publishLog.repoId, repos.id))
+    .leftJoin(issueDrafts, eq(publishLog.draftId, issueDrafts.id))
+
+  const rows = (filter.repoId ? baseQuery.where(eq(publishLog.repoId, filter.repoId)) : baseQuery)
+    .orderBy(desc(publishLog.publishedAt))
+    .all()
+
+  const sourceNoteIds = [
+    ...new Set(rows.flatMap((row) => parseJsonStringArray(row.sourceNoteIdsJson)))
+  ]
+  const sourceNotesById = new Map<string, IssueDraftSourceNote>()
+
+  if (sourceNoteIds.length > 0) {
+    const sourceNotes = db
+      .select(sourceNoteColumns)
+      .from(notes)
+      .where(inArray(notes.id, sourceNoteIds))
+      .all()
+    for (const note of sourceNotes) sourceNotesById.set(note.id, note)
+  }
+
+  return rows.map((row) => {
+    const sourceNotes = parseJsonStringArray(row.sourceNoteIdsJson)
+      .map((id) => sourceNotesById.get(id))
+      .filter((note): note is IssueDraftSourceNote => note !== undefined)
+
+    return {
+      id: row.id,
+      draftId: row.draftId,
+      repoId: row.repoId,
+      githubIssueUrl: row.githubIssueUrl,
+      publishedAt: row.publishedAt,
+      repo: row.repo as Repo,
+      draftTitle: row.draftTitle,
+      sourceNotes
+    }
+  })
+}
+
+function parseJsonStringArray(value: string | null): string[] {
+  if (!value) return []
+
+  try {
+    const parsed = JSON.parse(value)
+    return Array.isArray(parsed)
+      ? parsed.filter((item): item is string => typeof item === 'string')
+      : []
+  } catch {
+    return []
+  }
 }
