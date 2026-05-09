@@ -50,7 +50,16 @@ app.whenReady().then(() => {
     }
   }
 
-  registerIpcHandlers(db, { onNoteCreated: broadcastNoteCreated })
+  function broadcastIssueDraftsInvalidated(): void {
+    for (const win of BrowserWindow.getAllWindows()) {
+      win.webContents.send('issue-drafts:invalidated')
+    }
+  }
+
+  registerIpcHandlers(db, {
+    onNoteCreated: broadcastNoteCreated,
+    onIssueDraftsChanged: broadcastIssueDraftsInvalidated
+  })
 
   registerGitHubIpcHandlers(
     {
@@ -61,7 +70,12 @@ app.whenReady().then(() => {
   )
 
   registerRepoIpcHandlers(db)
-  registerPiIpcHandlers(db, { onDraftsGenerated: broadcastNoteCreated })
+  registerPiIpcHandlers(db, {
+    onDraftsGenerated: () => {
+      broadcastNoteCreated()
+      broadcastIssueDraftsInvalidated()
+    }
+  })
 
   ipcMain.on('scratchpad:hide', () => {
     hideScratchpad()

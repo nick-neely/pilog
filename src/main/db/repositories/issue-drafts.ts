@@ -1,4 +1,4 @@
-import { desc } from 'drizzle-orm'
+import { desc, eq } from 'drizzle-orm'
 import { v4 as uuidv4 } from 'uuid'
 import type { PilogDatabase } from '../client'
 import { issueDrafts } from '../schema'
@@ -69,6 +69,42 @@ export function listIssueDrafts(db: PilogDatabase): IssueDraft[] {
     .orderBy(desc(issueDrafts.createdAt))
     .all()
     .map(mapIssueDraft)
+}
+
+export function updateIssueDraft(
+  db: PilogDatabase,
+  input: { id: string; title: string; body: string; labels: string[] }
+): IssueDraft | null {
+  const existing = db
+    .select({ updatedAt: issueDrafts.updatedAt })
+    .from(issueDrafts)
+    .where(eq(issueDrafts.id, input.id))
+    .get()
+
+  if (!existing) return null
+
+  const nowDate = new Date()
+  const previousDate = new Date(existing.updatedAt)
+  if (nowDate <= previousDate) nowDate.setTime(previousDate.getTime() + 1)
+  const now = nowDate.toISOString()
+
+  db.update(issueDrafts)
+    .set({
+      title: input.title,
+      body: input.body,
+      labels: JSON.stringify(input.labels),
+      updatedAt: now
+    })
+    .where(eq(issueDrafts.id, input.id))
+    .run()
+
+  const row = db
+    .select(issueDraftColumns)
+    .from(issueDrafts)
+    .where(eq(issueDrafts.id, input.id))
+    .get()
+
+  return row ? mapIssueDraft(row) : null
 }
 
 function mapIssueDraft(row: typeof issueDrafts.$inferSelect): IssueDraft {

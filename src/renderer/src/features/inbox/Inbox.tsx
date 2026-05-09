@@ -304,6 +304,7 @@ export function Inbox({
   onNavigateToAgentRuns,
   onNavigateToRepositories,
   onNavigateToSettings,
+  onNavigateToDraftReview,
   paletteOpen,
   onPaletteOpenChange
 }: {
@@ -312,6 +313,7 @@ export function Inbox({
   onNavigateToAgentRuns: (runId?: string) => void
   onNavigateToRepositories: () => void
   onNavigateToSettings: () => void
+  onNavigateToDraftReview: () => void
   /** Controlled by App so the global Cmd-K trigger in AppShell can open the palette. */
   paletteOpen: boolean
   onPaletteOpenChange: (open: boolean) => void
@@ -580,6 +582,7 @@ export function Inbox({
         if (event.type === 'final') {
           await Promise.all([fetchNotes(), fetchStatusCounts()])
           clearSelection()
+          onNavigateToDraftReview()
         }
         if (event.type === 'error') {
           console.error(event.message)

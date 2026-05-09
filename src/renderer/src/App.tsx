@@ -4,8 +4,9 @@ import { Inbox } from './features/inbox/Inbox'
 import { Settings } from './features/settings/Settings'
 import { Repositories } from './features/repositories/Repositories'
 import { AgentRuns } from './features/agent-runs/AgentRuns'
+import { DraftReview } from './features/issue-drafts/DraftReview'
 
-type Route = 'inbox' | 'settings' | 'repositories' | 'agent-runs'
+type Route = 'inbox' | 'draft-review' | 'settings' | 'repositories' | 'agent-runs'
 
 let currentRoute: Route = 'inbox'
 const routeListeners = new Set<() => void>()
@@ -48,6 +49,12 @@ const VIEW_TABS = [
     // forward into the Agent Runs view from the Inbox surface.
     testId: 'open-agent-runs',
     activeTestId: 'view-tab-runs'
+  },
+  {
+    value: 'drafts' as const,
+    label: 'Drafts',
+    testId: 'view-tab-drafts-trigger',
+    activeTestId: 'view-tab-drafts'
   }
 ]
 
@@ -73,13 +80,15 @@ function App(): React.JSX.Element {
     return <Repositories onBack={() => setAppRoute('settings')} />
   }
 
-  const activeTab = route === 'inbox' ? 'inbox' : 'runs'
+  const activeTab = route === 'inbox' ? 'inbox' : route === 'draft-review' ? 'drafts' : 'runs'
 
   return (
     <AppShell
       tabs={VIEW_TABS}
       activeTab={activeTab}
-      onTabChange={(next) => setAppRoute(next === 'inbox' ? 'inbox' : 'agent-runs')}
+      onTabChange={(next) =>
+        setAppRoute(next === 'inbox' ? 'inbox' : next === 'drafts' ? 'draft-review' : 'agent-runs')
+      }
       onNavigateToSettings={() => setAppRoute('settings')}
       // Cmd-K lives in Inbox's command surface today; only show the
       // chrome trigger when the active view actually has a palette.
@@ -97,9 +106,12 @@ function App(): React.JSX.Element {
           }}
           onNavigateToRepositories={() => setAppRoute('repositories')}
           onNavigateToSettings={() => setAppRoute('settings')}
+          onNavigateToDraftReview={() => setAppRoute('draft-review')}
           paletteOpen={paletteOpen}
           onPaletteOpenChange={setPaletteOpen}
         />
+      ) : route === 'draft-review' ? (
+        <DraftReview />
       ) : (
         <AgentRuns
           focusRunId={focusedRunId}

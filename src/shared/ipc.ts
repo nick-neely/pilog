@@ -125,6 +125,13 @@ export type PublishLogEntry = {
   publishedAt: string
 }
 
+export type UpdateIssueDraftRequest = {
+  id: string
+  title: string
+  body: string
+  labels: string[]
+}
+
 export type IpcContract = {
   'note:create': { request: { content: string; repoId?: string | null }; response: Note }
   'note:list': { request: ListNotesRequest | void; response: Note[] }
@@ -177,6 +184,14 @@ export type IpcContract = {
     request: { id: string }
     response: AgentRunDetail | null
   }
+  'issue-drafts:list': {
+    request: void
+    response: IssueDraft[]
+  }
+  'issue-drafts:update': {
+    request: UpdateIssueDraftRequest
+    response: IssueDraft | null
+  }
   'debug:seedIssueGenerationFixture': {
     request: { repoPath: string; notes: string[] }
     response: { repoId: string; noteIds: string[] }
@@ -194,6 +209,7 @@ export type IpcEvent =
   | 'navigate:inbox'
   | 'navigate:settings'
   | 'agent-runs:invalidated'
+  | 'issue-drafts:invalidated'
 
 export type IpcAction = 'scratchpad:hide'
 
