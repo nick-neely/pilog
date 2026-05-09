@@ -16,7 +16,7 @@ import { Separator } from '@renderer/components/ui/separator'
 import { Textarea } from '@renderer/components/ui/textarea'
 import { cn } from '@renderer/lib/utils'
 import { extractAcceptanceCriteria, writeAcceptanceCriteria } from '@shared/acceptance-criteria'
-import type { Repo, UpdateIssueDraftRequest } from '@shared/ipc'
+import type { PathActionResult, Repo, UpdateIssueDraftRequest } from '@shared/ipc'
 import type { IssueDraft, IssueDraftForReview, IssueDraftSourceNote } from '@shared/types'
 
 const DRAFT_TIMESTAMP_FORMATTER = new Intl.DateTimeFormat(undefined, {
@@ -84,6 +84,30 @@ function confidenceLabel(confidence: IssueDraft['confidence']): string {
       return 'Medium confidence'
     case 'low':
       return 'Low confidence'
+  }
+}
+
+type PathAction = 'copy' | 'reveal'
+
+function pathActionChannel(action: PathAction): 'path:copy' | 'path:reveal' {
+  switch (action) {
+    case 'copy':
+      return 'path:copy'
+    case 'reveal':
+      return 'path:reveal'
+  }
+}
+
+function pathActionMessage(result: PathActionResult, action: PathAction): string {
+  if (result.ok) {
+    return action === 'copy' ? 'Copied path.' : 'Opened in file explorer.'
+  }
+
+  switch (result.reason) {
+    case 'missing':
+      return 'File was not found on disk.'
+    case 'unavailable':
+      return 'Could not use this path.'
   }
 }
 
@@ -277,21 +301,13 @@ function DraftEditor({
   })
 
   const handlePathAction = useCallback(
-    async (file: IssueDraft['affectedFiles'][number], action: 'copy' | 'reveal'): Promise<void> => {
-      const result = await window.pilog.invoke(action === 'copy' ? 'path:copy' : 'path:reveal', {
+    async (file: IssueDraft['affectedFiles'][number], action: PathAction): Promise<void> => {
+      const result = await window.pilog.invoke(pathActionChannel(action), {
         path: file.path,
         repoPath
       })
-      const message =
-        result.ok && action === 'copy'
-          ? 'Copied path.'
-          : result.ok
-            ? 'Opened in file explorer.'
-            : result.reason === 'missing'
-              ? 'File was not found on disk.'
-              : 'Could not use this path.'
 
-      setPathMessages((current) => ({ ...current, [file.path]: message }))
+      setPathMessages((current) => ({ ...current, [file.path]: pathActionMessage(result, action) }))
     },
     [repoPath]
   )
