@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useEffectEvent, useMemo, useState } from 'react'
 import {
   ArrowRight01Icon,
+  CancelCircleIcon,
   Copy01Icon,
   FolderOpenIcon,
   Tick02Icon,
@@ -17,7 +18,20 @@ import { Textarea } from '@renderer/components/ui/textarea'
 import { cn } from '@renderer/lib/utils'
 import { extractAcceptanceCriteria, writeAcceptanceCriteria } from '@shared/acceptance-criteria'
 import type { PathActionResult, Repo, UpdateIssueDraftRequest } from '@shared/ipc'
-import type { IssueDraft, IssueDraftForReview, IssueDraftSourceNote } from '@shared/types'
+import type {
+  IssueDraft,
+  IssueDraftForReview,
+  IssueDraftSourceNote,
+  IssueDraftStatus
+} from '@shared/types'
+
+const EMPTY_STATUS_COUNTS: Record<IssueDraftStatus, number> = {
+  draft: 0,
+  dismissed: 0,
+  published: 0
+}
+
+const ISSUE_DRAFT_STATUSES: readonly IssueDraftStatus[] = ['draft', 'dismissed', 'published']
 
 const DRAFT_TIMESTAMP_FORMATTER = new Intl.DateTimeFormat(undefined, {
   month: 'short',
@@ -111,6 +125,45 @@ function pathActionMessage(result: PathActionResult, action: PathAction): string
   }
 }
 
+function statusLabel(status: IssueDraftStatus): string {
+  switch (status) {
+    case 'draft':
+      return 'Active'
+    case 'dismissed':
+      return 'Dismissed'
+    case 'published':
+      return 'Published'
+  }
+}
+
+function countDraftsByStatus(drafts: IssueDraft[]): Record<IssueDraftStatus, number> {
+  const counts = { ...EMPTY_STATUS_COUNTS }
+  for (const draft of drafts) {
+    counts[draft.status] += 1
+  }
+  return counts
+}
+
+function emptyDraftDescription(
+  statusFilter: IssueDraftStatus,
+  statusCounts: Record<IssueDraftStatus, number>
+): string {
+  if (statusFilter !== 'draft') {
+    return `No ${statusLabel(statusFilter).toLowerCase()} drafts.`
+  }
+
+  if (statusCounts.dismissed > 0) {
+    return 'No active drafts. Dismissed drafts stay local and can be inspected from the Dismissed filter.'
+  }
+
+  return 'No active drafts yet. Generate drafts from selected inbox notes to review them here.'
+}
+
+function formatDraftCount(count: number, status: IssueDraftStatus): string {
+  const label = statusLabel(status).toLowerCase()
+  return `${count} ${label} draft${count === 1 ? '' : 's'}`
+}
+
 export function DraftReview({
   onOpenSourceNote
 }: {
@@ -118,22 +171,28 @@ export function DraftReview({
 }): React.JSX.Element {
   const [drafts, setDrafts] = useState<IssueDraftForReview[]>([])
   const [repos, setRepos] = useState<Repo[]>([])
+  const [statusFilter, setStatusFilter] = useState<IssueDraftStatus>('draft')
+  const [statusCounts, setStatusCounts] =
+    useState<Record<IssueDraftStatus, number>>(EMPTY_STATUS_COUNTS)
   const [selectedDraftId, setSelectedDraftId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
   const fetchDrafts = useCallback(async (): Promise<void> => {
-    const [result, repoResult] = await Promise.all([
-      window.pilog.invoke('issue-drafts:list'),
+    const [allDrafts, repoResult] = await Promise.all([
+      window.pilog.invoke('issue-drafts:list', { status: 'all' }),
       window.pilog.invoke('repos:list')
     ])
-    setDrafts(result)
+    const filteredDrafts = allDrafts.filter((draft) => draft.status === statusFilter)
+
+    setDrafts(filteredDrafts)
     setRepos(repoResult)
+    setStatusCounts(countDraftsByStatus(allDrafts))
     setSelectedDraftId((current) => {
-      if (current && result.some((draft) => draft.id === current)) return current
-      return result[0]?.id ?? null
+      if (current && filteredDrafts.some((draft) => draft.id === current)) return current
+      return filteredDrafts[0]?.id ?? null
     })
     setLoading(false)
-  }, [])
+  }, [statusFilter])
 
   useEffect(() => {
     queueMicrotask(() => {
@@ -149,26 +208,59 @@ export function DraftReview({
 
   const selectedDraft = drafts.find((draft) => draft.id === selectedDraftId) ?? null
   const reposById = useMemo(() => new Map(repos.map((repo) => [repo.id, repo])), [repos])
+  const emptyDescription = emptyDraftDescription(statusFilter, statusCounts)
 
   return (
     <div className="flex h-full bg-background text-foreground">
       <aside className="flex w-[27rem] min-w-0 shrink-0 flex-col overflow-hidden border-r">
-        <div className="flex shrink-0 items-center justify-between gap-3 border-b px-6 py-3">
-          <p className="text-sm text-muted-foreground">
-            {loading ? 'Loading drafts' : `${drafts.length} draft${drafts.length === 1 ? '' : 's'}`}
-          </p>
-          <Badge variant="outline" className="shrink-0">
-            Review queue
-          </Badge>
+        <div className="flex shrink-0 flex-col gap-3 border-b px-6 py-3">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm text-muted-foreground">
+              {loading ? 'Loading drafts' : formatDraftCount(drafts.length, statusFilter)}
+            </p>
+            <Badge variant="outline" className="shrink-0">
+              Review queue
+            </Badge>
+          </div>
+          <div className="grid grid-cols-3 gap-1" aria-label="Draft status filter">
+            {ISSUE_DRAFT_STATUSES.map((status) => {
+              const active = statusFilter === status
+              return (
+                <Button
+                  key={status}
+                  type="button"
+                  variant={active ? 'secondary' : 'ghost'}
+                  size="sm"
+                  className="h-8 justify-between px-2"
+                  aria-pressed={active}
+                  onClick={() => setStatusFilter(status)}
+                >
+                  <span>{statusLabel(status)}</span>
+                  <span className="tabular font-mono text-xs text-muted-foreground">
+                    {statusCounts[status]}
+                  </span>
+                </Button>
+              )
+            })}
+          </div>
         </div>
 
         <ScrollArea className="min-h-0 flex-1">
           <div className="p-3">
             {drafts.length === 0 ? (
               <Empty className="mt-12 border-none bg-transparent p-8 shadow-none">
-                <EmptyDescription>
-                  No drafts yet. Generate drafts from selected inbox notes to review them here.
-                </EmptyDescription>
+                <EmptyDescription>{emptyDescription}</EmptyDescription>
+                {statusFilter === 'draft' && statusCounts.dismissed > 0 ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="mt-4"
+                    onClick={() => setStatusFilter('dismissed')}
+                  >
+                    Show dismissed drafts
+                  </Button>
+                ) : null}
               </Empty>
             ) : (
               <ul className="flex flex-col gap-1">
@@ -197,7 +289,7 @@ export function DraftReview({
                       </span>
 
                       <span className="mt-2 flex flex-wrap items-center gap-1.5">
-                        <Badge variant="secondary">{draft.status}</Badge>
+                        <Badge variant="secondary">{statusLabel(draft.status)}</Badge>
                         <Badge variant="outline">{confidenceLabel(draft.confidence)}</Badge>
                         {draft.labels.slice(0, 3).map((label) => (
                           <Badge key={label} variant="outline">
@@ -227,6 +319,7 @@ export function DraftReview({
             repoPath={reposById.get(selectedDraft.repoId)?.localPath ?? null}
             onSaved={fetchDrafts}
             onOpenSourceNote={onOpenSourceNote}
+            onStatusChanged={fetchDrafts}
           />
         ) : (
           <Empty className="h-full border-none bg-transparent shadow-none">
@@ -242,18 +335,21 @@ function DraftEditor({
   draft,
   repoPath,
   onOpenSourceNote,
-  onSaved
+  onSaved,
+  onStatusChanged
 }: {
   draft: IssueDraftForReview
   repoPath: string | null
   onOpenSourceNote: (noteId: string) => void
   onSaved: () => Promise<void>
+  onStatusChanged: () => Promise<void>
 }): React.JSX.Element {
   const [title, setTitle] = useState(draft.title)
   const [body, setBody] = useState(draft.body)
   const [labels, setLabels] = useState(formatLabels(draft.labels))
   const [criteria, setCriteria] = useState(extractAcceptanceCriteria(draft.body).join('\n'))
   const [saving, setSaving] = useState(false)
+  const [updatingStatus, setUpdatingStatus] = useState(false)
   const [savedAt, setSavedAt] = useState<string | null>(null)
   const [pathMessages, setPathMessages] = useState<Record<string, string>>({})
 
@@ -295,6 +391,23 @@ function DraftEditor({
       setSaving(false)
     }
   }, [bodyForSave, dirty, draft.id, onSaved, parsedLabels, saving, title])
+
+  const handleStatusChange = useCallback(
+    async (status: IssueDraftStatus): Promise<void> => {
+      if (updatingStatus || draft.status === status) return
+      setUpdatingStatus(true)
+      try {
+        await window.pilog.invoke('issue-drafts:updateStatus', {
+          id: draft.id,
+          status
+        })
+      } finally {
+        setUpdatingStatus(false)
+      }
+      await onStatusChanged()
+    },
+    [draft.id, draft.status, onStatusChanged, updatingStatus]
+  )
 
   const handleSaveShortcut = useEffectEvent(() => {
     if (dirty && !saving) void handleSave()
@@ -349,6 +462,29 @@ function DraftEditor({
               <HugeiconsIcon icon={ViewIcon} data-icon="inline-start" aria-hidden />
               Publish later
             </Button>
+            {draft.status === 'dismissed' ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={updatingStatus}
+                onClick={() => void handleStatusChange('draft')}
+              >
+                <HugeiconsIcon icon={Tick02Icon} data-icon="inline-start" aria-hidden />
+                Restore
+              </Button>
+            ) : draft.status === 'draft' ? (
+              <Button
+                type="button"
+                variant="destructive"
+                size="sm"
+                disabled={updatingStatus}
+                onClick={() => void handleStatusChange('dismissed')}
+              >
+                <HugeiconsIcon icon={CancelCircleIcon} data-icon="inline-start" aria-hidden />
+                Dismiss
+              </Button>
+            ) : null}
             <Button
               type="button"
               size="sm"
@@ -426,7 +562,7 @@ function DraftEditor({
           <section className="flex flex-col gap-2">
             <h3 className="text-sm font-semibold">Readiness</h3>
             <div className="flex flex-wrap gap-1.5">
-              <Badge variant="secondary">{draft.status}</Badge>
+              <Badge variant="secondary">{statusLabel(draft.status)}</Badge>
               <Badge variant="outline">{confidenceLabel(draft.confidence)}</Badge>
             </div>
           </section>

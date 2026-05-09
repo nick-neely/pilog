@@ -6,9 +6,11 @@ import {
   createIssueDraft,
   listIssueDrafts,
   listIssueDraftsForReview,
-  updateIssueDraft
+  updateIssueDraft,
+  updateIssueDraftStatus
 } from './issue-drafts'
-import { createNote, updateNoteStatus } from './notes'
+import { createNote, listNotes, updateNoteStatus } from './notes'
+import { listPublishLog } from './publish-log'
 import type { GeneratedIssueDraft } from '@shared/types'
 
 const generatedDraft: GeneratedIssueDraft = {
@@ -132,5 +134,45 @@ describe('issue-drafts repository', () => {
         labels: []
       })
     ).toBeNull()
+  })
+
+  it('dismisses a draft and excludes it from the default active list', () => {
+    const kept = createIssueDraft(db, { repoId, draft: generatedDraft })
+    const dismissed = createIssueDraft(db, {
+      repoId,
+      draft: { ...generatedDraft, title: 'Dismiss duplicate loading note' }
+    })
+
+    const updated = updateIssueDraftStatus(db, { id: dismissed.id, status: 'dismissed' })
+
+    expect(updated).toMatchObject({
+      id: dismissed.id,
+      status: 'dismissed',
+      title: 'Dismiss duplicate loading note',
+      githubIssueUrl: null
+    })
+    expect(updated?.updatedAt).not.toBe(dismissed.updatedAt)
+    expect(listIssueDrafts(db).map((draft) => draft.id)).toEqual([kept.id])
+    expect(listIssueDrafts(db, { status: 'dismissed' }).map((draft) => draft.id)).toEqual([
+      dismissed.id
+    ])
+  })
+
+  it('dismisses a draft without publishing or changing source note status', () => {
+    const note = createNote(db, { content: 'save button needs loading state', repoId })
+    updateNoteStatus(db, note.id, 'drafted')
+    const draft = createIssueDraft(db, {
+      repoId,
+      draft: { ...generatedDraft, sourceNoteIds: [note.id] }
+    })
+
+    updateIssueDraftStatus(db, { id: draft.id, status: 'dismissed' })
+
+    expect(listNotes(db, { repoId }).map((persisted) => persisted.status)).toEqual(['drafted'])
+    expect(listPublishLog(db, { repoId })).toEqual([])
+  })
+
+  it('returns null when updating status for a missing draft', () => {
+    expect(updateIssueDraftStatus(db, { id: 'missing', status: 'dismissed' })).toBeNull()
   })
 })

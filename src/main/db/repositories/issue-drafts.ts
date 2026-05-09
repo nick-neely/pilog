@@ -2,7 +2,12 @@ import { desc, eq, inArray } from 'drizzle-orm'
 import { v4 as uuidv4 } from 'uuid'
 import type { PilogDatabase } from '../client'
 import { issueDrafts, notes } from '../schema'
-import type { GeneratedIssueDraft, IssueDraft, IssueDraftForReview } from '@shared/types'
+import type {
+  GeneratedIssueDraft,
+  IssueDraft,
+  IssueDraftForReview,
+  IssueDraftStatus
+} from '@shared/types'
 
 const issueDraftColumns = {
   id: issueDrafts.id,
@@ -72,17 +77,22 @@ export function createIssueDraft(
   }
 }
 
-export function listIssueDrafts(db: PilogDatabase): IssueDraft[] {
-  return db
-    .select(issueDraftColumns)
-    .from(issueDrafts)
-    .orderBy(desc(issueDrafts.createdAt))
-    .all()
-    .map(mapIssueDraft)
+export function listIssueDrafts(
+  db: PilogDatabase,
+  filter: { status?: IssueDraftStatus | 'all' } = {}
+): IssueDraft[] {
+  const status = filter.status ?? 'draft'
+  const query = db.select(issueDraftColumns).from(issueDrafts)
+  const filtered = status === 'all' ? query : query.where(eq(issueDrafts.status, status))
+
+  return filtered.orderBy(desc(issueDrafts.createdAt)).all().map(mapIssueDraft)
 }
 
-export function listIssueDraftsForReview(db: PilogDatabase): IssueDraftForReview[] {
-  const drafts = listIssueDrafts(db)
+export function listIssueDraftsForReview(
+  db: PilogDatabase,
+  filter: { status?: IssueDraftStatus | 'all' } = {}
+): IssueDraftForReview[] {
+  const drafts = listIssueDrafts(db, filter)
   const sourceNoteIds = [...new Set(drafts.flatMap((draft) => draft.sourceNoteIds))]
 
   if (sourceNoteIds.length === 0) {
@@ -108,15 +118,10 @@ export function updateIssueDraft(
   db: PilogDatabase,
   input: { id: string; title: string; body: string; labels: string[] }
 ): IssueDraft | null {
-  const existing = db
-    .select({ updatedAt: issueDrafts.updatedAt })
-    .from(issueDrafts)
-    .where(eq(issueDrafts.id, input.id))
-    .get()
+  const previousUpdatedAt = getIssueDraftUpdatedAt(db, input.id)
+  if (!previousUpdatedAt) return null
 
-  if (!existing) return null
-
-  const now = nextUpdatedAt(existing.updatedAt)
+  const now = nextUpdatedAt(previousUpdatedAt)
 
   db.update(issueDrafts)
     .set({
@@ -128,11 +133,41 @@ export function updateIssueDraft(
     .where(eq(issueDrafts.id, input.id))
     .run()
 
-  const row = db
-    .select(issueDraftColumns)
-    .from(issueDrafts)
+  return getIssueDraftById(db, input.id)
+}
+
+export function updateIssueDraftStatus(
+  db: PilogDatabase,
+  input: { id: string; status: IssueDraftStatus }
+): IssueDraft | null {
+  const previousUpdatedAt = getIssueDraftUpdatedAt(db, input.id)
+  if (!previousUpdatedAt) return null
+
+  const now = nextUpdatedAt(previousUpdatedAt)
+
+  db.update(issueDrafts)
+    .set({
+      status: input.status,
+      updatedAt: now
+    })
     .where(eq(issueDrafts.id, input.id))
+    .run()
+
+  return getIssueDraftById(db, input.id)
+}
+
+function getIssueDraftUpdatedAt(db: PilogDatabase, id: string): string | null {
+  const row = db
+    .select({ updatedAt: issueDrafts.updatedAt })
+    .from(issueDrafts)
+    .where(eq(issueDrafts.id, id))
     .get()
+
+  return row?.updatedAt ?? null
+}
+
+function getIssueDraftById(db: PilogDatabase, id: string): IssueDraft | null {
+  const row = db.select(issueDraftColumns).from(issueDrafts).where(eq(issueDrafts.id, id)).get()
 
   return row ? mapIssueDraft(row) : null
 }

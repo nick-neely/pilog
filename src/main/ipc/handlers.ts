@@ -2,7 +2,11 @@ import { ipcMain, app } from 'electron'
 import type { IpcRequest, IpcResponse } from '@shared/ipc'
 import type { PilogDatabase } from '../db/client'
 import { getRunById, listRuns } from '../db/repositories/agent-runs'
-import { listIssueDraftsForReview, updateIssueDraft } from '../db/repositories/issue-drafts'
+import {
+  listIssueDraftsForReview,
+  updateIssueDraft,
+  updateIssueDraftStatus
+} from '../db/repositories/issue-drafts'
 import { pathActions } from '../file-actions'
 import {
   countNotesByStatus,
@@ -18,6 +22,7 @@ type DbChannel =
   | 'agent-runs:list'
   | 'issue-drafts:list'
   | 'issue-drafts:update'
+  | 'issue-drafts:updateStatus'
   | 'note:create'
   | 'note:list'
   | 'note:counts'
@@ -36,8 +41,9 @@ type Handler<C extends DbChannel> = (
 const handlers: { [C in DbChannel]: Handler<C> } = {
   'agent-runs:get': (db, request) => getRunById(db, request.id),
   'agent-runs:list': (db, request) => listRuns(db, request ?? undefined),
-  'issue-drafts:list': (db) => listIssueDraftsForReview(db),
+  'issue-drafts:list': (db, request) => listIssueDraftsForReview(db, request ?? undefined),
   'issue-drafts:update': (db, request) => updateIssueDraft(db, request),
+  'issue-drafts:updateStatus': (db, request) => updateIssueDraftStatus(db, request),
   'note:create': (db, request) => createNote(db, request),
   'note:list': (db, request) => listNotes(db, request ?? undefined),
   'note:counts': (db, request) => countNotesByStatus(db, request ?? undefined),
@@ -63,7 +69,9 @@ export function registerIpcHandlers(
       const handler = handlers[channel] as Handler<typeof channel>
       const result = handler(db, request)
       if (channel === 'note:create') options?.onNoteCreated?.()
-      if (channel === 'issue-drafts:update') options?.onIssueDraftsChanged?.()
+      if (channel === 'issue-drafts:update' || channel === 'issue-drafts:updateStatus') {
+        options?.onIssueDraftsChanged?.()
+      }
       return result
     })
   }

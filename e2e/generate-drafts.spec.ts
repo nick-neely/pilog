@@ -66,6 +66,30 @@ test('Generate Drafts persists one issue draft from selected repo notes', async 
   expect(drafts[0]?.body).toContain('save button needs loading state')
   expect(drafts[0]?.groupingReason).toBeTruthy()
 
+  const draftTabTrigger = page.locator('[data-testid="view-tab-drafts-trigger"]')
+  if ((await draftTabTrigger.count()) > 0) {
+    await draftTabTrigger.click()
+  }
+  await expect(page.locator('[data-testid="draft-row"]')).toHaveCount(1)
+  await page.getByRole('button', { name: 'Dismiss' }).click()
+
+  await expect
+    .poll(async () => {
+      const reloadedDrafts = await page.evaluate(async () =>
+        window.pilog.invoke('debug:listIssueDrafts')
+      )
+      return reloadedDrafts[0]?.status
+    })
+    .toBe('dismissed')
+
+  await page.reload()
+  await page.locator('[data-testid="view-tab-drafts-trigger"]').click()
+  await expect(page.locator('[data-testid="draft-row"]')).toHaveCount(0)
+  await expect(page.getByText('No active drafts.')).toBeVisible()
+  await page.getByRole('button', { name: 'Show dismissed drafts' }).click()
+  await expect(page.locator('[data-testid="draft-row"]')).toHaveCount(1)
+  await expect(page.getByRole('button', { name: 'Restore' })).toBeVisible()
+
   await exitApp(app)
 })
 
