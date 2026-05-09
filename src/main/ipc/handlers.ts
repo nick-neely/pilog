@@ -40,6 +40,12 @@ type Handler<C extends DbChannel> = (
   request: IpcRequest<C>
 ) => IpcResponse<C> | Promise<IpcResponse<C>>
 
+const ISSUE_DRAFT_CHANGE_CHANNELS = new Set<DbChannel>([
+  'issue-drafts:merge',
+  'issue-drafts:update',
+  'issue-drafts:updateStatus'
+])
+
 const handlers: { [C in DbChannel]: Handler<C> } = {
   'agent-runs:get': (db, request) => getRunById(db, request.id),
   'agent-runs:list': (db, request) => listRuns(db, request ?? undefined),
@@ -72,11 +78,7 @@ export function registerIpcHandlers(
       const handler = handlers[channel] as Handler<typeof channel>
       const result = handler(db, request)
       if (channel === 'note:create') options?.onNoteCreated?.()
-      if (
-        channel === 'issue-drafts:update' ||
-        channel === 'issue-drafts:updateStatus' ||
-        channel === 'issue-drafts:merge'
-      ) {
+      if (ISSUE_DRAFT_CHANGE_CHANNELS.has(channel)) {
         options?.onIssueDraftsChanged?.()
       }
       return result

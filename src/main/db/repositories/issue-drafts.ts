@@ -185,9 +185,8 @@ export function mergeIssueDrafts(
       throw new Error('Only active drafts can be merged.')
     }
 
-    const now = nextUpdatedAt(
-      [target.updatedAt, source.updatedAt].sort().at(-1) ?? target.updatedAt
-    )
+    const latestUpdatedAt = [target.updatedAt, source.updatedAt].sort().at(-1) ?? target.updatedAt
+    const now = nextUpdatedAt(latestUpdatedAt)
 
     tx.update(issueDrafts)
       .set({

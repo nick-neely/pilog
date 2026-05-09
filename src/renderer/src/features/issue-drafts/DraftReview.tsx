@@ -216,11 +216,15 @@ export function DraftReview({
   useEffect(() => window.pilog.on('issue-drafts:invalidated', handleDraftsInvalidated), [])
 
   const selectedDraft = drafts.find((draft) => draft.id === selectedDraftId) ?? null
-  const mergeCandidates = selectedDraft
-    ? drafts.filter(
-        (draft) => draft.id !== selectedDraft.id && draft.repoId === selectedDraft.repoId
-      )
-    : []
+  const mergeCandidates = useMemo(
+    () =>
+      selectedDraft
+        ? drafts.filter(
+            (draft) => draft.id !== selectedDraft.id && draft.repoId === selectedDraft.repoId
+          )
+        : [],
+    [drafts, selectedDraft]
+  )
   const reposById = useMemo(() => new Map(repos.map((repo) => [repo.id, repo])), [repos])
   const emptyDescription = emptyDraftDescription(statusFilter, statusCounts)
 
@@ -372,7 +376,7 @@ function DraftEditor({
   const [publishError, setPublishError] = useState<string | null>(null)
   const [publishedUrl, setPublishedUrl] = useState<string | null>(draft.githubIssueUrl)
   const [pathMessages, setPathMessages] = useState<Record<string, string>>({})
-  const [mergeSourceId, setMergeSourceId] = useState<string>('')
+  const [selectedMergeSourceId, setSelectedMergeSourceId] = useState<string>('')
   const [merging, setMerging] = useState(false)
   const [mergeMessage, setMergeMessage] = useState<string | null>(null)
   const [mergeError, setMergeError] = useState<string | null>(null)
@@ -395,13 +399,9 @@ function DraftEditor({
   const isPublished = draft.status === 'published'
   const canPublish = draft.status === 'draft'
   const canMerge = draft.status === 'draft' && mergeCandidates.length > 0
-
-  useEffect(() => {
-    setMergeSourceId((current) => {
-      if (current && mergeCandidates.some((candidate) => candidate.id === current)) return current
-      return mergeCandidates[0]?.id ?? ''
-    })
-  }, [mergeCandidates])
+  const mergeSourceId = mergeCandidates.some((candidate) => candidate.id === selectedMergeSourceId)
+    ? selectedMergeSourceId
+    : (mergeCandidates[0]?.id ?? '')
 
   const handleSave = useCallback(async (): Promise<void> => {
     if (!dirty || saving || isPublished) return
@@ -711,63 +711,18 @@ function DraftEditor({
 
           <Separator />
 
-          <section className="flex flex-col gap-2">
-            <h3 className="text-sm font-semibold">Merge Draft</h3>
-            {draft.status === 'draft' ? (
-              mergeCandidates.length > 0 ? (
-                <div className="flex flex-col gap-2">
-                  <Select value={mergeSourceId} onValueChange={setMergeSourceId}>
-                    <SelectTrigger className="w-full rounded-md" aria-label="Draft to merge">
-                      <SelectValue placeholder="Choose a draft" />
-                    </SelectTrigger>
-                    <SelectContent className="rounded-md">
-                      <SelectGroup>
-                        {mergeCandidates.map((candidate) => (
-                          <SelectItem
-                            key={candidate.id}
-                            value={candidate.id}
-                            className="rounded-md"
-                          >
-                            {candidate.title}
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs leading-relaxed text-muted-foreground">
-                    This saves current edits, appends the chosen draft, unions notes, labels, and
-                    files, then moves the other draft to Dismissed.
-                  </p>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    disabled={!mergeSourceId || merging || saving || publishing}
-                    onClick={() => void handleMerge()}
-                  >
-                    <HugeiconsIcon icon={GitMergeIcon} data-icon="inline-start" aria-hidden />
-                    {merging ? 'Merging' : 'Merge into this draft'}
-                  </Button>
-                  {mergeMessage ? (
-                    <p className="text-xs leading-relaxed text-muted-foreground" role="status">
-                      {mergeMessage}
-                    </p>
-                  ) : null}
-                  {mergeError ? (
-                    <p className="text-xs leading-relaxed text-destructive" role="alert">
-                      {mergeError}
-                    </p>
-                  ) : null}
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  No other active drafts are available in this repo.
-                </p>
-              )
-            ) : (
-              <p className="text-sm text-muted-foreground">Only active drafts can be merged.</p>
-            )}
-          </section>
+          <MergeDraftSection
+            draft={draft}
+            mergeCandidates={mergeCandidates}
+            mergeSourceId={mergeSourceId}
+            merging={merging}
+            mergeMessage={mergeMessage}
+            mergeError={mergeError}
+            saving={saving}
+            publishing={publishing}
+            onMergeSourceChange={setSelectedMergeSourceId}
+            onMerge={handleMerge}
+          />
 
           <Separator />
 
@@ -819,6 +774,86 @@ function DraftEditor({
         </aside>
       </div>
     </article>
+  )
+}
+
+function MergeDraftSection({
+  draft,
+  mergeCandidates,
+  mergeSourceId,
+  merging,
+  mergeMessage,
+  mergeError,
+  saving,
+  publishing,
+  onMergeSourceChange,
+  onMerge
+}: {
+  draft: IssueDraftForReview
+  mergeCandidates: IssueDraftForReview[]
+  mergeSourceId: string
+  merging: boolean
+  mergeMessage: string | null
+  mergeError: string | null
+  saving: boolean
+  publishing: boolean
+  onMergeSourceChange: (sourceId: string) => void
+  onMerge: () => Promise<void>
+}): React.JSX.Element {
+  const canChooseSource = draft.status === 'draft' && mergeCandidates.length > 0
+  const unavailableMessage =
+    draft.status === 'draft'
+      ? 'No other active drafts are available in this repo.'
+      : 'Only active drafts can be merged.'
+
+  return (
+    <section className="flex flex-col gap-2">
+      <h3 className="text-sm font-semibold">Merge Draft</h3>
+      {canChooseSource ? (
+        <div className="flex flex-col gap-2">
+          <Select value={mergeSourceId} onValueChange={onMergeSourceChange}>
+            <SelectTrigger className="w-full rounded-md" aria-label="Draft to merge">
+              <SelectValue placeholder="Choose a draft" />
+            </SelectTrigger>
+            <SelectContent className="rounded-md">
+              <SelectGroup>
+                {mergeCandidates.map((candidate) => (
+                  <SelectItem key={candidate.id} value={candidate.id} className="rounded-md">
+                    {candidate.title}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            This saves current edits, appends the chosen draft, unions notes, labels, and files,
+            then moves the other draft to Dismissed.
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={!mergeSourceId || merging || saving || publishing}
+            onClick={() => void onMerge()}
+          >
+            <HugeiconsIcon icon={GitMergeIcon} data-icon="inline-start" aria-hidden />
+            {merging ? 'Merging' : 'Merge into this draft'}
+          </Button>
+          {mergeMessage ? (
+            <p className="text-xs leading-relaxed text-muted-foreground" role="status">
+              {mergeMessage}
+            </p>
+          ) : null}
+          {mergeError ? (
+            <p className="text-xs leading-relaxed text-destructive" role="alert">
+              {mergeError}
+            </p>
+          ) : null}
+        </div>
+      ) : (
+        <p className="text-sm text-muted-foreground">{unavailableMessage}</p>
+      )}
+    </section>
   )
 }
 
