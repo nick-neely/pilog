@@ -38,3 +38,13 @@ Use skills to keep implementation aligned with PiLog’s design system and shadc
 - **Before any UI/UX work** (renderer components, layout, typography, microcopy, visual hierarchy, accessibility, settings/onboarding/empty states, tokens, or themed primitives): invoke `/impeccable` and follow its setup. If slash commands or skills are unavailable in your harness, read `PRODUCT.md` and `DESIGN.md` end to end and apply the same constraints (Reading-Room Journal, anti-references, WCAG 2.2 AA, keyboard parity).
 - **When touching shadcn/ui** (adding, changing, debugging, or composing primitives under `src/renderer/src/components/ui/` or imports from `@renderer/components/ui`): invoke `/shadcn`. Prefer existing primitives; add missing ones with `pnpm dlx shadcn@latest add <component>` (this repo uses pnpm). After `add`, read the generated files and fix imports, icon library (HugeIcons only), and composition before shipping.
 - **Sandcastle (Claude):** the driver mounts host `~/.claude/skills` at `/home/agent/.claude/skills` so Claude Code can resolve those skills in-container. Ensure that directory exists on the machine that runs Sandcastle.
+
+## Learned User Preferences
+
+- Prefer incremental polish over a full UI redesign when feedback is localized to one surface (for example the Repositories New Issue dialog).
+
+## Learned Workspace Facts
+
+- `.cursor/hooks/state/` is listed in `.gitignore`; hook state and continual-learning index files stay local and are not committed by default.
+- The shared `Note` type includes `runId: string | null`; main-process mapping from SQLite and test fixtures that construct `Note` values must include `runId` (from `run_id` or `null`).
+- The `.sandcastle/Dockerfile` image is a long-lived sandbox (`sleep infinity`); typical workflow is build, run with the repo mounted at `/home/agent/workspace`, then use `docker exec` for a shell (unless Sandcastle CLI drives mounts for you).

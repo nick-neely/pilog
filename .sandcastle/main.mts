@@ -115,7 +115,7 @@ const hooks = {
   sandbox: {
     onSandboxReady: [
       ...(useCodex ? [{ command: CODEX_AUTH_HOOK }] : []),
-      { command: 'CI=true pnpm install' }
+      { command: 'CI=true pnpm install', timeoutMs: 300_000 }
     ]
   }
 }
@@ -132,7 +132,7 @@ const MAX_ITERATIONS = 10
 // starts. With pnpm, packages and the virtual store live under node_modules
 // (including node_modules/.pnpm). Avoids a cold install; the hook above is
 // the safety net for platform-specific binaries.
-const copyToWorktree = ['node_modules']
+const copyToWorktree = ['node_modules', 'app/node_modules']
 
 type PlannedIssue = {
   id: string
