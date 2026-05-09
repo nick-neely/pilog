@@ -1,57 +1,57 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+    Activity01Icon,
+    Add01Icon,
+    Cancel01Icon,
+    CancelCircleIcon,
+    Settings02Icon,
+    SparklesIcon
+} from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
-  Activity01Icon,
-  Add01Icon,
-  Cancel01Icon,
-  CancelCircleIcon,
-  Settings02Icon,
-  SparklesIcon
-} from '@hugeicons/core-free-icons'
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    AlertDialogTrigger
+} from '@renderer/components/ui/alert-dialog'
+import { Badge } from '@renderer/components/ui/badge'
 import { Button } from '@renderer/components/ui/button'
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger
-} from '@renderer/components/ui/alert-dialog'
-import {
-  CommandDialog,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-  CommandSeparator,
-  CommandShortcut
+    CommandDialog,
+    CommandEmpty,
+    CommandGroup,
+    CommandInput,
+    CommandItem,
+    CommandList,
+    CommandSeparator,
+    CommandShortcut
 } from '@renderer/components/ui/command'
-import { Badge } from '@renderer/components/ui/badge'
 import { Empty, EmptyDescription } from '@renderer/components/ui/empty'
-import { StatusFilter } from './StatusFilter'
 import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
+    Select,
+    SelectContent,
+    SelectGroup,
+    SelectItem,
+    SelectTrigger,
+    SelectValue
 } from '@renderer/components/ui/select'
 import { Textarea } from '@renderer/components/ui/textarea'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@renderer/components/ui/tooltip'
 import { cn } from '@renderer/lib/utils'
 import type {
-  ListNotesRequest,
-  Note,
-  NoteStatus,
-  NoteStatusCounts,
-  PiStatus,
-  Repo
+    ListNotesRequest,
+    Note,
+    NoteStatus,
+    NoteStatusCounts,
+    PiStatus,
+    Repo
 } from '@shared/ipc'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { StatusFilter } from './StatusFilter'
 
 // Status filter rows. Order matches the inbox lifecycle (capture →
 // triage → publish → archive) so the list reads top-to-bottom as a
@@ -94,15 +94,6 @@ function formatNoteTimestamp(iso: string): string {
     hour: 'numeric',
     minute: '2-digit'
   }).format(date)
-}
-
-function useDebounce(value: string, ms: number): string {
-  const [debounced, setDebounced] = useState(value)
-  useEffect(() => {
-    const timer = setTimeout(() => setDebounced(value), ms)
-    return () => clearTimeout(timer)
-  }, [value, ms])
-  return debounced
 }
 
 // repoFilter encoding for Select values (non-empty strings for Radix Select items).
@@ -328,13 +319,8 @@ export function Inbox({
   const fetchIdRef = useRef(0)
   const countsFetchIdRef = useRef(0)
 
-  // The palette's text query also seeds the server-side search filter so
-  // typing in the palette narrows the inbox list as a side-effect, not the
-  // primary lever. The list filter remains driven by status chips; the
-  // palette's job is jump-to-result and command-running.
-  const debouncedPaletteQuery = useDebounce(paletteQuery, 200)
-
-  // Lookup map for note rows to show repo name without a linear search
+  // Palette search only narrows rows inside Cmd+K (`paletteJumpNotes`); it does
+  // not change the sidebar list, so the list stays stable while the dialog has focus.
   const reposById = useMemo(() => new Map(repos.map((r) => [r.id, r])), [repos])
 
   useEffect(() => {
@@ -346,7 +332,7 @@ export function Inbox({
     const id = ++fetchIdRef.current
     const result = await window.pilog.invoke(
       'note:list',
-      buildFilter(statusFilter, debouncedPaletteQuery, repoFilter)
+      buildFilter(statusFilter, '', repoFilter)
     )
     if (id !== fetchIdRef.current) return
     setNotes(result)
@@ -355,21 +341,21 @@ export function Inbox({
       const next = new Set([...prev].filter((rid) => validIds.has(rid)))
       return next.size === prev.size ? prev : next
     })
-  }, [statusFilter, debouncedPaletteQuery, repoFilter])
+  }, [statusFilter, repoFilter])
 
-  // Status counts honour the search and repo filters but not the status
-  // filter itself; they're the answer to "if I pick this status next, how
-  // many notes will I see?". Keep them out-of-band from `fetchNotes` so
-  // toggling the status chip doesn't refetch counts that didn't change.
+  // Status counts honour the repo filter but not the status filter itself;
+  // they're the answer to "if I pick this status next, how many notes will I see?".
+  // Keep them out-of-band from `fetchNotes` so toggling the status chip doesn't
+  // refetch counts that didn't change.
   const fetchStatusCounts = useCallback(async (): Promise<void> => {
     const id = ++countsFetchIdRef.current
-    const result = await window.pilog.invoke('note:counts', {
-      search: debouncedPaletteQuery || undefined,
-      repoId: repoFilter
-    })
+    const result = await window.pilog.invoke(
+      'note:counts',
+      repoFilter !== undefined ? { repoId: repoFilter } : undefined
+    )
     if (id !== countsFetchIdRef.current) return
     setStatusCounts(result)
-  }, [debouncedPaletteQuery, repoFilter])
+  }, [repoFilter])
 
   useEffect(() => {
     fetchNotes()
@@ -408,8 +394,6 @@ export function Inbox({
 
   const handleSave = async (id: string, content: string): Promise<void> => {
     await window.pilog.invoke('note:update', { id, content })
-    // Content edits can shift counts when a search filter is active
-    // (matching becomes non-matching). Cheap to refetch unconditionally.
     await Promise.all([fetchNotes(), fetchStatusCounts()])
   }
 
@@ -555,12 +539,20 @@ export function Inbox({
     return () => document.removeEventListener('keydown', onKey, { capture: true })
   }, [paletteOpen, selectedIds.size, setPaletteOpen, clearSelection])
 
+  const paletteJumpNotes = useMemo(() => {
+    const q = paletteQuery.trim().toLowerCase()
+    if (!q) return []
+    // Substring on note body (same rule as server `note:list` search). Sidebar
+    // is unchanged while typing; matches appear only in this palette.
+    return notes.filter((note) => note.content.toLowerCase().includes(q))
+  }, [notes, paletteQuery])
+
   const emptyMessage = useMemo(() => {
-    const filtered = Boolean(statusFilter || debouncedPaletteQuery || repoFilter !== undefined)
+    const filtered = Boolean(statusFilter || repoFilter !== undefined)
     return filtered
       ? 'No notes match the current filters.'
       : 'No notes yet. Capture a thought from the footer below.'
-  }, [statusFilter, debouncedPaletteQuery, repoFilter])
+  }, [statusFilter, repoFilter])
 
   const runCommand = (action: () => void): void => {
     setPaletteOpen(false)
@@ -836,12 +828,52 @@ export function Inbox({
       <CommandDialog open={paletteOpen} onOpenChange={setPaletteOpen}>
         <CommandInput
           data-testid="search-input"
-          placeholder="Search notes, run a command…"
+          placeholder="Jump to a note or run a command…"
           value={paletteQuery}
           onValueChange={setPaletteQuery}
         />
         <CommandList>
           <CommandEmpty>Nothing matches that yet.</CommandEmpty>
+
+          {paletteJumpNotes.length > 0 && (
+            <>
+              <CommandGroup heading="Notes">
+                {paletteJumpNotes.map((note) => {
+                  const preview = note.content.trim() || 'Untitled note'
+                  const repo = note.repoId ? reposById.get(note.repoId) : undefined
+                  const repoLabel = repo ? `${repo.owner}/${repo.name}` : ''
+                  return (
+                    <CommandItem
+                      key={note.id}
+                      data-testid="palette-note-row"
+                      value={`${note.content} ${preview} ${repoLabel} ${STATUS_LABEL[note.status]} ${note.id}`}
+                      onSelect={() =>
+                        runCommand(() => {
+                          const index = notes.findIndex((n) => n.id === note.id)
+                          setSelectedIds(new Set([note.id]))
+                          lastClickedIndex.current = index >= 0 ? index : null
+                        })
+                      }
+                      className="flex-col items-start gap-1 py-2"
+                    >
+                      <span className="line-clamp-2 w-full text-left">{preview}</span>
+                      <span className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                        <Badge variant="secondary" className="font-medium text-foreground/80">
+                          {STATUS_LABEL[note.status]}
+                        </Badge>
+                        {repo ? (
+                          <span className="truncate font-mono">{repoLabel}</span>
+                        ) : (
+                          <span className="text-muted-foreground/80">Unassigned</span>
+                        )}
+                      </span>
+                    </CommandItem>
+                  )
+                })}
+              </CommandGroup>
+              <CommandSeparator />
+            </>
+          )}
 
           <CommandGroup heading="Capture">
             <CommandItem

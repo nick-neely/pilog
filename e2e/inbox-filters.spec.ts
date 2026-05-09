@@ -1,7 +1,7 @@
-import { test, expect, _electron as electron, type ElectronApplication } from '@playwright/test'
+import { _electron as electron, expect, test, type ElectronApplication } from '@playwright/test'
 import { mkdtempSync, rmSync } from 'fs'
-import { join } from 'path'
 import { tmpdir } from 'os'
+import { join } from 'path'
 
 let userDataDir: string
 
@@ -49,20 +49,30 @@ test('inbox filters, search, and multi-select', async () => {
   await page.click('[data-testid="filter-drafted"]')
   await expect(noteRows).toHaveCount(3)
 
-  // Search via the Cmd+K command palette. The visible inline search input
-  // was retired in favour of a single discovery surface; the data-testid
-  // followed it. The palette query also feeds the server-side search
-  // filter, so the underlying inbox list narrows as the side-effect tested
-  // here (the palette's primary job is jump-to-note + commands).
+  // Cmd+K palette: sidebar stays on status/repo filters only; palette search
+  // matches notes inside the dialog only.
   await page.click('[data-testid="open-command"]')
   const searchInput = page.locator('[data-testid="search-input"]')
   await expect(searchInput).toBeVisible()
-  await searchInput.fill('New note')
+
+  const unique = `palette-filter-${Date.now()}`
+  await noteRows.first().click()
+  await page.locator('[aria-label="Note content"]').fill(unique)
+  const saveMod = process.platform === 'darwin' ? 'Meta' : 'Control'
+  await page.keyboard.press(`${saveMod}+s`)
+
+  await searchInput.fill(unique)
+  await expect(page.locator('[data-testid="palette-note-row"]')).toHaveCount(1)
   await expect(noteRows).toHaveCount(3)
 
-  // Search with no match
-  await searchInput.fill('nonexistent')
-  await expect(noteRows).toHaveCount(0)
+  await page.locator('[data-testid="palette-note-row"]').first().click()
+  await expect(searchInput).not.toBeVisible()
+  await expect(page.locator('[data-testid="selected-count"]')).toHaveText('1 selected')
+
+  await page.click('[data-testid="open-command"]')
+  await searchInput.fill('nonexistent-xyz-abc')
+  await expect(page.locator('[data-testid="palette-note-row"]')).toHaveCount(0)
+  await expect(noteRows).toHaveCount(3)
 
   // Clear search and close palette
   await searchInput.fill('')
