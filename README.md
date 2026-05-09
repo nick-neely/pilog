@@ -121,6 +121,16 @@ pnpm test:e2e
 
 `pnpm test:e2e` runs Playwright against the app. Some GitHub/Pi paths depend on local credentials and are skipped when the required environment is missing.
 
+The Review Mode publish e2e creates a real GitHub issue and is skipped unless both variables are set:
+
+```bash
+PILOG_E2E_GITHUB_TOKEN=github_pat_...
+PILOG_E2E_GITHUB_REPO=owner/sandbox-repo
+pnpm test:e2e -- e2e/review-mode-publish.spec.ts
+```
+
+Use a sandbox repository. The token must be allowed to create issues in `PILOG_E2E_GITHUB_REPO`; `GITHUB_TOKEN` or `GH_TOKEN` can be used instead of `PILOG_E2E_GITHUB_TOKEN`.
+
 ## Documentation
 
 | Doc                           | Contents                               |

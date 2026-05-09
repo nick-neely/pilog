@@ -252,8 +252,12 @@ export type IpcContract = {
     response: PathActionResult
   }
   'debug:seedIssueGenerationFixture': {
-    request: { repoPath: string; notes: string[] }
+    request: { repoPath: string; notes: string[]; githubOwner?: string; githubRepo?: string }
     response: { repoId: string; noteIds: string[] }
+  }
+  'debug:setGitHubAuth': {
+    request: { token: string; login?: string }
+    response: void
   }
   'debug:listIssueDrafts': { request: void; response: IssueDraft[] }
 }

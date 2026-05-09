@@ -21,6 +21,7 @@ import {
   setActivePiConfig
 } from '../pi/config'
 import { createSafeStorageAuthStorage } from '../pi/auth-storage'
+import { setSecret } from '../security/secrets'
 import {
   getAdvancedSettings,
   getTurnBudget,
@@ -285,11 +286,13 @@ export function registerPiIpcHandlers(
       'debug:seedIssueGenerationFixture',
       async (_event, request: IpcRequest<'debug:seedIssueGenerationFixture'>) => {
         mkdirSync(request.repoPath, { recursive: true })
+        const owner = request.githubOwner?.trim() || 'pilog'
+        const name = request.githubRepo?.trim() || 'fixture'
         const repo = createRepo(db, {
-          name: 'fixture',
-          owner: 'pilog',
+          name,
+          owner,
           localPath: request.repoPath,
-          githubUrl: 'https://github.com/pilog/fixture',
+          githubUrl: `https://github.com/${owner}/${name}`,
           defaultBranch: 'main'
         })
         const noteIds = request.notes.map(
@@ -306,6 +309,11 @@ export function registerPiIpcHandlers(
         return { repoId: repo.id, noteIds }
       }
     )
+
+    ipcMain.handle('debug:setGitHubAuth', (_event, request: IpcRequest<'debug:setGitHubAuth'>) => {
+      setSecret('github_token', request.token)
+      if (request.login) setSecret('github_login', request.login)
+    })
 
     ipcMain.handle('debug:listIssueDrafts', () => listIssueDrafts(db, { status: 'all' }))
   }
