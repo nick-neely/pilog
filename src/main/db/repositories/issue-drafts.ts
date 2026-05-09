@@ -161,6 +161,85 @@ export function updateIssueDraftStatus(
   return getIssueDraftById(db, input.id)
 }
 
+export function splitIssueDraft(
+  db: PilogDatabase,
+  input: { id: string; movedSourceNoteIds: string[] }
+): { original: IssueDraft; newDraft: IssueDraft } {
+  const newDraftId = uuidv4()
+
+  db.transaction((tx) => {
+    const row = tx
+      .select(issueDraftColumns)
+      .from(issueDrafts)
+      .where(eq(issueDrafts.id, input.id))
+      .get()
+    if (!row) throw new Error('Draft not found')
+
+    const draft = mapIssueDraft(row)
+    if (draft.status !== 'draft') throw new Error('Only active drafts can be split')
+
+    const movedSourceNoteIds = uniqueInOriginalOrder(draft.sourceNoteIds, input.movedSourceNoteIds)
+    if (movedSourceNoteIds.length === 0) {
+      throw new Error('Choose at least one source note to split')
+    }
+
+    const invalidSourceNoteIds = input.movedSourceNoteIds.filter(
+      (id) => !draft.sourceNoteIds.includes(id)
+    )
+    if (invalidSourceNoteIds.length > 0) {
+      throw new Error('Split source notes must belong to the selected draft')
+    }
+
+    const moved = new Set(movedSourceNoteIds)
+    const remainingSourceNoteIds = draft.sourceNoteIds.filter((id) => !moved.has(id))
+    if (remainingSourceNoteIds.length === 0) {
+      throw new Error('Split must leave at least one source note on each draft')
+    }
+
+    const now = nextUpdatedAt(draft.updatedAt)
+    const groupingReason = draft.groupingReason
+      ? `Split from draft: ${draft.groupingReason}`
+      : 'Split from draft.'
+
+    tx.update(issueDrafts)
+      .set({
+        sourceNoteIds: JSON.stringify(remainingSourceNoteIds),
+        updatedAt: now
+      })
+      .where(eq(issueDrafts.id, draft.id))
+      .run()
+
+    tx.insert(issueDrafts)
+      .values({
+        id: newDraftId,
+        repoId: draft.repoId,
+        title: `${draft.title} (split)`,
+        body: draft.body,
+        labels: JSON.stringify(draft.labels),
+        sourceNoteIds: JSON.stringify(movedSourceNoteIds),
+        affectedFilesJson: JSON.stringify(draft.affectedFiles),
+        confidence: draft.confidence,
+        groupingReason,
+        status: 'draft',
+        githubIssueUrl: null,
+        createdAt: now,
+        updatedAt: now
+      })
+      .run()
+  })
+
+  const original = getIssueDraftById(db, input.id)
+  const newDraft = getIssueDraftById(db, newDraftId)
+  if (!original || !newDraft) throw new Error('Split draft could not be loaded')
+
+  return { original, newDraft }
+}
+
+function uniqueInOriginalOrder(originalIds: string[], selectedIds: string[]): string[] {
+  const selected = new Set(selectedIds)
+  return originalIds.filter((id) => selected.has(id))
+}
+
 function getIssueDraftUpdatedAt(db: PilogDatabase, id: string): string | null {
   const row = db
     .select({ updatedAt: issueDrafts.updatedAt })

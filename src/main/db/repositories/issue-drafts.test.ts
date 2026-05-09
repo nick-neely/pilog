@@ -8,6 +8,7 @@ import {
   listIssueDrafts,
   listIssueDraftsForReview,
   markIssueDraftPublished,
+  splitIssueDraft,
   updateIssueDraft,
   updateIssueDraftStatus
 } from './issue-drafts'
@@ -125,6 +126,77 @@ describe('issue-drafts repository', () => {
       title: 'Add pending copy to save',
       labels: ['bug', 'settings']
     })
+  })
+
+  it('splits selected source notes into a new editable draft', () => {
+    const firstNote = createNote(db, { content: 'save button needs loading state', repoId })
+    const secondNote = createNote(db, { content: 'avatar upload errors silently', repoId })
+    const thirdNote = createNote(db, { content: 'mobile settings spacing is cramped', repoId })
+    const draft = createIssueDraft(db, {
+      repoId,
+      draft: {
+        ...generatedDraft,
+        sourceNoteIds: [firstNote.id, secondNote.id, thirdNote.id],
+        suggestedLabels: ['bug', 'settings'],
+        affectedFiles: [
+          { path: 'src/settings.tsx', reason: 'Settings surface' },
+          { path: 'src/avatar.tsx', reason: 'Avatar upload surface' }
+        ],
+        confidence: 'high',
+        groupingReason: 'Grouped broad settings UX notes'
+      }
+    })
+
+    const split = splitIssueDraft(db, {
+      id: draft.id,
+      movedSourceNoteIds: [secondNote.id]
+    })
+
+    expect(split.original).toMatchObject({
+      id: draft.id,
+      status: 'draft',
+      repoId,
+      sourceNoteIds: [firstNote.id, thirdNote.id]
+    })
+    expect(split.newDraft).toMatchObject({
+      repoId,
+      title: `${draft.title} (split)`,
+      body: draft.body,
+      labels: ['bug', 'settings'],
+      sourceNoteIds: [secondNote.id],
+      affectedFiles: draft.affectedFiles,
+      confidence: 'high',
+      groupingReason: 'Split from draft: Grouped broad settings UX notes',
+      status: 'draft',
+      githubIssueUrl: null
+    })
+    expect(split.newDraft.id).not.toBe(draft.id)
+
+    const reviewed = listIssueDraftsForReview(db, { status: 'draft' })
+    expect(
+      reviewed.find((item) => item.id === draft.id)?.sourceNotes.map((note) => note.id)
+    ).toEqual([firstNote.id, thirdNote.id])
+    expect(
+      reviewed.find((item) => item.id === split.newDraft.id)?.sourceNotes.map((note) => note.id)
+    ).toEqual([secondNote.id])
+  })
+
+  it('rejects a split that would leave either draft without source notes', () => {
+    const firstNote = createNote(db, { content: 'save button needs loading state', repoId })
+    const secondNote = createNote(db, { content: 'avatar upload errors silently', repoId })
+    const draft = createIssueDraft(db, {
+      repoId,
+      draft: { ...generatedDraft, sourceNoteIds: [firstNote.id, secondNote.id] }
+    })
+
+    expect(() =>
+      splitIssueDraft(db, {
+        id: draft.id,
+        movedSourceNoteIds: [firstNote.id, secondNote.id]
+      })
+    ).toThrow('Split must leave at least one source note on each draft')
+    expect(getIssueDraftById(db, draft.id)?.sourceNoteIds).toEqual([firstNote.id, secondNote.id])
+    expect(listIssueDrafts(db, { status: 'draft' })).toHaveLength(1)
   })
 
   it('returns null when updating a missing draft', () => {

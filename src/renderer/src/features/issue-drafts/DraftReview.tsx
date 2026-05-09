@@ -4,12 +4,14 @@ import {
   CancelCircleIcon,
   Copy01Icon,
   FolderOpenIcon,
+  SplitIcon,
   Tick02Icon,
   ViewIcon
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { Badge } from '@renderer/components/ui/badge'
 import { Button } from '@renderer/components/ui/button'
+import { Checkbox } from '@renderer/components/ui/checkbox'
 import { Empty, EmptyDescription } from '@renderer/components/ui/empty'
 import { Input } from '@renderer/components/ui/input'
 import { ScrollArea, ScrollBar } from '@renderer/components/ui/scroll-area'
@@ -320,6 +322,10 @@ export function DraftReview({
             onSaved={fetchDrafts}
             onOpenSourceNote={onOpenSourceNote}
             onStatusChanged={fetchDrafts}
+            onSplitComplete={async (newDraftId) => {
+              setSelectedDraftId(newDraftId)
+              await fetchDrafts()
+            }}
           />
         ) : (
           <Empty className="h-full border-none bg-transparent shadow-none">
@@ -336,13 +342,15 @@ function DraftEditor({
   repoPath,
   onOpenSourceNote,
   onSaved,
-  onStatusChanged
+  onStatusChanged,
+  onSplitComplete
 }: {
   draft: IssueDraftForReview
   repoPath: string | null
   onOpenSourceNote: (noteId: string) => void
   onSaved: () => Promise<void>
   onStatusChanged: () => Promise<void>
+  onSplitComplete: (newDraftId: string) => Promise<void>
 }): React.JSX.Element {
   const [title, setTitle] = useState(draft.title)
   const [body, setBody] = useState(draft.body)
@@ -355,6 +363,10 @@ function DraftEditor({
   const [publishError, setPublishError] = useState<string | null>(null)
   const [publishedUrl, setPublishedUrl] = useState<string | null>(draft.githubIssueUrl)
   const [pathMessages, setPathMessages] = useState<Record<string, string>>({})
+  const [splitMode, setSplitMode] = useState(false)
+  const [splitSourceNoteIds, setSplitSourceNoteIds] = useState<string[]>([])
+  const [splitting, setSplitting] = useState(false)
+  const [splitError, setSplitError] = useState<string | null>(null)
 
   const parsedLabels = useMemo(() => parseLabels(labels), [labels])
   const parsedCriteria = useMemo(() => parseCriteriaLines(criteria), [criteria])
@@ -373,6 +385,14 @@ function DraftEditor({
   const dirty = hasDraftChanges(draft, editedDraft)
   const isPublished = draft.status === 'published'
   const canPublish = draft.status === 'draft'
+  const canEnterSplit = draft.status === 'draft' && draft.sourceNoteIds.length > 1
+  const canSubmitSplit =
+    canEnterSplit &&
+    !dirty &&
+    !saving &&
+    !publishing &&
+    splitSourceNoteIds.length > 0 &&
+    draft.sourceNoteIds.length - splitSourceNoteIds.length > 0
 
   const handleSave = useCallback(async (): Promise<void> => {
     if (!dirty || saving || isPublished) return
@@ -456,6 +476,33 @@ function DraftEditor({
     [repoPath]
   )
 
+  const handleToggleSplitSourceNote = useCallback((noteId: string, checked: boolean): void => {
+    setSplitSourceNoteIds((current) => {
+      if (checked) return current.includes(noteId) ? current : [...current, noteId]
+      return current.filter((id) => id !== noteId)
+    })
+  }, [])
+
+  const handleSplitDraft = useCallback(async (): Promise<void> => {
+    if (!canSubmitSplit || splitting) return
+
+    setSplitting(true)
+    setSplitError(null)
+    try {
+      const split = await window.pilog.invoke('issue-drafts:split', {
+        id: draft.id,
+        movedSourceNoteIds: splitSourceNoteIds
+      })
+      setSplitMode(false)
+      setSplitSourceNoteIds([])
+      await onSplitComplete(split.newDraft.id)
+    } catch (err) {
+      setSplitError(err instanceof Error ? err.message : 'Split failed. Please try again.')
+    } finally {
+      setSplitting(false)
+    }
+  }, [canSubmitSplit, draft.id, onSplitComplete, splitSourceNoteIds, splitting])
+
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
       if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== 's') return
@@ -465,6 +512,12 @@ function DraftEditor({
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [])
+
+  useEffect(() => {
+    setSplitMode(false)
+    setSplitSourceNoteIds([])
+    setSplitError(null)
+  }, [draft.id])
 
   return (
     <article className="mx-auto flex min-h-full max-w-5xl flex-col">
@@ -627,8 +680,63 @@ function DraftEditor({
           <Separator />
 
           <section className="flex flex-col gap-2">
-            <h3 className="text-sm font-semibold">Source Notes</h3>
-            <SourceNotesList draft={draft} onOpenSourceNote={onOpenSourceNote} />
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="text-sm font-semibold">Source Notes</h3>
+              {canEnterSplit ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="xs"
+                  onClick={() => {
+                    setSplitError(null)
+                    setSplitMode((current) => !current)
+                    setSplitSourceNoteIds([])
+                  }}
+                >
+                  <HugeiconsIcon icon={SplitIcon} data-icon="inline-start" aria-hidden />
+                  {splitMode ? 'Cancel split' : 'Split'}
+                </Button>
+              ) : null}
+            </div>
+            {splitMode ? (
+              <div className="rounded-md border bg-muted/30 p-2">
+                <p className="text-xs leading-relaxed text-muted-foreground">
+                  Select the notes that should move into a new draft.
+                </p>
+                {dirty ? (
+                  <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                    Save changes before splitting so both drafts start from the reviewed content.
+                  </p>
+                ) : null}
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <Button
+                    type="button"
+                    size="xs"
+                    disabled={!canSubmitSplit || splitting}
+                    onClick={() => void handleSplitDraft()}
+                  >
+                    <HugeiconsIcon icon={SplitIcon} data-icon="inline-start" aria-hidden />
+                    {splitting ? 'Splitting' : 'Create split draft'}
+                  </Button>
+                  <span className="text-xs text-muted-foreground">
+                    {splitSourceNoteIds.length} moving,{' '}
+                    {draft.sourceNoteIds.length - splitSourceNoteIds.length} staying
+                  </span>
+                </div>
+                {splitError ? (
+                  <p className="mt-2 text-xs leading-relaxed text-destructive" role="alert">
+                    {splitError}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
+            <SourceNotesList
+              draft={draft}
+              onOpenSourceNote={onOpenSourceNote}
+              splitMode={splitMode}
+              selectedSourceNoteIds={splitSourceNoteIds}
+              onToggleSplitSourceNote={handleToggleSplitSourceNote}
+            />
           </section>
 
           <Separator />
@@ -686,12 +794,19 @@ function DraftEditor({
 
 function SourceNotesList({
   draft,
-  onOpenSourceNote
+  onOpenSourceNote,
+  splitMode,
+  selectedSourceNoteIds,
+  onToggleSplitSourceNote
 }: {
   draft: IssueDraftForReview
   onOpenSourceNote: (noteId: string) => void
+  splitMode: boolean
+  selectedSourceNoteIds: string[]
+  onToggleSplitSourceNote: (noteId: string, checked: boolean) => void
 }): React.JSX.Element {
   const sourceNotesById = new Map(draft.sourceNotes.map((note) => [note.id, note]))
+  const selected = new Set(selectedSourceNoteIds)
 
   if (draft.sourceNoteIds.length === 0) {
     return <p className="text-sm text-muted-foreground">No source notes recorded.</p>
@@ -702,14 +817,22 @@ function SourceNotesList({
       {draft.sourceNoteIds.map((id) => {
         const note = sourceNotesById.get(id)
         return note ? (
-          <SourceNoteItem key={id} note={note} onOpenSourceNote={onOpenSourceNote} />
+          <SourceNoteItem
+            key={id}
+            note={note}
+            onOpenSourceNote={onOpenSourceNote}
+            splitMode={splitMode}
+            selected={selected.has(id)}
+            onToggleSplitSourceNote={onToggleSplitSourceNote}
+          />
         ) : (
-          <li key={id} className="rounded-md border bg-muted/30 p-2">
-            <p className="font-mono text-xs text-muted-foreground">{id}</p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Source note is no longer available.
-            </p>
-          </li>
+          <UnavailableSourceNoteItem
+            key={id}
+            id={id}
+            splitMode={splitMode}
+            selected={selected.has(id)}
+            onToggleSplitSourceNote={onToggleSplitSourceNote}
+          />
         )
       })}
     </ul>
@@ -718,12 +841,49 @@ function SourceNotesList({
 
 function SourceNoteItem({
   note,
-  onOpenSourceNote
+  onOpenSourceNote,
+  splitMode,
+  selected,
+  onToggleSplitSourceNote
 }: {
   note: IssueDraftSourceNote
   onOpenSourceNote: (noteId: string) => void
+  splitMode: boolean
+  selected: boolean
+  onToggleSplitSourceNote: (noteId: string, checked: boolean) => void
 }): React.JSX.Element {
   const preview = note.content.trim() || 'Untitled note'
+
+  if (splitMode) {
+    return (
+      <li
+        className={cn(
+          'flex min-w-0 items-start gap-2 rounded-md border bg-muted/30 p-2',
+          selected && 'bg-muted'
+        )}
+      >
+        <Checkbox
+          id={`split-source-note-${note.id}`}
+          checked={selected}
+          onCheckedChange={(checked) => onToggleSplitSourceNote(note.id, checked === true)}
+          aria-label={`Move source note ${note.id.slice(0, 8)} into the split draft`}
+          className="mt-1"
+        />
+        <label htmlFor={`split-source-note-${note.id}`} className="min-w-0 flex-1 cursor-pointer">
+          <span className="flex min-w-0 flex-wrap items-center gap-1.5">
+            <Badge variant="secondary">{note.status}</Badge>
+            <span className="tabular text-xs text-muted-foreground">
+              {formatTimestamp(note.createdAt)}
+            </span>
+            <span className="truncate font-mono text-xs text-muted-foreground">
+              {note.id.slice(0, 8)}
+            </span>
+          </span>
+          <span className="mt-2 line-clamp-4 text-sm leading-relaxed">{preview}</span>
+        </label>
+      </li>
+    )
+  }
 
   return (
     <li>
@@ -746,6 +906,50 @@ function SourceNoteItem({
         </span>
         <span className="mt-2 line-clamp-4 text-sm leading-relaxed">{preview}</span>
       </button>
+    </li>
+  )
+}
+
+function UnavailableSourceNoteItem({
+  id,
+  splitMode,
+  selected,
+  onToggleSplitSourceNote
+}: {
+  id: string
+  splitMode: boolean
+  selected: boolean
+  onToggleSplitSourceNote: (noteId: string, checked: boolean) => void
+}): React.JSX.Element {
+  if (splitMode) {
+    return (
+      <li
+        className={cn(
+          'flex min-w-0 items-start gap-2 rounded-md border bg-muted/30 p-2',
+          selected && 'bg-muted'
+        )}
+      >
+        <Checkbox
+          id={`split-source-note-${id}`}
+          checked={selected}
+          onCheckedChange={(checked) => onToggleSplitSourceNote(id, checked === true)}
+          aria-label={`Move unavailable source note ${id} into the split draft`}
+          className="mt-1"
+        />
+        <label htmlFor={`split-source-note-${id}`} className="min-w-0 flex-1 cursor-pointer">
+          <span className="block font-mono text-xs text-muted-foreground">{id}</span>
+          <span className="mt-1 block text-xs text-muted-foreground">
+            Source note is no longer available.
+          </span>
+        </label>
+      </li>
+    )
+  }
+
+  return (
+    <li className="rounded-md border bg-muted/30 p-2">
+      <p className="font-mono text-xs text-muted-foreground">{id}</p>
+      <p className="mt-1 text-xs text-muted-foreground">Source note is no longer available.</p>
     </li>
   )
 }

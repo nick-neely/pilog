@@ -150,6 +150,16 @@ export type UpdateIssueDraftStatusRequest = {
   status: IssueDraftStatus
 }
 
+export type SplitIssueDraftRequest = {
+  id: string
+  movedSourceNoteIds: string[]
+}
+
+export type SplitIssueDraftResponse = {
+  original: IssueDraft
+  newDraft: IssueDraft
+}
+
 export type PublishIssueDraftRequest = UpdateIssueDraftRequest
 
 export type IpcContract = {
@@ -215,6 +225,10 @@ export type IpcContract = {
   'issue-drafts:updateStatus': {
     request: UpdateIssueDraftStatusRequest
     response: IssueDraft | null
+  }
+  'issue-drafts:split': {
+    request: SplitIssueDraftRequest
+    response: SplitIssueDraftResponse
   }
   'issue-drafts:publish': {
     request: PublishIssueDraftRequest
