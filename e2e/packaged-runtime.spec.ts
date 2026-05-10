@@ -101,9 +101,9 @@ test('packaged app launches and resolves runtime dependencies', async () => {
     await page.reload()
 
     const noteRows = page.locator('[data-testid="note-row"]')
-    await expect(noteRows.filter({ hasText: 'packaged build can generate fixture drafts' })).toHaveCount(
-      1
-    )
+    await expect(
+      noteRows.filter({ hasText: 'packaged build can generate fixture drafts' })
+    ).toHaveCount(1)
     await noteRows.filter({ hasText: 'packaged build can generate fixture drafts' }).click()
     const modifier = process.platform === 'darwin' ? 'Meta' : 'Control'
     await noteRows
