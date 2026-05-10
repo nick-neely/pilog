@@ -36,11 +36,13 @@ import type { RunNavigationOrigin } from '@renderer/features/agent-runs/navigati
 import { cn } from '@renderer/lib/utils'
 import type {
   AgentRunListItem,
+  GitHubLabel,
   GitHubStatus,
   PathActionResult,
   Repo,
   UpdateIssueDraftRequest
 } from '@shared/ipc'
+import { matchLabelsToRepoLabels, type LabelMatch } from '@shared/labels'
 import type {
   IssueDraft,
   IssueDraftForReview,
@@ -56,6 +58,12 @@ const EMPTY_STATUS_COUNTS: Record<IssueDraftStatus, number> = {
 }
 
 const ISSUE_DRAFT_STATUSES: readonly IssueDraftStatus[] = ['draft', 'dismissed', 'published']
+
+type RepoLabelLoadState = {
+  key: string | null
+  labels: GitHubLabel[]
+  error: string | null
+}
 
 const DRAFT_TIMESTAMP_FORMATTER = new Intl.DateTimeFormat(undefined, {
   month: 'short',
@@ -289,17 +297,74 @@ function publishBlockActionHandler(
   }
 }
 
+function buildLabelMatchLookup(labelMatches?: readonly LabelMatch[]): Map<string, LabelMatch> {
+  const matches = new Map<string, LabelMatch>()
+  for (const match of labelMatches ?? []) {
+    matches.set(match.input, match)
+    matches.set(match.name, match)
+  }
+  return matches
+}
+
+function labelBadgeState(input: {
+  label: string
+  matchesByInput: Map<string, LabelMatch>
+  keptUnmatchedLabels?: readonly string[]
+}): {
+  match: LabelMatch | undefined
+  displayName: string
+  statusText: string | null
+  kept: boolean
+} {
+  const match = input.matchesByInput.get(input.label)
+  const kept = Boolean(match && !match.matched && input.keptUnmatchedLabels?.includes(match.name))
+
+  if (!match) {
+    return {
+      match,
+      displayName: input.label,
+      statusText: null,
+      kept
+    }
+  }
+
+  return {
+    match,
+    displayName: match.name,
+    statusText: labelMatchStatusText(match, kept),
+    kept
+  }
+}
+
+function labelMatchStatusText(match: LabelMatch, kept: boolean): string {
+  if (kept) return 'Keep'
+  if (match.matched) return 'Matched'
+  return 'Unmatched'
+}
+
+function toggleStringInList(items: readonly string[], item: string): string[] {
+  if (items.includes(item)) return items.filter((current) => current !== item)
+  return [...items, item]
+}
+
 function LabelInput({
   labels,
+  labelMatches,
+  keptUnmatchedLabels,
+  onToggleKeepUnmatched,
   onChange,
   disabled
 }: {
   labels: string[]
+  labelMatches?: LabelMatch[]
+  keptUnmatchedLabels?: string[]
+  onToggleKeepUnmatched?: (label: string) => void
   onChange: (labels: string[]) => void
   disabled?: boolean
 }): React.JSX.Element {
   const [value, setValue] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
+  const matchesByInput = useMemo(() => buildLabelMatchLookup(labelMatches), [labelMatches])
 
   const addLabel = useCallback(
     (raw: string) => {
@@ -339,24 +404,47 @@ function LabelInput({
       )}
       onClick={() => inputRef.current?.focus()}
     >
-      {labels.map((label, index) => (
-        <Badge key={label} variant="secondary" className="gap-1 pr-1">
-          {label}
-          {!disabled && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation()
-                removeLabel(index)
-              }}
-              className="inline-flex items-center justify-center rounded-sm opacity-60 hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              aria-label={`Remove label ${label}`}
-            >
-              <HugeiconsIcon icon={Cancel01Icon} className="size-3" aria-hidden />
-            </button>
-          )}
-        </Badge>
-      ))}
+      {labels.map((label, index) => {
+        const badge = labelBadgeState({ label, matchesByInput, keptUnmatchedLabels })
+        const match = badge.match
+
+        return (
+          <Badge key={label} variant="secondary" className="gap-1 pr-1">
+            <span>{badge.displayName}</span>
+            {badge.statusText ? (
+              <span className="rounded-sm border border-border/70 bg-background/50 px-1 text-[10px] leading-4 text-muted-foreground">
+                {badge.statusText}
+              </span>
+            ) : null}
+            {match && !match.matched && !disabled && onToggleKeepUnmatched ? (
+              <button
+                type="button"
+                aria-pressed={badge.kept}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onToggleKeepUnmatched(match.name)
+                }}
+                className="rounded-sm px-1 text-[10px] leading-4 text-muted-foreground underline-offset-2 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                {badge.kept ? 'Undo' : 'Keep'}
+              </button>
+            ) : null}
+            {!disabled && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  removeLabel(index)
+                }}
+                className="inline-flex items-center justify-center rounded-sm opacity-60 hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                aria-label={`Remove label ${label}`}
+              >
+                <HugeiconsIcon icon={Cancel01Icon} className="size-3" aria-hidden />
+              </button>
+            )}
+          </Badge>
+        )
+      })}
       <input
         ref={inputRef}
         type="text"
@@ -629,6 +717,7 @@ export function DraftReview({
               key={selectedDraft.id}
               draft={selectedDraft}
               mergeCandidates={mergeCandidates}
+              repo={selectedDraftRepo ?? null}
               repoPath={selectedDraftRepo?.localPath ?? null}
               publishBlock={selectedDraftPublishBlock}
               onSaved={fetchDrafts}
@@ -825,6 +914,7 @@ function PublishBlocker({
 function DraftEditor({
   draft,
   mergeCandidates,
+  repo,
   repoPath,
   publishBlock,
   onOpenSourceNote,
@@ -836,6 +926,7 @@ function DraftEditor({
 }: {
   draft: IssueDraftForReview
   mergeCandidates: IssueDraftForReview[]
+  repo: Repo | null
   repoPath: string | null
   publishBlock: PublishBlock | null
   onOpenSourceNote: (noteId: string) => void
@@ -863,14 +954,85 @@ function DraftEditor({
   const [merging, setMerging] = useState(false)
   const [mergeMessage, setMergeMessage] = useState<string | null>(null)
   const [mergeError, setMergeError] = useState<string | null>(null)
+  const [repoLabelState, setRepoLabelState] = useState<RepoLabelLoadState>({
+    key: null,
+    labels: [],
+    error: null
+  })
+  const [keptUnmatchedLabels, setKeptUnmatchedLabels] = useState<string[]>([])
+  const repoOwner = repo?.owner ?? null
+  const repoName = repo?.name ?? null
+  const repoLabelRequest = useMemo(() => {
+    if (!repoOwner || !repoName) return null
+
+    return {
+      key: `${repoOwner}/${repoName}`,
+      owner: repoOwner,
+      name: repoName
+    }
+  }, [repoName, repoOwner])
+
+  useEffect(() => {
+    let cancelled = false
+    if (!repoLabelRequest) return
+
+    window.pilog
+      .invoke('github:listLabels', { owner: repoLabelRequest.owner, repo: repoLabelRequest.name })
+      .then((labels) => {
+        if (!cancelled) {
+          setRepoLabelState({ key: repoLabelRequest.key, labels, error: null })
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setRepoLabelState({
+            key: repoLabelRequest.key,
+            labels: [],
+            error: error instanceof Error ? error.message : 'Could not load repo labels.'
+          })
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [repoLabelRequest])
+
+  const repoLabelsLoading = Boolean(repoLabelRequest && repoLabelState.key !== repoLabelRequest.key)
+  const repoLabelsLoaded = Boolean(
+    repoLabelRequest && repoLabelState.key === repoLabelRequest.key && !repoLabelState.error
+  )
+  const repoLabelsError =
+    repoLabelRequest && repoLabelState.key === repoLabelRequest.key ? repoLabelState.error : null
+  const repoLabels = useMemo(
+    () => (repoLabelsLoaded ? repoLabelState.labels : []),
+    [repoLabelState.labels, repoLabelsLoaded]
+  )
+
+  const labelMatches = useMemo(
+    () => matchLabelsToRepoLabels(labels, repoLabels),
+    [labels, repoLabels]
+  )
+  const reviewedLabels = useMemo(
+    () => (repoLabelsLoaded ? labelMatches.map((match) => match.name) : labels),
+    [labelMatches, labels, repoLabelsLoaded]
+  )
+  const unmatchedLabels = useMemo(
+    () => labelMatches.filter((match) => !match.matched).map((match) => match.name),
+    [labelMatches]
+  )
+  const effectiveKeptUnmatchedLabels = useMemo(
+    () => keptUnmatchedLabels.filter((label) => unmatchedLabels.includes(label)),
+    [keptUnmatchedLabels, unmatchedLabels]
+  )
 
   const editedDraft = useMemo(
     () => ({
       title: normalizeDraftTitle(title),
       body,
-      labels
+      labels: reviewedLabels
     }),
-    [body, labels, title]
+    [body, reviewedLabels, title]
   )
   const dirty = hasDraftChanges(draft, editedDraft)
   const isPublished = draft.status === 'published'
@@ -924,7 +1086,8 @@ function DraftEditor({
         id: draft.id,
         title: editedDraft.title,
         body: editedDraft.body,
-        labels: editedDraft.labels
+        labels: editedDraft.labels,
+        keptUnmatchedLabels: effectiveKeptUnmatchedLabels
       })
       setTitle(published.title)
       setBody(published.body)
@@ -937,7 +1100,16 @@ function DraftEditor({
     } finally {
       setPublishing(false)
     }
-  }, [canPublish, draft.id, editedDraft, onSaved, publishBlock, publishing, saving])
+  }, [
+    canPublish,
+    draft.id,
+    effectiveKeptUnmatchedLabels,
+    editedDraft,
+    onSaved,
+    publishBlock,
+    publishing,
+    saving
+  ])
 
   const handleStatusChange = useCallback(
     async (status: IssueDraftStatus): Promise<void> => {
@@ -1174,7 +1346,29 @@ function DraftEditor({
             <label htmlFor="draft-labels" className="text-sm font-medium">
               Labels
             </label>
-            <LabelInput labels={labels} onChange={setLabels} disabled={isPublished} />
+            <LabelInput
+              labels={labels}
+              labelMatches={repoLabelsLoaded ? labelMatches : undefined}
+              keptUnmatchedLabels={effectiveKeptUnmatchedLabels}
+              onToggleKeepUnmatched={(label) => {
+                setKeptUnmatchedLabels((current) => toggleStringInList(current, label))
+              }}
+              onChange={setLabels}
+              disabled={isPublished}
+            />
+            {repoLabelsLoading ? (
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                Matching labels against {repo?.owner}/{repo?.name}.
+              </p>
+            ) : repoLabelsError ? (
+              <p className="text-xs leading-relaxed text-muted-foreground" role="status">
+                Could not check repo labels. Publish will check again before writing to GitHub.
+              </p>
+            ) : unmatchedLabels.length > 0 ? (
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                Unmatched labels are omitted on publish unless marked Keep.
+              </p>
+            ) : null}
           </div>
 
           <div className="flex min-w-0 flex-col gap-2">

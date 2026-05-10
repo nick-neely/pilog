@@ -92,6 +92,83 @@ describe('publishReviewedDraft', () => {
     )
   })
 
+  it('normalizes reviewed labels and omits unmatched labels unless explicitly kept', async () => {
+    const repo = createRepo(db, {
+      name: 'pilog',
+      owner: 'nick-neely',
+      localPath: '/tmp/pilog',
+      githubUrl: 'https://github.com/nick-neely/pilog',
+      defaultBranch: 'main'
+    })
+    const draft = createIssueDraft(db, {
+      repoId: repo.id,
+      draft: { ...generatedDraft, suggestedLabels: ['Bug', 'paper-cut'] }
+    })
+    const createIssue = vi.fn().mockResolvedValue({
+      url: 'https://github.com/nick-neely/pilog/issues/22',
+      number: 22
+    })
+    const listLabels = vi.fn().mockResolvedValue([{ name: 'bug' }, { name: 'ready-for-agent' }])
+
+    const published = await publishReviewedDraft(
+      db,
+      {
+        id: draft.id,
+        title: 'Edited title',
+        body: 'Edited markdown body',
+        labels: ['Bug', 'Ready For Agent', 'paper-cut'],
+        keptUnmatchedLabels: ['paper-cut']
+      },
+      { createIssue, listLabels }
+    )
+
+    expect(listLabels).toHaveBeenCalledWith('nick-neely', 'pilog')
+    expect(createIssue).toHaveBeenCalledWith('nick-neely', 'pilog', {
+      title: 'Edited title',
+      body: 'Edited markdown body',
+      labels: ['bug', 'ready-for-agent', 'paper-cut']
+    })
+    expect(published.labels).toEqual(['bug', 'ready-for-agent', 'paper-cut'])
+  })
+
+  it('drops unmatched generated labels from review publish by default', async () => {
+    const repo = createRepo(db, {
+      name: 'pilog',
+      owner: 'nick-neely',
+      localPath: '/tmp/pilog',
+      githubUrl: 'https://github.com/nick-neely/pilog',
+      defaultBranch: 'main'
+    })
+    const draft = createIssueDraft(db, {
+      repoId: repo.id,
+      draft: { ...generatedDraft, suggestedLabels: ['Bug', 'paper-cut'] }
+    })
+    const createIssue = vi.fn().mockResolvedValue({
+      url: 'https://github.com/nick-neely/pilog/issues/23',
+      number: 23
+    })
+
+    await publishReviewedDraft(
+      db,
+      {
+        id: draft.id,
+        title: 'Edited title',
+        body: 'Edited markdown body',
+        labels: ['Bug', 'paper-cut']
+      },
+      {
+        createIssue,
+        listLabels: vi.fn().mockResolvedValue([{ name: 'bug' }])
+      }
+    )
+
+    expect(createIssue).toHaveBeenCalledWith('nick-neely', 'pilog', {
+      title: 'Edited title',
+      body: 'Edited markdown body',
+      labels: ['bug']
+    })
+  })
+
   it('leaves local state untouched when GitHub issue creation fails', async () => {
     const repo = createRepo(db, {
       name: 'pilog',
@@ -214,6 +291,53 @@ describe('publishAutoPublishRun', () => {
         [secondNote.id, 'published']
       ])
     )
+  })
+
+  it('normalizes auto-publish labels and omits unmatched labels', async () => {
+    const repo = createRepo(db, {
+      name: 'pilog',
+      owner: 'nick-neely',
+      localPath: '/tmp/pilog',
+      githubUrl: 'https://github.com/nick-neely/pilog',
+      defaultBranch: 'main'
+    })
+    const note = createNote(db, { content: 'save button spins', repoId: repo.id })
+    updateNoteStatus(db, note.id, 'drafted')
+    const draft = createIssueDraft(db, {
+      repoId: repo.id,
+      draft: {
+        ...generatedDraft,
+        sourceNoteIds: [note.id],
+        suggestedLabels: ['Bug', 'paper-cut', 'ready for agent']
+      }
+    })
+    const run = createAgentRun(db, { repoId: repo.id, inputNoteIds: [note.id] })
+    finalizeAgentRun(db, {
+      id: run.id,
+      status: 'succeeded',
+      outputDraftIds: [draft.id],
+      eventStream: []
+    })
+    const createIssue = vi.fn().mockResolvedValue({
+      url: 'https://github.com/nick-neely/pilog/issues/43',
+      number: 43
+    })
+
+    const report = await publishAutoPublishRun(
+      db,
+      { runId: run.id },
+      {
+        createIssue,
+        listLabels: vi.fn().mockResolvedValue([{ name: 'bug' }, { name: 'ready-for-agent' }])
+      }
+    )
+
+    expect(report.successCount).toBe(1)
+    expect(createIssue).toHaveBeenCalledWith('nick-neely', 'pilog', {
+      title: draft.title,
+      body: draft.body,
+      labels: ['bug', 'ready-for-agent']
+    })
   })
 
   it('reports a GitHub 422 without rolling back earlier successful publishes', async () => {

@@ -287,6 +287,51 @@ describe('issue generation', () => {
     expect(listPublishLog(db, { repoId: repo.id })).toEqual([])
   })
 
+  it('normalizes auto-publish preview labels against repo labels', () => {
+    const db = createInMemoryDatabase()
+    runMigrations(db)
+    const repo = createRepo(db, {
+      owner: 'nick-neely',
+      name: 'pilog',
+      localPath: '/workspace/pilog',
+      githubUrl: 'https://github.com/nick-neely/pilog',
+      defaultBranch: 'main'
+    })
+    const note = createNote(db, { content: 'settings label variants', repoId: repo.id })
+    const run = createAgentRun(db, { repoId: repo.id, inputNoteIds: [note.id] })
+
+    const plan = planAutoPublishPreviewDrafts({
+      runId: run.id,
+      repo: {
+        ...repo,
+        autoPublishEnabled: true,
+        autoPublishMaxIssuesPerRun: 5,
+        autoPublishDefaultLabel: 'triaged-by-pilog',
+        autoPublishDryRun: true,
+        autoPublishRequireConfirmation: true
+      },
+      repoLabels: [{ name: 'ready-for-agent' }, { name: 'triaged-by-pilog' }],
+      drafts: [
+        {
+          ...draft,
+          sourceNoteIds: [note.id],
+          suggestedLabels: ['Ready For Agent', 'paper-cut']
+        }
+      ]
+    })
+
+    expect(plan.drafts[0]?.suggestedLabels).toEqual([
+      'ready-for-agent',
+      'paper-cut',
+      'triaged-by-pilog'
+    ])
+    expect(plan.drafts[0]?.labelMatches).toEqual([
+      { input: 'Ready For Agent', name: 'ready-for-agent', matched: true },
+      { input: 'paper-cut', name: 'paper-cut', matched: false },
+      { input: 'triaged-by-pilog', name: 'triaged-by-pilog', matched: true }
+    ])
+  })
+
   it('selects only eligible current-inbox notes for one repo', () => {
     const db = createInMemoryDatabase()
     runMigrations(db)

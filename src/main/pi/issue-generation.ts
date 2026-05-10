@@ -1,6 +1,8 @@
 import type { AgentTool } from '@earendil-works/pi-agent-core'
 import type { Note, Repo } from '@shared/ipc'
 import type { AutoPublishPreviewSummary, SearchProvider } from '@shared/types'
+import type { RepoLabelLike } from '@shared/labels'
+import { matchLabelsToRepoLabels } from '@shared/labels'
 import {
   GeneratedIssueDraftsSchema,
   SubmitIssueDraftsParameters,
@@ -226,6 +228,7 @@ export function planAutoPublishPreviewDrafts(input: {
   runId: string
   repo: Repo
   drafts: GeneratedIssueDraft[]
+  repoLabels?: RepoLabelLike[]
 }): AutoPublishPreviewPlan {
   if (!input.repo.autoPublishEnabled) {
     throw new Error('Auto-publish is not enabled for this repository.')
@@ -233,10 +236,16 @@ export function planAutoPublishPreviewDrafts(input: {
 
   const maxIssuesPerRun = Math.max(1, Math.floor(input.repo.autoPublishMaxIssuesPerRun))
   const defaultLabel = input.repo.autoPublishDefaultLabel.trim()
-  const plannedDrafts = input.drafts.slice(0, maxIssuesPerRun).map((draft) => ({
-    ...draft,
-    suggestedLabels: applyDefaultLabel(draft.suggestedLabels, defaultLabel)
-  }))
+  const plannedDrafts = input.drafts.slice(0, maxIssuesPerRun).map((draft) => {
+    const suggestedLabels = applyDefaultLabel(draft.suggestedLabels, defaultLabel)
+    const labelMatches = matchLabelsToRepoLabels(suggestedLabels, input.repoLabels ?? [])
+
+    return {
+      ...draft,
+      suggestedLabels: labelMatches.map((match) => match.name),
+      labelMatches
+    }
+  })
   const heldBackCount = Math.max(0, input.drafts.length - plannedDrafts.length)
   const limited = heldBackCount > 0
 

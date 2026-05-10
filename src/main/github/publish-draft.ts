@@ -2,9 +2,11 @@ import { and, eq, inArray } from 'drizzle-orm'
 import { v4 as uuidv4 } from 'uuid'
 import type {
   CreatedIssue,
+  GitHubLabel,
   PublishAutoPublishRunRequest,
   PublishIssueDraftRequest
 } from '@shared/ipc'
+import { filterLabelsForPublish } from '@shared/labels'
 import type { AutoPublishPublishReport, IssueDraft } from '@shared/types'
 import type { PilogDatabase } from '../db/client'
 import { issueDrafts, notes, publishLog } from '../db/schema'
@@ -18,6 +20,15 @@ type CreateIssueClient = (
   payload: { title: string; body: string; labels?: string[] }
 ) => Promise<CreatedIssue>
 
+type ListLabelsClient = (owner: string, repo: string) => Promise<Array<Pick<GitHubLabel, 'name'>>>
+
+type PublishClients =
+  | CreateIssueClient
+  | {
+      createIssue: CreateIssueClient
+      listLabels: ListLabelsClient
+    }
+
 type ReviewedDraftPayload = {
   title: string
   body: string
@@ -27,7 +38,7 @@ type ReviewedDraftPayload = {
 export async function publishReviewedDraft(
   db: PilogDatabase,
   request: PublishIssueDraftRequest,
-  createIssue: CreateIssueClient
+  clients: PublishClients
 ): Promise<IssueDraft> {
   const draft = getIssueDraftById(db, request.id)
   if (!draft) throw new Error('Draft not found')
@@ -36,12 +47,13 @@ export async function publishReviewedDraft(
   const repo = getRepoById(db, draft.repoId)
   if (!repo) throw new Error('Linked repository not found')
 
+  const publishClients = normalizePublishClients(clients)
   const reviewedDraft: ReviewedDraftPayload = {
     title: request.title.trim() || 'Untitled draft',
     body: request.body,
-    labels: request.labels
+    labels: await resolveLabelsForPublish({ request, repo, listLabels: publishClients.listLabels })
   }
-  const createdIssue = await createIssue(repo.owner, repo.name, {
+  const createdIssue = await publishClients.createIssue(repo.owner, repo.name, {
     title: reviewedDraft.title,
     body: reviewedDraft.body,
     labels: reviewedDraft.labels.length > 0 ? reviewedDraft.labels : undefined
@@ -61,7 +73,7 @@ export async function publishReviewedDraft(
 export async function publishAutoPublishRun(
   db: PilogDatabase,
   request: PublishAutoPublishRunRequest,
-  createIssue: CreateIssueClient
+  clients: PublishClients
 ): Promise<AutoPublishPublishReport> {
   const run = getRunById(db, request.runId)
   if (!run) throw new Error('Auto-publish run not found')
@@ -92,7 +104,7 @@ export async function publishAutoPublishRun(
           body: draft.body,
           labels: draft.labels
         },
-        createIssue
+        clients
       )
       successes.push({
         draftId: published.id,
@@ -118,6 +130,35 @@ export async function publishAutoPublishRun(
     successes,
     failures
   }
+}
+
+function normalizePublishClients(clients: PublishClients): {
+  createIssue: CreateIssueClient
+  listLabels: ListLabelsClient | null
+} {
+  if (typeof clients === 'function') {
+    return {
+      createIssue: clients,
+      listLabels: null
+    }
+  }
+
+  return clients
+}
+
+async function resolveLabelsForPublish(input: {
+  request: PublishIssueDraftRequest
+  repo: { owner: string; name: string }
+  listLabels: ListLabelsClient | null
+}): Promise<string[]> {
+  if (!input.listLabels) return input.request.labels
+
+  const repoLabels = await input.listLabels(input.repo.owner, input.repo.name)
+  return filterLabelsForPublish({
+    labels: input.request.labels,
+    repoLabels,
+    keptUnmatchedLabels: input.request.keptUnmatchedLabels
+  })
 }
 
 function recordLocalPublishState(

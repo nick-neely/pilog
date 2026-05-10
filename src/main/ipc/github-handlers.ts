@@ -47,7 +47,7 @@ export function registerGitHubIpcHandlers(
   })
 
   ipcMain.handle('issue-drafts:publish', async (_event, request) => {
-    const published = await publishReviewedDraft(db, request, createIssue)
+    const published = await publishReviewedDraft(db, request, { createIssue, listLabels })
 
     callbacks?.onIssueDraftsChanged?.()
     callbacks?.onNoteChanged?.()
@@ -58,7 +58,7 @@ export function registerGitHubIpcHandlers(
   })
 
   ipcMain.handle('issue-drafts:publishAutoPublishRun', async (_event, request) => {
-    const report = await publishAutoPublishRun(db, request, createIssue)
+    const report = await publishAutoPublishRun(db, request, { createIssue, listLabels })
 
     callbacks?.onIssueDraftsChanged?.()
     callbacks?.onNoteChanged?.()
