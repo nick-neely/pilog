@@ -12,6 +12,7 @@ import type {
   GenerateDraftsRequest,
   GenerateDraftsMode,
   GenerateDraftsStartResponse,
+  GitHubIssueTemplate,
   IssueDraftSourceNote,
   IssueDraft,
   IssueDraftForReview,
@@ -268,6 +269,10 @@ export type IpcContract = {
     request: UpdateRepoAutoPublishSettingsRequest
     response: Repo | null
   }
+  'repos:getDefaultIssueTemplate': {
+    request: { id: string }
+    response: GitHubIssueTemplate | null
+  }
   'repos:unlink': { request: { id: string }; response: boolean }
   'dialog:openDirectory': { request: void; response: string | null }
   'github:listLabels': {
@@ -386,6 +391,7 @@ export type {
   GenerateCurrentInboxDraftsStartResponse,
   GenerateDraftsRequest,
   GenerateDraftsMode,
+  GitHubIssueTemplate,
   IssueDraftStatus,
   PiActiveConfig,
   PiModelOption,

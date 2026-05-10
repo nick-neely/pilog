@@ -4,10 +4,15 @@ import type { PilogDatabase } from '../client'
 import { issueDrafts, notes } from '../schema'
 import type {
   GeneratedIssueDraft,
+  GitHubIssueTemplate,
   IssueDraft,
   IssueDraftForReview,
   IssueDraftStatus
 } from '@shared/types'
+import {
+  applyIssueTemplateToDraftBody,
+  formatFallbackIssueDraftBody
+} from '../../github/issue-templates'
 
 const issueDraftColumns = {
   id: issueDrafts.id,
@@ -37,11 +42,11 @@ const sourceNoteColumns = {
 
 export function createIssueDraft(
   db: PilogDatabase,
-  input: { repoId: string; draft: GeneratedIssueDraft }
+  input: { repoId: string; draft: GeneratedIssueDraft; template?: GitHubIssueTemplate | null }
 ): IssueDraft {
   const now = new Date().toISOString()
   const id = uuidv4()
-  const body = formatIssueDraftBody(input.draft)
+  const body = formatIssueDraftBody(input.draft, input.template)
 
   db.insert(issueDrafts)
     .values({
@@ -399,28 +404,11 @@ function mergeAffectedFiles(
   return [...filesByPath.values()]
 }
 
-export function formatIssueDraftBody(draft: GeneratedIssueDraft): string {
-  const lines = [
-    draft.summary,
-    '',
-    '## Context',
-    draft.context,
-    '',
-    '## Acceptance Criteria',
-    ...draft.acceptanceCriteria.map((item) => `- ${item}`)
-  ]
-
-  if (draft.implementationNotes.length > 0) {
-    lines.push(
-      '',
-      '## Implementation Notes',
-      ...draft.implementationNotes.map((item) => `- ${item}`)
-    )
-  }
-
-  if (draft.needsClarification && draft.needsClarification.length > 0) {
-    lines.push('', '## Needs Clarification', ...draft.needsClarification.map((item) => `- ${item}`))
-  }
-
-  return lines.join('\n')
+export function formatIssueDraftBody(
+  draft: GeneratedIssueDraft,
+  template?: GitHubIssueTemplate | null
+): string {
+  return template
+    ? applyIssueTemplateToDraftBody(draft, template)
+    : formatFallbackIssueDraftBody(draft)
 }

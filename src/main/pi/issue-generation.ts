@@ -12,6 +12,7 @@ import type { PilogDatabase } from '../db/client'
 import { formatIssueDraftBody } from '../db/repositories/issue-drafts'
 import { getRepoById } from '../db/repositories/repos'
 import { agentRuns, issueDrafts, notes } from '../db/schema'
+import { resolveDefaultIssueTemplate } from '../github/issue-templates'
 
 export type IssueGenerationInput = {
   runId: string
@@ -170,6 +171,9 @@ export function persistGeneratedIssueDrafts(
     eventStream: unknown[]
   }
 ): string[] {
+  const repo = getRepoById(db, input.repoId)
+  const template = repo ? resolveDefaultIssueTemplate(repo.localPath) : null
+
   return db.transaction((tx) => {
     const now = new Date().toISOString()
     const draftIds: string[] = []
@@ -185,7 +189,7 @@ export function persistGeneratedIssueDrafts(
           id,
           repoId: input.repoId,
           title: draft.title,
-          body: formatIssueDraftBody(draft),
+          body: formatIssueDraftBody(draft, template),
           labels: JSON.stringify(draft.suggestedLabels),
           sourceNoteIds: JSON.stringify(draft.sourceNoteIds),
           affectedFilesJson: JSON.stringify(draft.affectedFiles),

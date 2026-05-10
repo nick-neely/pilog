@@ -1,5 +1,8 @@
 import { GeneratedIssueDraftsSchema, type GeneratedIssueDraft } from '@shared/types'
 import { eq } from 'drizzle-orm'
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import {
   clarificationResponse,
@@ -112,6 +115,47 @@ describe('issue generation', () => {
     expect(finalizedRun?.status).toBe('succeeded')
     expect(JSON.parse(finalizedRun?.outputDraftIds ?? '[]')).toEqual(draftIds)
     expect(JSON.parse(finalizedRun?.eventStream ?? '[]')).toEqual([{ type: 'final' }])
+  })
+
+  it('scaffolds persisted generated draft bodies from the linked repo issue template', () => {
+    const db = createInMemoryDatabase()
+    runMigrations(db)
+    const repoPath = mkdtempSync(path.join(tmpdir(), 'pilog-generation-template-'))
+    mkdirSync(path.join(repoPath, '.github', 'ISSUE_TEMPLATE'), { recursive: true })
+    writeFileSync(
+      path.join(repoPath, '.github', 'ISSUE_TEMPLATE', 'bug.md'),
+      ['---', 'name: Bug report', '---', '', '## Summary', '', '## Acceptance Criteria'].join('\n')
+    )
+    const repo = createRepo(db, {
+      owner: 'nick-neely',
+      name: 'pilog',
+      localPath: repoPath,
+      githubUrl: 'https://github.com/nick-neely/pilog',
+      defaultBranch: 'main'
+    })
+    const note = createNote(db, { content: 'save button spins', repoId: repo.id })
+    const run = createAgentRun(db, { repoId: repo.id, inputNoteIds: [note.id] })
+
+    persistGeneratedIssueDrafts(db, {
+      runId: run.id,
+      repoId: repo.id,
+      selectedNoteIds: [note.id],
+      drafts: [{ ...draft, sourceNoteIds: [note.id] }],
+      eventStream: [{ type: 'final' }]
+    })
+
+    const persistedDraft = db.select().from(issueDrafts).get()
+
+    expect(persistedDraft?.body).toContain('## Summary\nSettings spacing is cramped on mobile.')
+    expect(persistedDraft?.body).toContain(
+      '## Acceptance Criteria\n- Settings spacing is readable on narrow screens.'
+    )
+    expect(persistedDraft?.body).toContain('## Pilog Review Notes')
+    expect(persistedDraft?.affectedFilesJson).toBe(
+      JSON.stringify([{ path: 'src/settings.tsx', reason: 'Settings page surface.' }])
+    )
+    expect(persistedDraft?.confidence).toBe('medium')
+    expect(persistedDraft?.groupingReason).toBe('Both notes describe settings mobile layout.')
   })
 
   it('persists multiple drafts and records every output id', () => {
