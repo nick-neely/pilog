@@ -1,7 +1,18 @@
 import type { GitHubStatus, Note, PiStatus, Repo } from './ipc'
 import type { IssueDraftForReview } from './types'
+import { z } from 'zod'
 
-export type OnboardingStepId = 'hotkey' | 'github' | 'repo' | 'pi' | 'note' | 'draft' | 'review'
+export const ONBOARDING_STEP_ORDER = [
+  'hotkey',
+  'github',
+  'repo',
+  'pi',
+  'note',
+  'draft',
+  'review'
+] as const
+
+export type OnboardingStepId = (typeof ONBOARDING_STEP_ORDER)[number]
 
 export type OnboardingState = {
   version: 1
@@ -29,20 +40,36 @@ export const DEFAULT_ONBOARDING_STATE: OnboardingState = {
   skippedAt: null
 }
 
+const OnboardingStateShape = z
+  .object({
+    skipped: z.boolean().optional(),
+    completed: z.boolean().optional(),
+    confirmedHotkeyAt: z.string().nullable().optional(),
+    completedAt: z.string().nullable().optional(),
+    skippedAt: z.string().nullable().optional()
+  })
+  .passthrough()
+
+export function normalizeOnboardingState(value: unknown): OnboardingState {
+  const parsed = OnboardingStateShape.safeParse(value)
+  if (!parsed.success) return DEFAULT_ONBOARDING_STATE
+
+  return {
+    version: 1,
+    skipped: parsed.data.skipped === true,
+    completed: parsed.data.completed === true,
+    confirmedHotkeyAt:
+      typeof parsed.data.confirmedHotkeyAt === 'string' ? parsed.data.confirmedHotkeyAt : null,
+    completedAt: typeof parsed.data.completedAt === 'string' ? parsed.data.completedAt : null,
+    skippedAt: typeof parsed.data.skippedAt === 'string' ? parsed.data.skippedAt : null
+  }
+}
+
 export function parseOnboardingState(raw: string | null): OnboardingState {
   if (!raw) return DEFAULT_ONBOARDING_STATE
 
   try {
-    const parsed = JSON.parse(raw) as Partial<OnboardingState>
-    return {
-      version: 1,
-      skipped: parsed.skipped === true,
-      completed: parsed.completed === true,
-      confirmedHotkeyAt:
-        typeof parsed.confirmedHotkeyAt === 'string' ? parsed.confirmedHotkeyAt : null,
-      completedAt: typeof parsed.completedAt === 'string' ? parsed.completedAt : null,
-      skippedAt: typeof parsed.skippedAt === 'string' ? parsed.skippedAt : null
-    }
+    return normalizeOnboardingState(JSON.parse(raw))
   } catch {
     return DEFAULT_ONBOARDING_STATE
   }
@@ -96,6 +123,20 @@ export function completeOnboardingState(
 
 export function shouldOpenMainWindowForOnboarding(state: OnboardingState): boolean {
   return !state.completed && !state.skipped
+}
+
+export function getCompletedOnboardingSteps(
+  state: OnboardingState,
+  signals: OnboardingSignals
+): Set<OnboardingStepId> {
+  const completed = new Set<OnboardingStepId>()
+  if (state.confirmedHotkeyAt) completed.add('hotkey')
+  if (signals.github.connected) completed.add('github')
+  if (signals.repos.length > 0) completed.add('repo')
+  if (signals.pi.configured) completed.add('pi')
+  if (signals.notes.length > 0) completed.add('note')
+  if (signals.drafts.length > 0) completed.add('draft')
+  return completed
 }
 
 export function getCurrentOnboardingStep(

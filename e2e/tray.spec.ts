@@ -47,7 +47,7 @@ test('first launch opens the visible inbox onboarding path', async () => {
 
 test('tray-first: skipped onboarding does not show the main window on default launch', async () => {
   let app = await launchApp()
-  let inboxPage = await app.firstWindow()
+  const inboxPage = await app.firstWindow()
   await inboxPage.getByRole('button', { name: 'Skip for now' }).click()
   await expect(inboxPage.getByRole('button', { name: 'Resume first-run setup' })).toBeVisible()
   await exitApp(app)

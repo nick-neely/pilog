@@ -3,6 +3,7 @@ import type { PilogDatabase } from '../client'
 import { settings } from '../schema'
 import type { SettingKey } from '@shared/ipc'
 import {
+  normalizeOnboardingState,
   parseOnboardingState,
   serializeOnboardingState,
   type OnboardingState
@@ -29,6 +30,7 @@ export function getOnboardingState(db: PilogDatabase): OnboardingState {
 }
 
 export function setOnboardingState(db: PilogDatabase, state: OnboardingState): OnboardingState {
-  setSetting(db, 'onboarding.state', serializeOnboardingState(state))
-  return state
+  const normalized = normalizeOnboardingState(state)
+  setSetting(db, 'onboarding.state', serializeOnboardingState(normalized))
+  return normalized
 }

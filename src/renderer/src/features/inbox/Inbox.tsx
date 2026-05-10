@@ -29,6 +29,7 @@ import type { RunNavigationOrigin } from '@renderer/features/agent-runs/navigati
 import { cn } from '@renderer/lib/utils'
 import type {
   GenerateDraftsMode,
+  GitHubStatus,
   ListNotesRequest,
   Note,
   OnboardingState,
@@ -41,9 +42,12 @@ import {
   DEFAULT_ONBOARDING_STATE,
   completeOnboardingState,
   confirmHotkeyOnboardingState,
+  getCompletedOnboardingSteps,
   getCurrentOnboardingStep,
+  ONBOARDING_STEP_ORDER,
   resumeOnboardingState,
   skipOnboardingState,
+  type OnboardingSignals,
   type OnboardingStepId
 } from '@shared/onboarding'
 import type {
@@ -131,11 +135,7 @@ type AutoPublishPreviewState = {
 type OnboardingPanelProps = {
   state: OnboardingState
   step: OnboardingStepId
-  githubConnected: boolean
-  repoCount: number
-  piConfigured: boolean
-  noteCount: number
-  draftCount: number
+  signals: OnboardingSignals
   working: boolean
   onConfirmHotkey: () => void
   onConnectGitHub: () => void
@@ -264,11 +264,7 @@ const ONBOARDING_STEP_LABELS: Record<OnboardingStepId, string> = {
 function OnboardingPanel({
   state,
   step,
-  githubConnected,
-  repoCount,
-  piConfigured,
-  noteCount,
-  draftCount,
+  signals,
   working,
   onConfirmHotkey,
   onConnectGitHub,
@@ -279,14 +275,7 @@ function OnboardingPanel({
   onOpenDrafts,
   onSkip
 }: OnboardingPanelProps): React.JSX.Element {
-  const completedSteps = new Set<OnboardingStepId>()
-  if (state.confirmedHotkeyAt) completedSteps.add('hotkey')
-  if (githubConnected) completedSteps.add('github')
-  if (repoCount > 0) completedSteps.add('repo')
-  if (piConfigured) completedSteps.add('pi')
-  if (noteCount > 0) completedSteps.add('note')
-  if (draftCount > 0) completedSteps.add('draft')
-
+  const completedSteps = getCompletedOnboardingSteps(state, signals)
   const action = getOnboardingAction({
     step,
     working,
@@ -318,7 +307,7 @@ function OnboardingPanel({
         </div>
 
         <ol className="grid gap-2 sm:grid-cols-2">
-          {(Object.keys(ONBOARDING_STEP_LABELS) as OnboardingStepId[]).map((id, index) => {
+          {ONBOARDING_STEP_ORDER.map((id, index) => {
             const done = completedSteps.has(id)
             const current = id === step
             return (
@@ -808,7 +797,7 @@ export function Inbox({
   const [onboardingState, setOnboardingState] = useState<OnboardingState>(DEFAULT_ONBOARDING_STATE)
   const [onboardingNotes, setOnboardingNotes] = useState<Note[]>([])
   const [onboardingDrafts, setOnboardingDrafts] = useState<IssueDraftForReview[]>([])
-  const [githubStatus, setGitHubStatus] = useState({ connected: false })
+  const [githubStatus, setGitHubStatus] = useState<GitHubStatus>({ connected: false })
   const [onboardingWorking, setOnboardingWorking] = useState(false)
   const [draftLinksByNote, setDraftLinksByNote] = useState<Map<string, NoteDraftLink[]>>(
     () => new Map()
@@ -836,13 +825,17 @@ export function Inbox({
   const mountedRef = useRef(true)
 
   const reposById = useMemo(() => new Map(repos.map((r) => [r.id, r])), [repos])
-  const onboardingStep = getCurrentOnboardingStep(onboardingState, {
-    github: githubStatus,
-    repos,
-    pi: piStatus,
-    notes: onboardingNotes,
-    drafts: onboardingDrafts
-  })
+  const onboardingSignals = useMemo<OnboardingSignals>(
+    () => ({
+      github: githubStatus,
+      repos,
+      pi: piStatus,
+      notes: onboardingNotes,
+      drafts: onboardingDrafts
+    }),
+    [githubStatus, onboardingDrafts, onboardingNotes, piStatus, repos]
+  )
+  const onboardingStep = getCurrentOnboardingStep(onboardingState, onboardingSignals)
 
   useEffect(() => {
     mountedRef.current = true
@@ -1581,11 +1574,7 @@ export function Inbox({
           <OnboardingPanel
             state={onboardingState}
             step={onboardingStep}
-            githubConnected={githubStatus.connected}
-            repoCount={repos.length}
-            piConfigured={piStatus.configured}
-            noteCount={onboardingNotes.length}
-            draftCount={onboardingDrafts.length}
+            signals={onboardingSignals}
             working={onboardingWorking || generating}
             onConfirmHotkey={handleConfirmHotkey}
             onConnectGitHub={() => void handleConnectGitHub()}

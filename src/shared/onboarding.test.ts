@@ -6,6 +6,7 @@ import {
   completeOnboardingState,
   confirmHotkeyOnboardingState,
   getCurrentOnboardingStep,
+  getCompletedOnboardingSteps,
   parseOnboardingState,
   resumeOnboardingState,
   serializeOnboardingState,
@@ -130,5 +131,26 @@ describe('onboarding state', () => {
         })
       )
     ).toBeNull()
+  })
+
+  it('reports completed setup steps from persisted and local app state', () => {
+    const state = confirmHotkeyOnboardingState(DEFAULT_ONBOARDING_STATE)
+    const completed = getCompletedOnboardingSteps(
+      state,
+      signals({
+        github: { connected: true },
+        repos: [repo],
+        pi: { configured: true },
+        notes: [note],
+        drafts: [draft]
+      })
+    )
+
+    expect([...completed]).toEqual(['hotkey', 'github', 'repo', 'pi', 'note', 'draft'])
+  })
+
+  it('normalizes malformed persisted state back to the default state', () => {
+    expect(parseOnboardingState('true')).toEqual(DEFAULT_ONBOARDING_STATE)
+    expect(parseOnboardingState('{')).toEqual(DEFAULT_ONBOARDING_STATE)
   })
 })
