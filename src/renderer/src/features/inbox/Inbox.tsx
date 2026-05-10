@@ -1,10 +1,4 @@
-import {
-  Add01Icon,
-  Cancel01Icon,
-  CancelCircleIcon,
-  GithubIcon,
-  SparklesIcon
-} from '@hugeicons/core-free-icons'
+import { Add01Icon, Cancel01Icon, GithubIcon, SparklesIcon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
   AlertDialog,
@@ -1203,51 +1197,26 @@ export function Inbox({
         {/* (4) Mode footer — capture by default, triage on selection */}
         <footer className="flex min-h-14 shrink-0 items-center border-t bg-background px-6 py-3">
           {hasSelection ? (
-            // Triage-mode: only the two actual triage actions. Clearing the
-            // selection lives on the title strip (the count chip) and on
-            // Esc, which keeps the footer uncluttered and
-            // gives the action buttons room to breathe in 320px.
+            // Triage-mode: draft generation (+ optional publish). Clearing the
+            // selection lives on the title strip (the count chip) and on Esc.
             <div className="flex w-full flex-col gap-1.5">
-              <div className="flex items-center gap-2">
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span className="flex-1">
-                      <Button
-                        size="sm"
-                        variant={canGenerateDrafts ? 'default' : 'outline'}
-                        disabled={!canGenerateDrafts}
-                        className="w-full justify-center"
-                        onClick={() => void handleGenerateDrafts('review')}
-                      >
-                        <HugeiconsIcon icon={SparklesIcon} data-icon="inline-start" aria-hidden />
-                        {generating ? 'Generating' : 'Generate Drafts'}
-                      </Button>
-                    </span>
-                  </TooltipTrigger>
-                  {!canGenerateDrafts && <TooltipContent>{generateDraftsReason}</TooltipContent>}
-                </Tooltip>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span className="flex-1">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled
-                        className="w-full justify-center"
-                        aria-label="Dismiss (activates in Phase 4)"
-                      >
-                        <HugeiconsIcon
-                          icon={CancelCircleIcon}
-                          data-icon="inline-start"
-                          aria-hidden
-                        />
-                        Dismiss
-                      </Button>
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent>Dismiss activates in Phase 4</TooltipContent>
-                </Tooltip>
-              </div>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="flex w-full">
+                    <Button
+                      size="sm"
+                      variant={canGenerateDrafts ? 'default' : 'outline'}
+                      disabled={!canGenerateDrafts}
+                      className="w-full justify-center"
+                      onClick={() => void handleGenerateDrafts('review')}
+                    >
+                      <HugeiconsIcon icon={SparklesIcon} data-icon="inline-start" aria-hidden />
+                      {generating ? 'Generating' : 'Generate Drafts'}
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                {!canGenerateDrafts && <TooltipContent>{generateDraftsReason}</TooltipContent>}
+              </Tooltip>
               {selectedRepo ? (
                 <Tooltip>
                   <TooltipTrigger asChild>

@@ -65,8 +65,8 @@ Set up once; reused by every phase.
 | 2     | GitHub + repo setup         | Connect GitHub, link a local repo, manually create a test issue          |   ☑    |
 | 3     | Pi agent runtime            | Selected notes + repo path → structured `IssueDraft` JSON stored locally |   ☑    |
 | 4     | Review mode                 | Draft cards: edit, split, merge, dismiss, publish to GitHub              |   ☑    |
-| 5     | Auto-publish mode           | One click: generate + publish, with safety rails and a publish report    |   ☐    |
-| 6     | Polish                      | Issue templates, label matching, prompt tuning, error states, packaging  |   ☐    |
+| 5     | Auto-publish mode           | One click: generate + publish, with safety rails and a publish report    |   ☑    |
+| 6     | 1.0 polish                  | Template-aware drafts, label matching, onboarding, packaging, updates    |   ☐    |
 
 Phase boundaries are _demoable_. Each ends with something a user could touch.
 
@@ -219,43 +219,52 @@ User can connect GitHub, link a real repo, type a title/body, and see the issue 
 
 **Goal:** One-click "generate and publish" with safety rails per PRD §8 Flow 3 + §9.7.
 
-- ☐ **Per-repo toggle** + max-issues-per-run, default label `triaged-by-pilog`, dry-run flag.
-- ☐ **Confirmation modal** showing the planned drafts before publish.
-- ☐ **Publish report** screen with successes/failures and links.
-- ☐ **Local audit log** view backed by `publish_log`.
-- ☐ **Tests** — happy path + partial failure (one issue 422s, others succeed).
+- ☑ **Per-repo toggle** + max-issues-per-run, default label `triaged-by-pilog`, dry-run flag, and confirmation requirement. Implemented by #30.
+- ☑ **Generate and Publish preview** showing planned drafts before any GitHub writes, with max-issue limiting, default-label application, and dry-run no-op behavior. Implemented by #31.
+- ☑ **Confirmed auto-publish** that creates GitHub issues, keeps successful local state, reports failures, and does not roll back already-created issues on partial failure. Implemented by #32.
+- ☑ **Current inbox batch entry point** for one repo's eligible unprocessed notes, reusing the same preview/publish/report path. Implemented by #33.
+- ☑ **Local audit log** view backed by `publish_log`, covering both manual Review Mode publishes and Auto-Publish Mode publishes. Implemented by #34.
+- ☑ **Tests** — unit and e2e coverage exists for guardrail defaults/persistence, preview/dry-run planning, partial publish failure, current inbox selection, and publish-log behavior.
 
 ### Phase 5 acceptance
 
-PRD §13 success criterion _"Auto-publish works but is clearly controlled and auditable"_ is demonstrably true.
+☑ PRD §13 success criterion _"Auto-publish works but is clearly controlled and auditable"_ is demonstrably true.
 
 ---
 
-## 8. Phase 6 — Polish
+## 8. Phase 6 — 1.0 Polish
 
-**Goal:** Make it feel like a 1.0.
+**Goal:** Hand the app to someone who has not seen it. They can understand the first-run path, generate GitHub-native issue content, and install/update a credible desktop build without asking a question.
 
-- ☐ Issue-template parsing → use repo's templates as scaffolding.
-- ☐ Label matching against the repo's existing labels (no inventing new ones unless asked).
-- ☐ Prompt tuning loop using fixture repos.
-- ☐ Loading / error / empty states across the app.
-- ☐ Onboarding flow (first launch: hotkey → GitHub → first repo → first note → first draft, all in-app).
-- ☐ App icon, tray icon, packaging for macOS/Windows/Linux. Code-signing scope decision.
-- ☐ App update channel via `electron-updater` (already a dep).
+### 8.1 GitHub-native draft quality
+
+- ☐ **Issue-template awareness** — read repo issue templates when available and use the chosen/default template as scaffolding for generated drafts and manual compose. Tracked by #35.
+- ☐ **Repo label matching** — fetch existing labels for the linked repo, normalize generated label suggestions against that set, and make invented labels explicit instead of silently sending them. Tracked by #36.
+- ◐ **Prompt tuning loop** — fixture response tests already cover grouping, splitting, parent/subtask, single-draft, and clarification shapes; Phase 6 needs fixture repos and repeatable quality checks that exercise real repo tools, templates, and labels. Tracked by #37.
+
+### 8.2 First-run and cross-app states
+
+- ◐ **Loading / error / empty states across the app** — core Inbox, Draft Review, Agent Runs, Settings, Repositories, auto-publish, and Publish Log states exist, but the app still needs a complete pass for consistency, recovery actions, and accessible wording. Tracked by #39.
+- ☐ **Onboarding flow** — first launch should guide the user through hotkey, GitHub auth, first linked repo, first note, first draft, and first publish without leaving the app. Tracked by #38.
+- ☐ **Packaged runtime readiness** — verify packaged builds can run Pi, `@vscode/ripgrep`, `better-sqlite3`, OAuth callback, safeStorage, and e2e smoke paths outside dev. Tracked by #40.
+
+### 8.3 Distribution and updates
+
+- ◐ **App icon, tray icon, and packaging** — resources and `electron-builder` targets exist, but metadata still uses boilerplate values and signing/notarization/distribution scope is unresolved. Tracked by #40.
+- ☐ **App update channel** — `electron-updater` is installed and `dev-app-update.yml` exists, but the real provider URL, update checks, and user-facing update states are not implemented. Tracked by #41.
 
 ### Phase 6 acceptance
 
-Hand the app to someone who hasn't seen it. They reach a published issue without asking a question.
+1. ☐ A new user can complete onboarding through a published issue without direct coaching.
+2. ☐ Generated drafts respect repo issue templates and label vocabulary.
+3. ☐ Errors across auth, repo selection, Pi configuration, generation, publishing, and update checks explain the recovery action.
+4. ☐ At least one unpacked desktop build is smoke-tested end-to-end, and signed/distribution decisions are documented.
 
 ---
 
 ## 9. Tracking and Handoff
 
-Once Phase 1 is shaped to your satisfaction:
-
-1. Run `triage` / `to-issues` skill against §3 of this doc to push Phase 1 tickets to `nick-neely/pilog` with the right labels (per `docs/agents/triage-labels.md`).
-2. Each issue references this doc by anchor (e.g. _"see Phase 1 §3.1"_).
-3. Subsequent phases get decomposed into issues only when their start is imminent — premature decomposition hides decisions that the prior phase will surface.
+Phase 6 is now the next real phase. Use `to-issues` against §8 and publish thin vertical slices to `nick-neely/pilog` with the `needs-triage` label. Each issue should reference the relevant §8 subsection and include enough acceptance criteria to be independently verifiable.
 
 ---
 
@@ -264,13 +273,13 @@ Once Phase 1 is shaped to your satisfaction:
 Carried from PRD §16, with assigned phase:
 
 - ☑ **Pi embedding strategy** — resolved in [ADR-0005](./adr/0005-pi-embedding-strategy.md). PiLog embeds Pi in-process via `pi-agent-core` + `pi-ai`, with a `safeStorage`-backed `AuthStorage`, `MessagePortMain` streaming, and a curated read-only tool set. No spike branch — the architecture was decided through documentation review and grilling against the existing domain model; empirical guards land as first-pass acceptance criteria on #12.
-- **Repo indexing: persistent vs. per-run** — defer until Phase 3 reveals latency reality.
-- **Issue-template parsing in MVP** — Phase 6 by default; pull forward to Phase 4 if drafts feel generic.
-- **Auto-publish behind "advanced" toggle** — Phase 5 design call.
+- ☑ **Repo indexing: persistent vs. per-run** — resolved as per-run repository tools for MVP. The agent has bounded read-only `read_file`, `glob`, `grep`, and git-context tools; persistent indexing remains future work only if latency or quality data demands it.
+- **Issue-template parsing in MVP** — Phase 6 work, now imminent.
+- ☑ **Auto-publish behind "advanced" toggle** — resolved by #30. Auto-publish is explicit, repo-scoped configuration in the Repositories surface, not a hidden global advanced mode.
 - **Multi-scratchpad vs. single inbox** — single inbox in MVP; revisit only if user feedback demands it.
 
-New questions to resolve in Phase 1:
+Remaining 1.0 questions:
 
 - macOS code-signing & notarization scope for MVP — affects whether Playwright e2e tests run against a packaged or unpacked app.
 - Should the inbox window remember its size/position across launches? (Default: yes, via `electron-window-state`.)
-- Settings storage: the `settings` key/value table or a JSON file in `userData`? (Default: table — single backup target.)
+- ☑ **Settings storage** — resolved as the `settings` key/value table, not a JSON file in `userData`.
