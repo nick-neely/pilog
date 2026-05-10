@@ -13,6 +13,7 @@ import { HugeiconsIcon } from '@hugeicons/react'
 import { Badge } from '@renderer/components/ui/badge'
 import { Button } from '@renderer/components/ui/button'
 import { Checkbox } from '@renderer/components/ui/checkbox'
+import { Alert, AlertDescription, AlertTitle } from '@renderer/components/ui/alert'
 import {
   Empty,
   EmptyContent,
@@ -30,10 +31,12 @@ import {
   SelectTrigger,
   SelectValue
 } from '@renderer/components/ui/select'
+import { Skeleton } from '@renderer/components/ui/skeleton'
 import { Textarea } from '@renderer/components/ui/textarea'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@renderer/components/ui/tooltip'
 import type { RunNavigationOrigin } from '@renderer/features/agent-runs/navigation'
 import { cn } from '@renderer/lib/utils'
+import { getErrorMessage, getPublishRecoveryState, type RecoveryState } from '../recovery-state'
 import type {
   AgentRunListItem,
   GitHubLabel,
@@ -471,14 +474,6 @@ function parseGitHubRepoUrl(url: string): { owner: string; name: string } | null
   }
 }
 
-function formatPublishError(error: unknown): string {
-  const message = error instanceof Error ? error.message : String(error)
-  if (/\b422\b/.test(message) || /validation failed/i.test(message)) {
-    return 'GitHub rejected this issue as invalid. Review the title, body, and labels, then try Publish again.'
-  }
-  return message || 'Publish failed. Your edits are still here. Please try again.'
-}
-
 export function DraftReview({
   focusDraftId,
   onFocusDraftHandled,
@@ -500,28 +495,40 @@ export function DraftReview({
   const [statusCounts, setStatusCounts] =
     useState<Record<IssueDraftStatus, number>>(EMPTY_STATUS_COUNTS)
   const [selectedDraftId, setSelectedDraftId] = useState<string | null>(null)
+  const [loadingDrafts, setLoadingDrafts] = useState(true)
+  const [draftsError, setDraftsError] = useState<string | null>(null)
 
   const fetchDrafts = useCallback(async (): Promise<void> => {
-    const [allDrafts, repoResult, githubResult, failedRunResult] = await Promise.all([
-      window.pilog.invoke('issue-drafts:list', { status: 'all' }),
-      window.pilog.invoke('repos:list'),
-      window.pilog.invoke('github:status'),
-      window.pilog.invoke('agent-runs:list', { status: 'failed', limit: 3 })
-    ])
-    const filteredDrafts =
-      statusFilter === undefined
-        ? [...allDrafts].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))
-        : allDrafts.filter((draft) => draft.status === statusFilter)
+    setLoadingDrafts(true)
+    setDraftsError(null)
+    try {
+      const [allDrafts, repoResult, githubResult, failedRunResult] = await Promise.all([
+        window.pilog.invoke('issue-drafts:list', { status: 'all' }),
+        window.pilog.invoke('repos:list'),
+        window.pilog.invoke('github:status'),
+        window.pilog.invoke('agent-runs:list', { status: 'failed', limit: 3 })
+      ])
+      const filteredDrafts =
+        statusFilter === undefined
+          ? [...allDrafts].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))
+          : allDrafts.filter((draft) => draft.status === statusFilter)
 
-    setDrafts(filteredDrafts)
-    setRepos(repoResult)
-    setGithubStatus(githubResult)
-    setFailedRuns(failedRunResult)
-    setStatusCounts(countDraftsByStatus(allDrafts))
-    setSelectedDraftId((current) => {
-      if (current && filteredDrafts.some((draft) => draft.id === current)) return current
-      return filteredDrafts[0]?.id ?? null
-    })
+      setDrafts(filteredDrafts)
+      setRepos(repoResult)
+      setGithubStatus(githubResult)
+      setFailedRuns(failedRunResult)
+      setStatusCounts(countDraftsByStatus(allDrafts))
+      setSelectedDraftId((current) => {
+        if (current && filteredDrafts.some((draft) => draft.id === current)) return current
+        return filteredDrafts[0]?.id ?? null
+      })
+    } catch (err) {
+      setDrafts([])
+      setDraftsError(getErrorMessage(err, 'Draft review could not be loaded.'))
+      setSelectedDraftId(null)
+    } finally {
+      setLoadingDrafts(false)
+    }
   }, [statusFilter])
 
   useEffect(() => {
@@ -621,7 +628,35 @@ export function DraftReview({
         <main className="min-h-0 flex-1">
           <ScrollArea className="h-full">
             <div className="min-w-0 px-3 py-3 pe-6">
-              {drafts.length === 0 ? (
+              {loadingDrafts ? (
+                <div className="flex flex-col gap-1" aria-label="Loading drafts">
+                  <Skeleton className="h-24 rounded-md" />
+                  <Skeleton className="h-24 rounded-md" />
+                  <Skeleton className="h-24 rounded-md" />
+                </div>
+              ) : draftsError ? (
+                <Empty className="mt-10 border-none bg-transparent p-6 shadow-none">
+                  <EmptyHeader>
+                    <EmptyTitle>Draft review unavailable</EmptyTitle>
+                    <EmptyDescription>
+                      Pilog could not read local drafts. Try loading them again before publishing.
+                    </EmptyDescription>
+                  </EmptyHeader>
+                  <EmptyContent className="gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => void fetchDrafts()}
+                    >
+                      Try again
+                    </Button>
+                    <p className="line-clamp-3 font-mono text-xs text-muted-foreground">
+                      {draftsError}
+                    </p>
+                  </EmptyContent>
+                </Empty>
+              ) : drafts.length === 0 ? (
                 <ReviewEmptyState
                   className="mt-10 p-6"
                   title={emptyTitle}
@@ -712,7 +747,13 @@ export function DraftReview({
 
       <main className="min-w-0 flex-1">
         <ScrollArea className="h-full">
-          {selectedDraft ? (
+          {loadingDrafts ? (
+            <div className="flex h-full flex-col gap-5 px-6 py-5" aria-label="Loading draft detail">
+              <Skeleton className="h-10 max-w-sm rounded-md" />
+              <Skeleton className="h-9 max-w-2xl rounded-md" />
+              <Skeleton className="h-[28rem] max-w-3xl rounded-md" />
+            </div>
+          ) : selectedDraft ? (
             <DraftEditor
               key={selectedDraft.id}
               draft={selectedDraft}
@@ -729,6 +770,18 @@ export function DraftReview({
                 setSelectedDraftId(newDraftId)
                 await fetchDrafts()
               }}
+            />
+          ) : draftsError ? (
+            <ReviewEmptyState
+              className="h-full"
+              title="Draft review unavailable"
+              description="Pilog could not read local drafts. Use Try again in the draft list."
+              statusFilter={statusFilter}
+              statusCounts={statusCounts}
+              failedRuns={failedRuns}
+              onNavigateToInbox={onNavigateToInbox}
+              onNavigateToAgentRuns={onNavigateToAgentRuns}
+              onSetStatusFilter={setStatusFilter}
             />
           ) : (
             <ReviewEmptyState
@@ -943,7 +996,7 @@ function DraftEditor({
   const [updatingStatus, setUpdatingStatus] = useState(false)
   const [publishing, setPublishing] = useState(false)
   const [savedAt, setSavedAt] = useState<string | null>(null)
-  const [publishError, setPublishError] = useState<string | null>(null)
+  const [publishError, setPublishError] = useState<RecoveryState | null>(null)
   const [publishedUrl, setPublishedUrl] = useState<string | null>(draft.githubIssueUrl)
   const [pathMessages, setPathMessages] = useState<Record<string, string>>({})
   const [splitMode, setSplitMode] = useState(false)
@@ -1026,6 +1079,13 @@ function DraftEditor({
     [keptUnmatchedLabels, unmatchedLabels]
   )
 
+  let publishRecoveryAction: (() => void) | null = null
+  if (publishError?.intent === 'settings') {
+    publishRecoveryAction = onNavigateToSettings
+  } else if (publishError?.intent === 'repositories') {
+    publishRecoveryAction = onNavigateToRepositories
+  }
+
   const editedDraft = useMemo(
     () => ({
       title: normalizeDraftTitle(title),
@@ -1074,7 +1134,12 @@ function DraftEditor({
 
   const handlePublish = useCallback(async (): Promise<void> => {
     if (publishBlock) {
-      setPublishError(publishBlock.description)
+      setPublishError({
+        title: publishBlock.title,
+        description: publishBlock.description,
+        actionLabel: publishBlock.actionLabel,
+        intent: publishBlock.action ?? 'none'
+      })
       return
     }
     if (publishing || saving || !canPublish) return
@@ -1096,7 +1161,7 @@ function DraftEditor({
       setPublishedUrl(published.githubIssueUrl)
       await onSaved()
     } catch (err) {
-      setPublishError(formatPublishError(err))
+      setPublishError(getPublishRecoveryState(err))
     } finally {
       setPublishing(false)
     }
@@ -1158,7 +1223,7 @@ function DraftEditor({
         await onSaved()
       }
     } catch (err) {
-      setMergeError(err instanceof Error ? err.message : 'Merge failed. Please try again.')
+      setMergeError(getErrorMessage(err, 'Merge failed. Please try again.'))
     } finally {
       setMerging(false)
     }
@@ -1213,7 +1278,7 @@ function DraftEditor({
       setSplitSourceNoteIds([])
       await onSplitComplete(split.newDraft.id)
     } catch (err) {
-      setSplitError(err instanceof Error ? err.message : 'Split failed. Please try again.')
+      setSplitError(getErrorMessage(err, 'Split failed. Please try again.'))
     } finally {
       setSplitting(false)
     }
@@ -1294,9 +1359,19 @@ function DraftEditor({
           </div>
         </div>
         {publishError ? (
-          <p className="mt-3 max-w-2xl text-sm leading-relaxed text-destructive" role="alert">
-            {publishError}
-          </p>
+          <Alert variant="destructive" className="mt-3 max-w-2xl rounded-md">
+            <AlertTitle>{publishError.title}</AlertTitle>
+            <AlertDescription className="flex flex-col gap-2">
+              <span>{publishError.description}</span>
+              {publishError.actionLabel && publishRecoveryAction ? (
+                <span>
+                  <Button type="button" variant="outline" size="sm" onClick={publishRecoveryAction}>
+                    {publishError.actionLabel}
+                  </Button>
+                </span>
+              ) : null}
+            </AlertDescription>
+          </Alert>
         ) : null}
         {publishBlock ? (
           <PublishBlocker

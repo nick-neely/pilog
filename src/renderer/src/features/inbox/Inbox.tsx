@@ -11,10 +11,12 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger
 } from '@renderer/components/ui/alert-dialog'
+import { Alert, AlertDescription, AlertTitle } from '@renderer/components/ui/alert'
 import { Badge } from '@renderer/components/ui/badge'
 import { Button } from '@renderer/components/ui/button'
 import { Empty, EmptyDescription } from '@renderer/components/ui/empty'
 import { ScrollArea } from '@renderer/components/ui/scroll-area'
+import { Skeleton } from '@renderer/components/ui/skeleton'
 import {
   Select,
   SelectContent,
@@ -60,6 +62,12 @@ import type {
 } from '@shared/types'
 import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
 import { StatusFilter } from './StatusFilter'
+import {
+  getErrorMessage,
+  getGenerationRecoveryState,
+  getPublishRecoveryState,
+  type RecoveryState
+} from '../recovery-state'
 
 // Status filter rows. Order matches the inbox lifecycle (capture →
 // triage → publish → archive) so the list reads top-to-bottom as a
@@ -146,6 +154,20 @@ type OnboardingPanelProps = {
   onGenerateFirstDraft: () => void
   onOpenDrafts: () => void
   onSkip: () => void
+}
+
+type GenerationErrorState = RecoveryState & {
+  message: string
+}
+
+function getGenerationErrorState(input: {
+  message: string
+  cause?: string | null
+}): GenerationErrorState {
+  return {
+    ...getGenerationRecoveryState(input),
+    message: input.message
+  }
 }
 
 function encodeRepoFilter(f: string | null | undefined): string {
@@ -853,6 +875,9 @@ export function Inbox({
   const [repoFilter, setRepoFilter] = useState<string | null | undefined>(undefined)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [currentInboxMessage, setCurrentInboxMessage] = useState<string | null>(null)
+  const [loadingNotes, setLoadingNotes] = useState(true)
+  const [notesError, setNotesError] = useState<string | null>(null)
+  const [generationError, setGenerationError] = useState<GenerationErrorState | null>(null)
   const lastClickedIndex = useRef<number | null>(null)
   const fetchIdRef = useRef(0)
   const countsFetchIdRef = useRef(0)
@@ -887,6 +912,8 @@ export function Inbox({
 
   const fetchNotes = useCallback(async (): Promise<void> => {
     const id = ++fetchIdRef.current
+    setLoadingNotes(true)
+    setNotesError(null)
     await window.pilog
       .invoke('note:list', buildFilter(statusFilter, '', repoFilter))
       .then((result) => {
@@ -897,6 +924,14 @@ export function Inbox({
           const next = new Set([...prev].filter((rid) => validIds.has(rid)))
           return next.size === prev.size ? prev : next
         })
+      })
+      .catch((err) => {
+        if (id !== fetchIdRef.current) return
+        setNotes([])
+        setNotesError(getErrorMessage(err, 'Inbox notes could not be loaded.'))
+      })
+      .finally(() => {
+        if (id === fetchIdRef.current) setLoadingNotes(false)
       })
   }, [statusFilter, repoFilter])
 
@@ -915,7 +950,7 @@ export function Inbox({
   }, [repoFilter])
 
   useEffect(() => {
-    fetchNotes()
+    void Promise.resolve().then(fetchNotes)
   }, [fetchNotes])
 
   const fetchDraftLinks = useCallback(async (): Promise<void> => {
@@ -1175,6 +1210,7 @@ export function Inbox({
     const selectedNoteSnapshot = [...selectedNotes]
     const selectedIdSnapshot = [...selectedIds]
     setGenerating(true)
+    setGenerationError(null)
     try {
       await window.pilog.runAgent({ noteIds: selectedIdSnapshot, mode }, async (event) => {
         if (event.type === 'final') {
@@ -1199,9 +1235,17 @@ export function Inbox({
           }
         }
         if (event.type === 'error') {
-          console.error(event.message)
+          if (!mountedRef.current) return
+          setGenerationError(
+            getGenerationErrorState({ message: event.message, cause: event.cause })
+          )
         }
       })
+    } catch (error) {
+      if (mountedRef.current) {
+        const message = getErrorMessage(error, String(error))
+        setGenerationError(getGenerationErrorState({ message }))
+      }
     } finally {
       if (mountedRef.current) {
         setGenerating(false)
@@ -1252,6 +1296,7 @@ export function Inbox({
   const handleProcessCurrentInbox = async (): Promise<void> => {
     if (!currentInboxRepo || !canProcessCurrentInbox) return
     setCurrentInboxMessage(null)
+    setGenerationError(null)
     const sourceNoteSnapshot = await window.pilog.invoke('note:list', {
       repoId: currentInboxRepo.id,
       status: 'unprocessed'
@@ -1277,13 +1322,21 @@ export function Inbox({
             }
           }
           if (event.type === 'error') {
-            console.error(event.message)
+            if (!mountedRef.current) return
+            setGenerationError(
+              getGenerationErrorState({ message: event.message, cause: event.cause })
+            )
           }
         }
       )
       if ('skipped' in start && mountedRef.current) {
         setCurrentInboxMessage(start.reason)
         await Promise.all([fetchNotes(), fetchStatusCounts(), fetchDraftLinks()])
+      }
+    } catch (error) {
+      if (mountedRef.current) {
+        const message = getErrorMessage(error, String(error))
+        setGenerationError(getGenerationErrorState({ message }))
       }
     } finally {
       if (mountedRef.current) {
@@ -1310,10 +1363,11 @@ export function Inbox({
       }))
     } catch (error) {
       if (!mountedRef.current) return
+      const recovery = getPublishRecoveryState(error)
       setAutoPublishPreview((prev) => ({
         ...prev,
         publishing: false,
-        publishError: error instanceof Error ? error.message : String(error)
+        publishError: recovery.description
       }))
     }
   }
@@ -1428,7 +1482,30 @@ export function Inbox({
         <main className="flex-1 min-h-0">
           <ScrollArea className="h-full">
             <div className="min-w-0 px-3 py-3 pe-6">
-              {notes.length === 0 ? (
+              {loadingNotes ? (
+                <div className="flex flex-col gap-1" aria-label="Loading inbox notes">
+                  <Skeleton className="h-[76px] rounded-md" />
+                  <Skeleton className="h-[76px] rounded-md" />
+                  <Skeleton className="h-[76px] rounded-md" />
+                </div>
+              ) : notesError ? (
+                <Empty className="mt-12 border-none bg-transparent p-8 shadow-none">
+                  <EmptyDescription>
+                    Inbox notes could not be read. Try loading them again.
+                  </EmptyDescription>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => void fetchNotes()}
+                  >
+                    Try again
+                  </Button>
+                  <p className="line-clamp-3 font-mono text-xs text-muted-foreground">
+                    {notesError}
+                  </p>
+                </Empty>
+              ) : notes.length === 0 ? (
                 <Empty className="mt-12 border-none bg-transparent p-8 shadow-none">
                   <EmptyDescription>{emptyMessage}</EmptyDescription>
                 </Empty>
@@ -1491,6 +1568,36 @@ export function Inbox({
             </div>
           </ScrollArea>
         </main>
+
+        {generationError ? (
+          <div className="shrink-0 border-t px-3 py-3">
+            <Alert variant="destructive" className="rounded-md">
+              <AlertTitle>{generationError.title}</AlertTitle>
+              <AlertDescription className="flex flex-col gap-2">
+                <span>{generationError.description}</span>
+                <span className="line-clamp-2 font-mono text-xs">{generationError.message}</span>
+                {generationError.actionLabel ? (
+                  <span>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        if (generationError.intent === 'settings') onNavigateToSettings()
+                        if (generationError.intent === 'repositories') onNavigateToRepositories()
+                        if (generationError.intent === 'agent-runs') {
+                          onNavigateToAgentRuns(undefined, { kind: 'history' })
+                        }
+                      }}
+                    >
+                      {generationError.actionLabel}
+                    </Button>
+                  </span>
+                ) : null}
+              </AlertDescription>
+            </Alert>
+          </div>
+        ) : null}
 
         {/* (4) Mode footer — capture by default, triage on selection */}
         <footer className="flex min-h-14 shrink-0 items-center border-t bg-background px-6 py-3">
@@ -1591,7 +1698,12 @@ export function Inbox({
         Rule: when a note is open, the textarea is the visual centre.
       */}
       <section className="flex-1 min-w-0">
-        {selectedNote ? (
+        {loadingNotes ? (
+          <div className="flex h-full flex-col gap-4 px-6 py-5" aria-label="Loading note detail">
+            <Skeleton className="h-8 max-w-xs rounded-md" />
+            <Skeleton className="h-[30rem] max-w-[72ch] rounded-md" />
+          </div>
+        ) : selectedNote ? (
           <NoteDetail
             key={selectedNote.id}
             note={selectedNote}

@@ -21,6 +21,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger
 } from '@renderer/components/ui/alert-dialog'
+import { Alert, AlertDescription, AlertTitle } from '@renderer/components/ui/alert'
 import { Avatar, AvatarFallback } from '@renderer/components/ui/avatar'
 import { Button } from '@renderer/components/ui/button'
 import { Card, CardContent } from '@renderer/components/ui/card'
@@ -67,6 +68,7 @@ import {
   isSearchProvider
 } from '@shared/types'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { getErrorMessage, getPiSetupRecoveryState } from '../recovery-state'
 
 const SEARCH_PROVIDER_LABELS: Record<SearchProvider, string> = {
   brave: 'Brave',
@@ -89,6 +91,8 @@ type PiConfigState = {
   save: () => Promise<void>
   importExisting: () => Promise<void>
   reset: () => Promise<void>
+  error: string | null
+  retry: () => Promise<void>
 }
 
 type AdvancedSettingsState = {
@@ -130,23 +134,38 @@ function useSetting(key: SettingKey): [string | null, (value: string) => Promise
 function useGitHubStatus(): {
   status: GitHubStatus | null
   connecting: boolean
+  error: string | null
+  refresh: () => Promise<void>
   connect: () => Promise<void>
   signOut: () => Promise<void>
 } {
   const [status, setStatus] = useState<GitHubStatus | null>(null)
   const [connecting, setConnecting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const refresh = useCallback(async (): Promise<void> => {
+    try {
+      setError(null)
+      setStatus(await window.pilog.invoke('github:status'))
+    } catch (err) {
+      setStatus({ connected: false })
+      setError(getErrorMessage(err, 'GitHub status could not be read.'))
+    }
+  }, [])
 
   useEffect(() => {
-    window.pilog.invoke('github:status').then(setStatus)
-  }, [])
+    void Promise.resolve().then(refresh)
+  }, [refresh])
 
   const connect = useCallback(async () => {
     setConnecting(true)
     try {
+      setError(null)
       const result = await window.pilog.invoke('github:connect')
       setStatus(result)
-    } catch {
+    } catch (err) {
       setStatus({ connected: false })
+      setError(getErrorMessage(err, 'GitHub connection did not finish.'))
     } finally {
       setConnecting(false)
     }
@@ -157,7 +176,7 @@ function useGitHubStatus(): {
     setStatus({ connected: false })
   }, [])
 
-  return { status, connecting, connect, signOut }
+  return { status, connecting, error, refresh, connect, signOut }
 }
 
 function usePiConfig(): PiConfigState {
@@ -168,28 +187,34 @@ function usePiConfig(): PiConfigState {
   const [selectedModel, setSelectedModel] = useState('')
   const [apiKey, setApiKey] = useState('')
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const modelFetchIdRef = useRef(0)
   const mountedRef = useRef(false)
 
   const refresh = useCallback((): Promise<void> => {
     if (!mountedRef.current) return Promise.resolve()
+    setError(null)
     return Promise.all([
       window.pilog.invoke('pi:getActiveConfig'),
       window.pilog.invoke('pi:listProviders')
-    ]).then(([nextActive, nextProviders]) => {
-      if (!mountedRef.current) return
-      setActive(nextActive)
-      setProviders(nextProviders)
-      setSelectedProviderState(nextActive.provider ?? nextProviders[0]?.id ?? '')
-    })
+    ])
+      .then(([nextActive, nextProviders]) => {
+        if (!mountedRef.current) return
+        setActive(nextActive)
+        setProviders(nextProviders)
+        setSelectedProviderState(nextActive.provider ?? nextProviders[0]?.id ?? '')
+      })
+      .catch((err) => {
+        if (!mountedRef.current) return
+        setProviders([])
+        setError(getErrorMessage(err, 'Pi configuration could not be loaded.'))
+      })
   }, [])
 
   useEffect(() => {
     mountedRef.current = true
 
-    refresh().catch(() => {
-      if (mountedRef.current) setProviders([])
-    })
+    void refresh()
 
     return () => {
       mountedRef.current = false
@@ -200,10 +225,18 @@ function usePiConfig(): PiConfigState {
   useEffect(() => {
     const fetchId = ++modelFetchIdRef.current
 
+    if (!selectedProvider && providers.length === 0) {
+      void Promise.resolve().then(() => {
+        if (fetchId === modelFetchIdRef.current) setModels([])
+      })
+      return
+    }
+
     window.pilog
       .invoke('pi:listModels', selectedProvider ? { provider: selectedProvider } : undefined)
       .then((nextModels) => {
         if (fetchId !== modelFetchIdRef.current) return
+        setError(null)
         setModels(nextModels)
         setSelectedModel((current) => {
           return getPreferredModelId({
@@ -215,7 +248,12 @@ function usePiConfig(): PiConfigState {
           })
         })
       })
-  }, [active?.modelId, active?.provider, selectedProvider])
+      .catch((err) => {
+        if (fetchId !== modelFetchIdRef.current) return
+        setModels([])
+        setError(getErrorMessage(err, 'Pi models could not be loaded.'))
+      })
+  }, [active?.modelId, active?.provider, providers.length, selectedProvider])
 
   const setSelectedProvider = useCallback((provider: string) => {
     setSelectedProviderState(provider)
@@ -226,6 +264,7 @@ function usePiConfig(): PiConfigState {
     if (!selectedProvider || !selectedModel) return
     setSaving(true)
     try {
+      setError(null)
       const next = await window.pilog.invoke('pi:setActiveConfig', {
         provider: selectedProvider,
         modelId: selectedModel,
@@ -234,20 +273,32 @@ function usePiConfig(): PiConfigState {
       setActive(next)
       setApiKey('')
       await refresh()
+    } catch (err) {
+      setError(getErrorMessage(err, 'Pi configuration could not be saved.'))
     } finally {
       setSaving(false)
     }
   }, [apiKey, refresh, selectedModel, selectedProvider])
 
   const importExisting = useCallback(async () => {
-    await window.pilog.invoke('pi:importExistingPiConfig')
-    await refresh()
+    try {
+      setError(null)
+      await window.pilog.invoke('pi:importExistingPiConfig')
+      await refresh()
+    } catch (err) {
+      setError(getErrorMessage(err, 'Existing Pi config could not be imported.'))
+    }
   }, [refresh])
 
   const reset = useCallback(async () => {
-    await window.pilog.invoke('pi:resetConfig')
-    setApiKey('')
-    await refresh()
+    try {
+      setError(null)
+      await window.pilog.invoke('pi:resetConfig')
+      setApiKey('')
+      await refresh()
+    } catch (err) {
+      setError(getErrorMessage(err, 'Pi config could not be reset.'))
+    }
   }, [refresh])
 
   return {
@@ -263,7 +314,9 @@ function usePiConfig(): PiConfigState {
     setApiKey,
     save,
     importExisting,
-    reset
+    reset,
+    error,
+    retry: refresh
   }
 }
 
@@ -403,6 +456,10 @@ export function Settings({
     : 'Paste API key'
   const piCredentialStatus = pi.active?.hasApiKey ? 'stored' : 'not stored'
   const piSaveLabel = getPiSaveLabel(pi)
+  const piRecovery = getPiSetupRecoveryState({
+    error: pi.error,
+    hasProviders: pi.providers.length > 0
+  })
   const advancedSettings = advanced.settings
   const turnBudgetDirty =
     advancedSettings !== null && advanced.turnBudgetDraft !== String(advancedSettings.turnBudget)
@@ -487,6 +544,28 @@ export function Settings({
                     {github.connecting ? 'Connecting…' : 'Connect GitHub'}
                   </Button>
                 )}
+                {github.error ? (
+                  <Alert variant="destructive" className="rounded-md">
+                    <AlertTitle>GitHub connection needs attention</AlertTitle>
+                    <AlertDescription className="flex flex-col gap-2">
+                      <span>
+                        Pilog could not confirm your GitHub connection. Try connecting again, or
+                        reload the status if you already authorized access.
+                      </span>
+                      <span className="font-mono text-xs">{github.error}</span>
+                      <span>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => void github.refresh()}
+                        >
+                          Retry GitHub status
+                        </Button>
+                      </span>
+                    </AlertDescription>
+                  </Alert>
+                ) : null}
               </section>
 
               <section className="flex flex-col gap-3">
@@ -611,6 +690,26 @@ export function Settings({
                 </div>
 
                 <Separator />
+
+                {piRecovery ? (
+                  <Alert variant="destructive" className="rounded-md">
+                    <AlertTitle>{piRecovery.title}</AlertTitle>
+                    <AlertDescription className="flex flex-col gap-2">
+                      <span>{piRecovery.description}</span>
+                      <span className="font-mono text-xs">{pi.error}</span>
+                      <span>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => void pi.retry()}
+                        >
+                          {piRecovery.actionLabel}
+                        </Button>
+                      </span>
+                    </AlertDescription>
+                  </Alert>
+                ) : null}
 
                 <div className="flex flex-wrap items-center gap-2">
                   <Button variant="outline" size="sm" onClick={() => void pi.importExisting()}>

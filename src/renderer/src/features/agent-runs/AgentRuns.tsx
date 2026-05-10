@@ -9,6 +9,7 @@ import {
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { Badge } from '@renderer/components/ui/badge'
+import { Button } from '@renderer/components/ui/button'
 import {
   Collapsible,
   CollapsibleContent,
@@ -17,6 +18,7 @@ import {
 import { Empty, EmptyDescription } from '@renderer/components/ui/empty'
 import { ScrollArea, ScrollBar } from '@renderer/components/ui/scroll-area'
 import { Separator } from '@renderer/components/ui/separator'
+import { Skeleton } from '@renderer/components/ui/skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@renderer/components/ui/tabs'
 import { cn } from '@renderer/lib/utils'
 import type {
@@ -26,6 +28,7 @@ import type {
   AgentRunStatusCounts
 } from '@shared/ipc'
 import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
+import { getErrorMessage } from '../recovery-state'
 
 const EMPTY_RUN_STATUS_COUNTS: AgentRunStatusCounts = {
   running: 0,
@@ -128,24 +131,36 @@ export function AgentRuns({
   const [selectedDraftId, setSelectedDraftId] = useState<string | null>(null)
   const [scrollTop, setScrollTop] = useState(0)
   const [viewportHeight, setViewportHeight] = useState(1)
+  const [loadingRuns, setLoadingRuns] = useState(true)
+  const [runsError, setRunsError] = useState<string | null>(null)
   const listRef = useRef<HTMLDivElement | null>(null)
   const detailFetchId = useRef(0)
 
   const fetchRuns = useCallback(async (): Promise<void> => {
-    const [result, counts] = await Promise.all([
-      window.pilog.invoke('agent-runs:list', {
-        status: statusFilter,
-        limit: 200
-      }),
-      window.pilog.invoke('agent-runs:counts')
-    ])
-    setRuns(result)
-    setStatusCounts(counts)
-    setSelectedRunId((current) => {
-      if (focusRunId && result.some((r) => r.id === focusRunId)) return focusRunId
-      if (current && result.some((r) => r.id === current)) return current
-      return result[0]?.id ?? null
-    })
+    setLoadingRuns(true)
+    setRunsError(null)
+    try {
+      const [result, counts] = await Promise.all([
+        window.pilog.invoke('agent-runs:list', {
+          status: statusFilter,
+          limit: 200
+        }),
+        window.pilog.invoke('agent-runs:counts')
+      ])
+      setRuns(result)
+      setStatusCounts(counts)
+      setSelectedRunId((current) => {
+        if (focusRunId && result.some((r) => r.id === focusRunId)) return focusRunId
+        if (current && result.some((r) => r.id === current)) return current
+        return result[0]?.id ?? null
+      })
+    } catch (err) {
+      setRuns([])
+      setRunsError(getErrorMessage(err, 'Run history could not be read.'))
+      setSelectedRunId(null)
+    } finally {
+      setLoadingRuns(false)
+    }
   }, [statusFilter, focusRunId])
 
   const fetchDetail = useCallback(async (runId: string): Promise<void> => {
@@ -262,7 +277,24 @@ export function AgentRuns({
           className="flex-1 overflow-y-auto p-3"
           onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}
         >
-          {runs.length === 0 ? (
+          {loadingRuns ? (
+            <div className="flex flex-col gap-1" aria-label="Loading agent runs">
+              <Skeleton className="h-[92px] rounded-md" />
+              <Skeleton className="h-[92px] rounded-md" />
+              <Skeleton className="h-[92px] rounded-md" />
+            </div>
+          ) : runsError ? (
+            <Empty className="mt-12 border-none bg-transparent p-8 shadow-none">
+              <EmptyDescription>
+                Run history could not be read. Failed generation details stay local, so try loading
+                them again.
+              </EmptyDescription>
+              <Button type="button" variant="outline" size="sm" onClick={() => void fetchRuns()}>
+                Try again
+              </Button>
+              <p className="line-clamp-3 font-mono text-xs text-muted-foreground">{runsError}</p>
+            </Empty>
+          ) : runs.length === 0 ? (
             <Empty className="mt-12 border-none bg-transparent p-8 shadow-none">
               <EmptyDescription>No agent runs match this filter.</EmptyDescription>
             </Empty>

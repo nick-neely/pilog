@@ -282,7 +282,7 @@ function App(): React.JSX.Element {
   if (route === 'repositories') {
     return (
       <>
-        <Repositories onBack={openSettings} />
+        <Repositories onBack={openSettings} onNavigateSettings={openSettings} />
         <GlobalCommandPalette
           open={paletteOpen}
           onOpenChange={setPaletteOpen}
