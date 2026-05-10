@@ -41,6 +41,7 @@ import type {
   CreateIssueRequest,
   DetectLocalRepoResult,
   GitHubLabel,
+  GitHubIssueTemplate,
   GitHubRepo,
   Repo,
   RepoAutoPublishSettings,
@@ -225,14 +226,17 @@ type NewIssueState =
   | { step: 'error'; labels: GitHubLabel[]; message: string }
 
 function MarkdownEditor({
+  value,
   onChange,
   disabled
 }: {
+  value: string
   onChange: (value: string) => void
   disabled: boolean
 }): React.JSX.Element {
   const editorRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
+  const initialValueRef = useRef(value)
   const onChangeRef = useRef(onChange)
   useEffect(() => {
     onChangeRef.current = onChange
@@ -242,6 +246,7 @@ function MarkdownEditor({
     if (!editorRef.current) return
 
     const state = EditorState.create({
+      doc: initialValueRef.current,
       extensions: [
         history(),
         syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
@@ -269,6 +274,14 @@ function MarkdownEditor({
 
     return () => view.destroy()
   }, [])
+
+  useEffect(() => {
+    const view = viewRef.current
+    if (!view) return
+    const currentValue = view.state.doc.toString()
+    if (currentValue === value) return
+    view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: value } })
+  }, [value])
 
   useEffect(() => {
     const view = viewRef.current
@@ -301,6 +314,7 @@ function NewIssueDialog({
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
   const [selectedLabels, setSelectedLabels] = useState<string[]>([])
+  const [issueTemplate, setIssueTemplate] = useState<GitHubIssueTemplate | null>(null)
 
   useEffect(() => {
     if (!open) return
@@ -311,6 +325,7 @@ function NewIssueDialog({
       setTitle('')
       setBody('')
       setSelectedLabels([])
+      setIssueTemplate(null)
       window.pilog
         .invoke('github:listLabels', {
           owner: repo.owner,
@@ -322,11 +337,22 @@ function NewIssueDialog({
         .catch(() => {
           if (!cancelled) setState({ step: 'open', labels: [], labelsLoading: false })
         })
+      window.pilog
+        .invoke('repos:getDefaultIssueTemplate', { id: repo.id })
+        .then((template) => {
+          if (cancelled || !template) return
+          setIssueTemplate(template)
+          setBody(template.body)
+          if (template.title) setTitle(template.title)
+        })
+        .catch(() => {
+          if (!cancelled) setIssueTemplate(null)
+        })
     })
     return (): void => {
       cancelled = true
     }
-  }, [open, repo.owner, repo.name])
+  }, [open, repo.id, repo.owner, repo.name])
 
   const handleSubmit = async (): Promise<void> => {
     if (state.step !== 'open' && state.step !== 'error') return
@@ -427,8 +453,15 @@ function NewIssueDialog({
               </div>
 
               <div className="flex flex-col gap-2">
-                <Label>Body</Label>
-                <MarkdownEditor onChange={setBody} disabled={isSubmitting} />
+                <div className="flex items-center justify-between gap-3">
+                  <Label>Body</Label>
+                  {issueTemplate ? (
+                    <span className="truncate text-xs text-muted-foreground">
+                      Template: {issueTemplate.name}
+                    </span>
+                  ) : null}
+                </div>
+                <MarkdownEditor value={body} onChange={setBody} disabled={isSubmitting} />
               </div>
 
               {labels.length > 0 && (

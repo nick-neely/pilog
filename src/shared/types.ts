@@ -267,3 +267,11 @@ export type IssueDraftSourceNote = {
 export type IssueDraftForReview = IssueDraft & {
   sourceNotes: IssueDraftSourceNote[]
 }
+
+export type GitHubIssueTemplate = {
+  kind: 'markdown' | 'yaml-form'
+  name: string
+  path: string
+  title: string
+  body: string
+}
