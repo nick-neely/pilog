@@ -7,23 +7,27 @@ async function main(): Promise<void> {
 
   for (const fixture of report.fixtures) {
     const status = fixture.passed ? 'PASS' : 'FAIL'
-    console.log(`${status} ${fixture.id}: ${fixture.title}`)
-    console.log(`  drafts: ${fixture.draftCount}`)
-    console.log(
+    writeLine(`${status} ${fixture.id}: ${fixture.title}`)
+    writeLine(`  drafts: ${fixture.draftCount}`)
+    writeLine(
       `  source notes: ${fixture.sourceNoteGroups.map((group) => group.join('+')).join(', ')}`
     )
-    console.log(`  labels: ${fixture.labels.map((labels) => labels.join(',')).join(' | ')}`)
-    console.log(
+    writeLine(`  labels: ${fixture.labels.map((labels) => labels.join(',')).join(' | ')}`)
+    writeLine(
       `  affected files: ${fixture.affectedFiles.map((files) => files.join(',')).join(' | ')}`
     )
-    console.log(`  clarification drafts: ${fixture.clarificationDraftCount}`)
+    writeLine(`  clarification drafts: ${fixture.clarificationDraftCount}`)
 
     for (const failure of fixture.failures) {
-      console.log(`  - ${failure}`)
+      writeLine(`  - ${failure}`)
     }
   }
 
   if (!report.passed) {
     process.exitCode = 1
   }
+}
+
+function writeLine(message: string): void {
+  process.stdout.write(`${message}\n`)
 }

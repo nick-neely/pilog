@@ -1,5 +1,6 @@
 import type { AgentTool } from '@earendil-works/pi-agent-core'
 import { matchLabelsToRepoLabels } from '@shared/labels'
+import type { Note } from '@shared/ipc'
 import type { GeneratedIssueDraft, IssueDraft } from '@shared/types'
 import { execFileSync } from 'node:child_process'
 import { cpSync, mkdtempSync } from 'node:fs'
@@ -16,6 +17,10 @@ import { promptQualityFixtures, type PromptQualityFixture } from './prompt-quali
 import { createIssueGenerationTools } from './runtime'
 
 type RepoToolName = 'list_dir' | 'read_file' | 'grep' | 'git_status'
+
+const REQUIRED_REPO_TOOLS = ['list_dir', 'read_file', 'grep', 'git_status'] as const
+const FIXTURE_REPO_OWNER = 'pilog-fixtures'
+const FIXTURE_REPO_TIMESTAMP = '2026-05-10T00:00:00.000Z'
 
 export type PromptQualityFixtureResult = {
   id: PromptQualityFixture['id']
@@ -66,36 +71,32 @@ async function evaluatePromptQualityFixture(
   const db = createInMemoryDatabase()
   runMigrations(db)
   const repo = createRepo(db, {
-    owner: 'pilog-fixtures',
+    owner: FIXTURE_REPO_OWNER,
     name: fixture.id,
     localPath: repoPath,
-    githubUrl: `https://github.com/pilog-fixtures/${fixture.id}`,
+    githubUrl: createFixtureGithubUrl(fixture.id),
     defaultBranch: 'main'
   })
   const persistedNotes = fixture.notes.map((note) =>
     createNote(db, { content: note.content, repoId: repo.id })
   )
-  const noteIdByFixtureId = new Map(
-    fixture.notes.map((note, index) => [note.id, persistedNotes[index]!.id])
-  )
+  const persistedNoteIdByFixtureId = createPersistedNoteIdMap(fixture, persistedNotes)
   const run = createAgentRun(db, {
     repoId: repo.id,
     inputNoteIds: persistedNotes.map((note) => note.id)
   })
   const prompt = buildIssueGenerationPrompt({
     repo,
-    notes: fixture.notes.map((note, index) => ({
-      ...persistedNotes[index]!,
-      id: note.id,
-      content: note.content
-    }))
+    notes: createPromptNotes(fixture, persistedNotes)
   })
   const promptIncludesRepoPath = prompt.includes(repoPath)
   const repoToolCalls = await exerciseGenerationTools(fixture, repo.localPath)
   const normalizedDrafts = normalizeFixtureDrafts(fixture.response, fixture)
   const persistedDrafts = normalizedDrafts.map((draft) => ({
     ...draft,
-    sourceNoteIds: draft.sourceNoteIds.map((id) => noteIdByFixtureId.get(id)!)
+    sourceNoteIds: draft.sourceNoteIds.map((id) =>
+      getPersistedNoteId(persistedNoteIdByFixtureId, fixture.id, id)
+    )
   }))
 
   persistGeneratedIssueDrafts(db, {
@@ -127,18 +128,18 @@ async function exerciseGenerationTools(
     {
       repo: {
         id: fixture.id,
-        owner: 'pilog-fixtures',
+        owner: FIXTURE_REPO_OWNER,
         name: fixture.id,
         localPath: repoPath,
-        githubUrl: `https://github.com/pilog-fixtures/${fixture.id}`,
+        githubUrl: createFixtureGithubUrl(fixture.id),
         defaultBranch: 'main',
         autoPublishEnabled: false,
         autoPublishMaxIssuesPerRun: 5,
         autoPublishDefaultLabel: 'triaged-by-pilog',
         autoPublishDryRun: false,
         autoPublishRequireConfirmation: true,
-        createdAt: '2026-05-10T00:00:00.000Z',
-        updatedAt: '2026-05-10T00:00:00.000Z'
+        createdAt: FIXTURE_REPO_TIMESTAMP,
+        updatedAt: FIXTURE_REPO_TIMESTAMP
       },
       webSearch: undefined
     },
@@ -203,15 +204,42 @@ function createFixtureResult(input: {
   const clarificationDraftCount = normalizedDrafts.filter(
     (draft) => (draft.needsClarification?.length ?? 0) > 0
   ).length
-  const templateApplied =
-    storedDrafts.length === normalizedDrafts.length &&
-    storedDrafts.every((draft) => draft.body.includes('## Pilog Review Notes')) &&
-    storedDrafts.every((draft) => draft.body.includes('<!-- Fixture template marker -->'))
-  const result: PromptQualityFixtureResult = {
+  const templateApplied = didApplyFixtureTemplate(storedDrafts, normalizedDrafts.length)
+  const failures: string[] = []
+
+  expectEqual(failures, 'draft count', normalizedDrafts.length, fixture.expected.draftCount)
+  expectEqual(failures, 'source note grouping', sourceNoteGroups, fixture.expected.sourceNoteGroups)
+  expectEqual(failures, 'labels', labels, fixture.expected.labels)
+  expectEqual(failures, 'affected files', affectedFiles, fixture.expected.affectedFiles)
+  expectEqual(
+    failures,
+    'clarification draft count',
+    clarificationDraftCount,
+    fixture.expected.clarificationDraftCount
+  )
+  expectIncludes(
+    failures,
+    'acceptance criteria',
+    normalizedDrafts.map((draft) => draft.acceptanceCriteria),
+    fixture.expected.acceptanceCriteriaIncludes
+  )
+  expectIncludes(
+    failures,
+    'implementation notes',
+    normalizedDrafts.map((draft) => draft.implementationNotes),
+    fixture.expected.implementationNotesIncludes ?? []
+  )
+  if (!promptIncludesRepoPath) failures.push('prompt omitted the fixture repo path')
+  for (const toolName of REQUIRED_REPO_TOOLS) {
+    if (!repoToolCalls.includes(toolName)) failures.push(`repo tool was not exercised: ${toolName}`)
+  }
+  if (!templateApplied) failures.push('repo issue template was not applied to persisted drafts')
+
+  return {
     id: fixture.id,
     title: fixture.title,
-    passed: false,
-    failures: [],
+    passed: failures.length === 0,
+    failures,
     promptIncludesRepoPath,
     repoToolCalls,
     templateApplied,
@@ -221,44 +249,6 @@ function createFixtureResult(input: {
     affectedFiles,
     clarificationDraftCount
   }
-
-  expectEqual(result.failures, 'draft count', normalizedDrafts.length, fixture.expected.draftCount)
-  expectEqual(
-    result.failures,
-    'source note grouping',
-    sourceNoteGroups,
-    fixture.expected.sourceNoteGroups
-  )
-  expectEqual(result.failures, 'labels', labels, fixture.expected.labels)
-  expectEqual(result.failures, 'affected files', affectedFiles, fixture.expected.affectedFiles)
-  expectEqual(
-    result.failures,
-    'clarification draft count',
-    clarificationDraftCount,
-    fixture.expected.clarificationDraftCount
-  )
-  expectIncludes(
-    result.failures,
-    'acceptance criteria',
-    normalizedDrafts.map((draft) => draft.acceptanceCriteria),
-    fixture.expected.acceptanceCriteriaIncludes
-  )
-  expectIncludes(
-    result.failures,
-    'implementation notes',
-    normalizedDrafts.map((draft) => draft.implementationNotes),
-    fixture.expected.implementationNotesIncludes ?? []
-  )
-  if (!promptIncludesRepoPath) result.failures.push('prompt omitted the fixture repo path')
-  for (const toolName of ['list_dir', 'read_file', 'grep', 'git_status'] as const) {
-    if (!repoToolCalls.includes(toolName))
-      result.failures.push(`repo tool was not exercised: ${toolName}`)
-  }
-  if (!templateApplied)
-    result.failures.push('repo issue template was not applied to persisted drafts')
-
-  result.passed = result.failures.length === 0
-  return result
 }
 
 function expectEqual(failures: string[], label: string, actual: unknown, expected: unknown): void {
@@ -281,6 +271,65 @@ function expectIncludes(
       }
     }
   })
+}
+
+function createPersistedNoteIdMap(
+  fixture: PromptQualityFixture,
+  persistedNotes: Array<{ id: string }>
+): Map<string, string> {
+  return new Map(
+    fixture.notes.map((note, index) => {
+      const persistedNote = persistedNotes[index]
+      if (!persistedNote) {
+        throw new Error(`Fixture ${fixture.id} did not persist note ${note.id}.`)
+      }
+
+      return [note.id, persistedNote.id]
+    })
+  )
+}
+
+function createPromptNotes(fixture: PromptQualityFixture, persistedNotes: Note[]): Note[] {
+  return fixture.notes.map((note, index) => {
+    const persistedNote = persistedNotes[index]
+    if (!persistedNote) {
+      throw new Error(`Fixture ${fixture.id} did not persist note ${note.id}.`)
+    }
+
+    return {
+      ...persistedNote,
+      id: note.id,
+      content: note.content
+    }
+  })
+}
+
+function getPersistedNoteId(
+  noteIdByFixtureId: Map<string, string>,
+  fixtureId: PromptQualityFixture['id'],
+  noteId: string
+): string {
+  const persistedNoteId = noteIdByFixtureId.get(noteId)
+  if (!persistedNoteId) {
+    throw new Error(`Fixture ${fixtureId} draft referenced unknown source note ${noteId}.`)
+  }
+
+  return persistedNoteId
+}
+
+function didApplyFixtureTemplate(storedDrafts: IssueDraft[], expectedDraftCount: number): boolean {
+  return (
+    storedDrafts.length === expectedDraftCount &&
+    storedDrafts.every(
+      (draft) =>
+        draft.body.includes('## Pilog Review Notes') &&
+        draft.body.includes('<!-- Fixture template marker -->')
+    )
+  )
+}
+
+function createFixtureGithubUrl(id: PromptQualityFixture['id']): string {
+  return `https://github.com/${FIXTURE_REPO_OWNER}/${id}`
 }
 
 function prepareFixtureRepo(id: PromptQualityFixture['id']): string {
