@@ -3,7 +3,7 @@ import { mkdtempSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { describe, expect, it, vi } from 'vitest'
-import type { UpdateCheckResult } from 'electron-updater'
+import type { UpdateCheckResult, UpdateInfo } from 'electron-updater'
 import {
   AppUpdateService,
   readPackagedUpdateChannel,
@@ -163,7 +163,7 @@ describe('AppUpdateService', () => {
   })
 })
 
-function updateInfo(version: string) {
+function updateInfo(version: string): UpdateInfo {
   return {
     version,
     files: [],

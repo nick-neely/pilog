@@ -2,7 +2,7 @@ import { readFileSync } from 'fs'
 import { join } from 'path'
 import { BrowserWindow, ipcMain } from 'electron'
 import { autoUpdater } from 'electron-updater'
-import type { UpdateCheckResult, UpdateInfo } from 'electron-updater'
+import type { UpdateCheckResult } from 'electron-updater'
 import type { AppUpdateChannel, AppUpdateStatus } from '@shared/ipc'
 
 type UpdaterEvent =
@@ -108,20 +108,10 @@ export class AppUpdateService {
       this.setStatus({ state: 'checking', errorMessage: null })
     })
     this.updater.on('update-not-available', (info) => {
-      this.setStatus({
-        state: 'not-available',
-        updateVersion: getUpdateVersion(info),
-        lastCheckedAt: new Date().toISOString(),
-        errorMessage: null
-      })
+      this.setCheckedStatus('not-available', info)
     })
     this.updater.on('update-available', (info) => {
-      this.setStatus({
-        state: 'available',
-        updateVersion: getUpdateVersion(info),
-        lastCheckedAt: new Date().toISOString(),
-        errorMessage: null
-      })
+      this.setCheckedStatus('available', info)
     })
     this.updater.on('download-progress', () => {
       this.setStatus({ state: 'downloading', errorMessage: null })
@@ -134,11 +124,7 @@ export class AppUpdateService {
       })
     })
     this.updater.on('error', (error) => {
-      this.setStatus({
-        state: 'error',
-        errorMessage: getErrorMessage(error),
-        lastCheckedAt: new Date().toISOString()
-      })
+      this.setErrorStatus(error, { lastCheckedAt: new Date().toISOString() })
     })
   }
 
@@ -150,27 +136,9 @@ export class AppUpdateService {
     if (this.status.state === 'disabled') return this.status
     try {
       const result = await this.updater.checkForUpdates()
-      if (result?.isUpdateAvailable === false) {
-        this.setStatus({
-          state: 'not-available',
-          updateVersion: getUpdateVersion(result.updateInfo),
-          lastCheckedAt: new Date().toISOString(),
-          errorMessage: null
-        })
-      } else if (result?.isUpdateAvailable === true) {
-        this.setStatus({
-          state: 'available',
-          updateVersion: getUpdateVersion(result.updateInfo),
-          lastCheckedAt: new Date().toISOString(),
-          errorMessage: null
-        })
-      }
+      this.setStatusFromCheckResult(result)
     } catch (error) {
-      this.setStatus({
-        state: 'error',
-        errorMessage: getErrorMessage(error),
-        lastCheckedAt: new Date().toISOString()
-      })
+      this.setErrorStatus(error, { lastCheckedAt: new Date().toISOString() })
     }
     return this.status
   }
@@ -181,7 +149,7 @@ export class AppUpdateService {
     try {
       await this.updater.downloadUpdate()
     } catch (error) {
-      this.setStatus({ state: 'error', errorMessage: getErrorMessage(error) })
+      this.setErrorStatus(error)
     }
     return this.status
   }
@@ -195,6 +163,37 @@ export class AppUpdateService {
   private setStatus(patch: Partial<AppUpdateStatus>): void {
     this.status = { ...this.status, ...patch }
     this.broadcast(this.status)
+  }
+
+  private setStatusFromCheckResult(result: UpdateCheckResult | null): void {
+    if (result?.isUpdateAvailable === false) {
+      this.setCheckedStatus('not-available', result.updateInfo)
+      return
+    }
+
+    if (result?.isUpdateAvailable === true) {
+      this.setCheckedStatus('available', result.updateInfo)
+    }
+  }
+
+  private setCheckedStatus(
+    state: Extract<AppUpdateStatus['state'], 'not-available' | 'available'>,
+    info: unknown
+  ): void {
+    this.setStatus({
+      state,
+      updateVersion: getUpdateVersion(info),
+      lastCheckedAt: new Date().toISOString(),
+      errorMessage: null
+    })
+  }
+
+  private setErrorStatus(error: unknown, patch: { lastCheckedAt?: string } = {}): void {
+    this.setStatus({
+      state: 'error',
+      errorMessage: getErrorMessage(error),
+      ...patch
+    })
   }
 }
 
@@ -213,7 +212,7 @@ export function broadcastAppUpdateStatus(status: AppUpdateStatus): void {
 
 function getUpdateVersion(info: unknown): string | null {
   if (typeof info === 'object' && info !== null && 'version' in info) {
-    const version = (info as Pick<UpdateInfo, 'version'>).version
+    const version = info.version
     return typeof version === 'string' ? version : null
   }
   return null
