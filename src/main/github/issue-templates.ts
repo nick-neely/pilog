@@ -7,6 +7,11 @@ type FrontMatter = {
   fields: Record<string, string>
 }
 
+type DraftSection = {
+  heading: string
+  content: string
+}
+
 const ISSUE_TEMPLATE_DIR = path.join('.github', 'ISSUE_TEMPLATE')
 const SINGLE_ISSUE_TEMPLATE = path.join('.github', 'ISSUE_TEMPLATE.md')
 const CONFIG_TEMPLATE_NAMES = new Set(['config.yml', 'config.yaml'])
@@ -201,26 +206,23 @@ function renderYamlIssueFormBody(lines: string[]): string {
 
 function fillTemplateSections(templateBody: string, draft: GeneratedIssueDraft): string {
   let body = templateBody.trim()
-  body = fillSection(body, 'Summary', draft.summary)
-  body = fillSection(body, 'Context', draft.context)
-  body = fillSection(body, 'Additional context', draft.context)
-  body = fillSection(
-    body,
-    'Acceptance Criteria',
-    draft.acceptanceCriteria.map((item) => `- ${item}`).join('\n')
-  )
-  body = fillSection(
-    body,
-    'Implementation Notes',
-    draft.implementationNotes.map((item) => `- ${item}`).join('\n')
-  )
+  const sections: DraftSection[] = [
+    { heading: 'Summary', content: draft.summary },
+    { heading: 'Context', content: draft.context },
+    { heading: 'Additional context', content: draft.context },
+    { heading: 'Acceptance Criteria', content: formatMarkdownList(draft.acceptanceCriteria) },
+    { heading: 'Implementation Notes', content: formatMarkdownList(draft.implementationNotes) }
+  ]
 
   if (draft.needsClarification && draft.needsClarification.length > 0) {
-    body = fillSection(
-      body,
-      'Needs Clarification',
-      draft.needsClarification.map((item) => `- ${item}`).join('\n')
-    )
+    sections.push({
+      heading: 'Needs Clarification',
+      content: formatMarkdownList(draft.needsClarification)
+    })
+  }
+
+  for (const section of sections) {
+    body = fillSection(body, section.heading, section.content)
   }
 
   if (!hasHeading(body, 'Summary')) {
@@ -231,7 +233,7 @@ function fillTemplateSections(templateBody: string, draft: GeneratedIssueDraft):
     body = [
       body,
       '## Acceptance Criteria',
-      ...draft.acceptanceCriteria.map((item) => `- ${item}`)
+      ...formatMarkdownListLines(draft.acceptanceCriteria)
     ].join('\n')
   }
 
@@ -271,19 +273,23 @@ function formatPilogReviewNotes(draft: GeneratedIssueDraft, templateBody: string
     lines.push(
       '',
       '### Implementation Notes',
-      ...draft.implementationNotes.map((item) => `- ${item}`)
+      ...formatMarkdownListLines(draft.implementationNotes)
     )
   }
 
   if (draft.needsClarification && draft.needsClarification.length > 0) {
-    lines.push(
-      '',
-      '### Needs Clarification',
-      ...draft.needsClarification.map((item) => `- ${item}`)
-    )
+    lines.push('', '### Needs Clarification', ...formatMarkdownListLines(draft.needsClarification))
   }
 
   return lines.join('\n')
+}
+
+function formatMarkdownList(items: string[]): string {
+  return formatMarkdownListLines(items).join('\n')
+}
+
+function formatMarkdownListLines(items: string[]): string[] {
+  return items.map((item) => `- ${item}`)
 }
 
 function normalizeTemplatePath(templatePath: string): string {
