@@ -17,6 +17,7 @@ import type {
   IssueDraft,
   IssueDraftForReview,
   IssueDraftStatus,
+  OnboardingState,
   PiActiveConfig,
   PiModelOption,
   PiProviderOption,
@@ -57,6 +58,7 @@ export type CountNotesRequest = {
 
 export type SettingKey =
   | 'hotkey.scratchpad'
+  | 'onboarding.state'
   | 'openInboxAtLogin'
   | 'scratchpad.lastRepoId'
   | 'pi.activeProvider'
@@ -258,6 +260,8 @@ export type IpcContract = {
   'note:delete': { request: { id: string }; response: boolean }
   'setting:get': { request: { key: SettingKey }; response: string | null }
   'setting:set': { request: { key: SettingKey; value: string }; response: void }
+  'onboarding:get': { request: void; response: OnboardingState }
+  'onboarding:set': { request: OnboardingState; response: OnboardingState }
   'settings:getAdvanced': { request: void; response: AdvancedSettings }
   'settings:setAdvanced': { request: SetAdvancedSettingsRequest; response: AdvancedSettings }
   'github:connect': { request: void; response: GitHubStatus }
@@ -394,6 +398,7 @@ export type {
   GenerateDraftsMode,
   GitHubIssueTemplate,
   IssueDraftStatus,
+  OnboardingState,
   PiActiveConfig,
   PiModelOption,
   PiProviderOption,

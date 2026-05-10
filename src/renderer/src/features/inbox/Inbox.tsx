@@ -30,13 +30,27 @@ import { cn } from '@renderer/lib/utils'
 import type { LabelMatch } from '@shared/labels'
 import type {
   GenerateDraftsMode,
+  GitHubStatus,
   ListNotesRequest,
   Note,
+  OnboardingState,
   NoteStatus,
   NoteStatusCounts,
   PiStatus,
   Repo
 } from '@shared/ipc'
+import {
+  DEFAULT_ONBOARDING_STATE,
+  completeOnboardingState,
+  confirmHotkeyOnboardingState,
+  getCompletedOnboardingSteps,
+  getCurrentOnboardingStep,
+  ONBOARDING_STEP_ORDER,
+  resumeOnboardingState,
+  skipOnboardingState,
+  type OnboardingSignals,
+  type OnboardingStepId
+} from '@shared/onboarding'
 import type {
   AutoPublishPreviewSummary,
   AutoPublishPublishReport,
@@ -117,6 +131,21 @@ type AutoPublishPreviewState = {
   report: AutoPublishPublishReport | null
   publishing: boolean
   publishError: string | null
+}
+
+type OnboardingPanelProps = {
+  state: OnboardingState
+  step: OnboardingStepId
+  signals: OnboardingSignals
+  working: boolean
+  onConfirmHotkey: () => void
+  onConnectGitHub: () => void
+  onLinkRepo: () => void
+  onConfigurePi: () => void
+  onCreateFirstNote: () => void
+  onGenerateFirstDraft: () => void
+  onOpenDrafts: () => void
+  onSkip: () => void
 }
 
 function encodeRepoFilter(f: string | null | undefined): string {
@@ -221,6 +250,133 @@ function getDetailEmptyDescription(input: {
     return `${input.selectionCount} notes selected. Triage actions live in the sidebar footer; press Esc to clear.`
   }
   return 'Select a note to read or edit.'
+}
+
+const ONBOARDING_STEP_LABELS: Record<OnboardingStepId, string> = {
+  hotkey: 'Confirm hotkey',
+  github: 'Connect GitHub',
+  repo: 'Link a repo',
+  pi: 'Configure Pi',
+  note: 'Capture a note',
+  draft: 'Generate a draft',
+  review: 'Review or publish'
+}
+
+function OnboardingPanel({
+  state,
+  step,
+  signals,
+  working,
+  onConfirmHotkey,
+  onConnectGitHub,
+  onLinkRepo,
+  onConfigurePi,
+  onCreateFirstNote,
+  onGenerateFirstDraft,
+  onOpenDrafts,
+  onSkip
+}: OnboardingPanelProps): React.JSX.Element {
+  const completedSteps = getCompletedOnboardingSteps(state, signals)
+  const action = getOnboardingAction({
+    step,
+    working,
+    onConfirmHotkey,
+    onConnectGitHub,
+    onLinkRepo,
+    onConfigurePi,
+    onCreateFirstNote,
+    onGenerateFirstDraft,
+    onOpenDrafts
+  })
+
+  return (
+    <section
+      data-testid="onboarding-panel"
+      aria-labelledby="onboarding-title"
+      className="mx-auto flex h-full w-full max-w-2xl flex-col justify-center px-8 py-10"
+    >
+      <div className="flex flex-col gap-6 border-y py-6">
+        <div className="flex flex-col gap-2">
+          <p className="text-xs font-medium text-muted-foreground">First run</p>
+          <h2 id="onboarding-title" className="font-heading text-2xl font-normal leading-tight">
+            Start with one useful draft.
+          </h2>
+          <p className="max-w-[62ch] text-sm leading-relaxed text-muted-foreground">
+            Pilog needs a hotkey, GitHub, one local repository, Pi credentials, and one note. Each
+            step uses the real app state, so you can leave and come back without losing work.
+          </p>
+        </div>
+
+        <ol className="grid gap-2 sm:grid-cols-2">
+          {ONBOARDING_STEP_ORDER.map((id, index) => {
+            const done = completedSteps.has(id)
+            const current = id === step
+            return (
+              <li
+                key={id}
+                data-testid={`onboarding-step-${id}`}
+                aria-current={current ? 'step' : undefined}
+                className={cn(
+                  'flex min-h-10 items-center gap-2 rounded-md border px-3 py-2 text-sm',
+                  current ? 'bg-muted text-foreground' : 'text-muted-foreground',
+                  done ? 'border-border' : 'border-transparent'
+                )}
+              >
+                <span className="tabular flex size-5 shrink-0 items-center justify-center rounded-sm border font-mono text-[11px]">
+                  {done ? 'OK' : index + 1}
+                </span>
+                <span>{ONBOARDING_STEP_LABELS[id]}</span>
+              </li>
+            )
+          })}
+        </ol>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <Button onClick={action.onClick} disabled={working}>
+            {action.label}
+          </Button>
+          <Button variant="ghost" onClick={onSkip} disabled={working}>
+            Skip for now
+          </Button>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function getOnboardingAction(input: {
+  step: OnboardingStepId
+  working: boolean
+  onConfirmHotkey: () => void
+  onConnectGitHub: () => void
+  onLinkRepo: () => void
+  onConfigurePi: () => void
+  onCreateFirstNote: () => void
+  onGenerateFirstDraft: () => void
+  onOpenDrafts: () => void
+}): { label: string; onClick: () => void } {
+  switch (input.step) {
+    case 'hotkey':
+      return { label: 'Confirm CommandOrControl+Alt+N', onClick: input.onConfirmHotkey }
+    case 'github':
+      return {
+        label: input.working ? 'Connecting' : 'Connect GitHub',
+        onClick: input.onConnectGitHub
+      }
+    case 'repo':
+      return { label: 'Link a local repo', onClick: input.onLinkRepo }
+    case 'pi':
+      return { label: 'Configure Pi', onClick: input.onConfigurePi }
+    case 'note':
+      return { label: 'Write the first note', onClick: input.onCreateFirstNote }
+    case 'draft':
+      return {
+        label: input.working ? 'Generating' : 'Generate first draft',
+        onClick: input.onGenerateFirstDraft
+      }
+    case 'review':
+      return { label: 'Open Drafts', onClick: input.onOpenDrafts }
+  }
 }
 
 function NoteDetail({
@@ -672,6 +828,11 @@ export function Inbox({
   onNavigateToAgentRuns: (runId?: string, origin?: RunNavigationOrigin) => void
 }): React.JSX.Element {
   const [notes, setNotes] = useState<Note[]>([])
+  const [onboardingState, setOnboardingState] = useState<OnboardingState>(DEFAULT_ONBOARDING_STATE)
+  const [onboardingNotes, setOnboardingNotes] = useState<Note[]>([])
+  const [onboardingDrafts, setOnboardingDrafts] = useState<IssueDraftForReview[]>([])
+  const [githubStatus, setGitHubStatus] = useState<GitHubStatus>({ connected: false })
+  const [onboardingWorking, setOnboardingWorking] = useState(false)
   const [draftLinksByNote, setDraftLinksByNote] = useState<Map<string, NoteDraftLink[]>>(
     () => new Map()
   )
@@ -698,6 +859,17 @@ export function Inbox({
   const mountedRef = useRef(true)
 
   const reposById = useMemo(() => new Map(repos.map((r) => [r.id, r])), [repos])
+  const onboardingSignals = useMemo<OnboardingSignals>(
+    () => ({
+      github: githubStatus,
+      repos,
+      pi: piStatus,
+      notes: onboardingNotes,
+      drafts: onboardingDrafts
+    }),
+    [githubStatus, onboardingDrafts, onboardingNotes, piStatus, repos]
+  )
+  const onboardingStep = getCurrentOnboardingStep(onboardingState, onboardingSignals)
 
   useEffect(() => {
     mountedRef.current = true
@@ -709,6 +881,8 @@ export function Inbox({
   useEffect(() => {
     window.pilog.invoke('repos:list').then(setRepos)
     window.pilog.invoke('pi:status').then(setPiStatus)
+    window.pilog.invoke('github:status').then(setGitHubStatus)
+    window.pilog.invoke('onboarding:get').then(setOnboardingState)
   }, [])
 
   const fetchNotes = useCallback(async (): Promise<void> => {
@@ -747,6 +921,12 @@ export function Inbox({
   const fetchDraftLinks = useCallback(async (): Promise<void> => {
     const drafts = await window.pilog.invoke('issue-drafts:list', { status: 'all' })
     setDraftLinksByNote(mapDraftLinksByNote(drafts))
+    setOnboardingDrafts(drafts)
+  }, [])
+
+  const fetchOnboardingNotes = useCallback(async (): Promise<void> => {
+    const allNotes = await window.pilog.invoke('note:list')
+    setOnboardingNotes(allNotes)
   }, [])
 
   useEffect(() => {
@@ -758,6 +938,10 @@ export function Inbox({
   useEffect(() => {
     fetchStatusCounts()
   }, [fetchStatusCounts])
+
+  useEffect(() => {
+    fetchOnboardingNotes()
+  }, [fetchOnboardingNotes])
 
   const handleFocusNoteHandled = useEffectEvent(() => {
     onFocusNoteHandled?.()
@@ -777,6 +961,7 @@ export function Inbox({
   const handleNoteCreated = useEffectEvent(() => {
     void fetchNotes()
     void fetchStatusCounts()
+    void fetchOnboardingNotes()
   })
 
   useEffect(() => window.pilog.on('note:created', handleNoteCreated), [])
@@ -794,6 +979,43 @@ export function Inbox({
     await Promise.all([fetchNotes(), fetchStatusCounts()])
     requestAnimationFrame(() => setSelectedIds(new Set([created.id])))
   }, [fetchNotes, fetchStatusCounts])
+
+  const persistOnboardingState = useCallback(async (next: OnboardingState): Promise<void> => {
+    const saved = await window.pilog.invoke('onboarding:set', next)
+    setOnboardingState(saved)
+  }, [])
+
+  const handleConfirmHotkey = useCallback((): void => {
+    void persistOnboardingState(confirmHotkeyOnboardingState(onboardingState))
+  }, [onboardingState, persistOnboardingState])
+
+  const handleSkipOnboarding = useCallback((): void => {
+    void persistOnboardingState(skipOnboardingState(onboardingState))
+  }, [onboardingState, persistOnboardingState])
+
+  const handleResumeOnboarding = useCallback((): void => {
+    void persistOnboardingState(resumeOnboardingState(onboardingState))
+  }, [onboardingState, persistOnboardingState])
+
+  const handleConnectGitHub = useCallback(async (): Promise<void> => {
+    setOnboardingWorking(true)
+    try {
+      const next = await window.pilog.invoke('github:connect')
+      setGitHubStatus(next)
+    } finally {
+      setOnboardingWorking(false)
+    }
+  }, [])
+
+  const handleCreateFirstNote = useCallback(async (): Promise<void> => {
+    const firstRepo = repos[0]
+    const created = await window.pilog.invoke('note:create', {
+      content: '',
+      repoId: firstRepo?.id ?? null
+    })
+    await Promise.all([fetchNotes(), fetchStatusCounts(), fetchOnboardingNotes()])
+    requestAnimationFrame(() => setSelectedIds(new Set([created.id])))
+  }, [fetchNotes, fetchOnboardingNotes, fetchStatusCounts, repos])
 
   const handleSave = async (id: string, content: string): Promise<void> => {
     await window.pilog.invoke('note:update', { id, content })
@@ -969,6 +1191,9 @@ export function Inbox({
               publishError: null
             })
           } else {
+            if (!onboardingState.completed) {
+              await persistOnboardingState(completeOnboardingState(onboardingState))
+            }
             clearSelection()
             onNavigateToDraftReview()
           }
@@ -980,6 +1205,45 @@ export function Inbox({
     } finally {
       if (mountedRef.current) {
         setGenerating(false)
+        window.pilog.invoke('pi:status').then(setPiStatus)
+      }
+    }
+  }
+
+  const handleGenerateFirstDraft = async (): Promise<void> => {
+    const firstReadyNote =
+      onboardingNotes.find((note) => note.status === 'unprocessed' && note.repoId) ??
+      (await window.pilog.invoke('note:list')).find(
+        (note) => note.status === 'unprocessed' && note.repoId
+      )
+    if (!firstReadyNote || !piStatus.configured || generating) return
+
+    setOnboardingWorking(true)
+    setGenerating(true)
+    try {
+      await window.pilog.runAgent(
+        { noteIds: [firstReadyNote.id], mode: 'review' },
+        async (event) => {
+          if (event.type === 'final') {
+            if (!mountedRef.current) return
+            await Promise.all([
+              fetchNotes(),
+              fetchStatusCounts(),
+              fetchDraftLinks(),
+              fetchOnboardingNotes(),
+              persistOnboardingState(completeOnboardingState(onboardingState))
+            ])
+            onNavigateToDraftReview()
+          }
+          if (event.type === 'error') {
+            console.error(event.message)
+          }
+        }
+      )
+    } finally {
+      if (mountedRef.current) {
+        setGenerating(false)
+        setOnboardingWorking(false)
         window.pilog.invoke('pi:status').then(setPiStatus)
       }
     }
@@ -1340,9 +1604,29 @@ export function Inbox({
             onNavigateToDraftReview={onNavigateToDraftReview}
             draftLinks={draftLinksByNote.get(selectedNote.id) ?? []}
           />
+        ) : onboardingStep && !onboardingState.skipped ? (
+          <OnboardingPanel
+            state={onboardingState}
+            step={onboardingStep}
+            signals={onboardingSignals}
+            working={onboardingWorking || generating}
+            onConfirmHotkey={handleConfirmHotkey}
+            onConnectGitHub={() => void handleConnectGitHub()}
+            onLinkRepo={onNavigateToRepositories}
+            onConfigurePi={onNavigateToSettings}
+            onCreateFirstNote={() => void handleCreateFirstNote()}
+            onGenerateFirstDraft={() => void handleGenerateFirstDraft()}
+            onOpenDrafts={() => onNavigateToDraftReview()}
+            onSkip={handleSkipOnboarding}
+          />
         ) : (
           <Empty className="h-full border-none bg-transparent shadow-none">
             <EmptyDescription className="max-w-[36ch]">{detailEmptyDescription}</EmptyDescription>
+            {!onboardingState.completed && onboardingState.skipped ? (
+              <Button variant="link" size="sm" className="mt-2" onClick={handleResumeOnboarding}>
+                Resume first-run setup
+              </Button>
+            ) : null}
           </Empty>
         )}
       </section>

@@ -307,3 +307,5 @@ export type GitHubIssueTemplate = {
   title: string
   body: string
 }
+
+export type { OnboardingState, OnboardingStepId, OnboardingSignals } from './onboarding'

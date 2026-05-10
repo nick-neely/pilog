@@ -17,7 +17,12 @@ import {
   updateNote
 } from '../db/repositories/notes'
 import { listPublishAuditLog } from '../db/repositories/publish-log'
-import { getSetting, setSetting } from '../db/repositories/settings'
+import {
+  getOnboardingState,
+  getSetting,
+  setOnboardingState,
+  setSetting
+} from '../db/repositories/settings'
 import { pathActions } from '../file-actions'
 
 type DbChannel =
@@ -34,6 +39,8 @@ type DbChannel =
   | 'note:counts'
   | 'note:update'
   | 'note:delete'
+  | 'onboarding:get'
+  | 'onboarding:set'
   | 'path:copy'
   | 'path:reveal'
   | 'publish-log:list'
@@ -66,6 +73,8 @@ const handlers: { [C in DbChannel]: Handler<C> } = {
   'note:counts': (db, request) => countNotesByStatus(db, request),
   'note:update': (db, request) => updateNote(db, request),
   'note:delete': (db, request) => deleteNote(db, request),
+  'onboarding:get': (db) => getOnboardingState(db),
+  'onboarding:set': (db, request) => setOnboardingState(db, request),
   'path:copy': (_db, request) => pathActions.copyPath(request),
   'path:reveal': (_db, request) => pathActions.revealPath(request),
   'publish-log:list': (db, request) => listPublishAuditLog(db, request),
