@@ -15,7 +15,12 @@ asarUnpack:
   - '**/*.node'
   - '**/node_modules/@vscode/ripgrep/bin/**'
   - resources/**
-publish: null
+publish:
+  provider: github
+  owner: nick-neely
+  repo: pilog
+  channel: latest
+  releaseType: release
 win:
   executableName: Pilog
 nsis:

@@ -249,6 +249,29 @@ export type PublishAutoPublishRunRequest = {
   runId: string
 }
 
+export type AppUpdateChannel = 'stable' | 'preview'
+
+export type AppUpdateState =
+  | 'disabled'
+  | 'idle'
+  | 'checking'
+  | 'not-available'
+  | 'available'
+  | 'downloading'
+  | 'downloaded'
+  | 'error'
+
+export type AppUpdateStatus = {
+  state: AppUpdateState
+  version: string
+  channel: AppUpdateChannel
+  channelLabel: string
+  updateVersion: string | null
+  lastCheckedAt: string | null
+  errorMessage: string | null
+  disabledReason: 'development' | 'unpackaged' | null
+}
+
 export type IpcContract = {
   'note:create': { request: { content: string; repoId?: string | null }; response: Note }
   'note:list': { request: ListNotesRequest | undefined; response: Note[] }
@@ -348,6 +371,10 @@ export type IpcContract = {
     request: { repoId?: string } | undefined
     response: PublishAuditLogEntry[]
   }
+  'app-updates:getStatus': { request: void; response: AppUpdateStatus }
+  'app-updates:check': { request: void; response: AppUpdateStatus }
+  'app-updates:download': { request: void; response: AppUpdateStatus }
+  'app-updates:restart': { request: void; response: AppUpdateStatus }
   'path:copy': {
     request: PathActionRequest
     response: PathActionResult
@@ -380,6 +407,7 @@ export type IpcEvent =
   | 'navigate:settings'
   | 'agent-runs:invalidated'
   | 'issue-drafts:invalidated'
+  | 'app-updates:status'
 
 export type IpcAction = 'scratchpad:hide'
 

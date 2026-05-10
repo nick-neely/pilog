@@ -18,6 +18,11 @@ import { PILOG_APP_ID, PILOG_PRODUCT_NAME } from '../shared/app-identity'
 import { shouldOpenMainWindowForOnboarding } from '../shared/onboarding'
 import { createTray, destroyTray } from './tray/create-tray'
 import {
+  AppUpdateService,
+  readPackagedUpdateChannel,
+  registerAppUpdateIpcHandlers
+} from './update/app-update-service'
+import {
   destroyMainWindow,
   showMainWindow,
   showMainWindowOnRoute
@@ -60,6 +65,16 @@ app.whenReady().then(() => {
       win.webContents.send('issue-drafts:invalidated')
     }
   }
+
+  const appUpdateService = new AppUpdateService({
+    isPackaged: app.isPackaged,
+    isDev: is.dev,
+    version: app.getVersion(),
+    updateChannel:
+      process.env.PILOG_UPDATE_CHANNEL ?? readPackagedUpdateChannel(process.resourcesPath)
+  })
+  appUpdateService.initialize()
+  registerAppUpdateIpcHandlers(appUpdateService)
 
   registerIpcHandlers(db, {
     onNoteCreated: broadcastNoteCreated,
