@@ -7,7 +7,7 @@ import { loadDotEnvFile } from './config/env'
 import { createDatabase } from './db/client'
 import { runMigrations } from './db/migrations'
 import { cancelRunningAgentRuns } from './db/repositories/agent-runs'
-import { getSetting, setSetting } from './db/repositories/settings'
+import { getOnboardingState, getSetting, setSetting } from './db/repositories/settings'
 import { registerGlobalHotkeys, unregisterGlobalHotkeys } from './hotkeys/register-global-hotkeys'
 import { registerIpcHandlers } from './ipc/handlers'
 import { registerGitHubIpcHandlers } from './ipc/github-handlers'
@@ -15,6 +15,7 @@ import { registerRepoIpcHandlers } from './ipc/repo-handlers'
 import { registerPiIpcHandlers } from './ipc/pi-handlers'
 import { buildAppMenu } from './menu/app-menu'
 import { PILOG_APP_ID, PILOG_PRODUCT_NAME } from '../shared/app-identity'
+import { shouldOpenMainWindowForOnboarding } from '../shared/onboarding'
 import { createTray, destroyTray } from './tray/create-tray'
 import {
   destroyMainWindow,
@@ -109,7 +110,8 @@ app.whenReady().then(() => {
   })
 
   const openAtLogin = getSetting(db, 'openInboxAtLogin') === 'true'
-  if (openAtLogin) {
+  const onboardingNeedsWindow = shouldOpenMainWindowForOnboarding(getOnboardingState(db))
+  if (openAtLogin || onboardingNeedsWindow) {
     showMainWindow(icon)
   }
 

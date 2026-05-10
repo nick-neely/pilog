@@ -267,3 +267,5 @@ export type IssueDraftSourceNote = {
 export type IssueDraftForReview = IssueDraft & {
   sourceNotes: IssueDraftSourceNote[]
 }
+
+export type { OnboardingState, OnboardingStepId, OnboardingSignals } from './onboarding'

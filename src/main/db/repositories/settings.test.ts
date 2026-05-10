@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { createInMemoryDatabase, type PilogDatabase } from '../client'
 import { runMigrations } from '../migrations'
-import { getSetting, setSetting } from './settings'
+import { DEFAULT_ONBOARDING_STATE, completeOnboardingState } from '@shared/onboarding'
+import { getOnboardingState, getSetting, setOnboardingState, setSetting } from './settings'
 
 describe('settings repository', () => {
   let db: PilogDatabase
@@ -37,5 +38,15 @@ describe('settings repository', () => {
 
     expect(getSetting(db, 'hotkey.scratchpad')).toBe('CmdOrCtrl+Shift+N')
     expect(getSetting(db, 'openInboxAtLogin')).toBe('true')
+  })
+
+  it('stores onboarding completion state in the settings table', () => {
+    expect(getOnboardingState(db)).toEqual(DEFAULT_ONBOARDING_STATE)
+
+    const completed = completeOnboardingState(DEFAULT_ONBOARDING_STATE, '2026-05-10T12:00:00.000Z')
+    setOnboardingState(db, completed)
+
+    expect(getOnboardingState(db)).toEqual(completed)
+    expect(getSetting(db, 'onboarding.state')).toContain('"completed":true')
   })
 })

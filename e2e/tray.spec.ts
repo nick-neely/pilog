@@ -20,17 +20,50 @@ async function launchApp(): Promise<ElectronApplication> {
   })
 }
 
-test('tray-first: no main window on default launch', async () => {
+async function exitApp(app: ElectronApplication): Promise<void> {
+  const process = app.process()
+  await Promise.race([
+    app.evaluate(({ app }) => app.exit(0)).catch(() => undefined),
+    new Promise((resolve) => setTimeout(resolve, 500))
+  ])
+  if (!process.killed) process.kill('SIGKILL')
+  await new Promise((resolve) => setTimeout(resolve, 100))
+}
+
+test('first launch opens the visible inbox onboarding path', async () => {
   const app = await launchApp()
 
-  const windows = app.windows()
-  expect(windows.length).toBe(0)
+  const inboxPage = await app.firstWindow()
+  await inboxPage.waitForLoadState('domcontentloaded')
+  await expect(inboxPage.locator('h1')).toHaveText('Inbox')
+  await expect(inboxPage.locator('[data-testid="onboarding-panel"]')).toBeVisible()
+  await expect(inboxPage.locator('[data-testid="onboarding-step-hotkey"]')).toHaveAttribute(
+    'aria-current',
+    'step'
+  )
 
-  await app.close()
+  await exitApp(app)
+})
+
+test('tray-first: skipped onboarding does not show the main window on default launch', async () => {
+  let app = await launchApp()
+  let inboxPage = await app.firstWindow()
+  await inboxPage.getByRole('button', { name: 'Skip for now' }).click()
+  await expect(inboxPage.getByRole('button', { name: 'Resume first-run setup' })).toBeVisible()
+  await exitApp(app)
+
+  app = await launchApp()
+  expect(app.windows().length).toBe(0)
+  await exitApp(app)
 })
 
 test('tray-first: Open Inbox action shows main window', async () => {
-  const app = await launchApp()
+  let app = await launchApp()
+  let inboxPage = await app.firstWindow()
+  await inboxPage.getByRole('button', { name: 'Skip for now' }).click()
+  await exitApp(app)
+
+  app = await launchApp()
 
   expect(app.windows().length).toBe(0)
 
@@ -38,9 +71,9 @@ test('tray-first: Open Inbox action shows main window', async () => {
     ipcMain.emit('tray:open-inbox')
   })
 
-  const inboxPage = await app.firstWindow()
+  inboxPage = await app.firstWindow()
   await inboxPage.waitForLoadState('domcontentloaded')
   await expect(inboxPage.locator('h1')).toHaveText('Inbox')
 
-  await app.close()
+  await exitApp(app)
 })
