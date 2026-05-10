@@ -132,7 +132,7 @@ export async function startOAuthFlow(
         res.end(
           '<html><body style="font-family:system-ui;text-align:center;padding:4rem">' +
             '<h1>Connected to GitHub</h1>' +
-            '<p>You can close this tab and return to PiLog.</p>' +
+            '<p>You can close this tab and return to Pilog.</p>' +
             '</body></html>'
         )
 

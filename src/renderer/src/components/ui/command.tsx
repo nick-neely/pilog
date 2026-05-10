@@ -6,7 +6,7 @@ import { Search01Icon } from '@hugeicons/core-free-icons'
 
 import { cn } from '@renderer/lib/utils'
 
-// PiLog's command palette is the keyboard-first discovery surface: search,
+// Pilog's command palette is the keyboard-first discovery surface: search,
 // filters, capture-from-anywhere. Styled to honour the Active-dialog role
 // in DESIGN.md (rounded-xl, single ring, ambient shadow, no glass).
 

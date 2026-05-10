@@ -1,42 +1,41 @@
-appId: com.electron.app
-productName: pilog
+appId: dev.pilog.app
+productName: Pilog
 directories:
   app: app
   buildResources: build
 files:
   - out/**
   - package.json
+extraResources:
+  - from: resources/icon.png
+    to: resources/icon.png
+  - from: resources/tray-icon.png
+    to: resources/tray-icon.png
 asarUnpack:
   - '**/*.node'
   - '**/node_modules/@vscode/ripgrep/bin/**'
   - resources/**
+publish: null
 win:
-  executableName: pilog
+  executableName: Pilog
 nsis:
-  artifactName: ${name}-${version}-setup.${ext}
+  artifactName: Pilog-${version}-Setup.${ext}
   shortcutName: ${productName}
   uninstallDisplayName: ${productName}
   createDesktopShortcut: always
 mac:
   entitlementsInherit: build/entitlements.mac.plist
-  extendInfo:
-    - NSCameraUsageDescription: Application requests access to the device's camera.
-    - NSMicrophoneUsageDescription: Application requests access to the device's microphone.
-    - NSDocumentsFolderUsageDescription: Application requests access to the user's Documents folder.
-    - NSDownloadsFolderUsageDescription: Application requests access to the user's Downloads folder.
   notarize: false
 dmg:
-  artifactName: ${name}-${version}.${ext}
+  artifactName: Pilog-${version}.${ext}
 linux:
   target:
     - AppImage
     - snap
     - deb
-  maintainer: electronjs.org
-  category: Utility
+  executableName: pilog
+  maintainer: Nick Neely
+  category: Development
 appImage:
-  artifactName: ${name}-${version}.${ext}
+  artifactName: Pilog-${version}.${ext}
 npmRebuild: true
-publish:
-  provider: generic
-  url: https://example.com/auto-updates

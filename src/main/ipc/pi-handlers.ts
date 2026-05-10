@@ -23,6 +23,7 @@ import {
 } from '../pi/config'
 import { createSafeStorageAuthStorage } from '../pi/auth-storage'
 import { setSecret } from '../security/secrets'
+import { getRuntimeHealthCheck } from '../runtime-health'
 import {
   getAdvancedSettings,
   getTurnBudget,
@@ -67,7 +68,12 @@ function prepareAgentEventForMode(
 
 export function registerPiIpcHandlers(
   db: PilogDatabase,
-  options?: { onDraftsGenerated?: () => void; runAgentImpl?: RunAgent; runTimeoutMs?: number }
+  options?: {
+    iconPath?: string
+    onDraftsGenerated?: () => void
+    runAgentImpl?: RunAgent
+    runTimeoutMs?: number
+  }
 ): void {
   const runAgentImpl = options?.runAgentImpl ?? runAgent
   const runTimeoutMs = options?.runTimeoutMs ?? DEFAULT_AGENT_RUN_TIMEOUT_MS
@@ -375,6 +381,7 @@ export function registerPiIpcHandlers(
     ipcMain.handle('debug:listPublishLog', (_event, request: IpcRequest<'debug:listPublishLog'>) =>
       listPublishLog(db, request)
     )
+    ipcMain.handle('debug:runtimeHealth', () => getRuntimeHealthCheck(options?.iconPath ?? ''))
   }
 }
 

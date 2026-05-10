@@ -101,7 +101,7 @@ test('Review Mode publishes an edited generated draft and stores the GitHub issu
     await expect(page.getByRole('heading', { name: 'Draft Review' })).toBeVisible()
 
     const uniqueSuffix = Date.now().toString(36)
-    const editedTitle = `PiLog e2e review publish ${uniqueSuffix}`
+    const editedTitle = `Pilog e2e review publish ${uniqueSuffix}`
     const editedCriterion = `Stores returned GitHub issue URL (${uniqueSuffix})`
 
     await page.getByLabel('Draft title').fill(editedTitle)

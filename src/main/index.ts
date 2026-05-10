@@ -2,6 +2,7 @@ import { electronApp, is, optimizer } from '@electron-toolkit/utils'
 import { app, BrowserWindow, ipcMain, Menu } from 'electron'
 import { join } from 'path'
 import icon from '../../resources/icon.png?asset'
+import trayIcon from '../../resources/tray-icon.png?asset'
 import { loadDotEnvFile } from './config/env'
 import { createDatabase } from './db/client'
 import { runMigrations } from './db/migrations'
@@ -13,6 +14,7 @@ import { registerGitHubIpcHandlers } from './ipc/github-handlers'
 import { registerRepoIpcHandlers } from './ipc/repo-handlers'
 import { registerPiIpcHandlers } from './ipc/pi-handlers'
 import { buildAppMenu } from './menu/app-menu'
+import { PILOG_APP_ID, PILOG_PRODUCT_NAME } from '../shared/app-identity'
 import { createTray, destroyTray } from './tray/create-tray'
 import {
   destroyMainWindow,
@@ -27,8 +29,10 @@ if (process.env.PILOG_USER_DATA) {
   app.setPath('userData', process.env.PILOG_USER_DATA)
 }
 
+app.setName(PILOG_PRODUCT_NAME)
+
 app.whenReady().then(() => {
-  electronApp.setAppUserModelId('com.electron')
+  electronApp.setAppUserModelId(PILOG_APP_ID)
 
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)
@@ -75,6 +79,7 @@ app.whenReady().then(() => {
 
   registerRepoIpcHandlers(db)
   registerPiIpcHandlers(db, {
+    iconPath: icon,
     onDraftsGenerated: () => {
       broadcastNoteCreated()
       broadcastIssueDraftsInvalidated()
@@ -97,7 +102,7 @@ app.whenReady().then(() => {
   })
   Menu.setApplicationMenu(menu)
 
-  createTray(icon, {
+  createTray(trayIcon, {
     onOpenInbox: () => showMainWindow(icon),
     onNewNote: () => openScratchpad(),
     onOpenSettings: () => showMainWindowOnRoute(icon, 'navigate:settings')

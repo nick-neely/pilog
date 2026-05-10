@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-PiLog needs at least two distinct surfaces: the **inbox** (a full main window for triaging notes) and the **scratchpad** (a small, frameless, always-on-top capture overlay). Future slices will add a system tray and possibly a settings window. We need to decide how these map to Electron's `BrowserWindow` abstraction.
+Pilog needs at least two distinct surfaces: the **inbox** (a full main window for triaging notes) and the **scratchpad** (a small, frameless, always-on-top capture overlay). Future slices will add a system tray and possibly a settings window. We need to decide how these map to Electron's `BrowserWindow` abstraction.
 
 ### Options considered
 

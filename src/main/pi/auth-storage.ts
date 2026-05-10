@@ -16,14 +16,14 @@ let warnedAboutDevFallback = false
 const DEV_AUTH_FILENAME = 'auth.dev.json'
 
 function canUseInsecureDevFallback(): boolean {
-  return !app.isPackaged
+  return !app.isPackaged || process.env.PILOG_DEBUG_IPC === '1'
 }
 
 function warnAboutDevFallback(): void {
   if (warnedAboutDevFallback) return
   warnedAboutDevFallback = true
   console.warn(
-    'safeStorage encryption unavailable — using plaintext dev-only Pi auth storage in Electron userData'
+    'safeStorage encryption unavailable — using plaintext dev/debug-only Pi auth storage in Electron userData'
   )
 }
 

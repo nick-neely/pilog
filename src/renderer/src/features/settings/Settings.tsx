@@ -461,7 +461,7 @@ export function Settings({
               <section className="flex flex-col gap-3">
                 <h2 className="text-sm font-medium text-foreground">GitHub</h2>
                 <p className="text-xs text-muted-foreground">
-                  Connect your GitHub account to create issues from PiLog.
+                  Connect your GitHub account to create issues from Pilog.
                 </p>
                 {github.status?.connected ? (
                   <Card size="sm" className="shadow-none ring-1 ring-border">
@@ -505,7 +505,7 @@ export function Settings({
                     <h2 className="text-sm font-medium text-foreground">Provider &amp; Model</h2>
                     <p className="mt-1 max-w-[68ch] text-xs text-muted-foreground">
                       Choose the Pi model used for draft generation. Credentials are stored in
-                      OS-backed safe storage, separate from PiLog settings.
+                      OS-backed safe storage, separate from Pilog settings.
                     </p>
                   </div>
                   {pi.active?.valid && (
@@ -661,7 +661,7 @@ export function Settings({
                       <AlertDialogHeader>
                         <AlertDialogTitle>Reset Pi config?</AlertDialogTitle>
                         <AlertDialogDescription>
-                          This removes PiLog&apos;s stored Pi credentials and clears the active
+                          This removes Pilog&apos;s stored Pi credentials and clears the active
                           provider and model. Your standalone Pi config is left untouched.
                         </AlertDialogDescription>
                       </AlertDialogHeader>
@@ -895,7 +895,7 @@ export function Settings({
                   </Button>
                 </div>
                 <p className="text-[11px] text-muted-foreground">
-                  Takes effect after restarting PiLog.
+                  Takes effect after restarting Pilog.
                 </p>
               </section>
 
@@ -915,7 +915,7 @@ export function Settings({
                   </Label>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  When disabled, PiLog starts in the system tray only.
+                  When disabled, Pilog starts in the system tray only.
                 </p>
               </section>
             </div>

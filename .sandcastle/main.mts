@@ -110,7 +110,7 @@ function sandboxProvider(): SandboxProvider {
 // Hooks run inside the sandbox before the agent starts each iteration.
 // CI=true: pnpm refuses to alter node_modules without a TTY unless CI is set
 // (Sandcastle uses `docker exec … sh -c`, which is non-interactive).
-// PILOG_SANDBOX=1: skip Electron native rebuild (electron-rebuild → electronjs.org);
+// PILOG_SANDBOX=1: skip Electron native rebuild (electron-rebuild → Electron download hosts);
 // agents only need linked deps; host `node_modules` copy covers most binaries.
 // Codex: copy subscription auth from read-only mount before install.
 const hooks = {

@@ -149,7 +149,7 @@ function createFixtureRepo(): { repoPath: string } {
 
   execFileSync('git', ['init', '-b', 'main'], { cwd: repoPath })
   execFileSync('git', ['config', 'user.email', 'pilog@example.com'], { cwd: repoPath })
-  execFileSync('git', ['config', 'user.name', 'PiLog'], { cwd: repoPath })
+  execFileSync('git', ['config', 'user.name', 'Pilog'], { cwd: repoPath })
   execFileSync('git', ['add', 'src/app.ts'], { cwd: repoPath })
   execFileSync('git', ['commit', '-m', 'Initial commit'], { cwd: repoPath })
 

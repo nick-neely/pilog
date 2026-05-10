@@ -6,10 +6,10 @@ Accepted
 
 ## Context
 
-Phase 2 requires connecting a GitHub account from inside PiLog. Two viable OAuth strategies exist for Electron desktop apps:
+Phase 2 requires connecting a GitHub account from inside Pilog. Two viable OAuth strategies exist for Electron desktop apps:
 
 1. **Local-loopback callback** – Start an HTTP server on `127.0.0.1` with a random port, open the system browser to GitHub's `/login/oauth/authorize` with `redirect_uri` pointing at the loopback server. GitHub redirects back with a `code`; the main process exchanges it for a token.
-2. **Device flow** – POST to `/login/device/code`, display a user-code in PiLog, open `github.com/login/device` in the browser, poll until the user approves. No loopback server needed but UX is clunkier (copy-paste a code).
+2. **Device flow** – POST to `/login/device/code`, display a user-code in Pilog, open `github.com/login/device` in the browser, poll until the user approves. No loopback server needed but UX is clunkier (copy-paste a code).
 
 For token storage, options considered:
 
@@ -21,9 +21,9 @@ For token storage, options considered:
 
 **Local-loopback OAuth callback** for authentication, **`safeStorage`-backed file storage** for token persistence.
 
-- The loopback flow is preferred for desktop UX: the user clicks one button, authorises in their default browser, and returns to PiLog already connected. No code to copy.
+- The loopback flow is preferred for desktop UX: the user clicks one button, authorises in their default browser, and returns to Pilog already connected. No code to copy.
 - `safeStorage.encryptString()` encrypts the token; the resulting buffer is base64-encoded and written to `{userData}/secrets.json`. On read, the buffer is decrypted with `safeStorage.decryptString()`.
-- If `safeStorage.isEncryptionAvailable()` returns false in a packaged app (rare — headless Linux without a keyring), the module logs a warning and refuses to persist. During development only, PiLog falls back to a plaintext `secrets.dev.json` file under Electron `userData` so WSL2/dev environments can exercise the full GitHub flow.
+- If `safeStorage.isEncryptionAvailable()` returns false in a packaged app (rare — headless Linux without a keyring), the module logs a warning and refuses to persist. During development only, Pilog falls back to a plaintext `secrets.dev.json` file under Electron `userData` so WSL2/dev environments can exercise the full GitHub flow.
 - OAuth client ID and client secret are supplied via build-time environment variables (`GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`). Neither appears in the renderer or preload bundle — they're only read in the main process at runtime.
 - The token never touches `pilog.sqlite`.
 

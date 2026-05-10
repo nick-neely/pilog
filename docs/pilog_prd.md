@@ -1,16 +1,16 @@
-# PiLog PRD: Frictionless Developer Scratchpad to GitHub Issue Agent
+# Pilog PRD: Frictionless Developer Scratchpad to GitHub Issue Agent
 
 ## 1. Product Summary
 
-**PiLog** is a desktop developer scratchpad that lets users instantly capture rough, stream-of-consciousness notes without leaving their current flow. A global hotkey opens a lightweight markdown editor where developers can jot down bugs, UX tweaks, feature ideas, refactors, and “fix this later” thoughts.
+**Pilog** is a desktop developer scratchpad that lets users instantly capture rough, stream-of-consciousness notes without leaving their current flow. A global hotkey opens a lightweight markdown editor where developers can jot down bugs, UX tweaks, feature ideas, refactors, and “fix this later” thoughts.
 
-PiLog then uses a local AI agent, powered by the Pi agent harness, to analyze those notes, inspect the active repository for context, group related ideas, and generate GitHub-ready issues with clear titles, descriptions, affected files, implementation context, and acceptance criteria.
+Pilog then uses a local AI agent, powered by the Pi agent harness, to analyze those notes, inspect the active repository for context, group related ideas, and generate GitHub-ready issues with clear titles, descriptions, affected files, implementation context, and acceptance criteria.
 
 The core goal is to turn messy developer notes into useful GitHub issues with almost no context switching.
 
 ## 2. Working Name
 
-**Recommended name: PiLog**
+**Recommended name: Pilog**
 
 Rationale:
 
@@ -22,7 +22,7 @@ Rationale:
 
 Domain note:
 
-- Public search shows an existing `PiLog Group` enterprise data-governance company, so trademark/domain checks are still required before serious launch.
+- Public search shows an existing `Pilog Group` enterprise data-governance company, so trademark/domain checks are still required before serious launch.
 - `Dispatch` has stronger conflict risk because `withdispatch.dev` is already an AI coding-agent product.
 - Recommended domain patterns to check manually: `pilog.dev`, `usepilog.dev`, `pilogapp.com`, `pilog.ai`, `getpilog.dev`, `trypilog.dev`.
 
@@ -45,7 +45,7 @@ Most developers either:
 - create a low-quality issue,
 - or forget it entirely.
 
-PiLog solves this by separating **capture** from **triage**.
+Pilog solves this by separating **capture** from **triage**.
 
 ## 4. Target Users
 
@@ -153,9 +153,9 @@ Store locally:
 ### Agent Harness
 
 - **Pi agent harness** as the local agent substrate
-- PiLog should integrate Pi directly inside the app experience. The user should not need to manually install the Pi CLI or run a separate setup process outside PiLog.
-- Preferred MVP approach: bundle or embed Pi through the available package/runtime integration and expose Pi configuration through PiLog's settings/onboarding screens.
-- Fallback approach: if direct embedding is blocked by Pi packaging constraints, PiLog may manage the Pi binary/CLI internally, including installation, updates, and health checks, without requiring the user to leave the app.
+- Pilog should integrate Pi directly inside the app experience. The user should not need to manually install the Pi CLI or run a separate setup process outside Pilog.
+- Preferred MVP approach: bundle or embed Pi through the available package/runtime integration and expose Pi configuration through Pilog's settings/onboarding screens.
+- Fallback approach: if direct embedding is blocked by Pi packaging constraints, Pilog may manage the Pi binary/CLI internally, including installation, updates, and health checks, without requiring the user to leave the app.
 
 Use Pi to:
 
@@ -166,7 +166,7 @@ Use Pi to:
 - split complex notes into multiple issues
 - propose affected files and labels
 
-The Electron app owns the UX, local data, GitHub publishing flow, and session lifecycle. Pi is the internal agent runtime behind the app, not an external prerequisite the user has to understand before using PiLog.
+The Electron app owns the UX, local data, GitHub publishing flow, and session lifecycle. Pi is the internal agent runtime behind the app, not an external prerequisite the user has to understand before using Pilog.
 
 ### GitHub Integration
 
@@ -259,29 +259,29 @@ Structure guidance:
 
 - Use OS keychain/keytar or Electron safeStorage for secrets
 - Never store GitHub tokens in plain text
-- Never store model provider API keys in PiLog's SQLite database
+- Never store model provider API keys in Pilog's SQLite database
 - Make auto-publish opt-in per repository
 - Show clear model/data settings before sending repo content to any model
 - Keep issue publishing auditable with a local publish log
 
 ### AI Provider and BYOK Model
 
-PiLog is BYOK by design. AI provider configuration is delegated to Pi, but exposed through PiLog's own onboarding/settings UX.
+Pilog is BYOK by design. AI provider configuration is delegated to Pi, but exposed through Pilog's own onboarding/settings UX.
 
 Requirements:
 
-- Users configure provider credentials and model choices through Pi-native configuration surfaced inside PiLog.
-- PiLog should not require users to install Pi separately, open a terminal, or manually edit config files for the normal setup path.
-- PiLog should not own a separate model-provider abstraction in MVP. Pi remains the authority for model/provider support.
-- PiLog may show the selected/default model and provide a guided setup flow, but it should avoid duplicating Pi's full provider configuration system.
-- Advanced users may optionally open/edit the underlying Pi config from PiLog.
+- Users configure provider credentials and model choices through Pi-native configuration surfaced inside Pilog.
+- Pilog should not require users to install Pi separately, open a terminal, or manually edit config files for the normal setup path.
+- Pilog should not own a separate model-provider abstraction in MVP. Pi remains the authority for model/provider support.
+- Pilog may show the selected/default model and provide a guided setup flow, but it should avoid duplicating Pi's full provider configuration system.
+- Advanced users may optionally open/edit the underlying Pi config from Pilog.
 
 ## 8. Main User Flows
 
 ### Flow 1: Capture a Note
 
 1. User presses global hotkey.
-2. PiLog opens a small always-on-top scratchpad.
+2. Pilog opens a small always-on-top scratchpad.
 3. User writes rough markdown notes.
 4. User closes the window or presses save.
 5. Notes are saved locally to the inbox.
@@ -297,7 +297,7 @@ auth redirect after session expires is broken, maybe middleware?
 
 ### Flow 2: Review Mode Issue Generation
 
-1. User opens PiLog inbox.
+1. User opens Pilog inbox.
 2. User selects one or more notes.
 3. User clicks **Generate Draft Issues**.
 4. Agent inspects notes and local repo context.
@@ -482,7 +482,7 @@ Settings should include:
 - Default mode: Review or Auto-publish
 - Default repository
 - GitHub account connection
-- Model/provider setup and selection through Pi, surfaced inside PiLog
+- Model/provider setup and selection through Pi, surfaced inside Pilog
 - Repo indexing settings
 - Auto-publish safety settings
 - Data/privacy controls
@@ -640,7 +640,7 @@ The MVP is successful if:
 
 - Add internal Pi runtime/bridge service.
 - Bundle or manage Pi so users do not need a separate Pi install.
-- Add guided Pi provider/model setup inside PiLog.
+- Add guided Pi provider/model setup inside Pilog.
 - Send selected notes and repo path to the agent.
 - Let agent inspect repo files.
 - Return structured issue draft JSON.
@@ -696,7 +696,7 @@ Return structured JSON matching the provided schema.
 
 ## 16. Open Questions
 
-- Can Pi be embedded cleanly through a package/runtime integration, or does PiLog need to internally manage a bundled Pi binary/CLI?
+- Can Pi be embedded cleanly through a package/runtime integration, or does Pilog need to internally manage a bundled Pi binary/CLI?
 - Should repo indexing be persistent or done per generation run?
 - Should issue templates be parsed in MVP or added shortly after?
 - Should auto-publish be hidden behind an “advanced” setting?
@@ -712,5 +712,5 @@ Return structured JSON matching the provided schema.
 - Require manual GitHub auth through device flow or local OAuth callback
 - Require manual repo linking
 - Use local SQLite-compatible storage with Drizzle + better-sqlite3
-- Use Pi-managed BYOK provider configuration surfaced inside PiLog
+- Use Pi-managed BYOK provider configuration surfaced inside Pilog
 - Show source notes on every generated issue

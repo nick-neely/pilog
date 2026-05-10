@@ -14,15 +14,15 @@ The primary surface is the desktop app itself — a global-hotkey scratchpad and
 
 ## Product Purpose
 
-PiLog separates **capture** from **triage**. The scratchpad is the lightest possible markdown surface, opened by a global hotkey, designed to disappear from your attention as soon as the note is written. The inbox accumulates raw notes; on demand, a local Pi-driven agent reads them alongside the active repository and produces grouped, repo-aware GitHub issue drafts (titles, bodies, suggested labels, acceptance criteria, affected files, confidence, and concise rationale).
+Pilog separates **capture** from **triage**. The scratchpad is the lightest possible markdown surface, opened by a global hotkey, designed to disappear from your attention as soon as the note is written. The inbox accumulates raw notes; on demand, a local Pi-driven agent reads them alongside the active repository and produces grouped, repo-aware GitHub issue drafts (titles, bodies, suggested labels, acceptance criteria, affected files, confidence, and concise rationale).
 
 Success looks like: a note captured in under three seconds, a pile of five rough notes turning into one to three useful issue drafts, every draft linked back to its source notes, every draft auditable before it's published. Auto-publish exists for power users but is explicit, repo-scoped, and logged.
 
-The product is local-first by default — notes, drafts, repo metadata, and agent run history live in local SQLite; secrets live in OS credential storage; provider/model configuration is delegated to Pi (BYOK) but surfaced inside PiLog.
+The product is local-first by default — notes, drafts, repo metadata, and agent run history live in local SQLite; secrets live in OS credential storage; provider/model configuration is delegated to Pi (BYOK) but surfaced inside Pilog.
 
 ## Brand Personality
 
-**Warm, crafted, calm.** PiLog should feel like a developer's bedside journal — a quiet, considered editor that respects what you're writing and the moment you're writing it. References we admire: iA Writer, Things 3, Obsidian, Bear, Linear's restraint without Linear's coolness.
+**Warm, crafted, calm.** Pilog should feel like a developer's bedside journal — a quiet, considered editor that respects what you're writing and the moment you're writing it. References we admire: iA Writer, Things 3, Obsidian, Bear, Linear's restraint without Linear's coolness.
 
 Voice: precise, plainspoken, never cute. Never ships an em dash. Never says "magic" or "✨". Doesn't over-explain. Microcopy reads like a thoughtful collaborator who has worked on a real codebase.
 
@@ -34,11 +34,11 @@ Emotional goals:
 
 ## Anti-references
 
-Three traps PiLog must actively avoid:
+Three traps Pilog must actively avoid:
 
-1. **The generic AI-tool aesthetic.** No purple/teal gradients, no glassmorphic cards, no gradient text, no "✨ AI" badges, no shimmer effects, no wand icons, no "magic" copy. PiLog uses an LLM; it is not "an AI app."
+1. **The generic AI-tool aesthetic.** No purple/teal gradients, no glassmorphic cards, no gradient text, no "✨ AI" badges, no shimmer effects, no wand icons, no "magic" copy. Pilog uses an LLM; it is not "an AI app."
 2. **SaaS-cliché dashboards.** No hero-metric template (big number / small label / supporting stats / gradient accent). No identical icon-heading-text card grids. No side-stripe colored borders on cards or alerts. No friendly-rounded onboarding illustrations.
-3. **The stock shadcn dashboard demo look.** Default shadcn theme + Inter + zinc neutrals + one blue accent is the path of least resistance and lands PiLog among 200 indistinguishable AI-tool dashboards. shadcn is a primitive layer; the visual identity must be committed and recognizable on its own.
+3. **The stock shadcn dashboard demo look.** Default shadcn theme + Inter + zinc neutrals + one blue accent is the path of least resistance and lands Pilog among 200 indistinguishable AI-tool dashboards. shadcn is a primitive layer; the visual identity must be committed and recognizable on its own.
 
 Specific patterns to avoid: modal-as-first-thought, nested cards, dense top bars with breadcrumbs everywhere, persistent banners, identical-card grids, decorative blurs.
 

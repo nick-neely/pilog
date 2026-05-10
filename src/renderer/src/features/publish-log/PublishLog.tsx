@@ -113,7 +113,7 @@ export function PublishLog({
               <EmptyHeader>
                 <EmptyTitle>No successful publishes recorded</EmptyTitle>
                 <EmptyDescription>
-                  This local log starts filling after PiLog successfully creates GitHub issues. Dry
+                  This local log starts filling after Pilog successfully creates GitHub issues. Dry
                   runs and failed publishes are not written here.
                 </EmptyDescription>
               </EmptyHeader>

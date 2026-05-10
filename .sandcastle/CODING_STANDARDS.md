@@ -5,7 +5,7 @@
      reviewer can verify from a diff alone. Aspirations belong in CONTEXT.md
      or ADRs, not here. -->
 
-PiLog is an Electron + React + TypeScript desktop app. The main process owns truth (DB, secrets, GitHub, Pi runtime, file system); the renderer is a UI client that only talks to main through a typed IPC contract. These standards exist to keep that boundary honest and the code refactor-safe.
+Pilog is an Electron + React + TypeScript desktop app. The main process owns truth (DB, secrets, GitHub, Pi runtime, file system); the renderer is a UI client that only talks to main through a typed IPC contract. These standards exist to keep that boundary honest and the code refactor-safe.
 
 ## Style
 

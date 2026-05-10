@@ -1,7 +1,7 @@
 import { cn } from '@renderer/lib/utils'
 import type { NoteStatus, NoteStatusCounts } from '@shared/ipc'
 
-// PiLog's inbox status filter. Replaces the previous pill-shaped chip row,
+// Pilog's inbox status filter. Replaces the previous pill-shaped chip row,
 // which (a) violated DESIGN.md's "no pill shapes" rule with `rounded-full`,
 // and (b) reflowed when the moss "× N selected" indicator appeared on the
 // same line. Both problems disappear once the filter becomes a vertical

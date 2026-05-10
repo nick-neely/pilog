@@ -522,7 +522,7 @@ function getAutoPublishDialogDescription(
     return `${report.successCount} published, ${report.failureCount} failed.`
   }
 
-  return summary?.message ?? 'PiLog planned these drafts for review before any GitHub writes.'
+  return summary?.message ?? 'Pilog planned these drafts for review before any GitHub writes.'
 }
 
 function AutoPublishReport({

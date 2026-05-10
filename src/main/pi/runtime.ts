@@ -196,7 +196,7 @@ async function* runFixtureAgent(input: IssueGenerationInput): AsyncIterable<Agen
     type: 'final',
     drafts: [
       {
-        title: 'Triage selected PiLog notes',
+        title: 'Triage selected Pilog notes',
         summary: input.notes
           .flatMap((note) => {
             const content = note.content.trim()

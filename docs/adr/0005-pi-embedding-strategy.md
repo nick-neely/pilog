@@ -6,7 +6,7 @@ Accepted (2026-05-08)
 
 ## Context
 
-PiLog's MVP depends on a local AI agent that reads selected notes and the active repo, then returns structured GitHub-issue drafts. PRD §7 designates **Pi** as that runtime — specifically the open-source TypeScript agent framework at [`earendil-works/pi`](https://github.com/earendil-works/pi), comprising:
+Pilog's MVP depends on a local AI agent that reads selected notes and the active repo, then returns structured GitHub-issue drafts. PRD §7 designates **Pi** as that runtime — specifically the open-source TypeScript agent framework at [`earendil-works/pi`](https://github.com/earendil-works/pi), comprising:
 
 - `@earendil-works/pi-agent-core` — the raw `Agent` loop (turn-by-turn LLM completion, tool dispatch, event emission)
 - `@earendil-works/pi-ai` — the unified multi-provider LLM API (`getModel`, `complete`) and OAuth-token refresh
@@ -18,7 +18,7 @@ This ADR fixes those axes so Phase 3 work (#12–#15) has a stable target.
 
 ## Decision
 
-PiLog embeds Pi as a **library imported in-process into the Electron main process**, layered on `pi-agent-core` + `pi-ai`, with a `safeStorage`-backed implementation of Pi's `AuthStorage` interface, `MessagePortMain`-based streaming to the renderer, and a curated read-only tool set.
+Pilog embeds Pi as a **library imported in-process into the Electron main process**, layered on `pi-agent-core` + `pi-ai`, with a `safeStorage`-backed implementation of Pi's `AuthStorage` interface, `MessagePortMain`-based streaming to the renderer, and a curated read-only tool set.
 
 The decision has eight components.
 
@@ -39,13 +39,13 @@ The first implementation pass must verify, with a snapshot before/after a real r
 
 ### 2. Pi layer: `pi-agent-core` + `pi-ai`, not the coding-agent SDK
 
-PiLog imports `Agent` and `AgentLoopConfig` from `@earendil-works/pi-agent-core` and `getModel`/`complete` from `@earendil-works/pi-ai`. We do **not** import the coding-agent SDK's session, prompt, or tool set.
+Pilog imports `Agent` and `AgentLoopConfig` from `@earendil-works/pi-agent-core` and `getModel`/`complete` from `@earendil-works/pi-ai`. We do **not** import the coding-agent SDK's session, prompt, or tool set.
 
-Structured output uses the **exit-tool pattern**: PiLog registers a tool named `submit_issue_drafts` whose parameters carry the `GeneratedIssueDraft[]` schema from PRD §10 verbatim. Pi enforces the parameter schema (TypeBox) at call time, so the agent literally cannot emit off-schema output that reaches persistence. The first call to `submit_issue_drafts` is the run's result; the agent loop terminates after that turn.
+Structured output uses the **exit-tool pattern**: Pilog registers a tool named `submit_issue_drafts` whose parameters carry the `GeneratedIssueDraft[]` schema from PRD §10 verbatim. Pi enforces the parameter schema (TypeBox) at call time, so the agent literally cannot emit off-schema output that reaches persistence. The first call to `submit_issue_drafts` is the run's result; the agent loop terminates after that turn.
 
 Rationale:
 
-- The exit-tool contract collapses validation: Pi's parameter check and PiLog's persistence-side Zod check are the same schema, applied once.
+- The exit-tool contract collapses validation: Pi's parameter check and Pilog's persistence-side Zod check are the same schema, applied once.
 - The agent is **read-only by construction** — it has no write/edit/exec/network tools, so prompt-injected note content cannot escape the curated tool set. This is a real security property, not prompt discipline. The coding-agent SDK ships `edit`/`write`/`bash` and a system prompt assuming they exist; we would be working against its grain.
 - PRD §15's prompt is a triage prompt, not a coding-agent prompt. Writing it fresh on `pi-agent-core` is straightforward; adapting it on top of the coding-agent's session prompt is a guessing game about residual coding-agent behavior.
 - Auto-compaction, auto-retry, and session resume — the coding-agent SDK's main extras — do not benefit our one-shot, short-context, ephemeral runs.
@@ -54,29 +54,29 @@ The first implementation pass must verify that calling the exit tool actually te
 
 ### 3. BYOK: reuse Pi's `AuthStorage` interface, supply a `safeStorage` backend
 
-PiLog reuses Pi's credential-and-catalog primitives:
+Pilog reuses Pi's credential-and-catalog primitives:
 
-- `AuthStorage` (interface) — exposed by `@earendil-works/pi-coding-agent`; PiLog supplies its own implementation
+- `AuthStorage` (interface) — exposed by `@earendil-works/pi-coding-agent`; Pilog supplies its own implementation
 - `ModelRegistry` (`getApiKeyAndHeaders`, `getAll`, `find`) — used as-is
 - `getOAuthApiKey` from `@earendil-works/pi-ai/oauth` — used as-is, never reimplemented
 
-The only PiLog-owned credential code is **`SafeStorageAuthStorage`** at `src/main/pi/auth-storage.ts`: a class implementing the `AuthStorage` interface against `safeStorage.encryptString` / `decryptString` over per-provider blob files at `app.getPath('userData')/pi-auth/<provider>.bin`.
+The only Pilog-owned credential code is **`SafeStorageAuthStorage`** at `src/main/pi/auth-storage.ts`: a class implementing the `AuthStorage` interface against `safeStorage.encryptString` / `decryptString` over per-provider blob files at `app.getPath('userData')/pi-auth/<provider>.bin`.
 
-PiLog **never** reads or writes `~/.pi/agent/auth.json`. A one-time **import-from-existing-Pi** affordance is acceptable in #13 but is not required for MVP.
+Pilog **never** reads or writes `~/.pi/agent/auth.json`. A one-time **import-from-existing-Pi** affordance is acceptable in #13 but is not required for MVP.
 
 OAuth is deferred to post-MVP — only API-key flows are surfaced in MVP Settings UI. The `AuthStorage` interface still requires `setOAuthCredential`/`getOAuthCredential` methods, which are implemented from day one. Adding OAuth post-MVP is therefore a Settings-flow slice (browser launch + loopback + `setOAuthCredential` call), not a credential-layer rewrite.
 
 Rationale:
 
 - PRD §7 requires OS credential storage. Pi's default `~/.pi/agent/auth.json` is 0600 plaintext — better than the DB but worse than `safeStorage`. Adopting `safeStorage` aligns Pi credentials with the GitHub token that already lives there per ADR-0004.
-- Sharing `auth.json` with a user's standalone `pi` install introduces two writers on one file and a UX confound ("why did my token disappear?"). PiLog owns its own credential lifecycle.
+- Sharing `auth.json` with a user's standalone `pi` install introduces two writers on one file and a UX confound ("why did my token disappear?"). Pilog owns its own credential lifecycle.
 - The reinvention surface is small: ~60 lines of storage-method bodies. Provider catalog, model catalog, OAuth refresh, and `getApiKeyAndHeaders` semantics all stay in Pi.
 
-The first implementation pass must verify that `ModelRegistry` accepts a custom `AuthStorage` instance (constructor injection) rather than only `discoverAuthStorage()`. If it does not, PiLog subclasses the concrete `AuthStorage` and overrides only the persistence methods.
+The first implementation pass must verify that `ModelRegistry` accepts a custom `AuthStorage` instance (constructor injection) rather than only `discoverAuthStorage()`. If it does not, Pilog subclasses the concrete `AuthStorage` and overrides only the persistence methods.
 
 ### 4. Streaming: `MessagePortMain` per invocation, plus invalidation broadcast
 
-PiLog uses two distinct IPC primitives.
+Pilog uses two distinct IPC primitives.
 
 **Per-invocation agent stream — `MessagePortMain`.** On `pi:generateDrafts:start`, main creates a `MessageChannelMain`, returns the `runId` to the caller via the normal `IpcContract` request/response, and posts the renderer-side port via `webContents.postMessage('pi:agent-stream', { runId }, [port])`. Preload listens for that channel, consumes the port as a typed event stream, and exposes `window.pilog.runAgent(input, onEvent): Promise<void>` to the renderer. The `MessagePortMain` lifecycle stays inside preload because Electron's `contextBridge` cannot clone AsyncIterator objects across the isolated-world boundary.
 
@@ -104,7 +104,7 @@ The first implementation pass must verify the preload glue: receiving a `Message
 
 ### 5. Tool set: read-only by construction; opt-in `web_search`; no `bash`
 
-PiLog registers exactly the following tools against `pi-agent-core`'s `Agent`:
+Pilog registers exactly the following tools against `pi-agent-core`'s `Agent`:
 
 | Tool                  | Parameters                          | Backend                                                                 |
 | --------------------- | ----------------------------------- | ----------------------------------------------------------------------- |
@@ -161,13 +161,13 @@ The first implementation pass must verify `@vscode/ripgrep`'s `rgPath` resolves 
 
 ### 7. Update channel
 
-Pi's version is **pinned to an exact version** in `package.json` (no caret range), and travels with PiLog releases via the existing `electron-updater` channel. There is no separate Pi update channel, no in-app "update Pi" affordance, and no version skew between PiLog and its bundled Pi.
+Pi's version is **pinned to an exact version** in `package.json` (no caret range), and travels with Pilog releases via the existing `electron-updater` channel. There is no separate Pi update channel, no in-app "update Pi" affordance, and no version skew between Pilog and its bundled Pi.
 
-A boot-time runtime sanity check in `src/main/pi/runtime.ts` asserts `pi-agent-core` and `pi-ai` imported successfully; a failed assertion surfaces a non-dismissible banner ("PiLog's agent runtime didn't load — reinstall or check logs") and disables **Generate Drafts**.
+A boot-time runtime sanity check in `src/main/pi/runtime.ts` asserts `pi-agent-core` and `pi-ai` imported successfully; a failed assertion surfaces a non-dismissible banner ("Pilog's agent runtime didn't load — reinstall or check logs") and disables **Generate Drafts**.
 
 Rationale:
 
-- Exact-pinning makes Pi's version part of PiLog's changelog. A transient ranged update under our feet could change tool-call semantics or LLM-API request shape between user installs of the "same" PiLog release.
+- Exact-pinning makes Pi's version part of Pilog's changelog. A transient ranged update under our feet could change tool-call semantics or LLM-API request shape between user installs of the "same" Pilog release.
 - Boot-time assertion catches a corrupted install at app start instead of at first **Generate Drafts** click.
 - Co-shipping eliminates the "incompatible Pi version" failure mode from runtime concerns: it can only happen in pathologically corrupted installs, which the boot-time assertion catches anyway.
 
@@ -211,18 +211,18 @@ ADR-0005 commits to handling the following classes of failure with the listed su
 ### Positive
 
 - The agent is read-only by construction. Prompt-injected note content cannot mutate the user's repo, run shells, or reach arbitrary network destinations.
-- Provider credentials live in OS keychain via `safeStorage` from day one — no plaintext credential file appears on disk under PiLog's authority.
+- Provider credentials live in OS keychain via `safeStorage` from day one — no plaintext credential file appears on disk under Pilog's authority.
 - The exit-tool pattern collapses two validation steps (Pi-side parameter schema, persistence-side Zod) into one schema applied once.
-- Pi version pinning + electron-updater bundling eliminates a class of cross-version compatibility issues and makes Pi part of PiLog's changelog.
+- Pi version pinning + electron-updater bundling eliminates a class of cross-version compatibility issues and makes Pi part of Pilog's changelog.
 - `MessagePortMain` per invocation gives per-run lifecycle natively, maps onto AsyncIterable, and is friendly to a future move to a process-isolated Pi if conditions for revisiting trigger.
 - ADR-0003's request/response IPC contract is unchanged; streaming is an additive primitive governed here, not a replacement for `IpcContract`.
 
 ### Negative / accepted costs
 
-- **No crash isolation.** A Pi-side fault that escapes Pi's event/error model can take down PiLog. Mitigation: pure-JS HTTP-bound Pi makes catastrophic faults very unlikely. Conditions for revisiting are below.
+- **No crash isolation.** A Pi-side fault that escapes Pi's event/error model can take down Pilog. Mitigation: pure-JS HTTP-bound Pi makes catastrophic faults very unlikely. Conditions for revisiting are below.
 - **Lower model output quality than with bash available.** Models bench better on coding tasks when `bash` is in the tool set. We accept this for MVP because the named read-only tools cover legitimate triage uses; we revisit if integration testing shows the agent hitting tool-shape limitations.
 - **No general web access.** `web_fetch` is unavailable; only opt-in `web_search` with bounded results.
-- **PiLog owns ~60 lines of credential-storage glue (`SafeStorageAuthStorage`).** A new Pi major version that changes the `AuthStorage` interface forces a small adapter update. Worth it for OS-keychain compliance.
+- **Pilog owns ~60 lines of credential-storage glue (`SafeStorageAuthStorage`).** A new Pi major version that changes the `AuthStorage` interface forces a small adapter update. Worth it for OS-keychain compliance.
 - **Two IPC primitives instead of one.** `MessagePortMain` for per-run streams, `webContents.send` for cross-window broadcast. Documented division; not free, but each is used for what it's good at.
 
 ### Conditions for revisiting
@@ -236,14 +236,14 @@ ADR-0005 commits to handling the following classes of failure with the listed su
 
 - **Child-process embedding via `pi --mode rpc`.** Adds a serialize/parse layer with no behavioral gain for a JS-on-JS embedding. Cancellation, BYOK transit, and AsyncIterable mapping are all cleaner in-process. Rejected unless conditions for revisiting trigger.
 - **Embedding `@earendil-works/pi-coding-agent` as the agent layer.** The coding-agent SDK's session prompt is tuned for "act like Claude Code" and its tool set ships `edit`/`write`/`bash`. We would be working against its grain; the read-only-by-construction property would become "read-only by tool-filter discipline" — weaker. Rejected.
-- **Storing credentials in `~/.pi/agent/auth.json` directly.** Plaintext file contradicts PRD §7's OS-keychain requirement. Two writers (PiLog + standalone `pi`) on one file is a UX confound. Rejected.
+- **Storing credentials in `~/.pi/agent/auth.json` directly.** Plaintext file contradicts PRD §7's OS-keychain requirement. Two writers (Pilog + standalone `pi`) on one file is a UX confound. Rejected.
 - **OS-level / container / microVM sandboxing for MVP.** Docker requires a multi-GB user-installed daemon, a UX deal-breaker. bubblewrap / gVisor / Firecracker are Linux-only. macOS App Sandbox / Windows AppContainer / Linux namespaces are a per-platform triple whose value is conditional on capable tools we are not giving the agent. Rejected for MVP; revisit per condition #1 above.
 
 ## Downstream issue impacts
 
 - **#11 (this ADR's parent issue)** — re-scoped: deliver this ADR + propagate restructure through #12–#15. No spike branch.
 - **#12** — extends the `agent_runs.status` enum to include `cancelled` from day one. Tracer-bullet acceptance includes the three first-pass empirical guards (process mutation, exit-tool termination, `AuthStorage` injection). Reads `pi.turnBudget` from settings rather than hardcoding.
-- **#13** — Settings → Provider & Model surfaces `ModelRegistry`'s catalogs; `SafeStorageAuthStorage` is the storage backend; the "Open advanced config" affordance is reframed as "Import existing Pi config" / "View active config" / "Reset Pi config" since PiLog has no `~/.pi/agent/auth.json` to point at.
+- **#13** — Settings → Provider & Model surfaces `ModelRegistry`'s catalogs; `SafeStorageAuthStorage` is the storage backend; the "Open advanced config" affordance is reframed as "Import existing Pi config" / "View active config" / "Reset Pi config" since Pilog has no `~/.pi/agent/auth.json` to point at.
 - **New sibling to #13** — Settings → Advanced exposes the Turn Budget control (numeric, default 20) and the Web Search toggle + provider API key.
 - **#14** — implements the eight read-only tools (`read_file`, `list_dir`, `glob`, `grep`, `git_status`, `git_diff`, `git_log`, `git_blame`) with the sandbox property enforced inside each `execute` body.
 - **#15** — Agent Runs status filter chips include `cancelled` alongside `running` / `succeeded` / `failed`; renders the persisted full Pi event stream for the detail view.

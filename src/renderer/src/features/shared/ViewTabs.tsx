@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { cn } from '@renderer/lib/utils'
 
-// PiLog's app-level view nav. Lives in the global top bar (see AppShell);
+// Pilog's app-level view nav. Lives in the global top bar (see AppShell);
 // the sidebar deliberately doesn't render this so view chrome and view
 // content stay separated.
 //

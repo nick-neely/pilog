@@ -269,8 +269,8 @@ function buildAutoPublishPreviewMessage(input: {
   dryRun: boolean
 }): string {
   const dryRunPrefix = input.dryRun
-    ? 'Dry run: PiLog planned these drafts and will not write to GitHub.'
-    : 'PiLog planned these drafts for review before any GitHub writes.'
+    ? 'Dry run: Pilog planned these drafts and will not write to GitHub.'
+    : 'Pilog planned these drafts for review before any GitHub writes.'
 
   if (input.heldBackCount === 0) return dryRunPrefix
 

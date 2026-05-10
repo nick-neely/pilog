@@ -27,7 +27,7 @@ function createRuntimeRequire(): NodeJS.Require {
 
   const devRuntimePackage = resolve(process.cwd(), 'app/package.json')
 
-  if (existsSync(devRuntimePackage)) {
+  if (process.defaultApp === true && existsSync(devRuntimePackage)) {
     return createRequire(devRuntimePackage)
   }
 

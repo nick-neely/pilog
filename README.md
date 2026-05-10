@@ -1,8 +1,8 @@
-# PiLog
+# Pilog
 
 [![React Doctor](https://www.react.doctor/share/badge?p=pilog&s=91&w=34&f=18)](https://www.react.doctor/share?p=pilog&s=91&w=34&f=18)
 
-PiLog is a local-first Electron app for capturing rough developer notes and turning them into GitHub-ready issue drafts. Use the global scratchpad to jot something down without leaving your current flow, then triage those notes later from the inbox.
+Pilog is a local-first Electron app for capturing rough developer notes and turning them into GitHub-ready issue drafts. Use the global scratchpad to jot something down without leaving your current flow, then triage those notes later from the inbox.
 
 The app currently supports:
 
@@ -12,8 +12,7 @@ The app currently supports:
 - GitHub sign-in, local repository linking, and manual issue publishing
 - Embedded Pi draft generation from selected notes and linked repo context
 - Agent run history for inspecting generated drafts, errors, and transcripts
-
-Publishing generated drafts is still Phase 4 work; today the Pi agent stores structured issue drafts locally for review.
+- Draft Review publishing and explicit repo-scoped auto-publish with a local publish log
 
 ## Requirements
 
@@ -55,7 +54,7 @@ Optional development setting:
 PILOG_USER_DATA=/tmp/pilog-dev-profile
 ```
 
-In WSL2, Electron `safeStorage` may be unavailable without a Linux keyring. In development only, PiLog falls back to a plaintext `secrets.dev.json` file in Electron `userData` so GitHub and Pi credential flows can still be exercised. Packaged builds do not use that fallback.
+In WSL2, Electron `safeStorage` may be unavailable without a Linux keyring. In development only, Pilog falls back to a plaintext `secrets.dev.json` file in Electron `userData` so GitHub and Pi credential flows can still be exercised. Packaged builds do not use that fallback.
 
 ## Development
 
@@ -73,7 +72,7 @@ Draft generation requires:
 2. A Pi provider, model, and API key in Settings → Provider & Model.
 3. One or more selected inbox notes that all belong to the same linked repo.
 
-Select the notes in the inbox and click **Generate Drafts**. PiLog persists the run, generated drafts, source-note links, affected files, confidence, and grouping reason locally. Use the Agent Runs view to inspect outputs and errors.
+Select the notes in the inbox and click **Generate Drafts**. Pilog persists the run, generated drafts, source-note links, affected files, confidence, and grouping reason locally. Use the Agent Runs view to inspect outputs and errors.
 
 ## Build
 
@@ -94,6 +93,8 @@ Create an unpacked directory build:
 ```bash
 pnpm build:unpack
 ```
+
+Packaging and signing notes live in `docs/packaging.md`. The intended user-facing distribution path is a direct download from `https://pilog.dev`; GitHub Releases remain the power-user/archive path. Windows and macOS builds are signing-ready but unsigned for MVP until the relevant certificates/accounts are available.
 
 ### Windows Builds From WSL2
 
@@ -117,9 +118,12 @@ pnpm typecheck
 pnpm lint
 pnpm test
 pnpm test:e2e
+pnpm test:e2e:packaged
 ```
 
 `pnpm test:e2e` runs Playwright against the app. Some GitHub/Pi paths depend on local credentials and are skipped when the required environment is missing.
+
+`pnpm test:e2e:packaged` builds an unpacked app and verifies that packaged runtime dependencies load outside the dev server.
 
 The Review Mode publish e2e creates a real GitHub issue and is skipped unless both variables are set:
 
@@ -133,11 +137,12 @@ Use a sandbox repository. The token must be allowed to create issues in `PILOG_E
 
 ## Documentation
 
-| Doc                           | Contents                               |
-| ----------------------------- | -------------------------------------- |
-| `PRODUCT.md`                  | Product strategy and positioning       |
-| `DESIGN.md`                   | Visual system and UX constraints       |
-| `CONTEXT.md`                  | Domain vocabulary and glossary         |
-| `docs/pilog_prd.md`           | Product requirements and flows         |
-| `docs/implementation-plan.md` | Phased roadmap and acceptance criteria |
-| `docs/adr/`                   | Architecture decision records          |
+| Doc                           | Contents                                  |
+| ----------------------------- | ----------------------------------------- |
+| `PRODUCT.md`                  | Product strategy and positioning          |
+| `DESIGN.md`                   | Visual system and UX constraints          |
+| `CONTEXT.md`                  | Domain vocabulary and glossary            |
+| `docs/pilog_prd.md`           | Product requirements and flows            |
+| `docs/implementation-plan.md` | Phased roadmap and acceptance criteria    |
+| `docs/packaging.md`           | Packaged builds, icons, and signing scope |
+| `docs/adr/`                   | Architecture decision records             |

@@ -5,7 +5,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@renderer/components/ui
 import { ViewTabs, type ViewTab } from '@renderer/features/shared/ViewTabs'
 import type { ReactNode } from 'react'
 
-// AppShell is the global window chrome for PiLog's tab views (Inbox,
+// AppShell is the global window chrome for Pilog's tab views (Inbox,
 // Agent Runs, and any future list-shaped views). It owns the only
 // horizontal navigation strip in the app, so the sidebar never has to
 // fight an action cluster for 320px of width.

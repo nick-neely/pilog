@@ -75,7 +75,7 @@ function prepareFixtureRepo(): string {
   cpSync(path.join(process.cwd(), 'fixtures', 'agent', 'repo'), repoPath, { recursive: true })
   execFileSync('git', ['init', '-b', 'main'], { cwd: repoPath })
   execFileSync('git', ['config', 'user.email', 'pilog@example.com'], { cwd: repoPath })
-  execFileSync('git', ['config', 'user.name', 'PiLog'], { cwd: repoPath })
+  execFileSync('git', ['config', 'user.name', 'Pilog'], { cwd: repoPath })
   execFileSync('git', ['add', '.'], { cwd: repoPath })
   execFileSync('git', ['commit', '-m', 'Initial fixture repo'], { cwd: repoPath })
   return repoPath

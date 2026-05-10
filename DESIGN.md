@@ -1,5 +1,5 @@
 ---
-name: PiLog
+name: Pilog
 description: A developer's bedside journal — paper-warm, type-led, moss-accented.
 colors:
   parchment: 'oklch(0.96 0.006 75)'
@@ -98,17 +98,17 @@ components:
     backgroundColor: '{colors.ink}'
 ---
 
-# Design System: PiLog
+# Design System: Pilog
 
 ## 1. Overview
 
 **Creative North Star: "The Reading-Room Journal"**
 
-PiLog is a quiet annotated page in a sunlit reading room. The neutrals are paper-warm and faintly ash-toned — never `#fff`, never `#000`, never zinc. The single accent is **Reading-Room Moss** (`oklch(0.48 0.08 145)` light, lifted to `oklch(0.6 0.085 145)` for low-ambient dark): the color a librarian might use for marginalia. Type carries the weight a frame would in a SaaS dashboard: **Source Serif 4** for display gravity, **IBM Plex Sans** for the humanist body, **IBM Plex Mono** for code, paths, and editor body. Surfaces are flat by default; depth is conveyed by tonal contrast on the warm-neutral ramp, never by shadow.
+Pilog is a quiet annotated page in a sunlit reading room. The neutrals are paper-warm and faintly ash-toned — never `#fff`, never `#000`, never zinc. The single accent is **Reading-Room Moss** (`oklch(0.48 0.08 145)` light, lifted to `oklch(0.6 0.085 145)` for low-ambient dark): the color a librarian might use for marginalia. Type carries the weight a frame would in a SaaS dashboard: **Source Serif 4** for display gravity, **IBM Plex Sans** for the humanist body, **IBM Plex Mono** for code, paths, and editor body. Surfaces are flat by default; depth is conveyed by tonal contrast on the warm-neutral ramp, never by shadow.
 
-The system explicitly rejects three patterns named in PRODUCT.md: **the generic AI-tool aesthetic** (purple/teal gradients, glassmorphism, gradient text, "✨ AI" garnish), **the SaaS-cliché dashboard** (hero-metric tiles, identical icon-heading-text card grids, side-stripe colored borders, friendly-rounded illustrations), and **the stock shadcn dashboard demo look** (default theme, Inter, zinc neutrals, blue accent — the path of least resistance). PiLog uses shadcn as a primitive layer; the visual identity is committed and recognizable on its own.
+The system explicitly rejects three patterns named in PRODUCT.md: **the generic AI-tool aesthetic** (purple/teal gradients, glassmorphism, gradient text, "✨ AI" garnish), **the SaaS-cliché dashboard** (hero-metric tiles, identical icon-heading-text card grids, side-stripe colored borders, friendly-rounded illustrations), and **the stock shadcn dashboard demo look** (default theme, Inter, zinc neutrals, blue accent — the path of least resistance). Pilog uses shadcn as a primitive layer; the visual identity is committed and recognizable on its own.
 
-Both light and dark themes are first-class. Light is the daylight scene — a developer at 11am, daylight raking the desk, glancing into PiLog to drop a thought and glancing out. Dark is the same developer at 11pm, monitor as the only light source, the moss reading true at low ambient light. Both are audited against WCAG 2.2 AA on every text/role pairing.
+Both light and dark themes are first-class. Light is the daylight scene — a developer at 11am, daylight raking the desk, glancing into Pilog to drop a thought and glancing out. Dark is the same developer at 11pm, monitor as the only light source, the moss reading true at low ambient light. Both are audited against WCAG 2.2 AA on every text/role pairing.
 
 **Key Characteristics:**
 
@@ -171,7 +171,7 @@ The neutral ramp is the project's main visual surface. Light steps are tinted to
 **Body Font:** IBM Plex Sans (IBM; variable; system-ui fallback)
 **Code/Mono Font:** IBM Plex Mono (IBM; static 400/500; ui-monospace fallback)
 
-**Character.** Source Serif 4 gives PiLog the gravity of a thoughtful publication: humane, slightly literary, entirely legible at display sizes without going magazine-precious. IBM Plex Sans keeps every list, label, and microcopy line legible at any size — a humanist sans engineered to coexist with its serif and mono siblings. IBM Plex Mono is editor-grade and visually paired with the body sans, so reading code in note bodies, file paths in draft cards, and content in the CodeMirror/Milkdown editor all feel intentional rather than incidental.
+**Character.** Source Serif 4 gives Pilog the gravity of a thoughtful publication: humane, slightly literary, entirely legible at display sizes without going magazine-precious. IBM Plex Sans keeps every list, label, and microcopy line legible at any size — a humanist sans engineered to coexist with its serif and mono siblings. IBM Plex Mono is editor-grade and visually paired with the body sans, so reading code in note bodies, file paths in draft cards, and content in the CodeMirror/Milkdown editor all feel intentional rather than incidental.
 
 ### Hierarchy
 
@@ -192,7 +192,7 @@ The neutral ramp is the project's main visual surface. Light steps are tinted to
 
 ## 4. Elevation
 
-PiLog is **flat by default**. Surfaces separate via tonal layering on the warm-neutral ramp, not shadow. Parchment-Light over Parchment, Ash over Parchment, Dark Card over Dark Ink — that's how depth reads.
+Pilog is **flat by default**. Surfaces separate via tonal layering on the warm-neutral ramp, not shadow. Parchment-Light over Parchment, Ash over Parchment, Dark Card over Dark Ink — that's how depth reads.
 
 Shadow exists only as a state response, never as a baseline. The scratchpad window is the lone exception — being a separate Electron window, it carries the OS's native window shadow, which is correct; do not add a CSS shadow on top.
 

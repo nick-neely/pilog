@@ -1,4 +1,5 @@
 import { Tray, Menu, app, nativeImage } from 'electron'
+import { PILOG_PRODUCT_NAME } from '../../shared/app-identity'
 
 let tray: Tray | null = null
 
@@ -11,7 +12,7 @@ export interface TrayCallbacks {
 export function createTray(iconPath: string, callbacks: TrayCallbacks): Tray {
   const icon = nativeImage.createFromPath(iconPath).resize({ width: 16, height: 16 })
   tray = new Tray(icon)
-  tray.setToolTip('PiLog')
+  tray.setToolTip(PILOG_PRODUCT_NAME)
 
   const contextMenu = Menu.buildFromTemplate([
     { label: 'Open Inbox', click: callbacks.onOpenInbox },

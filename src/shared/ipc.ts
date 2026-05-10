@@ -170,6 +170,23 @@ export type CreatedIssue = {
   number: number
 }
 
+export type RuntimeHealthCheck = {
+  appId: string
+  expectedProductName: string
+  productName: string
+  packaged: boolean
+  defaultApp: boolean
+  resourcesPath: string
+  iconPath: string
+  iconExists: boolean
+  iconFilename: string
+  sqlite: { ok: boolean; error?: string }
+  piAgentCore: { ok: boolean; error?: string }
+  piAi: { ok: boolean; error?: string }
+  ripgrep: { ok: boolean; path: string; fromAsarUnpacked: boolean }
+  boilerplateFree: { appId: boolean; productName: boolean }
+}
+
 export type PublishLogEntry = {
   id: string
   draftId: string | null
@@ -337,6 +354,7 @@ export type IpcContract = {
     request: { token: string; login?: string }
     response: void
   }
+  'debug:runtimeHealth': { request: void; response: RuntimeHealthCheck }
   'debug:listIssueDrafts': { request: void; response: IssueDraft[] }
   'debug:listPublishLog': { request: { repoId: string }; response: PublishLogEntry[] }
 }

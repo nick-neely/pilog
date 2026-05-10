@@ -1,6 +1,6 @@
-# PiLog Implementation Plan
+# Pilog Implementation Plan
 
-This document is the **source of truth for sequencing PiLog MVP work**. It complements `docs/pilog_prd.md` (the _what_) by making the _how_ and _in what order_ explicit. As phases land, each completed item should be checked off here and reflected in `CONTEXT.md` / `docs/adr/`.
+This document is the **source of truth for sequencing Pilog MVP work**. It complements `docs/pilog_prd.md` (the _what_) by making the _how_ and _in what order_ explicit. As phases land, each completed item should be checked off here and reflected in `CONTEXT.md` / `docs/adr/`.
 
 > **Status legend:** ☐ not started · ◐ in progress · ☑ done
 
@@ -163,7 +163,7 @@ A reviewer can verify each of:
 
 ## 4. Phase 2 — GitHub and Repo Setup
 
-**Goal:** Connect a GitHub account, register a local repo, and create a hand-written test issue from inside PiLog. Notes can now be tagged with a repo.
+**Goal:** Connect a GitHub account, register a local repo, and create a hand-written test issue from inside Pilog. Notes can now be tagged with a repo.
 
 - ☑ **Auth** — GitHub OAuth via local-loopback callback (preferred over device flow for desktop UX). Token stored via `safeStorage`. Rotation/sign-out flow. _ADR-0004._ (#7)
 - ☑ **GitHub client** — Octokit wrapper with retry + rate-limit awareness; thin functions: `listRepos`, `listLabels(repo)`, `getIssueTemplates(repo)`, `createIssue(repo, payload)`.
@@ -185,7 +185,7 @@ User can connect GitHub, link a real repo, type a title/body, and see the issue 
 
 - ☑ **Embedding strategy** — resolved in [ADR-0005](./adr/0005-pi-embedding-strategy.md): in-process `pi-agent-core` + `pi-ai`, exit-tool pattern, `safeStorage`-backed `AuthStorage`, `MessagePortMain` streaming, curated read-only tool set.
 - ☑ **Pi runtime bridge** — `src/main/pi/runtime.ts` implements `runAgent(input): AsyncIterable<AgentEvent>` per ADR-0005 §1–4. Preload consumes the `MessagePortMain` stream and exposes a cloneable `window.pilog.runAgent(input, onEvent): Promise<void>` renderer API.
-- ☑ **Pi config UX** — `Settings → Provider & Model`. Surfaces Pi's BYOK flow inside PiLog (PRD §7 BYOK). "Open advanced config" escape hatch.
+- ☑ **Pi config UX** — `Settings → Provider & Model`. Surfaces Pi's BYOK flow inside Pilog (PRD §7 BYOK). "Open advanced config" escape hatch.
 - ☑ **Issue generation** — `src/main/pi/issue-generation.ts` constructs the prompt per PRD §15, supplies repo path + selected notes, validates output against the `GeneratedIssueDraft` Zod schema (PRD §10), persists to `issue_drafts`.
 - ☑ **Agent runs view** — minimal list of past runs with input/output/error, useful for debugging prompts.
 - ☑ **Inbox button wires up** — _Generate Draft Issues_ now does something for selected notes.
@@ -246,12 +246,12 @@ User can connect GitHub, link a real repo, type a title/body, and see the issue 
 
 - ◐ **Loading / error / empty states across the app** — core Inbox, Draft Review, Agent Runs, Settings, Repositories, auto-publish, and Publish Log states exist, but the app still needs a complete pass for consistency, recovery actions, and accessible wording. Tracked by #39.
 - ☐ **Onboarding flow** — first launch should guide the user through hotkey, GitHub auth, first linked repo, first note, first draft, and first publish without leaving the app. Tracked by #38.
-- ☐ **Packaged runtime readiness** — verify packaged builds can run Pi, `@vscode/ripgrep`, `better-sqlite3`, OAuth callback, safeStorage, and e2e smoke paths outside dev. Tracked by #40.
+- ☑ **Packaged runtime readiness** — unpacked packaged smoke now verifies the packaged app launches outside dev, resolves `better-sqlite3`, Pi packages, `@vscode/ripgrep`, app identity, icon resources, note CRUD, fixture draft generation, and the core Inbox/Drafts/Settings/Repositories surfaces. Tracked by #40.
 
 ### 8.3 Distribution and updates
 
-- ◐ **App icon, tray icon, and packaging** — resources and `electron-builder` targets exist, but metadata still uses boilerplate values and signing/notarization/distribution scope is unresolved. Tracked by #40.
-- ☐ **App update channel** — `electron-updater` is installed and `dev-app-update.yml` exists, but the real provider URL, update checks, and user-facing update states are not implemented. Tracked by #41.
+- ☑ **App icon, tray icon, and packaging** — `pilog-app-icon.png` is promoted to the canonical app/tray source, Electron Builder metadata uses Pilog values, app id is `dev.pilog.app`, fake update configuration is removed, and signing/notarization is documented as ready but deferred. Tracked by #40.
+- ☐ **App update channel** — `electron-updater` is installed, but #40 deliberately removed fake provider configuration; #41 owns real provider setup, update checks, and user-facing update states.
 
 ### Phase 6 acceptance
 
@@ -272,7 +272,7 @@ Phase 6 is now the next real phase. Use `to-issues` against §8 and publish thin
 
 Carried from PRD §16, with assigned phase:
 
-- ☑ **Pi embedding strategy** — resolved in [ADR-0005](./adr/0005-pi-embedding-strategy.md). PiLog embeds Pi in-process via `pi-agent-core` + `pi-ai`, with a `safeStorage`-backed `AuthStorage`, `MessagePortMain` streaming, and a curated read-only tool set. No spike branch — the architecture was decided through documentation review and grilling against the existing domain model; empirical guards land as first-pass acceptance criteria on #12.
+- ☑ **Pi embedding strategy** — resolved in [ADR-0005](./adr/0005-pi-embedding-strategy.md). Pilog embeds Pi in-process via `pi-agent-core` + `pi-ai`, with a `safeStorage`-backed `AuthStorage`, `MessagePortMain` streaming, and a curated read-only tool set. No spike branch — the architecture was decided through documentation review and grilling against the existing domain model; empirical guards land as first-pass acceptance criteria on #12.
 - ☑ **Repo indexing: persistent vs. per-run** — resolved as per-run repository tools for MVP. The agent has bounded read-only `read_file`, `glob`, `grep`, and git-context tools; persistent indexing remains future work only if latency or quality data demands it.
 - **Issue-template parsing in MVP** — Phase 6 work, now imminent.
 - ☑ **Auto-publish behind "advanced" toggle** — resolved by #30. Auto-publish is explicit, repo-scoped configuration in the Repositories surface, not a hidden global advanced mode.

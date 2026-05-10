@@ -401,7 +401,7 @@ function NewIssueDialog({
                 New issue: {repo.owner}/{repo.name}
               </DialogTitle>
               <DialogDescription className="sr-only">
-                Create a new GitHub issue from PiLog.
+                Create a new GitHub issue from Pilog.
               </DialogDescription>
             </DialogHeader>
 
@@ -591,7 +591,7 @@ function AutoPublishSettings({
         <div className="flex max-w-[36rem] flex-col gap-1">
           <p className="text-sm font-medium">Auto-publish guardrails</p>
           <p className="text-sm leading-6 text-muted-foreground">
-            Applies only to {repo.owner}/{repo.name}. PiLog will use these limits before any
+            Applies only to {repo.owner}/{repo.name}. Pilog will use these limits before any
             generated issue can be written to GitHub.
           </p>
         </div>
@@ -659,7 +659,7 @@ function AutoPublishSettings({
           <span className="flex flex-col gap-1">
             <span className="text-sm font-medium">Require confirmation</span>
             <span className="text-xs leading-5 text-muted-foreground">
-              Show the planned drafts before PiLog writes to GitHub.
+              Show the planned drafts before Pilog writes to GitHub.
             </span>
           </span>
           <Switch

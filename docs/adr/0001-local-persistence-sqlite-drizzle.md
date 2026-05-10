@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-PiLog needs local-first persistence for notes, issue drafts, repositories, agent runs, publish history, and settings. The app runs inside Electron on Node.js.
+Pilog needs local-first persistence for notes, issue drafts, repositories, agent runs, publish history, and settings. The app runs inside Electron on Node.js.
 
 Options considered:
 

@@ -139,7 +139,7 @@ test('Generate and Publish dry run previews planned drafts without publish write
 
     await expect(page.getByRole('alertdialog')).toContainText('Dry-run publish plan')
     await expect(page.getByRole('alertdialog')).toContainText('Dry run, no GitHub writes')
-    await expect(page.getByRole('alertdialog')).toContainText('Triage selected PiLog notes')
+    await expect(page.getByRole('alertdialog')).toContainText('Triage selected Pilog notes')
     await expect(page.getByRole('alertdialog')).toContainText('ready-for-agent')
 
     const drafts = await page.evaluate(async () => window.pilog.invoke('debug:listIssueDrafts'))
@@ -293,7 +293,7 @@ test('Agent Runs shows live generation, detail transcript, and source note navig
 
     await runRows.first().click()
     await expect(page.locator('[data-testid="run-output-draft"]')).toContainText(
-      'Triage selected PiLog notes'
+      'Triage selected Pilog notes'
     )
     await page.getByRole('tab', { name: /Transcript/ }).click()
     await expect(page.locator('[data-testid="run-event-transcript"]')).toContainText('final')
