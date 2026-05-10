@@ -13,6 +13,14 @@ export type RecoveryState = {
   intent: RecoveryIntent
 }
 
+const CREDENTIAL_ERROR_PATTERN = /credential|api key|provider key/i
+const REPOSITORY_ERROR_PATTERN = /repo|repository|local path/i
+const GITHUB_VALIDATION_ERROR_PATTERN = /\b422\b|validation failed/i
+
+export function getErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error ? error.message : fallback
+}
+
 export function getPiSetupRecoveryState(input: {
   error: string | null
   hasProviders: boolean
@@ -36,7 +44,7 @@ export function getGenerationRecoveryState(input: {
   if (
     input.cause === 'missing-credential' ||
     input.cause === 'auth_invalid' ||
-    /credential|api key|provider key/i.test(input.message)
+    CREDENTIAL_ERROR_PATTERN.test(input.message)
   ) {
     return {
       title: 'Draft generation needs Pi credentials',
@@ -47,7 +55,7 @@ export function getGenerationRecoveryState(input: {
     }
   }
 
-  if (/repo|repository|local path/i.test(input.message)) {
+  if (REPOSITORY_ERROR_PATTERN.test(input.message)) {
     return {
       title: 'Draft generation needs a linked repo',
       description:
@@ -68,7 +76,7 @@ export function getGenerationRecoveryState(input: {
 export function getPublishRecoveryState(error: unknown): RecoveryState {
   const message = error instanceof Error ? error.message : String(error)
 
-  if (/\b422\b/.test(message) || /validation failed/i.test(message)) {
+  if (GITHUB_VALIDATION_ERROR_PATTERN.test(message)) {
     return {
       title: 'GitHub rejected the issue',
       description:

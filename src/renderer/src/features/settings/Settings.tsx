@@ -68,7 +68,7 @@ import {
   isSearchProvider
 } from '@shared/types'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { getPiSetupRecoveryState } from '../recovery-state'
+import { getErrorMessage, getPiSetupRecoveryState } from '../recovery-state'
 
 const SEARCH_PROVIDER_LABELS: Record<SearchProvider, string> = {
   brave: 'Brave',
@@ -149,12 +149,12 @@ function useGitHubStatus(): {
       setStatus(await window.pilog.invoke('github:status'))
     } catch (err) {
       setStatus({ connected: false })
-      setError(err instanceof Error ? err.message : 'GitHub status could not be read.')
+      setError(getErrorMessage(err, 'GitHub status could not be read.'))
     }
   }, [])
 
   useEffect(() => {
-    void refresh()
+    void Promise.resolve().then(refresh)
   }, [refresh])
 
   const connect = useCallback(async () => {
@@ -165,7 +165,7 @@ function useGitHubStatus(): {
       setStatus(result)
     } catch (err) {
       setStatus({ connected: false })
-      setError(err instanceof Error ? err.message : 'GitHub connection did not finish.')
+      setError(getErrorMessage(err, 'GitHub connection did not finish.'))
     } finally {
       setConnecting(false)
     }
@@ -207,7 +207,7 @@ function usePiConfig(): PiConfigState {
       .catch((err) => {
         if (!mountedRef.current) return
         setProviders([])
-        setError(err instanceof Error ? err.message : 'Pi configuration could not be loaded.')
+        setError(getErrorMessage(err, 'Pi configuration could not be loaded.'))
       })
   }, [])
 
@@ -226,7 +226,9 @@ function usePiConfig(): PiConfigState {
     const fetchId = ++modelFetchIdRef.current
 
     if (!selectedProvider && providers.length === 0) {
-      setModels([])
+      void Promise.resolve().then(() => {
+        if (fetchId === modelFetchIdRef.current) setModels([])
+      })
       return
     }
 
@@ -249,7 +251,7 @@ function usePiConfig(): PiConfigState {
       .catch((err) => {
         if (fetchId !== modelFetchIdRef.current) return
         setModels([])
-        setError(err instanceof Error ? err.message : 'Pi models could not be loaded.')
+        setError(getErrorMessage(err, 'Pi models could not be loaded.'))
       })
   }, [active?.modelId, active?.provider, providers.length, selectedProvider])
 
@@ -272,7 +274,7 @@ function usePiConfig(): PiConfigState {
       setApiKey('')
       await refresh()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Pi configuration could not be saved.')
+      setError(getErrorMessage(err, 'Pi configuration could not be saved.'))
     } finally {
       setSaving(false)
     }
@@ -284,7 +286,7 @@ function usePiConfig(): PiConfigState {
       await window.pilog.invoke('pi:importExistingPiConfig')
       await refresh()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Existing Pi config could not be imported.')
+      setError(getErrorMessage(err, 'Existing Pi config could not be imported.'))
     }
   }, [refresh])
 
@@ -295,7 +297,7 @@ function usePiConfig(): PiConfigState {
       setApiKey('')
       await refresh()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Pi config could not be reset.')
+      setError(getErrorMessage(err, 'Pi config could not be reset.'))
     }
   }, [refresh])
 

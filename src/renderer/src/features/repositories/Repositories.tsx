@@ -48,6 +48,7 @@ import type {
 } from '@shared/ipc'
 import { DEFAULT_REPO_AUTO_PUBLISH_SETTINGS, normalizeRepoAutoPublishSettings } from '@shared/ipc'
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
+import { getErrorMessage } from '../recovery-state'
 
 /** `#rrggbb` for inline swatch, or neutral fallback if GitHub sends an odd value */
 function githubLabelHex(color: string): string | undefined {
@@ -190,7 +191,7 @@ function AddRepoFlow({
       setState({
         step: 'error',
         localPath,
-        message: err instanceof Error ? err.message : 'Repository detection failed.'
+        message: getErrorMessage(err, 'Repository detection failed.')
       })
     }
   }
@@ -210,7 +211,7 @@ function AddRepoFlow({
       setState({
         step: 'error',
         localPath: state.localPath,
-        message: err instanceof Error ? err.message : 'Repository could not be linked.'
+        message: getErrorMessage(err, 'Repository could not be linked.')
       })
     }
   }
@@ -406,8 +407,7 @@ function NewIssueDialog({
       const result = await window.pilog.invoke('github:createIssue', request)
       setState({ step: 'success', issueUrl: result.url })
     } catch (err) {
-      const message =
-        err instanceof Error ? err.message : 'Failed to create issue. Please try again.'
+      const message = getErrorMessage(err, 'Failed to create issue. Please try again.')
       setState({ step: 'error', labels: capturedLabels, message })
     }
   }

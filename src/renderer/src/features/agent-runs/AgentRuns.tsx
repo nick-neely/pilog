@@ -28,6 +28,7 @@ import type {
   AgentRunStatusCounts
 } from '@shared/ipc'
 import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
+import { getErrorMessage } from '../recovery-state'
 
 const EMPTY_RUN_STATUS_COUNTS: AgentRunStatusCounts = {
   running: 0,
@@ -155,7 +156,7 @@ export function AgentRuns({
       })
     } catch (err) {
       setRuns([])
-      setRunsError(err instanceof Error ? err.message : 'Run history could not be read.')
+      setRunsError(getErrorMessage(err, 'Run history could not be read.'))
       setSelectedRunId(null)
     } finally {
       setLoadingRuns(false)

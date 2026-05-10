@@ -36,7 +36,7 @@ import { Textarea } from '@renderer/components/ui/textarea'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@renderer/components/ui/tooltip'
 import type { RunNavigationOrigin } from '@renderer/features/agent-runs/navigation'
 import { cn } from '@renderer/lib/utils'
-import { getPublishRecoveryState, type RecoveryState } from '../recovery-state'
+import { getErrorMessage, getPublishRecoveryState, type RecoveryState } from '../recovery-state'
 import type {
   AgentRunListItem,
   GitHubStatus,
@@ -436,7 +436,7 @@ export function DraftReview({
       })
     } catch (err) {
       setDrafts([])
-      setDraftsError(err instanceof Error ? err.message : 'Draft review could not be loaded.')
+      setDraftsError(getErrorMessage(err, 'Draft review could not be loaded.'))
       setSelectedDraftId(null)
     } finally {
       setLoadingDrafts(false)
@@ -916,6 +916,12 @@ function DraftEditor({
   const [merging, setMerging] = useState(false)
   const [mergeMessage, setMergeMessage] = useState<string | null>(null)
   const [mergeError, setMergeError] = useState<string | null>(null)
+  let publishRecoveryAction: (() => void) | null = null
+  if (publishError?.intent === 'settings') {
+    publishRecoveryAction = onNavigateToSettings
+  } else if (publishError?.intent === 'repositories') {
+    publishRecoveryAction = onNavigateToRepositories
+  }
 
   const editedDraft = useMemo(
     () => ({
@@ -1044,7 +1050,7 @@ function DraftEditor({
         await onSaved()
       }
     } catch (err) {
-      setMergeError(err instanceof Error ? err.message : 'Merge failed. Please try again.')
+      setMergeError(getErrorMessage(err, 'Merge failed. Please try again.'))
     } finally {
       setMerging(false)
     }
@@ -1099,7 +1105,7 @@ function DraftEditor({
       setSplitSourceNoteIds([])
       await onSplitComplete(split.newDraft.id)
     } catch (err) {
-      setSplitError(err instanceof Error ? err.message : 'Split failed. Please try again.')
+      setSplitError(getErrorMessage(err, 'Split failed. Please try again.'))
     } finally {
       setSplitting(false)
     }
@@ -1184,19 +1190,9 @@ function DraftEditor({
             <AlertTitle>{publishError.title}</AlertTitle>
             <AlertDescription className="flex flex-col gap-2">
               <span>{publishError.description}</span>
-              {publishError.actionLabel &&
-              (publishError.intent === 'settings' || publishError.intent === 'repositories') ? (
+              {publishError.actionLabel && publishRecoveryAction ? (
                 <span>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={
-                      publishError.intent === 'settings'
-                        ? onNavigateToSettings
-                        : onNavigateToRepositories
-                    }
-                  >
+                  <Button type="button" variant="outline" size="sm" onClick={publishRecoveryAction}>
                     {publishError.actionLabel}
                   </Button>
                 </span>

@@ -48,6 +48,7 @@ import type {
 import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
 import { StatusFilter } from './StatusFilter'
 import {
+  getErrorMessage,
   getGenerationRecoveryState,
   getPublishRecoveryState,
   type RecoveryState
@@ -127,6 +128,16 @@ type AutoPublishPreviewState = {
 
 type GenerationErrorState = RecoveryState & {
   message: string
+}
+
+function getGenerationErrorState(input: {
+  message: string
+  cause?: string | null
+}): GenerationErrorState {
+  return {
+    ...getGenerationRecoveryState(input),
+    message: input.message
+  }
 }
 
 function encodeRepoFilter(f: string | null | undefined): string {
@@ -709,7 +720,7 @@ export function Inbox({
       .catch((err) => {
         if (id !== fetchIdRef.current) return
         setNotes([])
-        setNotesError(err instanceof Error ? err.message : 'Inbox notes could not be loaded.')
+        setNotesError(getErrorMessage(err, 'Inbox notes could not be loaded.'))
       })
       .finally(() => {
         if (id === fetchIdRef.current) setLoadingNotes(false)
@@ -731,7 +742,7 @@ export function Inbox({
   }, [repoFilter])
 
   useEffect(() => {
-    fetchNotes()
+    void Promise.resolve().then(fetchNotes)
   }, [fetchNotes])
 
   const fetchDraftLinks = useCallback(async (): Promise<void> => {
@@ -965,21 +976,16 @@ export function Inbox({
           }
         }
         if (event.type === 'error') {
-          console.error(event.message)
           if (!mountedRef.current) return
-          setGenerationError({
-            ...getGenerationRecoveryState({ message: event.message, cause: event.cause }),
-            message: event.message
-          })
+          setGenerationError(
+            getGenerationErrorState({ message: event.message, cause: event.cause })
+          )
         }
       })
     } catch (error) {
       if (mountedRef.current) {
-        const message = error instanceof Error ? error.message : String(error)
-        setGenerationError({
-          ...getGenerationRecoveryState({ message }),
-          message
-        })
+        const message = getErrorMessage(error, String(error))
+        setGenerationError(getGenerationErrorState({ message }))
       }
     } finally {
       if (mountedRef.current) {
@@ -1018,12 +1024,10 @@ export function Inbox({
             }
           }
           if (event.type === 'error') {
-            console.error(event.message)
             if (!mountedRef.current) return
-            setGenerationError({
-              ...getGenerationRecoveryState({ message: event.message, cause: event.cause }),
-              message: event.message
-            })
+            setGenerationError(
+              getGenerationErrorState({ message: event.message, cause: event.cause })
+            )
           }
         }
       )
@@ -1033,11 +1037,8 @@ export function Inbox({
       }
     } catch (error) {
       if (mountedRef.current) {
-        const message = error instanceof Error ? error.message : String(error)
-        setGenerationError({
-          ...getGenerationRecoveryState({ message }),
-          message
-        })
+        const message = getErrorMessage(error, String(error))
+        setGenerationError(getGenerationErrorState({ message }))
       }
     } finally {
       if (mountedRef.current) {
