@@ -3,38 +3,51 @@ import { markdown } from '@codemirror/lang-markdown'
 import { defaultHighlightStyle, syntaxHighlighting } from '@codemirror/language'
 import { EditorState } from '@codemirror/state'
 import { EditorView, keymap } from '@codemirror/view'
-import { Tick02Icon } from '@hugeicons/core-free-icons'
+import {
+    ArrowDown01Icon,
+    ArrowLeft01Icon,
+    ArrowUp01Icon,
+    RepositoryIcon,
+    Tick02Icon
+} from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { Alert, AlertDescription } from '@renderer/components/ui/alert'
+import { Badge } from '@renderer/components/ui/badge'
 import { Button } from '@renderer/components/ui/button'
-import { Card, CardContent } from '@renderer/components/ui/card'
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle
+    Collapsible,
+    CollapsibleContent,
+    CollapsibleTrigger
+} from '@renderer/components/ui/collapsible'
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle
 } from '@renderer/components/ui/dialog'
 import { Empty, EmptyDescription } from '@renderer/components/ui/empty'
 import { Input } from '@renderer/components/ui/input'
 import { Label } from '@renderer/components/ui/label'
 import { ScrollArea } from '@renderer/components/ui/scroll-area'
+import { Separator } from '@renderer/components/ui/separator'
 import { Skeleton } from '@renderer/components/ui/skeleton'
 import { Switch } from '@renderer/components/ui/switch'
 import { Toggle } from '@renderer/components/ui/toggle'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@renderer/components/ui/tooltip'
 import { cn } from '@renderer/lib/utils'
-import { DEFAULT_REPO_AUTO_PUBLISH_SETTINGS, normalizeRepoAutoPublishSettings } from '@shared/ipc'
 import type {
-  CreateIssueRequest,
-  DetectLocalRepoResult,
-  GitHubLabel,
-  GitHubRepo,
-  Repo,
-  UpdateRepoAutoPublishSettingsRequest,
-  RepoAutoPublishSettings
+    CreateIssueRequest,
+    DetectLocalRepoResult,
+    GitHubLabel,
+    GitHubRepo,
+    Repo,
+    RepoAutoPublishSettings,
+    UpdateRepoAutoPublishSettingsRequest
 } from '@shared/ipc'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { DEFAULT_REPO_AUTO_PUBLISH_SETTINGS, normalizeRepoAutoPublishSettings } from '@shared/ipc'
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
 
 /** `#rrggbb` for inline swatch, or neutral fallback if GitHub sends an odd value */
 function githubLabelHex(color: string): string | undefined {
@@ -120,8 +133,8 @@ function DetectResultInline({
 
   const { githubRepo, defaultBranch } = result
   return (
-    <Card size="sm" className="shadow-none ring-1 ring-border">
-      <CardContent className="flex flex-col gap-3 py-4">
+    <div className="rounded-md border border-border bg-card p-4">
+      <div className="flex flex-col gap-3">
         <div>
           <p className="text-sm font-medium">{githubRepo.fullName}</p>
           <p className="text-xs text-muted-foreground">
@@ -137,8 +150,8 @@ function DetectResultInline({
             Cancel
           </Button>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   )
 }
 
@@ -440,15 +453,13 @@ function NewIssueDialog({
                     {labels.map((label) => {
                       const selected = selectedLabels.includes(label.name)
                       const swatch = githubLabelHex(label.color)
-                      return (
+                      const toggle = (
                         <Toggle
-                          key={label.id}
                           pressed={selected}
                           onPressedChange={() => !isSubmitting && toggleLabel(label.name)}
                           disabled={isSubmitting}
                           variant="outline"
                           size="sm"
-                          title={label.description ?? undefined}
                           aria-label={
                             selected ? `${label.name}, selected` : `${label.name}, not selected`
                           }
@@ -479,6 +490,18 @@ function NewIssueDialog({
                           />
                           <span className="min-w-0 text-left">{label.name}</span>
                         </Toggle>
+                      )
+                      return (
+                        <Fragment key={label.id}>
+                          {label.description ? (
+                            <Tooltip>
+                              <TooltipTrigger asChild>{toggle}</TooltipTrigger>
+                              <TooltipContent>{label.description}</TooltipContent>
+                            </Tooltip>
+                          ) : (
+                            toggle
+                          )}
+                        </Fragment>
                       )
                     })}
                   </div>
@@ -511,52 +534,6 @@ function NewIssueDialog({
         )}
       </DialogContent>
     </Dialog>
-  )
-}
-
-function RepoRow({
-  repo,
-  onUnlink,
-  onUpdated
-}: {
-  repo: Repo
-  onUnlink: (id: string) => void
-  onUpdated: () => void
-}): React.JSX.Element {
-  const [showNewIssue, setShowNewIssue] = useState(false)
-
-  return (
-    <>
-      <Card size="sm" className="shadow-none ring-1 ring-border">
-        <CardContent className="flex flex-col gap-4 py-4">
-          <div className="flex flex-row items-start justify-between gap-4">
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium">
-                {repo.owner}/{repo.name}
-              </p>
-              <p className="mt-0.5 truncate font-mono text-xs text-muted-foreground">
-                {repo.localPath}
-              </p>
-              {repo.defaultBranch && (
-                <p className="text-xs text-muted-foreground">
-                  Branch: <span className="font-mono">{repo.defaultBranch}</span>
-                </p>
-              )}
-            </div>
-            <div className="flex shrink-0 items-center gap-2">
-              <Button size="sm" variant="outline" onClick={() => setShowNewIssue(true)}>
-                New Issue
-              </Button>
-              <Button variant="ghost" size="sm" onClick={() => onUnlink(repo.id)}>
-                Remove
-              </Button>
-            </div>
-          </div>
-          <AutoPublishSettings key={repo.updatedAt} repo={repo} onUpdated={onUpdated} />
-        </CardContent>
-      </Card>
-      <NewIssueDialog repo={repo} open={showNewIssue} onOpenChange={setShowNewIssue} />
-    </>
   )
 }
 
@@ -609,103 +586,187 @@ function AutoPublishSettings({
   }
 
   return (
-    <div className="border-t pt-4">
-      <div className="flex flex-col gap-4">
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex max-w-[36rem] flex-col gap-1">
-            <p className="text-sm font-medium">Auto-publish guardrails</p>
-            <p className="text-sm leading-6 text-muted-foreground">
-              Applies only to {repo.owner}/{repo.name}. PiLog will use these limits before any
-              generated issue can be written to GitHub.
-            </p>
-          </div>
-          <div className="flex shrink-0 items-center gap-2">
-            <Label htmlFor={`auto-publish-enabled-${repo.id}`} className="text-sm">
-              {enabled ? 'Enabled' : 'Disabled'}
-            </Label>
-            <Switch
-              id={`auto-publish-enabled-${repo.id}`}
-              checked={enabled}
-              onCheckedChange={setEnabled}
-              aria-label={`Auto-publish for ${repo.owner}/${repo.name}`}
-            />
-          </div>
-        </div>
-
-        <div className="grid gap-3 sm:grid-cols-[minmax(0,0.6fr)_minmax(0,1fr)]">
-          <div className="flex flex-col gap-2">
-            <Label htmlFor={`auto-publish-max-${repo.id}`}>Max issues per run</Label>
-            <Input
-              id={`auto-publish-max-${repo.id}`}
-              type="number"
-              min={1}
-              max={50}
-              inputMode="numeric"
-              value={maxIssues}
-              onChange={(event) => setMaxIssues(event.target.value)}
-            />
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor={`auto-publish-label-${repo.id}`}>Default label</Label>
-            <Input
-              id={`auto-publish-label-${repo.id}`}
-              type="text"
-              value={defaultLabel}
-              onChange={(event) => setDefaultLabel(event.target.value)}
-              placeholder={DEFAULT_REPO_AUTO_PUBLISH_SETTINGS.autoPublishDefaultLabel}
-            />
-          </div>
-        </div>
-
-        <div className="grid gap-3 sm:grid-cols-2">
-          <label
-            htmlFor={`auto-publish-dry-run-${repo.id}`}
-            className="flex cursor-pointer items-start justify-between gap-3 rounded-md bg-muted/40 p-3"
-          >
-            <span className="flex flex-col gap-1">
-              <span className="text-sm font-medium">Dry run</span>
-              <span className="text-xs leading-5 text-muted-foreground">
-                Generate the publish plan without creating GitHub issues.
-              </span>
-            </span>
-            <Switch
-              id={`auto-publish-dry-run-${repo.id}`}
-              checked={dryRun}
-              onCheckedChange={setDryRun}
-              size="sm"
-            />
-          </label>
-
-          <label
-            htmlFor={`auto-publish-confirm-${repo.id}`}
-            className="flex cursor-pointer items-start justify-between gap-3 rounded-md bg-muted/40 p-3"
-          >
-            <span className="flex flex-col gap-1">
-              <span className="text-sm font-medium">Require confirmation</span>
-              <span className="text-xs leading-5 text-muted-foreground">
-                Show the planned drafts before PiLog writes to GitHub.
-              </span>
-            </span>
-            <Switch
-              id={`auto-publish-confirm-${repo.id}`}
-              checked={requireConfirmation}
-              onCheckedChange={setRequireConfirmation}
-              size="sm"
-            />
-          </label>
-        </div>
-
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-xs text-muted-foreground" aria-live="polite">
-            {message ??
-              `Defaults are disabled, ${DEFAULT_REPO_AUTO_PUBLISH_SETTINGS.autoPublishMaxIssuesPerRun} issues, ${DEFAULT_REPO_AUTO_PUBLISH_SETTINGS.autoPublishDefaultLabel}, confirmation on.`}
+    <div className="flex flex-col gap-4 pt-4">
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex max-w-[36rem] flex-col gap-1">
+          <p className="text-sm font-medium">Auto-publish guardrails</p>
+          <p className="text-sm leading-6 text-muted-foreground">
+            Applies only to {repo.owner}/{repo.name}. PiLog will use these limits before any
+            generated issue can be written to GitHub.
           </p>
-          <Button size="sm" variant="outline" onClick={handleSave} disabled={!isDirty || saving}>
-            {saving ? 'Saving…' : 'Save guardrails'}
-          </Button>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <Label htmlFor={`auto-publish-enabled-${repo.id}`} className="text-sm">
+            {enabled ? 'Enabled' : 'Disabled'}
+          </Label>
+          <Switch
+            id={`auto-publish-enabled-${repo.id}`}
+            checked={enabled}
+            onCheckedChange={setEnabled}
+            aria-label={`Auto-publish for ${repo.owner}/${repo.name}`}
+          />
         </div>
       </div>
+
+      <div className="grid gap-3 sm:grid-cols-[minmax(0,0.6fr)_minmax(0,1fr)]">
+        <div className="flex flex-col gap-2">
+          <Label htmlFor={`auto-publish-max-${repo.id}`}>Max issues per run</Label>
+          <Input
+            id={`auto-publish-max-${repo.id}`}
+            type="number"
+            min={1}
+            max={50}
+            inputMode="numeric"
+            value={maxIssues}
+            onChange={(event) => setMaxIssues(event.target.value)}
+          />
+        </div>
+        <div className="flex flex-col gap-2">
+          <Label htmlFor={`auto-publish-label-${repo.id}`}>Default label</Label>
+          <Input
+            id={`auto-publish-label-${repo.id}`}
+            type="text"
+            value={defaultLabel}
+            onChange={(event) => setDefaultLabel(event.target.value)}
+            placeholder={DEFAULT_REPO_AUTO_PUBLISH_SETTINGS.autoPublishDefaultLabel}
+          />
+        </div>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label
+          htmlFor={`auto-publish-dry-run-${repo.id}`}
+          className="flex cursor-pointer items-start justify-between gap-3 rounded-md bg-muted/40 p-3"
+        >
+          <span className="flex flex-col gap-1">
+            <span className="text-sm font-medium">Dry run</span>
+            <span className="text-xs leading-5 text-muted-foreground">
+              Generate the publish plan without creating GitHub issues.
+            </span>
+          </span>
+          <Switch
+            id={`auto-publish-dry-run-${repo.id}`}
+            checked={dryRun}
+            onCheckedChange={setDryRun}
+            size="sm"
+          />
+        </label>
+
+        <label
+          htmlFor={`auto-publish-confirm-${repo.id}`}
+          className="flex cursor-pointer items-start justify-between gap-3 rounded-md bg-muted/40 p-3"
+        >
+          <span className="flex flex-col gap-1">
+            <span className="text-sm font-medium">Require confirmation</span>
+            <span className="text-xs leading-5 text-muted-foreground">
+              Show the planned drafts before PiLog writes to GitHub.
+            </span>
+          </span>
+          <Switch
+            id={`auto-publish-confirm-${repo.id}`}
+            checked={requireConfirmation}
+            onCheckedChange={setRequireConfirmation}
+            size="sm"
+          />
+        </label>
+      </div>
+
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-xs text-muted-foreground" aria-live="polite">
+          {message ??
+            `Defaults are disabled, ${DEFAULT_REPO_AUTO_PUBLISH_SETTINGS.autoPublishMaxIssuesPerRun} issues, ${DEFAULT_REPO_AUTO_PUBLISH_SETTINGS.autoPublishDefaultLabel}, confirmation on.`}
+        </p>
+        <Button size="sm" variant="outline" onClick={handleSave} disabled={!isDirty || saving}>
+          {saving ? 'Saving…' : 'Save guardrails'}
+        </Button>
+      </div>
     </div>
+  )
+}
+
+function RepoRow({
+  repo,
+  onUnlink,
+  onUpdated
+}: {
+  repo: Repo
+  onUnlink: (id: string) => void
+  onUpdated: () => void
+}): React.JSX.Element {
+  const [showNewIssue, setShowNewIssue] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+
+  const hasGuardrails =
+    repo.autoPublishEnabled ||
+    repo.autoPublishMaxIssuesPerRun !==
+      DEFAULT_REPO_AUTO_PUBLISH_SETTINGS.autoPublishMaxIssuesPerRun ||
+    repo.autoPublishDefaultLabel !== DEFAULT_REPO_AUTO_PUBLISH_SETTINGS.autoPublishDefaultLabel ||
+    repo.autoPublishDryRun ||
+    !repo.autoPublishRequireConfirmation
+
+  return (
+    <>
+      <div className="rounded-md border border-border">
+        {/* Compact repo header — scannable at a glance */}
+        <div className="flex items-center gap-3 px-4 py-3">
+          <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium">
+                {repo.owner}/{repo.name}
+              </span>
+              {repo.autoPublishEnabled ? (
+                <Badge variant="default" className="h-4 px-1.5 text-[10px]">
+                  Auto-publish on
+                </Badge>
+              ) : hasGuardrails ? (
+                <Badge variant="secondary" className="h-4 px-1.5 text-[10px]">
+                  Custom
+                </Badge>
+              ) : null}
+            </div>
+            <p className="truncate font-mono text-xs text-muted-foreground">{repo.localPath}</p>
+            {repo.defaultBranch && (
+              <p className="text-xs text-muted-foreground">
+                Branch: <span className="font-mono">{repo.defaultBranch}</span>
+              </p>
+            )}
+          </div>
+
+          <div className="flex shrink-0 items-center gap-1">
+            <Button size="sm" variant="outline" onClick={() => setShowNewIssue(true)}>
+              New Issue
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => onUnlink(repo.id)}>
+              Remove
+            </Button>
+          </div>
+        </div>
+
+        {/* Collapsible guardrails — progressive disclosure */}
+        <Collapsible open={settingsOpen} onOpenChange={setSettingsOpen}>
+          <CollapsibleTrigger asChild>
+            <button
+              type="button"
+              className="flex w-full items-center justify-between gap-2 border-t border-border px-4 py-2 text-xs text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            >
+              <span className="font-medium">Auto-publish guardrails</span>
+              <HugeiconsIcon
+                icon={settingsOpen ? ArrowUp01Icon : ArrowDown01Icon}
+                strokeWidth={2}
+                className="size-3.5 shrink-0"
+                aria-hidden
+              />
+            </button>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <div className="border-t border-border px-4 pb-4">
+              <AutoPublishSettings key={repo.updatedAt} repo={repo} onUpdated={onUpdated} />
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
+      </div>
+      <NewIssueDialog repo={repo} open={showNewIssue} onOpenChange={setShowNewIssue} />
+    </>
   )
 }
 
@@ -722,45 +783,63 @@ export function Repositories({ onBack }: { onBack: () => void }): React.JSX.Elem
   }
 
   return (
-    <div className="flex h-screen flex-col bg-background text-foreground">
-      <header className="flex items-center gap-4 border-b px-6 py-4">
-        <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={onBack}>
-          &larr; Back
+    <div className="flex h-full flex-col bg-background text-foreground">
+      <header className="flex items-center gap-3 border-b px-6 py-4">
+        <Button variant="ghost" size="icon" className="size-8" onClick={onBack} aria-label="Back">
+          <HugeiconsIcon icon={ArrowLeft01Icon} strokeWidth={2} className="size-4" aria-hidden />
         </Button>
-        <h1 className="text-xl font-semibold">Repositories</h1>
+        <div className="flex items-center gap-2">
+          <HugeiconsIcon
+            icon={RepositoryIcon}
+            strokeWidth={2}
+            className="size-5 text-muted-foreground"
+            aria-hidden
+          />
+          <h1 className="font-heading text-xl font-medium">Repositories</h1>
+        </div>
+        {repos.length > 0 && (
+          <Badge variant="secondary" className="ml-1 tabular">
+            {repos.length}
+          </Badge>
+        )}
       </header>
-      <div className="flex-1">
-        <ScrollArea className="h-full">
-          <div className="p-6">
-            <div className="mx-auto flex max-w-3xl flex-col gap-6">
-              {repos.length > 0 && (
-                <section className="flex flex-col gap-2">
-                  {repos.map((repo) => (
-                    <RepoRow
-                      key={repo.id}
-                      repo={repo}
-                      onUnlink={handleUnlink}
-                      onUpdated={handleRepoUpdated}
-                    />
-                  ))}
-                </section>
-              )}
 
-              {repos.length === 0 && (
-                <Empty className="border-none bg-transparent p-6 shadow-none">
-                  <EmptyDescription className="text-sm">
-                    No repositories linked yet. Add a local Git repository to get started.
-                  </EmptyDescription>
-                </Empty>
-              )}
+      <ScrollArea className="flex-1">
+        <div className="mx-auto flex max-w-3xl flex-col gap-8 p-6">
+          {repos.length > 0 && (
+            <section className="flex flex-col gap-3">
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-medium text-muted-foreground">Linked repositories</h2>
+              </div>
+              <div className="flex flex-col gap-3">
+                {repos.map((repo) => (
+                  <RepoRow
+                    key={repo.id}
+                    repo={repo}
+                    onUnlink={handleUnlink}
+                    onUpdated={handleRepoUpdated}
+                  />
+                ))}
+              </div>
+            </section>
+          )}
 
-              <section>
-                <AddRepoFlow onLinked={reload} />
-              </section>
-            </div>
-          </div>
-        </ScrollArea>
-      </div>
+          {repos.length === 0 && (
+            <Empty className="border-none bg-transparent py-12 shadow-none">
+              <EmptyDescription className="text-sm">
+                No repositories linked yet. Add a local Git repository to get started.
+              </EmptyDescription>
+            </Empty>
+          )}
+
+          <Separator />
+
+          <section className="flex flex-col gap-3">
+            <h2 className="text-sm font-medium text-muted-foreground">Add repository</h2>
+            <AddRepoFlow onLinked={reload} />
+          </section>
+        </div>
+      </ScrollArea>
     </div>
   )
 }

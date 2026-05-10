@@ -1,50 +1,51 @@
 import {
-  Cancel01Icon,
-  CancelCircleIcon,
-  Copy01Icon,
-  FolderOpenIcon,
-  GitMergeIcon,
-  InformationCircleIcon,
-  SplitIcon,
-  Tick02Icon,
-  ViewIcon
+    Cancel01Icon,
+    CancelCircleIcon,
+    Copy01Icon,
+    FolderOpenIcon,
+    GitMergeIcon,
+    InformationCircleIcon,
+    SplitIcon,
+    Tick02Icon,
+    ViewIcon
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { Badge } from '@renderer/components/ui/badge'
 import { Button } from '@renderer/components/ui/button'
 import { Checkbox } from '@renderer/components/ui/checkbox'
 import {
-  Empty,
-  EmptyContent,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyTitle
+    Empty,
+    EmptyContent,
+    EmptyDescription,
+    EmptyHeader,
+    EmptyTitle
 } from '@renderer/components/ui/empty'
 import { Input } from '@renderer/components/ui/input'
 import { ScrollArea } from '@renderer/components/ui/scroll-area'
 import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
+    Select,
+    SelectContent,
+    SelectGroup,
+    SelectItem,
+    SelectTrigger,
+    SelectValue
 } from '@renderer/components/ui/select'
 import { Textarea } from '@renderer/components/ui/textarea'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@renderer/components/ui/tooltip'
 import type { RunNavigationOrigin } from '@renderer/features/agent-runs/navigation'
 import { cn } from '@renderer/lib/utils'
 import type {
-  AgentRunListItem,
-  GitHubStatus,
-  PathActionResult,
-  Repo,
-  UpdateIssueDraftRequest
+    AgentRunListItem,
+    GitHubStatus,
+    PathActionResult,
+    Repo,
+    UpdateIssueDraftRequest
 } from '@shared/ipc'
 import type {
-  IssueDraft,
-  IssueDraftForReview,
-  IssueDraftSourceNote,
-  IssueDraftStatus
+    IssueDraft,
+    IssueDraftForReview,
+    IssueDraftSourceNote,
+    IssueDraftStatus
 } from '@shared/types'
 import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
 
@@ -551,6 +552,10 @@ export function DraftReview({
                     const repoLine = draftRepoEntry
                       ? `${draftRepoEntry.owner}/${draftRepoEntry.name}`
                       : 'Unassigned'
+                    const confidenceSidebarTooltip =
+                      draft.labels.length > 0
+                        ? `${confidenceLabel(draft.confidence)} · ${draft.labels.join(', ')}`
+                        : confidenceLabel(draft.confidence)
                     return (
                       <li key={draft.id}>
                         <button
@@ -560,18 +565,22 @@ export function DraftReview({
                           className={draftCardClassName(selectedDraftId === draft.id)}
                         >
                           <span className="flex min-w-0 flex-col gap-1">
-                            <span
-                              className="min-w-0 block truncate text-sm leading-snug"
-                              title={normalizeDraftTitle(draft.title)}
-                            >
-                              {normalizeDraftTitle(draft.title)}
-                            </span>
-                            <span
-                              className="block truncate font-mono text-xs text-muted-foreground/80"
-                              title={repoLine}
-                            >
-                              {repoLine}
-                            </span>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="min-w-0 block truncate text-sm leading-snug">
+                                  {normalizeDraftTitle(draft.title)}
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent>{normalizeDraftTitle(draft.title)}</TooltipContent>
+                            </Tooltip>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="block truncate font-mono text-xs text-muted-foreground/80">
+                                  {repoLine}
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent>{repoLine}</TooltipContent>
+                            </Tooltip>
                             <span className="flex min-w-0 items-center justify-between gap-2 text-xs">
                               <Badge variant="secondary" className="font-medium text-foreground/80">
                                 {statusLabel(draft.status)}
@@ -580,27 +589,27 @@ export function DraftReview({
                                 {formatTimestamp(draft.updatedAt)}
                               </span>
                             </span>
-                            <span
-                              className="line-clamp-2 min-w-0 break-words text-xs leading-snug"
-                              title={
-                                draft.labels.length > 0
-                                  ? `${confidenceLabel(draft.confidence)} · ${draft.labels.join(', ')}`
-                                  : confidenceLabel(draft.confidence)
-                              }
-                            >
-                              <span
-                                className="mr-1.5 inline-flex align-middle items-center rounded border border-border/55 bg-muted/40 px-1 py-px text-[11px] font-medium leading-tight text-foreground/75"
-                                aria-hidden
-                              >
-                                {confidenceSidebarShort(draft.confidence)}
-                              </span>
-                              <span className="sr-only">{confidenceLabel(draft.confidence)}</span>
-                              {draft.labels.length > 0 ? (
-                                <span className="align-middle text-muted-foreground">
-                                  {draft.labels.join(' · ')}
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="line-clamp-2 min-w-0 break-words text-xs leading-snug">
+                                  <span
+                                    className="mr-1.5 inline-flex align-middle items-center rounded border border-border/55 bg-muted/40 px-1 py-px text-[11px] font-medium leading-tight text-foreground/75"
+                                    aria-hidden
+                                  >
+                                    {confidenceSidebarShort(draft.confidence)}
+                                  </span>
+                                  <span className="sr-only">
+                                    {confidenceLabel(draft.confidence)}
+                                  </span>
+                                  {draft.labels.length > 0 ? (
+                                    <span className="align-middle text-muted-foreground">
+                                      {draft.labels.join(' · ')}
+                                    </span>
+                                  ) : null}
                                 </span>
-                              ) : null}
-                            </span>
+                              </TooltipTrigger>
+                              <TooltipContent>{confidenceSidebarTooltip}</TooltipContent>
+                            </Tooltip>
                           </span>
                         </button>
                       </li>
@@ -1269,24 +1278,38 @@ function DraftEditor({
                     <div className="flex items-start justify-between gap-2">
                       <p className="break-all font-mono text-xs">{file.path}</p>
                       <div className="flex shrink-0 items-center gap-0.5">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon-xs"
-                          onClick={() => void handlePathAction(file, 'copy')}
-                          title="Copy path"
-                        >
-                          <HugeiconsIcon icon={Copy01Icon} className="size-3.5" aria-hidden />
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon-xs"
-                          onClick={() => void handlePathAction(file, 'reveal')}
-                          title="Reveal in explorer"
-                        >
-                          <HugeiconsIcon icon={FolderOpenIcon} className="size-3.5" aria-hidden />
-                        </Button>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon-xs"
+                              onClick={() => void handlePathAction(file, 'copy')}
+                              aria-label="Copy path"
+                            >
+                              <HugeiconsIcon icon={Copy01Icon} className="size-3.5" aria-hidden />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Copy path</TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon-xs"
+                              onClick={() => void handlePathAction(file, 'reveal')}
+                              aria-label="Reveal in explorer"
+                            >
+                              <HugeiconsIcon
+                                icon={FolderOpenIcon}
+                                className="size-3.5"
+                                aria-hidden
+                              />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Reveal in explorer</TooltipContent>
+                        </Tooltip>
                       </div>
                     </div>
                     <p className="line-clamp-2 text-xs leading-relaxed text-muted-foreground">

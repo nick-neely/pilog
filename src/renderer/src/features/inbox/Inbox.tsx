@@ -43,8 +43,8 @@ import type {
   Repo
 } from '@shared/ipc'
 import type {
-  AutoPublishPublishReport,
   AutoPublishPreviewSummary,
+  AutoPublishPublishReport,
   GeneratedIssueDraft,
   IssueDraftForReview,
   IssueDraftStatus
@@ -476,9 +476,12 @@ function AutoPublishPreviewDialog({
                         <ul className="flex flex-col gap-1">
                           {draft.affectedFiles.map((file) => (
                             <li key={file.path} className="min-w-0">
-                              <p className="truncate font-mono text-xs" title={file.path}>
-                                {file.path}
-                              </p>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <p className="truncate font-mono text-xs">{file.path}</p>
+                                </TooltipTrigger>
+                                <TooltipContent className="font-mono">{file.path}</TooltipContent>
+                              </Tooltip>
                               <p className="line-clamp-2 text-xs text-muted-foreground">
                                 {file.reason}
                               </p>
@@ -611,8 +614,13 @@ function SourceNoteList({
         const note = sourceNotesById.get(noteId)
         const preview = note?.content.trim() || noteId
         return (
-          <li key={noteId} className={itemClassName} title={preview}>
-            {preview}
+          <li key={noteId} className="min-w-0">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className={cn('block min-w-0', itemClassName)}>{preview}</span>
+              </TooltipTrigger>
+              <TooltipContent>{preview}</TooltipContent>
+            </Tooltip>
           </li>
         )
       })}
@@ -1053,40 +1061,44 @@ export function Inbox({
               time, well within the ≤10% accent budget. Click anywhere on
               the row (or press Esc) to clear. */}
           {hasSelection ? (
-            <button
-              type="button"
-              onClick={clearSelection}
-              title={`Clear ${selectionCount} selected (Esc)`}
-              aria-label={`Clear ${selectionCount} selected ${
-                selectionCount === 1 ? 'note' : 'notes'
-              }`}
-              className={cn(
-                'flex h-7 cursor-pointer items-center gap-2 rounded-md px-1.5 text-xs transition-colors',
-                'bg-primary/10 text-foreground hover:bg-primary/15',
-                'focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/30'
-              )}
-            >
-              <HugeiconsIcon
-                icon={Cancel01Icon}
-                aria-hidden
-                strokeWidth={2}
-                className="size-3.5 shrink-0 text-primary"
-              />
-              {/* The testid lives on the count span (not the button) so the
-                  e2e suite's exact-text match against "{N} selected" stays
-                  green even with the trailing "Esc" hint kbd inside the
-                  same row. The button's aria-label carries the full
-                  intent for assistive tech. */}
-              <span data-testid="selected-count" className="tabular flex-1 text-left">
-                {selectionCount} selected
-              </span>
-              <span
-                aria-hidden
-                className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground/80"
-              >
-                Esc
-              </span>
-            </button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={clearSelection}
+                  aria-label={`Clear ${selectionCount} selected ${
+                    selectionCount === 1 ? 'note' : 'notes'
+                  }`}
+                  className={cn(
+                    'flex h-7 cursor-pointer items-center gap-2 rounded-md px-1.5 text-xs transition-colors',
+                    'bg-primary/10 text-foreground hover:bg-primary/15',
+                    'focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/30'
+                  )}
+                >
+                  <HugeiconsIcon
+                    icon={Cancel01Icon}
+                    aria-hidden
+                    strokeWidth={2}
+                    className="size-3.5 shrink-0 text-primary"
+                  />
+                  {/* The testid lives on the count span (not the button) so the
+                      e2e suite's exact-text match against "{N} selected" stays
+                      green even with the trailing "Esc" hint kbd inside the
+                      same row. The button's aria-label carries the full
+                      intent for assistive tech. */}
+                  <span data-testid="selected-count" className="tabular flex-1 text-left">
+                    {selectionCount} selected
+                  </span>
+                  <span
+                    aria-hidden
+                    className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground/80"
+                  >
+                    Esc
+                  </span>
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Clear {selectionCount} selected (Esc)</TooltipContent>
+            </Tooltip>
           ) : null}
           <Select
             value={encodeRepoFilter(repoFilter)}
@@ -1148,15 +1160,24 @@ export function Inbox({
                           }
                         >
                           <span className="min-w-0 flex flex-1 flex-col gap-1">
-                            <span className="block truncate text-sm leading-snug" title={preview}>
-                              {preview}
-                            </span>
-                            <span
-                              className="block truncate font-mono text-xs text-muted-foreground/80"
-                              title={repo ? `${repo.owner}/${repo.name}` : 'Unassigned'}
-                            >
-                              {repo ? `${repo.owner}/${repo.name}` : 'Unassigned'}
-                            </span>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="block truncate text-sm leading-snug">
+                                  {preview}
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent>{preview}</TooltipContent>
+                            </Tooltip>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="block truncate font-mono text-xs text-muted-foreground/80">
+                                  {repo ? `${repo.owner}/${repo.name}` : 'Unassigned'}
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                {repo ? `${repo.owner}/${repo.name}` : 'Unassigned'}
+                              </TooltipContent>
+                            </Tooltip>
                             <span className="flex min-w-0 items-center justify-between gap-2 text-xs">
                               <Badge
                                 variant="secondary"
@@ -1195,7 +1216,6 @@ export function Inbox({
                         size="sm"
                         variant={canGenerateDrafts ? 'default' : 'outline'}
                         disabled={!canGenerateDrafts}
-                        title={generateDraftsReason}
                         className="w-full justify-center"
                         onClick={() => void handleGenerateDrafts('review')}
                       >
@@ -1206,16 +1226,27 @@ export function Inbox({
                   </TooltipTrigger>
                   {!canGenerateDrafts && <TooltipContent>{generateDraftsReason}</TooltipContent>}
                 </Tooltip>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled
-                  title="Dismiss activates in Phase 4"
-                  className="flex-1 justify-center"
-                >
-                  <HugeiconsIcon icon={CancelCircleIcon} data-icon="inline-start" aria-hidden />
-                  Dismiss
-                </Button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="flex-1">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled
+                        className="w-full justify-center"
+                        aria-label="Dismiss (activates in Phase 4)"
+                      >
+                        <HugeiconsIcon
+                          icon={CancelCircleIcon}
+                          data-icon="inline-start"
+                          aria-hidden
+                        />
+                        Dismiss
+                      </Button>
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>Dismiss activates in Phase 4</TooltipContent>
+                </Tooltip>
               </div>
               {selectedRepo ? (
                 <Tooltip>
@@ -1225,7 +1256,6 @@ export function Inbox({
                         size="sm"
                         variant={canGenerateAndPublish ? 'outline' : 'ghost'}
                         disabled={!canGenerateAndPublish}
-                        title={generateAndPublishReason}
                         className="w-full justify-center"
                         onClick={() => void handleGenerateDrafts('auto-publish-preview')}
                       >
@@ -1261,7 +1291,6 @@ export function Inbox({
                         size="sm"
                         variant={canProcessCurrentInbox ? 'default' : 'outline'}
                         disabled={!canProcessCurrentInbox}
-                        title={processCurrentInboxReason}
                         className="w-full justify-center"
                         onClick={() => void handleProcessCurrentInbox()}
                       >

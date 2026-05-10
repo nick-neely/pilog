@@ -5,13 +5,14 @@ import { EditorState } from '@codemirror/state'
 import { EditorView, keymap } from '@codemirror/view'
 import { Badge } from '@renderer/components/ui/badge'
 import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
+    Select,
+    SelectContent,
+    SelectGroup,
+    SelectItem,
+    SelectTrigger,
+    SelectValue
 } from '@renderer/components/ui/select'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@renderer/components/ui/tooltip'
 import type { Repo } from '@shared/ipc'
 import { shouldSave } from '@shared/scratchpad'
 import { useCallback, useEffect, useEffectEvent, useRef, useState } from 'react'
@@ -148,14 +149,18 @@ export function Scratchpad(): React.JSX.Element {
       {/* Own row so typing never runs underneath the repo control */}
       <header className="flex shrink-0 items-center justify-end gap-2 border-b border-border/60 bg-background px-3 py-2">
         {repos.length === 0 ? (
-          <Badge
-            variant="outline"
-            className="cursor-default font-normal opacity-50"
-            aria-label="Link a repo first in Settings"
-            title="Link a repo first in Settings → Repositories"
-          >
-            Link a repo first
-          </Badge>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Badge
+                variant="outline"
+                className="cursor-default font-normal opacity-50"
+                aria-label="Link a repo first in Settings"
+              >
+                Link a repo first
+              </Badge>
+            </TooltipTrigger>
+            <TooltipContent>Link a repo first in Settings → Repositories</TooltipContent>
+          </Tooltip>
         ) : (
           <Select value={selectedRepoId ?? NOTE_REPO_NONE} onValueChange={handleRepoChange}>
             <SelectTrigger

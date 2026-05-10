@@ -1,8 +1,9 @@
-import type { ReactNode } from 'react'
-import { HugeiconsIcon } from '@hugeicons/react'
 import { Search01Icon, Settings02Icon } from '@hugeicons/core-free-icons'
+import { HugeiconsIcon } from '@hugeicons/react'
 import { Button } from '@renderer/components/ui/button'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@renderer/components/ui/tooltip'
 import { ViewTabs, type ViewTab } from '@renderer/features/shared/ViewTabs'
+import type { ReactNode } from 'react'
 
 // AppShell is the global window chrome for PiLog's tab views (Inbox,
 // Agent Runs, and any future list-shaped views). It owns the only
@@ -58,31 +59,39 @@ export function AppShell({
         </div>
         <div className="flex shrink-0 items-center gap-1">
           {onOpenCommandPalette ? (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              data-testid="open-command"
-              onClick={onOpenCommandPalette}
-              aria-label="Open command palette"
-              title="Search and commands"
-              className="gap-1.5 px-2 text-xs text-muted-foreground"
-            >
-              <HugeiconsIcon icon={Search01Icon} aria-hidden />
-              <kbd className="pointer-events-none font-mono">{metaKey}K</kbd>
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  data-testid="open-command"
+                  onClick={onOpenCommandPalette}
+                  aria-label="Open command palette"
+                  className="gap-1.5 px-2 text-xs text-muted-foreground"
+                >
+                  <HugeiconsIcon icon={Search01Icon} aria-hidden />
+                  <kbd className="pointer-events-none font-mono">{metaKey}K</kbd>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Search and commands</TooltipContent>
+            </Tooltip>
           ) : null}
-          <Button
-            type="button"
-            variant="outline"
-            size="icon-sm"
-            data-testid="open-settings"
-            onClick={onNavigateToSettings}
-            aria-label="Settings"
-            title="Settings"
-          >
-            <HugeiconsIcon icon={Settings02Icon} aria-hidden />
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon-sm"
+                data-testid="open-settings"
+                onClick={onNavigateToSettings}
+                aria-label="Settings"
+              >
+                <HugeiconsIcon icon={Settings02Icon} aria-hidden />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Settings</TooltipContent>
+          </Tooltip>
         </div>
       </header>
       <div className="min-h-0 flex-1">{children}</div>
