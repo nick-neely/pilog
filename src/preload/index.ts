@@ -10,7 +10,8 @@ import type {
   IpcChannel,
   IpcEvent,
   IpcRequest,
-  IpcResponse
+  IpcResponse,
+  AppUpdateStatus
 } from '../shared/ipc'
 
 const streamPorts = new Map<string, MessagePort>()
@@ -37,6 +38,15 @@ const pilog = {
     ipcRenderer.on(event, listener)
     return () => {
       ipcRenderer.removeListener(event, listener)
+    }
+  },
+  onUpdateStatus: (callback: (status: AppUpdateStatus) => void): (() => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, status: AppUpdateStatus): void => {
+      callback(status)
+    }
+    ipcRenderer.on('app-updates:status', listener)
+    return () => {
+      ipcRenderer.removeListener('app-updates:status', listener)
     }
   },
   send: (action: IpcAction): void => {

@@ -27,6 +27,7 @@
     "build:win": "pnpm run build && electron-builder --win",
     "build:mac": "pnpm run build && electron-builder --mac",
     "build:linux": "pnpm run build && electron-builder --linux",
+    "build:preview": "pnpm run build && electron-builder --config electron-builder.preview.yml",
     "test": "vitest run",
     "test:e2e": "playwright test",
     "test:e2e:packaged": "pnpm run build:unpack && playwright test e2e/packaged-runtime.spec.ts"

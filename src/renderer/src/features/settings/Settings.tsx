@@ -4,9 +4,12 @@ import {
   CheckmarkCircle01Icon,
   DatabaseImportIcon,
   Delete02Icon,
+  Download01Icon,
   EyeIcon,
   FileKeyIcon,
   GithubIcon,
+  ListRestartIcon,
+  Refresh01Icon,
   Search01Icon
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
@@ -52,6 +55,7 @@ import { Separator } from '@renderer/components/ui/separator'
 import { Switch } from '@renderer/components/ui/switch'
 import type {
   AdvancedSettings,
+  AppUpdateStatus,
   GitHubStatus,
   PiActiveConfig,
   PiModelOption,
@@ -67,6 +71,7 @@ import {
   isSearchProvider
 } from '@shared/types'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { getUpdateStatusView } from './update-status-view'
 
 const SEARCH_PROVIDER_LABELS: Record<SearchProvider, string> = {
   brave: 'Brave',
@@ -103,6 +108,13 @@ type AdvancedSettingsState = {
   setWebSearchProvider: (provider: SearchProvider) => Promise<void>
   setWebSearchApiKey: (apiKey: string) => void
   saveWebSearchApiKey: () => Promise<void>
+}
+
+type UpdateState = {
+  status: AppUpdateStatus | null
+  check: () => Promise<void>
+  download: () => Promise<void>
+  restart: () => Promise<void>
 }
 
 function useSetting(key: SettingKey): [string | null, (value: string) => Promise<void>] {
@@ -347,6 +359,38 @@ function useAdvancedSettings(): AdvancedSettingsState {
   }
 }
 
+function useAppUpdates(): UpdateState {
+  const [status, setStatus] = useState<AppUpdateStatus | null>(null)
+
+  useEffect(() => {
+    let mounted = true
+    window.pilog.invoke('app-updates:getStatus').then((next) => {
+      if (mounted) setStatus(next)
+    })
+    const unsubscribe = window.pilog.onUpdateStatus((next) => {
+      setStatus(next)
+    })
+    return () => {
+      mounted = false
+      unsubscribe()
+    }
+  }, [])
+
+  const check = useCallback(async () => {
+    setStatus(await window.pilog.invoke('app-updates:check'))
+  }, [])
+
+  const download = useCallback(async () => {
+    setStatus(await window.pilog.invoke('app-updates:download'))
+  }, [])
+
+  const restart = useCallback(async () => {
+    setStatus(await window.pilog.invoke('app-updates:restart'))
+  }, [])
+
+  return { status, check, download, restart }
+}
+
 function getPreferredModelId({
   current,
   activeProvider,
@@ -395,6 +439,7 @@ export function Settings({
   const github = useGitHubStatus()
   const pi = usePiConfig()
   const advanced = useAdvancedSettings()
+  const updates = useAppUpdates()
 
   const displayValue = userEdited ? (hotkeyDraft ?? '') : (hotkey ?? '')
   const dirty = userEdited && hotkeyDraft !== (hotkey ?? '')
@@ -429,6 +474,7 @@ export function Settings({
           : 'off'
       }`
     : 'Loading…'
+  const updateView = getUpdateStatusView(updates.status)
 
   const handleHotkeyChange = (value: string): void => {
     setUserEdited(true)
@@ -875,6 +921,59 @@ export function Settings({
                   </CollapsibleContent>
                 </section>
               </Collapsible>
+
+              <section className="flex flex-col gap-3" aria-live="polite">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <h2 className="text-sm font-medium text-foreground">Updates</h2>
+                    <p className="mt-1 text-xs text-muted-foreground">{updateView.title}</p>
+                  </div>
+                  {updates.status && (
+                    <span className="inline-flex shrink-0 items-center rounded-md bg-muted px-2 py-1 text-xs text-foreground">
+                      {updates.status.channelLabel}
+                    </span>
+                  )}
+                </div>
+                <div className="rounded-md bg-muted/35 p-3">
+                  <p className="text-xs text-muted-foreground">{updateView.detail}</p>
+                  {updates.status && (
+                    <p className="mt-2 font-mono text-[11px] text-muted-foreground">
+                      Installed {updates.status.version} · {updates.status.channelLabel} channel
+                    </p>
+                  )}
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => void updates.check()}
+                      disabled={!updateView.canCheck || updateView.busy}
+                    >
+                      <HugeiconsIcon icon={Refresh01Icon} data-icon="inline-start" aria-hidden />
+                      {updateView.busy ? 'Checking' : 'Check'}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => void updates.download()}
+                      disabled={!updateView.canDownload || updateView.busy}
+                    >
+                      <HugeiconsIcon icon={Download01Icon} data-icon="inline-start" aria-hidden />
+                      Download
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => void updates.restart()}
+                      disabled={!updateView.canRestart || updateView.busy}
+                    >
+                      <HugeiconsIcon icon={ListRestartIcon} data-icon="inline-start" aria-hidden />
+                      Restart
+                    </Button>
+                  </div>
+                </div>
+              </section>
 
               <section className="flex flex-col gap-3">
                 <h2 className="text-sm font-medium text-foreground">Global Hotkey</h2>

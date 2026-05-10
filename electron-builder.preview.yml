@@ -1,0 +1,7 @@
+extends: electron-builder.yml
+publish:
+  provider: github
+  owner: nick-neely
+  repo: pilog
+  channel: preview
+  releaseType: prerelease
