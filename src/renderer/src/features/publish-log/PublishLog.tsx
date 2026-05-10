@@ -3,16 +3,16 @@ import { HugeiconsIcon } from '@hugeicons/react'
 import { Badge } from '@renderer/components/ui/badge'
 import { Button } from '@renderer/components/ui/button'
 import {
-    Collapsible,
-    CollapsibleContent,
-    CollapsibleTrigger
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger
 } from '@renderer/components/ui/collapsible'
 import {
-    Empty,
-    EmptyContent,
-    EmptyDescription,
-    EmptyHeader,
-    EmptyTitle
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyTitle
 } from '@renderer/components/ui/empty'
 import { ScrollArea } from '@renderer/components/ui/scroll-area'
 import { Separator } from '@renderer/components/ui/separator'

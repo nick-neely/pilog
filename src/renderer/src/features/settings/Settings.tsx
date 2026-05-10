@@ -1,70 +1,70 @@
 import {
-    Activity01Icon,
-    ArrowDown01Icon,
-    CheckmarkCircle01Icon,
-    DatabaseImportIcon,
-    Delete02Icon,
-    EyeIcon,
-    FileKeyIcon,
-    GithubIcon,
-    Search01Icon
+  Activity01Icon,
+  ArrowDown01Icon,
+  CheckmarkCircle01Icon,
+  DatabaseImportIcon,
+  Delete02Icon,
+  EyeIcon,
+  FileKeyIcon,
+  GithubIcon,
+  Search01Icon
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-    AlertDialogTrigger
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger
 } from '@renderer/components/ui/alert-dialog'
 import { Avatar, AvatarFallback } from '@renderer/components/ui/avatar'
 import { Button } from '@renderer/components/ui/button'
 import { Card, CardContent } from '@renderer/components/ui/card'
 import {
-    Collapsible,
-    CollapsibleContent,
-    CollapsibleTrigger
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger
 } from '@renderer/components/ui/collapsible'
 import {
-    Combobox,
-    ComboboxContent,
-    ComboboxEmpty,
-    ComboboxInput,
-    ComboboxItem,
-    ComboboxList
+  Combobox,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxList
 } from '@renderer/components/ui/combobox'
 import { Input } from '@renderer/components/ui/input'
 import { Label } from '@renderer/components/ui/label'
 import { ScrollArea } from '@renderer/components/ui/scroll-area'
 import {
-    Select,
-    SelectContent,
-    SelectGroup,
-    SelectItem,
-    SelectTrigger,
-    SelectValue
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
 } from '@renderer/components/ui/select'
 import { Separator } from '@renderer/components/ui/separator'
 import { Switch } from '@renderer/components/ui/switch'
 import type {
-    AdvancedSettings,
-    GitHubStatus,
-    PiActiveConfig,
-    PiModelOption,
-    PiProviderOption,
-    SearchProvider,
-    SettingKey
+  AdvancedSettings,
+  GitHubStatus,
+  PiActiveConfig,
+  PiModelOption,
+  PiProviderOption,
+  SearchProvider,
+  SettingKey
 } from '@shared/ipc'
 import {
-    DEFAULT_TURN_BUDGET,
-    MAX_TURN_BUDGET,
-    MIN_TURN_BUDGET,
-    SEARCH_PROVIDERS,
-    isSearchProvider
+  DEFAULT_TURN_BUDGET,
+  MAX_TURN_BUDGET,
+  MIN_TURN_BUDGET,
+  SEARCH_PROVIDERS,
+  isSearchProvider
 } from '@shared/types'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 

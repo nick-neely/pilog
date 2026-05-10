@@ -4,28 +4,28 @@ import { defaultHighlightStyle, syntaxHighlighting } from '@codemirror/language'
 import { EditorState } from '@codemirror/state'
 import { EditorView, keymap } from '@codemirror/view'
 import {
-    ArrowDown01Icon,
-    ArrowLeft01Icon,
-    ArrowUp01Icon,
-    RepositoryIcon,
-    Tick02Icon
+  ArrowDown01Icon,
+  ArrowLeft01Icon,
+  ArrowUp01Icon,
+  RepositoryIcon,
+  Tick02Icon
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { Alert, AlertDescription } from '@renderer/components/ui/alert'
 import { Badge } from '@renderer/components/ui/badge'
 import { Button } from '@renderer/components/ui/button'
 import {
-    Collapsible,
-    CollapsibleContent,
-    CollapsibleTrigger
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger
 } from '@renderer/components/ui/collapsible'
 import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle
 } from '@renderer/components/ui/dialog'
 import { Empty, EmptyDescription } from '@renderer/components/ui/empty'
 import { Input } from '@renderer/components/ui/input'
@@ -38,13 +38,13 @@ import { Toggle } from '@renderer/components/ui/toggle'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@renderer/components/ui/tooltip'
 import { cn } from '@renderer/lib/utils'
 import type {
-    CreateIssueRequest,
-    DetectLocalRepoResult,
-    GitHubLabel,
-    GitHubRepo,
-    Repo,
-    RepoAutoPublishSettings,
-    UpdateRepoAutoPublishSettingsRequest
+  CreateIssueRequest,
+  DetectLocalRepoResult,
+  GitHubLabel,
+  GitHubRepo,
+  Repo,
+  RepoAutoPublishSettings,
+  UpdateRepoAutoPublishSettingsRequest
 } from '@shared/ipc'
 import { DEFAULT_REPO_AUTO_PUBLISH_SETTINGS, normalizeRepoAutoPublishSettings } from '@shared/ipc'
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
