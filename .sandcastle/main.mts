@@ -130,6 +130,17 @@ const hooks = {
 // Raise this if your backlog is large; lower it for a quick smoke-test run.
 const MAX_ITERATIONS = 10
 
+// Sandcastle registers cleanup handlers per live sandbox. Five parallel issue
+// pipelines are expected on this workstation, so raise Node's conservative
+// EventEmitter warning limit instead of treating normal cleanup hooks as leaks.
+const MAX_PARALLEL_ISSUES = readPositiveIntegerEnv('SANDCASTLE_MAX_PARALLEL_ISSUES', 5)
+const PROCESS_SIGNAL_LISTENER_LIMIT = readPositiveIntegerEnv(
+  'SANDCASTLE_PROCESS_MAX_LISTENERS',
+  Math.max(64, MAX_PARALLEL_ISSUES * 8)
+)
+
+process.setMaxListeners(Math.max(process.getMaxListeners(), PROCESS_SIGNAL_LISTENER_LIMIT))
+
 // Copy node_modules from the host into the worktree before each sandbox
 // starts. With pnpm, packages and the virtual store live under node_modules
 // (including node_modules/.pnpm). Avoids a cold install; the hook above is
@@ -142,6 +153,48 @@ type PlannedIssue = {
   branch: string
   implementationModel?: string
   implementationModelReason?: string
+}
+
+function readPositiveIntegerEnv(name: string, fallback: number): number {
+  const value = process.env[name]
+  if (!value) {
+    return fallback
+  }
+
+  const parsed = Number.parseInt(value, 10)
+  if (!Number.isFinite(parsed) || parsed < 1) {
+    throw new Error(`${name} must be a positive integer, got ${JSON.stringify(value)}.`)
+  }
+
+  return parsed
+}
+
+async function allSettledWithConcurrency<T, R>(
+  items: readonly T[],
+  concurrency: number,
+  task: (item: T, index: number) => Promise<R>
+): Promise<Array<PromiseSettledResult<R>>> {
+  const results = new Array<PromiseSettledResult<R>>(items.length)
+  let nextIndex = 0
+
+  async function worker(): Promise<void> {
+    while (nextIndex < items.length) {
+      const index = nextIndex
+      nextIndex += 1
+
+      try {
+        results[index] = { status: 'fulfilled', value: await task(items[index]!, index) }
+      } catch (reason) {
+        results[index] = { status: 'rejected', reason }
+      }
+    }
+  }
+
+  await Promise.all(
+    Array.from({ length: Math.min(concurrency, items.length) }, async () => worker())
+  )
+
+  return results
 }
 
 function implementationModelFor(issue: PlannedIssue): ClaudeModelRole {
@@ -291,7 +344,11 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
     break
   }
 
-  console.log(`Planning complete. ${issues.length} issue(s) to work in parallel:`)
+  const parallelIssueCount = Math.min(issues.length, MAX_PARALLEL_ISSUES)
+
+  console.log(
+    `Planning complete. ${issues.length} issue(s) ready; running ${parallelIssueCount} in parallel:`
+  )
   for (const issue of issues) {
     const modelLabel = executionModelLabel(issue)
     console.log(`  ${issue.id}: ${issue.title} → ${issue.branch} (${modelLabel})`)
@@ -307,8 +364,10 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
   // Promise.allSettled means one failing pipeline doesn't cancel the others.
   // -------------------------------------------------------------------------
 
-  const settled = await Promise.allSettled(
-    issues.map(async (issue) => {
+  const settled = await allSettledWithConcurrency(
+    issues,
+    MAX_PARALLEL_ISSUES,
+    async (issue) => {
       const sandbox = await sandcastle.createSandbox({
         branch: issue.branch,
         sandbox: sandboxProvider(),
@@ -361,7 +420,7 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
       } finally {
         await sandbox.close()
       }
-    })
+    }
   )
 
   // Log any agents that threw (network error, sandbox crash, etc.).
