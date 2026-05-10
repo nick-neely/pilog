@@ -78,23 +78,37 @@ type AddRepoState =
   | { step: 'detecting'; localPath: string }
   | { step: 'result'; localPath: string; result: DetectLocalRepoResult }
   | { step: 'linking' }
+  | { step: 'error'; localPath?: string; message: string }
 
 function DetectResultInline({
   localPath,
   result,
   onConfirm,
-  onReset
+  onReset,
+  onNavigateSettings
 }: {
   localPath: string
   result: DetectLocalRepoResult
   onConfirm: (githubRepo: GitHubRepo, defaultBranch: string) => void
   onReset: () => void
+  onNavigateSettings: () => void
 }): React.JSX.Element {
   if (result.state === 'unauthenticated') {
     return (
       <Alert variant="destructive">
         <AlertDescription>
-          Connect your GitHub account in Settings before adding a repository.
+          <span className="block">
+            Connect your GitHub account in Settings before adding a repository.
+          </span>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="mt-2"
+            onClick={onNavigateSettings}
+          >
+            Open Settings
+          </Button>
         </AlertDescription>
       </Alert>
     )
@@ -155,7 +169,13 @@ function DetectResultInline({
   )
 }
 
-function AddRepoFlow({ onLinked }: { onLinked: () => void }): React.JSX.Element {
+function AddRepoFlow({
+  onLinked,
+  onNavigateSettings
+}: {
+  onLinked: () => void
+  onNavigateSettings: () => void
+}): React.JSX.Element {
   const [state, setState] = useState<AddRepoState>({ step: 'idle' })
 
   const handlePickDirectory = async (): Promise<void> => {
@@ -163,20 +183,36 @@ function AddRepoFlow({ onLinked }: { onLinked: () => void }): React.JSX.Element 
     if (!localPath) return
 
     setState({ step: 'detecting', localPath })
-    const result = await window.pilog.invoke('repos:detectLocal', { localPath })
-    setState({ step: 'result', localPath, result })
+    try {
+      const result = await window.pilog.invoke('repos:detectLocal', { localPath })
+      setState({ step: 'result', localPath, result })
+    } catch (err) {
+      setState({
+        step: 'error',
+        localPath,
+        message: err instanceof Error ? err.message : 'Repository detection failed.'
+      })
+    }
   }
 
   const handleConfirm = async (githubRepo: GitHubRepo, defaultBranch: string): Promise<void> => {
     if (state.step !== 'result') return
     setState({ step: 'linking' })
-    await window.pilog.invoke('repos:link', {
-      localPath: state.localPath,
-      githubRepo,
-      defaultBranch
-    })
-    setState({ step: 'idle' })
-    onLinked()
+    try {
+      await window.pilog.invoke('repos:link', {
+        localPath: state.localPath,
+        githubRepo,
+        defaultBranch
+      })
+      setState({ step: 'idle' })
+      onLinked()
+    } catch (err) {
+      setState({
+        step: 'error',
+        localPath: state.localPath,
+        message: err instanceof Error ? err.message : 'Repository could not be linked.'
+      })
+    }
   }
 
   const handleReset = (): void => setState({ step: 'idle' })
@@ -206,6 +242,7 @@ function AddRepoFlow({ onLinked }: { onLinked: () => void }): React.JSX.Element 
             result={state.result}
             onConfirm={handleConfirm}
             onReset={handleReset}
+            onNavigateSettings={onNavigateSettings}
           />
           {state.result.state !== 'matched' && (
             <Button size="sm" variant="ghost" onClick={handlePickDirectory}>
@@ -213,6 +250,26 @@ function AddRepoFlow({ onLinked }: { onLinked: () => void }): React.JSX.Element 
             </Button>
           )}
         </div>
+      )}
+
+      {state.step === 'error' && (
+        <Alert variant="destructive">
+          <AlertDescription>
+            <span className="block">Pilog could not finish linking this repository.</span>
+            {state.localPath ? (
+              <span className="mt-1 block font-mono text-xs">{state.localPath}</span>
+            ) : null}
+            <span className="mt-1 block font-mono text-xs">{state.message}</span>
+            <span className="mt-2 flex gap-2">
+              <Button size="sm" variant="outline" onClick={handlePickDirectory}>
+                Try another directory
+              </Button>
+              <Button size="sm" variant="ghost" onClick={handleReset}>
+                Cancel
+              </Button>
+            </span>
+          </AlertDescription>
+        </Alert>
       )}
     </div>
   )
@@ -770,7 +827,13 @@ function RepoRow({
   )
 }
 
-export function Repositories({ onBack }: { onBack: () => void }): React.JSX.Element {
+export function Repositories({
+  onBack,
+  onNavigateSettings
+}: {
+  onBack: () => void
+  onNavigateSettings: () => void
+}): React.JSX.Element {
   const { repos, reload } = useRepos()
 
   const handleUnlink = async (id: string): Promise<void> => {
@@ -836,7 +899,7 @@ export function Repositories({ onBack }: { onBack: () => void }): React.JSX.Elem
 
           <section className="flex flex-col gap-3">
             <h2 className="text-sm font-medium text-muted-foreground">Add repository</h2>
-            <AddRepoFlow onLinked={reload} />
+            <AddRepoFlow onLinked={reload} onNavigateSettings={onNavigateSettings} />
           </section>
         </div>
       </ScrollArea>
