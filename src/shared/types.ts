@@ -24,7 +24,23 @@ export const GeneratedIssueDraftSchema = z.object({
   confidence: ConfidenceSchema,
   groupingReason: z.string().min(1),
   publishReady: z.boolean(),
-  needsClarification: z.array(z.string().min(1)).optional()
+  needsClarification: z.array(z.string().min(1)).optional(),
+  labelMatches: z
+    .array(
+      z.discriminatedUnion('matched', [
+        z.object({
+          input: z.string(),
+          name: z.string(),
+          matched: z.literal(true)
+        }),
+        z.object({
+          input: z.string(),
+          name: z.string(),
+          matched: z.literal(false)
+        })
+      ])
+    )
+    .optional()
 })
 
 export const GeneratedIssueDraftsSchema = z.array(GeneratedIssueDraftSchema)
@@ -52,7 +68,23 @@ export const GeneratedIssueDraftTypeBox = Type.Object({
   confidence: Type.Union([Type.Literal('low'), Type.Literal('medium'), Type.Literal('high')]),
   groupingReason: Type.String({ minLength: 1 }),
   publishReady: Type.Boolean(),
-  needsClarification: Type.Optional(Type.Array(Type.String({ minLength: 1 })))
+  needsClarification: Type.Optional(Type.Array(Type.String({ minLength: 1 }))),
+  labelMatches: Type.Optional(
+    Type.Array(
+      Type.Union([
+        Type.Object({
+          input: Type.String(),
+          name: Type.String(),
+          matched: Type.Literal(true)
+        }),
+        Type.Object({
+          input: Type.String(),
+          name: Type.String(),
+          matched: Type.Literal(false)
+        })
+      ])
+    )
+  )
 })
 
 export const SubmitIssueDraftsParameters = Type.Object({

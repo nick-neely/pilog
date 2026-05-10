@@ -38,6 +38,8 @@ import {
   type RunAgent
 } from '../pi/issue-generation'
 import { runAgent } from '../pi/runtime'
+import { listLabels } from '../github/client'
+import { matchLabelsToRepoLabels } from '@shared/labels'
 
 type ActiveRun = {
   controller: AbortController
@@ -48,17 +50,37 @@ type ActiveRun = {
 const activeRuns = new Map<string, ActiveRun>()
 const DEFAULT_AGENT_RUN_TIMEOUT_MS = 10 * 60 * 1000
 
-function prepareAgentEventForMode(
+type ListLabelsClient = typeof listLabels
+
+async function prepareAgentEventForMode(
   agentEvent: AgentEvent,
   mode: GenerateDraftsMode,
   runId: string,
-  repo: Repo
-): AgentEvent {
-  if (agentEvent.type !== 'final' || mode !== 'auto-publish-preview') {
+  repo: Repo,
+  listRepoLabels: ListLabelsClient
+): Promise<AgentEvent> {
+  if (agentEvent.type !== 'final') {
     return agentEvent
   }
 
-  const plan = planAutoPublishPreviewDrafts({ runId, repo, drafts: agentEvent.drafts })
+  const repoLabels = await listRepoLabels(repo.owner, repo.name)
+  if (mode !== 'auto-publish-preview') {
+    const drafts = agentEvent.drafts.map((draft) => {
+      const labelMatches = matchLabelsToRepoLabels(draft.suggestedLabels, repoLabels)
+      return {
+        ...draft,
+        suggestedLabels: labelMatches.map((match) => match.name),
+        labelMatches
+      }
+    })
+
+    return {
+      type: 'final',
+      drafts
+    }
+  }
+
+  const plan = planAutoPublishPreviewDrafts({ runId, repo, drafts: agentEvent.drafts, repoLabels })
   return {
     type: 'final',
     drafts: plan.drafts,
@@ -72,10 +94,12 @@ export function registerPiIpcHandlers(
     iconPath?: string
     onDraftsGenerated?: () => void
     runAgentImpl?: RunAgent
+    listLabelsImpl?: ListLabelsClient
     runTimeoutMs?: number
   }
 ): void {
   const runAgentImpl = options?.runAgentImpl ?? runAgent
+  const listLabelsImpl = options?.listLabelsImpl ?? listLabels
   const runTimeoutMs = options?.runTimeoutMs ?? DEFAULT_AGENT_RUN_TIMEOUT_MS
   const startGenerationRun = async (
     event: IpcMainInvokeEvent,
@@ -133,7 +157,13 @@ export function registerPiIpcHandlers(
           signal: controller.signal
         })) {
           if (active.finalized) break
-          const eventForRenderer = prepareAgentEventForMode(agentEvent, mode, run.id, repo)
+          const eventForRenderer = await prepareAgentEventForMode(
+            agentEvent,
+            mode,
+            run.id,
+            repo,
+            listLabelsImpl
+          )
           appendAgentEvent(db, run.id, active, eventForRenderer)
 
           if (eventForRenderer.type === 'final') {

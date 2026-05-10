@@ -206,6 +206,7 @@ export type UpdateIssueDraftRequest = {
   title: string
   body: string
   labels: string[]
+  keptUnmatchedLabels?: string[]
 }
 
 export type PathActionRequest = {

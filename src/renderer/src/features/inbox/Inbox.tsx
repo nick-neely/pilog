@@ -27,6 +27,7 @@ import { Textarea } from '@renderer/components/ui/textarea'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@renderer/components/ui/tooltip'
 import type { RunNavigationOrigin } from '@renderer/features/agent-runs/navigation'
 import { cn } from '@renderer/lib/utils'
+import type { LabelMatch } from '@shared/labels'
 import type {
   GenerateDraftsMode,
   ListNotesRequest,
@@ -449,13 +450,10 @@ function AutoPublishPreviewDialog({
                     <p className="max-w-[68ch] text-sm leading-relaxed text-muted-foreground">
                       {draft.summary}
                     </p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {draft.suggestedLabels.map((label) => (
-                        <Badge key={label} variant="secondary">
-                          {label}
-                        </Badge>
-                      ))}
-                    </div>
+                    <DraftLabelBadges
+                      labels={draft.suggestedLabels}
+                      labelMatches={draft.labelMatches}
+                    />
                     <div className="grid gap-3 md:grid-cols-2">
                       <div className="flex flex-col gap-1">
                         <p className="text-xs font-medium text-muted-foreground">Source notes</p>
@@ -502,6 +500,32 @@ function AutoPublishPreviewDialog({
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
+  )
+}
+
+function DraftLabelBadges({
+  labels,
+  labelMatches
+}: {
+  labels: string[]
+  labelMatches?: LabelMatch[]
+}): React.JSX.Element {
+  const badges =
+    labelMatches && labelMatches.length > 0
+      ? labelMatches
+      : labels.map((label) => ({ input: label, name: label, matched: true as const }))
+
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {badges.map((label) => (
+        <Badge key={`${label.input}:${label.name}`} variant="secondary" className="gap-1">
+          <span>{label.name}</span>
+          <span className="rounded-sm border border-border/70 bg-background/50 px-1 text-[10px] leading-4 text-muted-foreground">
+            {label.matched ? 'Matched' : 'Unmatched, omitted'}
+          </span>
+        </Badge>
+      ))}
+    </div>
   )
 }
 
