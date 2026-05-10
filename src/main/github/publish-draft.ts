@@ -47,21 +47,13 @@ export async function publishReviewedDraft(
   const repo = getRepoById(db, draft.repoId)
   if (!repo) throw new Error('Linked repository not found')
 
-  const { createIssue, listLabels } = normalizePublishClients(clients)
-  const repoLabels = listLabels ? await listLabels(repo.owner, repo.name) : null
-  const labels = repoLabels
-    ? filterLabelsForPublish({
-        labels: request.labels,
-        repoLabels,
-        keptUnmatchedLabels: request.keptUnmatchedLabels
-      })
-    : request.labels
+  const publishClients = normalizePublishClients(clients)
   const reviewedDraft: ReviewedDraftPayload = {
     title: request.title.trim() || 'Untitled draft',
     body: request.body,
-    labels
+    labels: await resolveLabelsForPublish({ request, repo, listLabels: publishClients.listLabels })
   }
-  const createdIssue = await createIssue(repo.owner, repo.name, {
+  const createdIssue = await publishClients.createIssue(repo.owner, repo.name, {
     title: reviewedDraft.title,
     body: reviewedDraft.body,
     labels: reviewedDraft.labels.length > 0 ? reviewedDraft.labels : undefined
@@ -152,6 +144,21 @@ function normalizePublishClients(clients: PublishClients): {
   }
 
   return clients
+}
+
+async function resolveLabelsForPublish(input: {
+  request: PublishIssueDraftRequest
+  repo: { owner: string; name: string }
+  listLabels: ListLabelsClient | null
+}): Promise<string[]> {
+  if (!input.listLabels) return input.request.labels
+
+  const repoLabels = await input.listLabels(input.repo.owner, input.repo.name)
+  return filterLabelsForPublish({
+    labels: input.request.labels,
+    repoLabels,
+    keptUnmatchedLabels: input.request.keptUnmatchedLabels
+  })
 }
 
 function recordLocalPublishState(

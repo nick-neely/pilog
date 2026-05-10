@@ -510,10 +510,7 @@ function DraftLabelBadges({
   labels: string[]
   labelMatches?: LabelMatch[]
 }): React.JSX.Element {
-  const badges =
-    labelMatches && labelMatches.length > 0
-      ? labelMatches
-      : labels.map((label) => ({ input: label, name: label, matched: true as const }))
+  const badges = labelBadgesForPreview(labels, labelMatches)
 
   return (
     <div className="flex flex-wrap gap-1.5">
@@ -527,6 +524,19 @@ function DraftLabelBadges({
       ))}
     </div>
   )
+}
+
+function labelBadgesForPreview(
+  labels: readonly string[],
+  labelMatches?: readonly LabelMatch[]
+): LabelMatch[] {
+  if (labelMatches && labelMatches.length > 0) return [...labelMatches]
+
+  return labels.map((label) => ({
+    input: label,
+    name: label,
+    matched: true
+  }))
 }
 
 function getAutoPublishDialogTitle(
