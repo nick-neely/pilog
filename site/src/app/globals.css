@@ -1,0 +1,112 @@
+@import 'tailwindcss';
+
+@import '@fontsource-variable/ibm-plex-sans';
+@import '@fontsource-variable/source-serif-4';
+@import '@fontsource/ibm-plex-mono/400.css';
+@import '@fontsource/ibm-plex-mono/500.css';
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --background: oklch(0.96 0.006 75);
+  --foreground: oklch(0.22 0.012 60);
+  --card: oklch(0.96 0.006 75);
+  --card-foreground: oklch(0.22 0.012 60);
+  --popover: oklch(0.97 0.005 75);
+  --popover-foreground: oklch(0.22 0.012 60);
+
+  --primary: oklch(0.48 0.08 145);
+  --primary-foreground: oklch(0.97 0.005 75);
+
+  --secondary: oklch(0.92 0.006 75);
+  --secondary-foreground: oklch(0.22 0.012 60);
+  --muted: oklch(0.92 0.006 75);
+  --muted-foreground: oklch(0.48 0.012 60);
+  --accent: oklch(0.92 0.006 75);
+  --accent-foreground: oklch(0.22 0.012 60);
+
+  --destructive: oklch(0.5 0.16 28);
+
+  --border: oklch(0.88 0.008 70);
+  --input: oklch(0.88 0.008 70);
+  --ring: oklch(0.48 0.08 145);
+
+  --radius: 0.5rem;
+}
+
+.dark {
+  --background: oklch(0.18 0.012 60);
+  --foreground: oklch(0.92 0.008 75);
+  --card: oklch(0.22 0.014 60);
+  --card-foreground: oklch(0.92 0.008 75);
+  --popover: oklch(0.22 0.014 60);
+  --popover-foreground: oklch(0.92 0.008 75);
+
+  --primary: oklch(0.6 0.085 145);
+  --primary-foreground: oklch(0.15 0.012 60);
+
+  --secondary: oklch(0.26 0.014 60);
+  --secondary-foreground: oklch(0.92 0.008 75);
+  --muted: oklch(0.26 0.014 60);
+  --muted-foreground: oklch(0.7 0.012 70);
+  --accent: oklch(0.26 0.014 60);
+  --accent-foreground: oklch(0.92 0.008 75);
+
+  --destructive: oklch(0.64 0.155 28);
+
+  --border: oklch(0.92 0.008 75 / 8%);
+  --input: oklch(0.92 0.008 75 / 12%);
+  --ring: oklch(0.6 0.085 145);
+}
+
+@layer base {
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-sans);
+  }
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    @apply font-sans;
+  }
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+  code,
+  kbd,
+  pre,
+  samp {
+    font-family: var(--font-mono);
+  }
+}
+
+@theme inline {
+  --font-sans: 'IBM Plex Sans Variable', 'IBM Plex Sans', system-ui, sans-serif;
+  --font-heading: 'Source Serif 4 Variable', 'Source Serif 4', Georgia, 'Iowan Old Style', serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
+
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+}
