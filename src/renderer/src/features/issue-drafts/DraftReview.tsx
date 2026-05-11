@@ -36,6 +36,7 @@ import { Textarea } from '@renderer/components/ui/textarea'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@renderer/components/ui/tooltip'
 import type { RunNavigationOrigin } from '@renderer/features/agent-runs/navigation'
 import { cn } from '@renderer/lib/utils'
+import { PILOG_APP_SHORTCUTS, usePilogHotkey } from '@renderer/shortcuts/pilog-hotkeys'
 import { getErrorMessage, getPublishRecoveryState, type RecoveryState } from '../recovery-state'
 import { PUBLISH_EGRESS_DISCLOSURE } from '@shared/data-boundaries'
 import type {
@@ -1302,15 +1303,9 @@ function DraftEditor({
     }
   }, [canSubmitSplit, draft.id, onSplitComplete, splitSourceNoteIds, splitting])
 
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent): void => {
-      if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== 's') return
-      event.preventDefault()
-      handleSaveShortcut()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [])
+  usePilogHotkey(PILOG_APP_SHORTCUTS.save, () => handleSaveShortcut(), {
+    allowInEditable: true
+  })
 
   return (
     <article className="flex min-h-full flex-col">

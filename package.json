@@ -108,6 +108,7 @@
     "@earendil-works/pi-agent-core": "0.74.0",
     "@earendil-works/pi-ai": "0.74.0",
     "@earendil-works/pi-coding-agent": "0.74.0",
+    "@tanstack/react-hotkeys": "^0.10.0",
     "@vscode/ripgrep": "^1.18.0",
     "ms": "2.1.3",
     "react-resizable-panels": "^4.11.0",

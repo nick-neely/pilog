@@ -17,7 +17,9 @@ import {
   CommandSeparator,
   CommandShortcut
 } from '@renderer/components/ui/command'
+import { shortcutBindingMeta } from '@renderer/shortcuts/pilog-hotkeys'
 import type { Note, Repo } from '@shared/ipc'
+import { SHORTCUT_CONTRACT } from '@shared/shortcuts'
 import type { IssueDraftForReview } from '@shared/types'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
@@ -107,6 +109,8 @@ export function GlobalCommandPalette({
 
   const reposById = useMemo(() => new Map(repos.map((repo) => [repo.id, repo])), [repos])
   const normalizedQuery = query.trim().toLowerCase()
+  const openInboxShortcut = shortcutBindingMeta(SHORTCUT_CONTRACT.openInbox).description
+  const openDraftsShortcut = shortcutBindingMeta(SHORTCUT_CONTRACT.openDrafts).description
 
   const noteResults = useMemo(() => {
     if (!normalizedQuery) return []
@@ -215,12 +219,16 @@ export function GlobalCommandPalette({
           <CommandItem onSelect={() => runCommand(onOpenInbox)}>
             <HugeiconsIcon icon={InboxIcon} aria-hidden />
             <span>Open inbox</span>
-            {activeRoute === 'inbox' && <CommandShortcut>active</CommandShortcut>}
+            <CommandShortcut>
+              {activeRoute === 'inbox' ? 'active' : openInboxShortcut}
+            </CommandShortcut>
           </CommandItem>
           <CommandItem onSelect={() => runCommand(onOpenDrafts)}>
             <HugeiconsIcon icon={File01Icon} aria-hidden />
             <span>Open drafts</span>
-            {activeRoute === 'draft-review' && <CommandShortcut>active</CommandShortcut>}
+            <CommandShortcut>
+              {activeRoute === 'draft-review' ? 'active' : openDraftsShortcut}
+            </CommandShortcut>
           </CommandItem>
           <CommandItem data-testid="cmd-agent-runs" onSelect={() => runCommand(onOpenRunHistory)}>
             <HugeiconsIcon icon={Activity01Icon} aria-hidden />

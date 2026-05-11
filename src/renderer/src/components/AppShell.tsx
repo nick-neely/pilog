@@ -3,6 +3,7 @@ import { HugeiconsIcon } from '@hugeicons/react'
 import { Button } from '@renderer/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@renderer/components/ui/tooltip'
 import { ViewTabs, type ViewTab } from '@renderer/features/shared/ViewTabs'
+import { PILOG_APP_SHORTCUTS, shortcutBindingMeta } from '@renderer/shortcuts/pilog-hotkeys'
 import type { ReactNode } from 'react'
 
 // AppShell is the global window chrome for Pilog's tab views (Inbox,
@@ -42,11 +43,7 @@ export function AppShell({
   onOpenCommandPalette,
   children
 }: AppShellProps): React.JSX.Element {
-  // The Cmd-K kbd hint is back inline because the top bar has window
-  // width to spend on it; this is the affordance most worth keeping
-  // discoverable in the chrome.
-  const isMac = typeof navigator !== 'undefined' && navigator.platform.toUpperCase().includes('MAC')
-  const metaKey = isMac ? '⌘' : 'Ctrl'
+  const commandPaletteShortcut = shortcutBindingMeta(PILOG_APP_SHORTCUTS.commandPalette).description
 
   return (
     <div className="flex h-screen flex-col bg-background text-foreground">
@@ -71,7 +68,7 @@ export function AppShell({
                   className="gap-1.5 px-2 text-xs text-muted-foreground"
                 >
                   <HugeiconsIcon icon={Search01Icon} aria-hidden />
-                  <kbd className="pointer-events-none font-mono">{metaKey}K</kbd>
+                  <kbd className="pointer-events-none font-mono">{commandPaletteShortcut}</kbd>
                 </Button>
               </TooltipTrigger>
               <TooltipContent>Search and commands</TooltipContent>

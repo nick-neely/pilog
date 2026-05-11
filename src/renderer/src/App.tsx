@@ -1,4 +1,4 @@
-import { useEffect, useState, useSyncExternalStore } from 'react'
+import { useState, useSyncExternalStore } from 'react'
 import { AppShell } from './components/AppShell'
 import { GlobalCommandPalette } from './components/GlobalCommandPalette'
 import {
@@ -16,6 +16,7 @@ import { AgentRuns } from './features/agent-runs/AgentRuns'
 import { DraftReview } from './features/issue-drafts/DraftReview'
 import { PublishLog } from './features/publish-log/PublishLog'
 import type { RunNavigationOrigin } from './features/agent-runs/navigation'
+import { PILOG_APP_SHORTCUTS, usePilogHotkey } from './shortcuts/pilog-hotkeys'
 
 type Route = 'inbox' | 'draft-review' | 'settings' | 'repositories' | 'agent-runs' | 'publish-log'
 type ViewTabValue = 'inbox' | 'drafts'
@@ -217,16 +218,11 @@ function App(): React.JSX.Element {
   const [runOrigin, setRunOrigin] = useState<RunNavigationOrigin | null>(null)
   const [paletteOpen, setPaletteOpen] = useState(false)
 
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent): void => {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
-        event.preventDefault()
-        setPaletteOpen((open) => !open)
-      }
-    }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [])
+  usePilogHotkey(PILOG_APP_SHORTCUTS.commandPalette, () => {
+    setPaletteOpen((open) => !open)
+  })
+  usePilogHotkey(PILOG_APP_SHORTCUTS.openInbox, () => setAppRoute('inbox'))
+  usePilogHotkey(PILOG_APP_SHORTCUTS.openDrafts, () => setAppRoute('draft-review'))
 
   const openInbox = (): void => setAppRoute('inbox')
   const openDrafts = (): void => setAppRoute('draft-review')

@@ -44,6 +44,11 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@renderer/components/ui
 import type { RunNavigationOrigin } from '@renderer/features/agent-runs/navigation'
 import { cn } from '@renderer/lib/utils'
 import {
+  PILOG_APP_SHORTCUTS,
+  isEditableShortcutTarget,
+  usePilogHotkey
+} from '@renderer/shortcuts/pilog-hotkeys'
+import {
   AUTO_PUBLISH_EGRESS_DISCLOSURE,
   GENERATION_EGRESS_DISCLOSURE,
   LOCAL_FIRST_DISCLOSURE
@@ -74,6 +79,7 @@ import {
 } from '@shared/onboarding'
 import {
   DEFAULT_GLOBAL_CAPTURE_SHORTCUT,
+  SHORTCUT_CONTRACT,
   formatShortcutForDisplay,
   getShortcutDisplayPlatform
 } from '@shared/shortcuts'
@@ -977,18 +983,11 @@ function NoteDetail({
     if (dirty) void handleSave()
   })
 
-  // Mod+S saves, matching the Scratchpad's editor convention. Keyboard-first
-  // is a system promise; the visible Save button is a courtesy, not the path.
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent): void => {
-      const isSave = (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's'
-      if (!isSave) return
-      e.preventDefault()
-      handleSaveShortcut()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [])
+  // Mod+S saves this note even while focus is in the note textarea. That
+  // shortcut is an explicit editor-surface opt-in, unlike navigation keys.
+  usePilogHotkey(PILOG_APP_SHORTCUTS.save, () => handleSaveShortcut(), {
+    allowInEditable: true
+  })
 
   return (
     <article className="flex h-full flex-col">
@@ -1792,32 +1791,19 @@ export function Inbox({
     selectionCount
   })
 
-  // Esc clears note selection. The listener uses
-  // capture on `document` so key events still reach us when a control stops
-  // propagation before `window`; we skip handling when the repo Select menu
-  // is open so Esc can close that surface first.
-  const handleInboxKeydown = useEffectEvent((e: KeyboardEvent): void => {
-    if (e.key !== 'Escape' || selectedIds.size === 0) {
-      return
-    }
+  const handleInboxEscape = useEffectEvent((e: KeyboardEvent): void => {
+    if (selectedIds.size === 0) return
     if (document.querySelector('[data-slot="select-content"][data-state="open"]')) {
       return
     }
-    const t = e.target
-    const el = t instanceof HTMLElement ? t : null
-    const tag = el?.tagName?.toLowerCase()
-    const typingSurface =
-      tag === 'input' || tag === 'textarea' || tag === 'select' || el?.isContentEditable === true
-    if (typingSurface) return
+    if (isEditableShortcutTarget(e.target)) return
     e.preventDefault()
     clearSelection()
   })
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent): void => handleInboxKeydown(e)
-    document.addEventListener('keydown', onKey, { capture: true })
-    return () => document.removeEventListener('keydown', onKey, { capture: true })
-  }, [])
+  usePilogHotkey(SHORTCUT_CONTRACT.contextualEscape, (e) => handleInboxEscape(e), {
+    enabled: selectedIds.size > 0
+  })
 
   const emptyMessage = useMemo(() => {
     const filtered = Boolean(statusFilter || repoFilter !== undefined)
