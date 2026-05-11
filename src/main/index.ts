@@ -9,6 +9,7 @@ import { runMigrations } from './db/migrations'
 import { cancelRunningAgentRuns } from './db/repositories/agent-runs'
 import { getOnboardingState, getSetting, setSetting } from './db/repositories/settings'
 import { registerGlobalHotkeys, unregisterGlobalHotkeys } from './hotkeys/register-global-hotkeys'
+import { resolveGitHubAuthOptions } from './github/auth'
 import { registerIpcHandlers } from './ipc/handlers'
 import { registerGitHubIpcHandlers } from './ipc/github-handlers'
 import { registerRepoIpcHandlers } from './ipc/repo-handlers'
@@ -30,6 +31,8 @@ import {
 import { hideScratchpad, openScratchpad } from './window/create-scratchpad-window'
 
 loadDotEnvFile()
+
+const BUNDLED_GITHUB_CLIENT_ID = process.env.PILOG_BUNDLED_GITHUB_CLIENT_ID?.trim() ?? ''
 
 if (process.env.PILOG_USER_DATA) {
   app.setPath('userData', process.env.PILOG_USER_DATA)
@@ -82,10 +85,11 @@ app.whenReady().then(() => {
   })
 
   registerGitHubIpcHandlers(
-    {
-      clientId: process.env.GITHUB_CLIENT_ID?.trim() ?? '',
-      clientSecret: process.env.GITHUB_CLIENT_SECRET?.trim() ?? ''
-    },
+    resolveGitHubAuthOptions({
+      env: process.env,
+      isDev: is.dev,
+      bundledClientId: BUNDLED_GITHUB_CLIENT_ID
+    }),
     db,
     {
       onIssueDraftsChanged: broadcastIssueDraftsInvalidated,

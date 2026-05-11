@@ -8,6 +8,7 @@ export function useGitHubStatus(): {
   error: string | null
   refresh: () => Promise<void>
   connect: () => Promise<GitHubStatus | null>
+  cancelConnect: () => Promise<void>
   signOut: () => Promise<void>
 } {
   const [status, setStatus] = useState<GitHubStatus | null>(null)
@@ -27,6 +28,24 @@ export function useGitHubStatus(): {
   useEffect(() => {
     void Promise.resolve().then(refresh)
   }, [refresh])
+
+  useEffect(() => {
+    return window.pilog.onGitHubAuthProgress((auth) => {
+      setStatus((current) => ({
+        connected: current?.connected ?? false,
+        login: current?.login,
+        auth
+      }))
+      if (
+        auth.state === 'denied' ||
+        auth.state === 'expired' ||
+        auth.state === 'cancelled' ||
+        auth.state === 'network_error'
+      ) {
+        setError(auth.message)
+      }
+    })
+  }, [])
 
   const connect = useCallback(async (): Promise<GitHubStatus | null> => {
     setConnecting(true)
@@ -49,5 +68,9 @@ export function useGitHubStatus(): {
     setStatus({ connected: false })
   }, [])
 
-  return { status, connecting, error, refresh, connect, signOut }
+  const cancelConnect = useCallback(async () => {
+    await window.pilog.invoke('github:cancelConnect')
+  }, [])
+
+  return { status, connecting, error, refresh, connect, cancelConnect, signOut }
 }

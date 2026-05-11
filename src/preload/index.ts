@@ -11,7 +11,8 @@ import type {
   IpcEvent,
   IpcRequest,
   IpcResponse,
-  AppUpdateStatus
+  AppUpdateStatus,
+  GitHubAuthProgress
 } from '../shared/ipc'
 
 const streamPorts = new Map<string, MessagePort>()
@@ -47,6 +48,15 @@ const pilog = {
     ipcRenderer.on('app-updates:status', listener)
     return () => {
       ipcRenderer.removeListener('app-updates:status', listener)
+    }
+  },
+  onGitHubAuthProgress: (callback: (progress: GitHubAuthProgress) => void): (() => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, progress: GitHubAuthProgress): void => {
+      callback(progress)
+    }
+    ipcRenderer.on('github:authProgress', listener)
+    return () => {
+      ipcRenderer.removeListener('github:authProgress', listener)
     }
   },
   send: (action: IpcAction): void => {

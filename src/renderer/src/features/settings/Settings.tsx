@@ -53,7 +53,13 @@ import {
 import { Separator } from '@renderer/components/ui/separator'
 import { Switch } from '@renderer/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@renderer/components/ui/tabs'
-import type { AdvancedSettings, AppUpdateStatus, SearchProvider, SettingKey } from '@shared/ipc'
+import type {
+  AdvancedSettings,
+  AppUpdateStatus,
+  GitHubAuthProgress,
+  SearchProvider,
+  SettingKey
+} from '@shared/ipc'
 import {
   DEFAULT_TURN_BUDGET,
   MAX_TURN_BUDGET,
@@ -73,6 +79,26 @@ const SEARCH_PROVIDER_LABELS: Record<SearchProvider, string> = {
 }
 const TURN_BUDGET_ERROR = `Enter a whole number from ${MIN_TURN_BUDGET} to ${MAX_TURN_BUDGET}.`
 const TURN_BUDGET_HELP = `Generation stops if a run passes this many turns. Default is ${DEFAULT_TURN_BUDGET}.`
+
+function githubAuthMessage(auth: GitHubAuthProgress | undefined): string | null {
+  if (!auth) return null
+
+  switch (auth.state) {
+    case 'device_code':
+      return 'GitHub is open in your browser. Enter this code to approve Pilog.'
+    case 'polling':
+      return auth.message
+    case 'slow_down':
+      return auth.message
+    case 'authorized':
+      return `Connected as ${auth.login}.`
+    case 'denied':
+    case 'expired':
+    case 'cancelled':
+    case 'network_error':
+      return auth.message
+  }
+}
 
 type AdvancedSettingsState = {
   settings: AdvancedSettings | null
@@ -468,9 +494,46 @@ export function Settings({
                         </CardContent>
                       </Card>
                     ) : (
-                      <Button onClick={github.connect} disabled={github.connecting} size="sm">
-                        {github.connecting ? 'Connecting…' : 'Connect GitHub'}
-                      </Button>
+                      <div className="flex flex-col gap-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Button onClick={github.connect} disabled={github.connecting} size="sm">
+                            {github.connecting ? 'Waiting for GitHub' : 'Connect GitHub'}
+                          </Button>
+                          {github.connecting ? (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => void github.cancelConnect()}
+                            >
+                              Cancel
+                            </Button>
+                          ) : null}
+                        </div>
+                        {github.status?.auth ? (
+                          <div className="rounded-md border bg-muted/40 p-3" aria-live="polite">
+                            {github.status.auth.state === 'device_code' ? (
+                              <div className="flex flex-col gap-2">
+                                <p className="text-xs text-muted-foreground">
+                                  {githubAuthMessage(github.status.auth)}
+                                </p>
+                                <div className="flex flex-wrap items-center gap-3">
+                                  <code className="rounded-sm border bg-background px-2 py-1 font-mono text-sm text-foreground">
+                                    {github.status.auth.userCode}
+                                  </code>
+                                  <span className="text-xs text-muted-foreground">
+                                    {github.status.auth.verificationUri}
+                                  </span>
+                                </div>
+                              </div>
+                            ) : (
+                              <p className="text-xs text-muted-foreground">
+                                {githubAuthMessage(github.status.auth)}
+                              </p>
+                            )}
+                          </div>
+                        ) : null}
+                      </div>
                     )}
                     {github.error ? (
                       <Alert variant="destructive" className="rounded-md">

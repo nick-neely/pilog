@@ -67,7 +67,23 @@ export type SettingKey =
   | 'pi.webSearchEnabled'
   | 'pi.webSearchProvider'
 
-export type GitHubStatus = { connected: boolean; login?: string }
+export type GitHubAuthProgress =
+  | {
+      state: 'device_code'
+      userCode: string
+      verificationUri: string
+      expiresAt: string
+      intervalSeconds: number
+    }
+  | { state: 'polling'; message: string }
+  | { state: 'slow_down'; intervalSeconds: number; message: string }
+  | { state: 'authorized'; login: string }
+  | { state: 'denied'; message: string }
+  | { state: 'expired'; message: string }
+  | { state: 'cancelled'; message: string }
+  | { state: 'network_error'; message: string }
+
+export type GitHubStatus = { connected: boolean; login?: string; auth?: GitHubAuthProgress }
 
 export type GitHubRepo = {
   id: number
@@ -290,6 +306,7 @@ export type IpcContract = {
   'settings:getAdvanced': { request: void; response: AdvancedSettings }
   'settings:setAdvanced': { request: SetAdvancedSettingsRequest; response: AdvancedSettings }
   'github:connect': { request: void; response: GitHubStatus }
+  'github:cancelConnect': { request: void; response: void }
   'github:signOut': { request: void; response: void }
   'github:status': { request: void; response: GitHubStatus }
   'repos:list': { request: void; response: Repo[] }
@@ -410,6 +427,7 @@ export type IpcEvent =
   | 'agent-runs:invalidated'
   | 'issue-drafts:invalidated'
   | 'app-updates:status'
+  | 'github:authProgress'
 
 export type IpcAction = 'scratchpad:hide'
 
