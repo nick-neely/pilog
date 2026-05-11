@@ -17,6 +17,8 @@ export type ShortcutBinding =
       key: string
     }
 
+const COMMAND_OR_CONTROL_KEYS = new Set(['CommandOrControl', 'CmdOrCtrl'])
+
 export const SHORTCUT_CONTRACT = {
   globalCapture: {
     id: 'global.capture',
@@ -63,8 +65,10 @@ export const SHORTCUT_CONTRACT = {
 export const DEFAULT_GLOBAL_CAPTURE_SHORTCUT = SHORTCUT_CONTRACT.globalCapture.accelerator
 
 export function getShortcutDisplayPlatform(platform: string): ShortcutDisplayPlatform {
-  if (platform.toLowerCase().includes('mac')) return 'mac'
-  if (platform.toLowerCase().includes('win')) return 'windows'
+  const normalizedPlatform = platform.toLowerCase()
+
+  if (normalizedPlatform.includes('mac')) return 'mac'
+  if (normalizedPlatform.includes('win')) return 'windows'
   return 'linux'
 }
 
@@ -79,7 +83,7 @@ export function formatShortcutForDisplay(
   return shortcut
     .split('+')
     .map((part) => {
-      if (part === 'CommandOrControl' || part === 'CmdOrCtrl') return commandKey
+      if (COMMAND_OR_CONTROL_KEYS.has(part)) return commandKey
       return part
     })
     .join(' + ')

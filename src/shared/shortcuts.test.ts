@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest'
 import {
   DEFAULT_GLOBAL_CAPTURE_SHORTCUT,
   SHORTCUT_CONTRACT,
-  formatShortcutForDisplay
+  formatShortcutForDisplay,
+  getShortcutDisplayPlatform
 } from './shortcuts'
 
 describe('shortcut contract', () => {
@@ -38,5 +39,11 @@ describe('shortcut contract', () => {
   it('formats sequences and single keys without accelerator separators', () => {
     expect(formatShortcutForDisplay(SHORTCUT_CONTRACT.generateDrafts.sequence, 'mac')).toBe('G D')
     expect(formatShortcutForDisplay(SHORTCUT_CONTRACT.contextualEscape.key, 'windows')).toBe('Esc')
+  })
+
+  it('detects display platforms from navigator platform strings', () => {
+    expect(getShortcutDisplayPlatform('MacIntel')).toBe('mac')
+    expect(getShortcutDisplayPlatform('Win32')).toBe('windows')
+    expect(getShortcutDisplayPlatform('Linux x86_64')).toBe('linux')
   })
 })

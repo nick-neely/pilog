@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import type { ReactElement } from 'react'
 
 const SHORTCUTS = [
   { label: 'Capture', value: 'CommandOrControl+Shift+Space' },
@@ -10,7 +11,7 @@ const SHORTCUTS = [
   { label: 'Step back', value: 'Esc' }
 ] as const
 
-export default function LandingPage() {
+export default function LandingPage(): ReactElement {
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-20 px-6 py-20">
       <section className="flex flex-col items-start gap-6">
