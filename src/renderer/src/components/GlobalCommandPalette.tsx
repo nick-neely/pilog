@@ -18,6 +18,7 @@ import {
   CommandShortcut
 } from '@renderer/components/ui/command'
 import { shortcutBindingMeta } from '@renderer/shortcuts/pilog-hotkeys'
+import { getShortcutHelpItems } from '@renderer/shortcuts/shortcut-help'
 import type { Note, Repo } from '@shared/ipc'
 import { SHORTCUT_CONTRACT } from '@shared/shortcuts'
 import type { IssueDraftForReview } from '@shared/types'
@@ -111,6 +112,7 @@ export function GlobalCommandPalette({
   const normalizedQuery = query.trim().toLowerCase()
   const openInboxShortcut = shortcutBindingMeta(SHORTCUT_CONTRACT.openInbox).description
   const openDraftsShortcut = shortcutBindingMeta(SHORTCUT_CONTRACT.openDrafts).description
+  const shortcutHelpItems = useMemo(() => getShortcutHelpItems(), [])
 
   const noteResults = useMemo(() => {
     if (!normalizedQuery) return []
@@ -239,6 +241,19 @@ export function GlobalCommandPalette({
             <span>Settings</span>
             <CommandShortcut>{`${META_KEY},`}</CommandShortcut>
           </CommandItem>
+        </CommandGroup>
+        <CommandSeparator />
+        <CommandGroup heading="Keyboard Shortcuts">
+          {shortcutHelpItems.map((shortcut) => (
+            <CommandItem
+              key={shortcut.id}
+              value={`${shortcut.label} ${shortcut.shortcut} ${shortcut.id}`}
+              onSelect={() => undefined}
+            >
+              <span>{shortcut.label}</span>
+              <CommandShortcut>{shortcut.shortcut}</CommandShortcut>
+            </CommandItem>
+          ))}
         </CommandGroup>
       </CommandList>
     </CommandDialog>

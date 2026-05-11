@@ -119,7 +119,7 @@ Order matters: 1A → 1B → 1C. Each can be a standalone PR.
 
 ### 3.2 Sub-phase 1B — Capture (the scratchpad)
 
-- ☑ **Global hotkey** — register `CommandOrControl+Alt+N` on app ready; deregister on quit. Read user override from a new `settings` row (key/value table).
+- ☑ **Global hotkey** — register `CommandOrControl+Shift+Space` on app ready; deregister on quit. Read user override from a new `settings` row (key/value table).
 - ☑ **Scratchpad window**
   - Frameless, always-on-top, 480×360, centered to active screen.
   - Single CodeMirror 6 instance configured for markdown. No menus, no chrome.
