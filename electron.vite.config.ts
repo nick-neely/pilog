@@ -5,6 +5,11 @@ import tailwindcss from '@tailwindcss/vite'
 
 export default defineConfig({
   main: {
+    define: {
+      'process.env.PILOG_BUNDLED_GITHUB_CLIENT_ID': JSON.stringify(
+        process.env.PILOG_BUNDLED_GITHUB_CLIENT_ID ?? process.env.GITHUB_CLIENT_ID ?? ''
+      )
+    },
     resolve: {
       alias: {
         '@main': resolve('src/main'),

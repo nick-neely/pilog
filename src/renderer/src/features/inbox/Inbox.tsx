@@ -764,12 +764,29 @@ function OnboardingPanel({
               </div>
             </div>
           ) : (
-            <Button onClick={action.onClick} disabled={working} className="min-w-[12rem]" size="lg">
-              {working && (
-                <span className="mr-2 inline-block size-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-              )}
-              {action.label}
-            </Button>
+            <div className="flex w-full flex-col items-center gap-3">
+              {displayedStep === 'github' && getGitHubAuthText(signals.github) ? (
+                <div
+                  className="w-full max-w-md rounded-md border bg-muted/30 p-3"
+                  aria-live="polite"
+                >
+                  <p className="text-xs leading-5 text-muted-foreground">
+                    {getGitHubAuthText(signals.github)}
+                  </p>
+                </div>
+              ) : null}
+              <Button
+                onClick={action.onClick}
+                disabled={working}
+                className="min-w-[12rem]"
+                size="lg"
+              >
+                {working && (
+                  <span className="mr-2 inline-block size-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                )}
+                {action.label}
+              </Button>
+            </div>
           )}
         </div>
 
@@ -825,6 +842,16 @@ function getOnboardingAction(input: {
     case 'review':
       return { label: 'Open full draft', onClick: input.onOpenDrafts }
   }
+}
+
+function getGitHubAuthText(status: GitHubStatus): string | null {
+  const auth = status.auth
+  if (!auth) return null
+  if (auth.state === 'device_code') {
+    return `Enter ${auth.userCode} at ${auth.verificationUri}.`
+  }
+  if (auth.state === 'authorized') return `Connected as ${auth.login}.`
+  return 'message' in auth ? auth.message : null
 }
 
 function getLatestOnboardingDraftPreview(
@@ -1420,6 +1447,16 @@ export function Inbox({
     window.pilog.invoke('setting:get', { key: 'hotkey.scratchpad' }).then((value) => {
       setOnboardingHotkey(value)
       setOnboardingHotkeyDraft(value ?? '')
+    })
+  }, [])
+
+  useEffect(() => {
+    return window.pilog.onGitHubAuthProgress((auth) => {
+      setGitHubStatus((current) => ({
+        connected: current.connected,
+        login: current.login,
+        auth
+      }))
     })
   }, [])
 

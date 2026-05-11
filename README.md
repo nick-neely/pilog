@@ -43,19 +43,22 @@ pnpm install
 cp .env.example .env
 ```
 
-The `.env` file is only needed for GitHub OAuth. You can launch the app without filling it in, but GitHub sign-in will not work until `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` are set.
+Packaged GitHub sign-in uses GitHub OAuth Device Flow. The app only needs a public OAuth client ID bundled at build time, never a client secret. Set `PILOG_BUNDLED_GITHUB_CLIENT_ID` when building a distributable package, or set `GITHUB_CLIENT_ID` during development to exercise the same device flow.
 
-For GitHub sign-in, create a GitHub OAuth App with this callback URL:
+The OAuth app must have Device Flow enabled in GitHub's developer settings. No callback URL is used for the packaged/default flow.
+
+The old loopback OAuth path is development/test-only. To use it locally, create a GitHub OAuth App with this callback URL:
 
 ```text
 http://127.0.0.1/callback
 ```
 
-Then add the credentials to `.env`:
+Then add the credentials and opt into loopback in `.env`:
 
 ```bash
 GITHUB_CLIENT_ID=...
 GITHUB_CLIENT_SECRET=...
+PILOG_GITHUB_AUTH_FLOW=loopback
 ```
 
 Optional development setting:
