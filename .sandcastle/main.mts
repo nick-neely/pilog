@@ -63,22 +63,29 @@ function skillMounts(): Array<{ hostPath: string; sandboxPath: string; readonly:
   const mounts: Array<{ hostPath: string; sandboxPath: string; readonly: true }> = []
   const hostHome = homedir()
 
-  // Claude Code skills.
-  if (existsSync(join(hostHome, '.claude/skills'))) {
-    mounts.push({
-      hostPath: '~/.claude/skills',
-      sandboxPath: '/home/agent/.claude/skills',
-      readonly: true
-    })
-  }
+  const claudeDir = join(hostHome, '.claude/skills')
+  const agentsDir = join(hostHome, '.agents/skills')
+  const hasClaude = existsSync(claudeDir)
+  const hasAgents = existsSync(agentsDir)
 
-  // Codex/agents skills.
-  if (existsSync(join(hostHome, '.agents/skills'))) {
-    mounts.push({
-      hostPath: '~/.agents/skills',
-      sandboxPath: '/home/agent/.agents/skills',
-      readonly: true
-    })
+  // Claude Code reads ~/.claude/skills; Codex/agents tooling often uses ~/.agents/skills.
+  // Mount both in-container paths. If only one host directory exists, bind-mount it
+  // twice so either toolchain sees the same skills (future parallel Claude + Codex runs).
+  if (hasClaude && hasAgents) {
+    mounts.push(
+      { hostPath: '~/.claude/skills', sandboxPath: '/home/agent/.claude/skills', readonly: true },
+      { hostPath: '~/.agents/skills', sandboxPath: '/home/agent/.agents/skills', readonly: true }
+    )
+  } else if (hasClaude) {
+    mounts.push(
+      { hostPath: '~/.claude/skills', sandboxPath: '/home/agent/.claude/skills', readonly: true },
+      { hostPath: '~/.claude/skills', sandboxPath: '/home/agent/.agents/skills', readonly: true }
+    )
+  } else if (hasAgents) {
+    mounts.push(
+      { hostPath: '~/.agents/skills', sandboxPath: '/home/agent/.agents/skills', readonly: true },
+      { hostPath: '~/.agents/skills', sandboxPath: '/home/agent/.claude/skills', readonly: true }
+    )
   }
 
   return mounts

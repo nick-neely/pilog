@@ -238,20 +238,20 @@ User can connect GitHub, link a real repo, type a title/body, and see the issue 
 
 ### 8.1 GitHub-native draft quality
 
-- ☐ **Issue-template awareness** — read repo issue templates when available and use the chosen/default template as scaffolding for generated drafts and manual compose. Tracked by #35.
-- ☐ **Repo label matching** — fetch existing labels for the linked repo, normalize generated label suggestions against that set, and make invented labels explicit instead of silently sending them. Tracked by #36.
-- ◐ **Prompt tuning loop** — fixture response tests already cover grouping, splitting, parent/subtask, single-draft, and clarification shapes; Phase 6 needs fixture repos and repeatable quality checks that exercise real repo tools, templates, and labels. Tracked by #37.
+- ☑ **Issue-template awareness** — read repo issue templates when available and use the chosen/default template as scaffolding for generated drafts and manual compose. Tracked by #35.
+- ☑ **Repo label matching** — fetch existing labels for the linked repo, normalize generated label suggestions against that set, and make invented labels explicit instead of silently sending them. Tracked by #36.
+- ☑ **Prompt tuning loop** — fixture response tests already cover grouping, splitting, parent/subtask, single-draft, and clarification shapes; Phase 6 needs fixture repos and repeatable quality checks that exercise real repo tools, templates, and labels. Tracked by #37.
 
 ### 8.2 First-run and cross-app states
 
-- ◐ **Loading / error / empty states across the app** — core Inbox, Draft Review, Agent Runs, Settings, Repositories, auto-publish, and Publish Log states exist, but the app still needs a complete pass for consistency, recovery actions, and accessible wording. Tracked by #39.
-- ☐ **Onboarding flow** — first launch should guide the user through hotkey, GitHub auth, first linked repo, first note, first draft, and first publish without leaving the app. Tracked by #38.
+- ☑ **Loading / error / empty states across the app** — core Inbox, Draft Review, Agent Runs, Settings, Repositories, auto-publish, and Publish Log states exist, but the app still needs a complete pass for consistency, recovery actions, and accessible wording. Tracked by #39.
+- ☑ **Onboarding flow** — first launch should guide the user through hotkey, GitHub auth, first linked repo, first note, first draft, and first publish without leaving the app. Tracked by #38.
 - ☑ **Packaged runtime readiness** — unpacked packaged smoke now verifies the packaged app launches outside dev, resolves `better-sqlite3`, Pi packages, `@vscode/ripgrep`, app identity, icon resources, note CRUD, fixture draft generation, and the core Inbox/Drafts/Settings/Repositories surfaces. Tracked by #40.
 
 ### 8.3 Distribution and updates
 
 - ☑ **App icon, tray icon, and packaging** — `pilog-app-icon.png` is promoted to the canonical app/tray source, Electron Builder metadata uses Pilog values, app id is `dev.pilog.app`, fake update configuration is removed, and signing/notarization is documented as ready but deferred. Tracked by #40.
-- ☐ **App update channel** — `electron-updater` is installed, but #40 deliberately removed fake provider configuration; #41 owns real provider setup, update checks, and user-facing update states.
+- ☑ **App update channel** — `electron-updater` is installed, but #40 deliberately removed fake provider configuration; #41 owns real provider setup, update checks, and user-facing update states.
 
 ### Phase 6 acceptance
 
