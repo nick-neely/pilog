@@ -36,14 +36,19 @@ import { Textarea } from '@renderer/components/ui/textarea'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@renderer/components/ui/tooltip'
 import type { RunNavigationOrigin } from '@renderer/features/agent-runs/navigation'
 import { cn } from '@renderer/lib/utils'
-import { PILOG_APP_SHORTCUTS, usePilogHotkey } from '@renderer/shortcuts/pilog-hotkeys'
 import {
   getListNavigationIndex,
   shouldHandleListNavigationShortcut,
   type ListNavigationDirection
 } from '@renderer/shortcuts/list-navigation'
+import {
+  PILOG_APP_SHORTCUTS,
+  shouldEnablePublishDraftShortcut,
+  usePilogHotkey
+} from '@renderer/shortcuts/pilog-hotkeys'
 import { getErrorMessage, getPublishRecoveryState, type RecoveryState } from '../recovery-state'
 import { PUBLISH_EGRESS_DISCLOSURE } from '@shared/data-boundaries'
+import { SHORTCUT_CONTRACT } from '@shared/shortcuts'
 import type {
   AgentRunListItem,
   GitHubLabel,
@@ -59,7 +64,6 @@ import type {
   IssueDraftSourceNote,
   IssueDraftStatus
 } from '@shared/types'
-import { SHORTCUT_CONTRACT } from '@shared/shortcuts'
 import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
 
 const EMPTY_STATUS_COUNTS: Record<IssueDraftStatus, number> = {
@@ -1341,6 +1345,9 @@ function DraftEditor({
 
   usePilogHotkey(PILOG_APP_SHORTCUTS.save, () => handleSaveShortcut(), {
     allowInEditable: true
+  })
+  usePilogHotkey(SHORTCUT_CONTRACT.publishDraft, () => void handlePublish(), {
+    enabled: shouldEnablePublishDraftShortcut({ canPublish, publishing, saving })
   })
 
   return (

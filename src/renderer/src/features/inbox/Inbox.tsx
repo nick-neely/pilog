@@ -45,8 +45,11 @@ import type { RunNavigationOrigin } from '@renderer/features/agent-runs/navigati
 import { cn } from '@renderer/lib/utils'
 import {
   PILOG_APP_SHORTCUTS,
-  isEditableShortcutTarget,
-  usePilogHotkey
+  hasOpenTransientUi,
+  shouldClearSelectionForContextualEscape,
+  shouldEnableGenerateDraftsShortcut,
+  usePilogHotkey,
+  usePilogHotkeySequence
 } from '@renderer/shortcuts/pilog-hotkeys'
 import {
   getListNavigationIndex,
@@ -1799,11 +1802,15 @@ export function Inbox({
 
   const handleInboxEscape = useCallback(
     (e: KeyboardEvent): void => {
-      if (selectedIds.size === 0) return
-      if (document.querySelector('[data-slot="select-content"][data-state="open"]')) {
+      if (
+        !shouldClearSelectionForContextualEscape({
+          selectionCount: selectedIds.size,
+          target: e.target,
+          transientUiOpen: hasOpenTransientUi()
+        })
+      ) {
         return
       }
-      if (isEditableShortcutTarget(e.target)) return
       e.preventDefault()
       clearSelection()
     },
@@ -1904,6 +1911,14 @@ export function Inbox({
       }
     }
   }
+
+  usePilogHotkeySequence(
+    SHORTCUT_CONTRACT.generateDrafts,
+    () => void handleGenerateDrafts('review'),
+    {
+      enabled: shouldEnableGenerateDraftsShortcut({ canGenerateDrafts })
+    }
+  )
 
   const handleGenerateFirstDraft = async (): Promise<void> => {
     const firstReadyNote =

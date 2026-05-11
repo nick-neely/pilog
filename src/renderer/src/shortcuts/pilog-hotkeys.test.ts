@@ -2,9 +2,13 @@ import { describe, expect, it } from 'vitest'
 import { SHORTCUT_CONTRACT } from '@shared/shortcuts'
 import {
   PILOG_APP_SHORTCUTS,
+  hasOpenTransientUi,
   isEditableShortcutTarget,
   shortcutBindingMeta,
-  shortcutBindingToTanStackHotkey
+  shortcutBindingToTanStackHotkey,
+  shouldClearSelectionForContextualEscape,
+  shouldEnableGenerateDraftsShortcut,
+  shouldEnablePublishDraftShortcut
 } from './pilog-hotkeys'
 
 describe('PiLog renderer hotkeys', () => {
@@ -61,5 +65,92 @@ describe('PiLog renderer hotkeys', () => {
         value: OriginalHTMLElement
       })
     }
+  })
+
+  it('enables the generate shortcut only when the visible generate action is enabled', () => {
+    expect(shouldEnableGenerateDraftsShortcut({ canGenerateDrafts: true })).toBe(true)
+    expect(shouldEnableGenerateDraftsShortcut({ canGenerateDrafts: false })).toBe(false)
+  })
+
+  it('enables the publish shortcut only when the visible publish action is enabled', () => {
+    expect(
+      shouldEnablePublishDraftShortcut({ canPublish: true, publishing: false, saving: false })
+    ).toBe(true)
+    expect(
+      shouldEnablePublishDraftShortcut({ canPublish: false, publishing: false, saving: false })
+    ).toBe(false)
+    expect(
+      shouldEnablePublishDraftShortcut({ canPublish: true, publishing: true, saving: false })
+    ).toBe(false)
+    expect(
+      shouldEnablePublishDraftShortcut({ canPublish: true, publishing: false, saving: true })
+    ).toBe(false)
+  })
+
+  it('prioritizes transient UI and editable surfaces before contextual selection clearing', () => {
+    const OriginalHTMLElement = globalThis.HTMLElement
+
+    class FakeHTMLElement extends EventTarget {
+      constructor(private readonly matched: boolean) {
+        super()
+      }
+
+      closest(): FakeHTMLElement | null {
+        return this.matched ? this : null
+      }
+    }
+
+    Object.defineProperty(globalThis, 'HTMLElement', {
+      configurable: true,
+      value: FakeHTMLElement
+    })
+
+    try {
+      expect(
+        shouldClearSelectionForContextualEscape({
+          selectionCount: 1,
+          target: new FakeHTMLElement(false),
+          transientUiOpen: false
+        })
+      ).toBe(true)
+      expect(
+        shouldClearSelectionForContextualEscape({
+          selectionCount: 1,
+          target: new FakeHTMLElement(false),
+          transientUiOpen: true
+        })
+      ).toBe(false)
+      expect(
+        shouldClearSelectionForContextualEscape({
+          selectionCount: 1,
+          target: new FakeHTMLElement(true),
+          transientUiOpen: false
+        })
+      ).toBe(false)
+      expect(
+        shouldClearSelectionForContextualEscape({
+          selectionCount: 0,
+          target: new FakeHTMLElement(false),
+          transientUiOpen: false
+        })
+      ).toBe(false)
+    } finally {
+      Object.defineProperty(globalThis, 'HTMLElement', {
+        configurable: true,
+        value: OriginalHTMLElement
+      })
+    }
+  })
+
+  it('detects open transient UI surfaces', () => {
+    const root = {
+      querySelector(selector: string): object | null {
+        expect(selector).toContain('[role="dialog"][data-state="open"]')
+        expect(selector).toContain('[data-slot="select-content"][data-state="open"]')
+        return {}
+      }
+    } as ParentNode
+
+    expect(hasOpenTransientUi(root)).toBe(true)
   })
 })

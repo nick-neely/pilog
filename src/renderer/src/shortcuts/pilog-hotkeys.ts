@@ -20,6 +20,19 @@ type ShortcutBindingMeta = {
   description: string
   pilogShortcutId: string
 }
+type GenerateDraftsShortcutState = {
+  canGenerateDrafts: boolean
+}
+type PublishDraftShortcutState = {
+  canPublish: boolean
+  publishing: boolean
+  saving: boolean
+}
+type ContextualEscapeState = {
+  selectionCount: number
+  target: EventTarget | null
+  transientUiOpen: boolean
+}
 
 type PilogHotkeyOptions = Omit<
   UseHotkeyOptions,
@@ -40,6 +53,15 @@ type PilogHotkeySequenceOptions = Omit<
 export const HOTKEY_CONFLICT_BEHAVIOR = import.meta.env.DEV ? 'warn' : 'allow'
 const EDITABLE_SHORTCUT_TARGET_SELECTOR =
   'input, textarea, select, [contenteditable=""], [contenteditable="true"], .cm-editor, .cm-content'
+const TRANSIENT_UI_SELECTOR = [
+  '[role="dialog"][data-state="open"]',
+  '[role="menu"][data-state="open"]',
+  '[role="listbox"][data-state="open"]',
+  '[role="tooltip"][data-state="open"]',
+  '[cmdk-dialog][data-state="open"]',
+  '[data-slot="select-content"][data-state="open"]',
+  '[data-radix-popper-content-wrapper] [data-state="open"]'
+].join(', ')
 
 export function usePilogHotkey(
   binding: ShortcutBinding,
@@ -117,6 +139,32 @@ export function isEditableShortcutTarget(target: EventTarget | null): boolean {
   const editable = target.closest(EDITABLE_SHORTCUT_TARGET_SELECTOR)
 
   return editable !== null
+}
+
+export function hasOpenTransientUi(root: ParentNode = document): boolean {
+  return root.querySelector(TRANSIENT_UI_SELECTOR) !== null
+}
+
+export function shouldEnableGenerateDraftsShortcut({
+  canGenerateDrafts
+}: GenerateDraftsShortcutState): boolean {
+  return canGenerateDrafts
+}
+
+export function shouldEnablePublishDraftShortcut({
+  canPublish,
+  publishing,
+  saving
+}: PublishDraftShortcutState): boolean {
+  return canPublish && !publishing && !saving
+}
+
+export function shouldClearSelectionForContextualEscape({
+  selectionCount,
+  target,
+  transientUiOpen
+}: ContextualEscapeState): boolean {
+  return selectionCount > 0 && !transientUiOpen && !isEditableShortcutTarget(target)
 }
 
 export const PILOG_APP_SHORTCUTS = {
