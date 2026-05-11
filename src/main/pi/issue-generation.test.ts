@@ -99,9 +99,11 @@ describe('issue generation', () => {
       githubUrl: 'https://github.com/nick-neely/pilog',
       defaultBranch: 'main'
     })
-    const listLabels = vi.fn().mockResolvedValue([
-      { id: 1, name: 'bug', color: 'd73a4a', description: 'Something is broken' }
-    ])
+    const listLabels = vi
+      .fn()
+      .mockResolvedValue([
+        { id: 1, name: 'bug', color: 'd73a4a', description: 'Something is broken' }
+      ])
 
     const hydrated = await hydrateRepoLabelsIfNeeded(db, repo, listLabels)
 

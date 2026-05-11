@@ -10,7 +10,7 @@ import {
   type UpdateRepoAutoPublishSettingsRequest
 } from '@shared/ipc'
 
-const repoColumns = {
+export const repoColumns = {
   id: repos.id,
   name: repos.name,
   owner: repos.owner,
@@ -127,7 +127,7 @@ export function deleteRepo(db: PilogDatabase, id: string): boolean {
   return result.changes > 0
 }
 
-type RepoRow = {
+export type RepoRow = {
   id: string
   name: string
   owner: string
@@ -145,7 +145,7 @@ type RepoRow = {
   updatedAt: string
 }
 
-function mapRepoRow(row: RepoRow): Repo {
+export function mapRepoRow(row: RepoRow): Repo {
   return {
     ...row,
     githubLabels: parseGithubLabels(row.githubLabels),

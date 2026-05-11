@@ -156,7 +156,11 @@ describe('publish-log repository', () => {
   })
 
   it('lists audit entries with repo, draft, and source-note context', () => {
-    const repo = createRepo(db, sampleRepo)
+    const repo = createRepo(db, {
+      ...sampleRepo,
+      githubLabels: [{ id: 1, name: 'bug', color: 'd73a4a', description: 'Something is broken' }],
+      githubLabelsSyncedAt: '2026-05-11T00:00:00.000Z'
+    })
     const note = createNote(db, { content: 'save button needs loading state', repoId: repo.id })
     const draft = createIssueDraft(db, {
       repoId: repo.id,
@@ -177,7 +181,11 @@ describe('publish-log repository', () => {
           id: repo.id,
           name: 'pilog',
           owner: 'nick-neely',
-          githubUrl: 'https://github.com/nick-neely/pilog'
+          githubUrl: 'https://github.com/nick-neely/pilog',
+          githubLabels: [
+            { id: 1, name: 'bug', color: 'd73a4a', description: 'Something is broken' }
+          ],
+          githubLabelsSyncedAt: '2026-05-11T00:00:00.000Z'
         }),
         sourceNotes: [
           expect.objectContaining({

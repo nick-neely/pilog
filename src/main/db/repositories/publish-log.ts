@@ -2,8 +2,9 @@ import { desc, eq, inArray } from 'drizzle-orm'
 import { v4 as uuidv4 } from 'uuid'
 import type { PilogDatabase } from '../client'
 import { issueDrafts, notes, publishLog, repos } from '../schema'
-import type { GitHubLabel, PublishAuditLogEntry, PublishLogEntry, Repo } from '@shared/ipc'
+import type { PublishAuditLogEntry, PublishLogEntry } from '@shared/ipc'
 import type { IssueDraftSourceNote } from '@shared/types'
+import { mapRepoRow, repoColumns } from './repos'
 
 const publishLogColumns = {
   id: publishLog.id,
@@ -11,24 +12,6 @@ const publishLogColumns = {
   repoId: publishLog.repoId,
   githubIssueUrl: publishLog.githubIssueUrl,
   publishedAt: publishLog.publishedAt
-} as const
-
-const repoColumns = {
-  id: repos.id,
-  name: repos.name,
-  owner: repos.owner,
-  localPath: repos.localPath,
-  githubUrl: repos.githubUrl,
-  defaultBranch: repos.defaultBranch,
-  githubLabels: repos.githubLabels,
-  githubLabelsSyncedAt: repos.githubLabelsSyncedAt,
-  autoPublishEnabled: repos.autoPublishEnabled,
-  autoPublishMaxIssuesPerRun: repos.autoPublishMaxIssuesPerRun,
-  autoPublishDefaultLabel: repos.autoPublishDefaultLabel,
-  autoPublishDryRun: repos.autoPublishDryRun,
-  autoPublishRequireConfirmation: repos.autoPublishRequireConfirmation,
-  createdAt: repos.createdAt,
-  updatedAt: repos.updatedAt
 } as const
 
 const sourceNoteColumns = {
@@ -119,38 +102,11 @@ export function listPublishAuditLog(
       repoId: row.repoId,
       githubIssueUrl: row.githubIssueUrl,
       publishedAt: row.publishedAt,
-      repo: mapRepo(row.repo),
+      repo: mapRepoRow(row.repo),
       draftTitle: row.draftTitle,
       sourceNotes
     }
   })
-}
-
-function mapRepo(repo: Omit<Repo, 'githubLabels'> & { githubLabels: string }): Repo {
-  return {
-    ...repo,
-    githubLabels: parseGithubLabels(repo.githubLabels),
-    githubLabelsSyncedAt: repo.githubLabelsSyncedAt ?? null
-  }
-}
-
-function parseGithubLabels(value: string): GitHubLabel[] {
-  try {
-    const parsed = JSON.parse(value) as unknown
-    return Array.isArray(parsed)
-      ? parsed.filter((label): label is GitHubLabel => {
-          return (
-            label !== null &&
-            typeof label === 'object' &&
-            typeof (label as GitHubLabel).id === 'number' &&
-            typeof (label as GitHubLabel).name === 'string' &&
-            typeof (label as GitHubLabel).color === 'string'
-          )
-        })
-      : []
-  } catch {
-    return []
-  }
 }
 
 function parseJsonStringArray(value: string | null): string[] {
