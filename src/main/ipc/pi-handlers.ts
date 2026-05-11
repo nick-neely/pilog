@@ -33,9 +33,9 @@ import {
 import {
   getCurrentInboxNotesForGeneration,
   getSelectedNotesForGeneration,
-  hydrateRepoLabelsIfNeeded,
   planAutoPublishPreviewDrafts,
   persistGeneratedIssueDrafts,
+  refreshRepoLabelsIfStale,
   type RunAgent
 } from '../pi/issue-generation'
 import { runAgent } from '../pi/runtime'
@@ -126,7 +126,7 @@ export function registerPiIpcHandlers(
       throw new Error('Configure Pi credentials before generating drafts.')
 
     if (getOctokitClient()) {
-      repo = await hydrateRepoLabelsIfNeeded(db, repo, listLabelsImpl)
+      repo = await refreshRepoLabelsIfStale(db, repo, listLabelsImpl)
     }
 
     const run = createAgentRun(db, {

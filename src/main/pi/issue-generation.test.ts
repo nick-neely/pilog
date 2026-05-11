@@ -22,6 +22,7 @@ import {
   buildIssueGenerationPrompt,
   createSubmitIssueDraftsTool,
   hydrateRepoLabelsIfNeeded,
+  refreshRepoLabelsIfStale,
   getCurrentInboxNotesForGeneration,
   persistGeneratedIssueDrafts,
   validateAndCollectSourceNoteIds
@@ -115,6 +116,54 @@ describe('issue generation', () => {
 
     const persisted = await hydrateRepoLabelsIfNeeded(db, hydrated, listLabels)
     expect(persisted.githubLabels).toEqual(hydrated.githubLabels)
+    expect(listLabels).toHaveBeenCalledTimes(1)
+  })
+
+  it('refreshes stale repo labels before generation so prompt and matching use the updated cache', async () => {
+    const db = createInMemoryDatabase()
+    runMigrations(db)
+    const repo = createRepo(db, {
+      owner: 'nick-neely',
+      name: 'pilog',
+      localPath: '/workspace/pilog',
+      githubUrl: 'https://github.com/nick-neely/pilog',
+      defaultBranch: 'main',
+      githubLabels: [{ id: 1, name: 'bug', color: 'd73a4a', description: null }],
+      githubLabelsSyncedAt: '2026-05-10T00:00:00.000Z'
+    })
+    const listLabels = vi.fn().mockResolvedValue([
+      { id: 2, name: 'enhancement', color: 'a2eeef', description: 'New feature or request' },
+      { id: 3, name: 'ready-for-agent', color: '0e8a16', description: null }
+    ])
+
+    const refreshed = await refreshRepoLabelsIfStale(db, repo, listLabels, {
+      now: new Date('2026-05-11T02:00:00.000Z')
+    })
+
+    expect(listLabels).toHaveBeenCalledWith('nick-neely', 'pilog')
+    expect(refreshed.githubLabels.map((label) => label.name)).toEqual([
+      'enhancement',
+      'ready-for-agent'
+    ])
+    expect(buildIssueGenerationPrompt({ repo: refreshed, notes: [] })).toContain(
+      '- enhancement: New feature or request'
+    )
+    expect(
+      planAutoPublishPreviewDrafts({
+        runId: 'run-1',
+        repo: {
+          ...refreshed,
+          autoPublishEnabled: true,
+          autoPublishDefaultLabel: 'ready-for-agent'
+        },
+        repoLabels: refreshed.githubLabels,
+        drafts: [{ ...draft, sourceNoteIds: [], suggestedLabels: ['Enhancement'] }]
+      }).drafts[0]?.suggestedLabels
+    ).toEqual(['enhancement', 'ready-for-agent'])
+
+    await refreshRepoLabelsIfStale(db, refreshed, listLabels, {
+      now: new Date('2026-05-11T03:00:00.000Z')
+    })
     expect(listLabels).toHaveBeenCalledTimes(1)
   })
 

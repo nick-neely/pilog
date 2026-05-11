@@ -34,6 +34,8 @@ export type AutoPublishPreviewPlan = {
   summary: AutoPublishPreviewSummary
 }
 
+export const GITHUB_LABEL_CACHE_REFRESH_INTERVAL_MS = 6 * 60 * 60 * 1000
+
 export function buildIssueGenerationPrompt(input: { repo: Repo; notes: Note[] }): string {
   const labelBlock = formatRepoLabelVocabulary(input.repo.githubLabels)
   const noteBlock = input.notes
@@ -89,7 +91,18 @@ export async function hydrateRepoLabelsIfNeeded(
   repo: Repo,
   listRepoLabels: (owner: string, repo: string) => Promise<GitHubLabel[]>
 ): Promise<Repo> {
-  if (repo.githubLabels.length > 0 || repo.githubLabelsSyncedAt) return repo
+  return refreshRepoLabelsIfStale(db, repo, listRepoLabels, {
+    refreshIntervalMs: Number.POSITIVE_INFINITY
+  })
+}
+
+export async function refreshRepoLabelsIfStale(
+  db: PilogDatabase,
+  repo: Repo,
+  listRepoLabels: (owner: string, repo: string) => Promise<GitHubLabel[]>,
+  options?: { now?: Date; refreshIntervalMs?: number }
+): Promise<Repo> {
+  if (!shouldRefreshRepoLabels(repo, options)) return repo
 
   try {
     const labels = await listRepoLabels(repo.owner, repo.name)
@@ -102,6 +115,25 @@ export async function hydrateRepoLabelsIfNeeded(
   } catch {
     return repo
   }
+}
+
+function shouldRefreshRepoLabels(
+  repo: Repo,
+  options?: { now?: Date; refreshIntervalMs?: number }
+): boolean {
+  const refreshIntervalMs = options?.refreshIntervalMs ?? GITHUB_LABEL_CACHE_REFRESH_INTERVAL_MS
+  if (refreshIntervalMs === Number.POSITIVE_INFINITY) {
+    return repo.githubLabels.length === 0 && !repo.githubLabelsSyncedAt
+  }
+
+  if (!repo.githubLabelsSyncedAt) return true
+
+  const syncedAt = Date.parse(repo.githubLabelsSyncedAt)
+  if (Number.isNaN(syncedAt)) return true
+
+  // Generation is the automatic refresh trigger. The 6-hour staleness guard keeps repeated
+  // runs from calling GitHub's labels endpoint on every draft generation.
+  return (options?.now ?? new Date()).getTime() - syncedAt >= refreshIntervalMs
 }
 
 function formatRepoLabelVocabulary(labels: GitHubLabel[]): string {
