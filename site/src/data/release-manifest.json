@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "stable": null,
+  "preview": {
+    "version": "0.1.0-preview.1",
+    "releaseUrl": "https://github.com/nick-neely/pilog/releases/tag/v0.1.0-preview.1",
+    "publishedAt": "2026-05-11T00:00:00Z",
+    "platforms": [
+      {
+        "platform": "macos",
+        "label": "macOS",
+        "description": "Unsigned universal build for Apple Silicon and Intel Macs.",
+        "artifacts": [
+          {
+            "fileName": "Pilog-0.1.0-preview.dmg",
+            "downloadUrl": "https://github.com/nick-neely/pilog/releases/download/v0.1.0-preview.1/Pilog-0.1.0-preview.dmg",
+            "label": "DMG installer"
+          },
+          {
+            "fileName": "Pilog-0.1.0-preview-mac.zip",
+            "downloadUrl": "https://github.com/nick-neely/pilog/releases/download/v0.1.0-preview.1/Pilog-0.1.0-preview-mac.zip",
+            "label": "ZIP archive"
+          }
+        ]
+      },
+      {
+        "platform": "windows",
+        "label": "Windows",
+        "description": "Unsigned 64-bit installer for Windows 10+.",
+        "artifacts": [
+          {
+            "fileName": "Pilog-0.1.0-preview-Setup.exe",
+            "downloadUrl": "https://github.com/nick-neely/pilog/releases/download/v0.1.0-preview.1/Pilog-0.1.0-preview-Setup.exe",
+            "label": "Installer"
+          }
+        ]
+      },
+      {
+        "platform": "linux",
+        "label": "Linux",
+        "description": "AppImage and .deb packages.",
+        "artifacts": [
+          {
+            "fileName": "Pilog-0.1.0-preview.AppImage",
+            "downloadUrl": "https://github.com/nick-neely/pilog/releases/download/v0.1.0-preview.1/Pilog-0.1.0-preview.AppImage",
+            "label": "AppImage"
+          },
+          {
+            "fileName": "Pilog-0.1.0-preview.deb",
+            "downloadUrl": "https://github.com/nick-neely/pilog/releases/download/v0.1.0-preview.1/Pilog-0.1.0-preview.deb",
+            "label": ".deb package"
+          }
+        ]
+      }
+    ]
+  }
+}
