@@ -5,6 +5,13 @@
 @import '@fontsource/ibm-plex-mono/400.css';
 @import '@fontsource/ibm-plex-mono/500.css';
 
+/* Tailwind v4 content scan. The site consumes shadcn primitives from the
+   Electron renderer via @pilog/ui (see packages/ui). Their class strings live
+   outside site/, so we must register the source directories here or Tailwind
+   will strip the classes from the production build. */
+@source "../../../packages/ui/src/**/*.{ts,tsx}";
+@source "../../../src/renderer/src/components/ui/**/*.{ts,tsx}";
+
 @custom-variant dark (&:is(.dark *));
 
 :root {

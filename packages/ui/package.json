@@ -1,0 +1,25 @@
+{
+  "name": "@pilog/ui",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Thin barrel re-exporting renderer shadcn primitives for cross-surface use (Electron app + pilog.dev site). Single source of truth lives in src/renderer/src/components/ui.",
+  "type": "module",
+  "exports": {
+    "./button": "./src/button.tsx",
+    "./badge": "./src/badge.tsx",
+    "./kbd": "./src/kbd.tsx",
+    "./card": "./src/card.tsx",
+    "./separator": "./src/separator.tsx",
+    "./utils": "./src/utils.ts"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "dependencies": {
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "radix-ui": "^1.4.3",
+    "tailwind-merge": "^3.5.0"
+  }
+}
