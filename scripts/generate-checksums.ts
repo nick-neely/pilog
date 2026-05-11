@@ -19,6 +19,7 @@ import { createHash } from 'node:crypto'
 import { createReadStream, existsSync } from 'node:fs'
 import { readdir, stat, writeFile } from 'node:fs/promises'
 import { basename, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 export const ARTIFACT_EXTENSIONS = ['.dmg', '.exe', '.AppImage', '.deb', '.snap', '.zip']
 
@@ -82,7 +83,7 @@ export async function generateChecksums(distDir: string): Promise<ChecksumEntry[
   return entries
 }
 
-if (process.argv[1] && import.meta.url.endsWith(process.argv[1].replace(/\\/g, '/'))) {
+if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   const distDir = process.argv[2] ?? 'dist'
   generateChecksums(distDir).catch((err) => {
     console.error(err instanceof Error ? err.message : err)

@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -76,10 +76,7 @@ describe('hashFile', () => {
     const file = join(tmpDir, 'known.dmg')
     await writeFile(file, 'hello world')
     const hash = await hashFile(file)
-    // sha256("hello world") = b94d27b9934d3e08a52e52d7da7dabfac484efe04294e576da0179a4ef725d85
-    // Let's just verify it's deterministic and not empty
-    expect(hash).not.toBe('')
-    expect(await hashFile(file)).toBe(hash)
+    expect(hash).toBe('b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9')
   })
 
   it('produces different hashes for different content', async () => {
@@ -158,7 +155,6 @@ describe('generateChecksums', () => {
   it('writes individual .sha256 files for each artifact', async () => {
     await writeFile(join(tmpDir, 'Pilog-1.0.0.dmg'), 'fake-dmg-content')
     await generateChecksums(tmpDir)
-    const { readFile } = await import('node:fs/promises')
     const sidecar = await readFile(join(tmpDir, 'Pilog-1.0.0.dmg.sha256'), 'utf8')
     expect(sidecar).toMatch(/^[0-9a-f]{64}  Pilog-1\.0\.0\.dmg\n$/)
   })
@@ -167,7 +163,6 @@ describe('generateChecksums', () => {
     await writeFile(join(tmpDir, 'Pilog-1.0.0.dmg'), 'dmg')
     await writeFile(join(tmpDir, 'Pilog-1.0.0-Setup.exe'), 'exe')
     await generateChecksums(tmpDir)
-    const { readFile } = await import('node:fs/promises')
     const combined = await readFile(join(tmpDir, 'checksums.txt'), 'utf8')
     expect(combined).toContain('Pilog-1.0.0.dmg')
     expect(combined).toContain('Pilog-1.0.0-Setup.exe')
