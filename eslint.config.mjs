@@ -6,7 +6,16 @@ import eslintPluginReactHooks from 'eslint-plugin-react-hooks'
 import eslintPluginReactRefresh from 'eslint-plugin-react-refresh'
 
 export default defineConfig(
-  { ignores: ['**/node_modules', '**/dist', '**/out', '**/.next'] },
+  {
+    ignores: [
+      '**/node_modules',
+      '**/dist',
+      '**/out',
+      '**/.next',
+      // Next.js emits this file; triple-slash refs are required for route types.
+      '**/next-env.d.ts'
+    ]
+  },
   tseslint.configs.recommended,
   eslintPluginReact.configs.flat.recommended,
   eslintPluginReact.configs.flat['jsx-runtime'],
@@ -40,6 +49,31 @@ export default defineConfig(
     rules: {
       '@typescript-eslint/explicit-function-return-type': 'off',
       'react-refresh/only-export-components': 'off'
+    }
+  },
+  {
+    // Shared UI package: barrel `export *` re-exports; Vite refresh rule does not apply.
+    files: ['packages/ui/**/*.{ts,tsx}'],
+    rules: {
+      'react-refresh/only-export-components': 'off'
+    }
+  },
+  {
+    // Marketing site (Next.js App Router): metadata exports; no Vite HMR.
+    files: ['site/**/*.{ts,tsx}'],
+    rules: {
+      'react-refresh/only-export-components': 'off',
+      '@typescript-eslint/explicit-function-return-type': 'off'
+    }
+  },
+  {
+    // `detectPlatform()` needs `navigator`; post-mount setState avoids SSR/CSR mismatch.
+    files: [
+      'site/src/components/platform-download.tsx',
+      'site/src/components/preview-download.tsx'
+    ],
+    rules: {
+      'react-hooks/set-state-in-effect': 'off'
     }
   }
 )

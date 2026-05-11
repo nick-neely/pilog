@@ -156,7 +156,7 @@ describe('generateChecksums', () => {
     await writeFile(join(tmpDir, 'Pilog-1.0.0.dmg'), 'fake-dmg-content')
     await generateChecksums(tmpDir)
     const sidecar = await readFile(join(tmpDir, 'Pilog-1.0.0.dmg.sha256'), 'utf8')
-    expect(sidecar).toMatch(/^[0-9a-f]{64}  Pilog-1\.0\.0\.dmg\n$/)
+    expect(sidecar).toMatch(/^[0-9a-f]{64}\s{2}Pilog-1\.0\.0\.dmg\n$/)
   })
 
   it('writes a combined checksums.txt file', async () => {
