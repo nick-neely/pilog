@@ -9,6 +9,7 @@ import {
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { Alert, AlertDescription, AlertTitle } from '@renderer/components/ui/alert'
+import { HotkeyInput } from '@renderer/components/HotkeyInput'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,7 +25,6 @@ import { Badge } from '@renderer/components/ui/badge'
 import { Button } from '@renderer/components/ui/button'
 import { Empty, EmptyDescription } from '@renderer/components/ui/empty'
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@renderer/components/ui/hover-card'
-import { Input } from '@renderer/components/ui/input'
 import { Kbd, KbdGroup } from '@renderer/components/ui/kbd'
 import { Label } from '@renderer/components/ui/label'
 import { Progress } from '@renderer/components/ui/progress'
@@ -578,10 +578,10 @@ function OnboardingPanel({
               <div className="flex w-full max-w-sm flex-col gap-1.5 text-left">
                 <Label htmlFor="onboarding-hotkey">Capture hotkey</Label>
                 <div className="flex items-center gap-2">
-                  <Input
+                  <HotkeyInput
                     id="onboarding-hotkey"
                     value={hotkeyDraft}
-                    onChange={(event) => onHotkeyChange(event.target.value)}
+                    onHotkeyChange={onHotkeyChange}
                     placeholder={DEFAULT_GLOBAL_CAPTURE_SHORTCUT}
                     className="font-mono"
                   />
@@ -595,9 +595,7 @@ function OnboardingPanel({
                     Save
                   </Button>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  Hotkey changes take effect after restarting Pilog.
-                </p>
+                <p className="text-xs text-muted-foreground">Press the keys you want, then save.</p>
               </div>
               <div className="flex flex-wrap items-center justify-center gap-2">
                 <Button onClick={action.onClick} disabled={working}>

@@ -13,6 +13,7 @@ import {
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { Alert, AlertDescription, AlertTitle } from '@renderer/components/ui/alert'
+import { HotkeyInput } from '@renderer/components/HotkeyInput'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -422,20 +423,20 @@ export function Settings({
                       Keyboard shortcut to open the scratchpad from anywhere.
                     </p>
                     <div className="flex items-center gap-3">
-                      <Input
-                        type="text"
+                      <HotkeyInput
                         aria-label="Scratchpad hotkey"
                         value={displayValue}
-                        onChange={(e) => handleHotkeyChange(e.target.value)}
+                        onHotkeyChange={handleHotkeyChange}
                         placeholder={DEFAULT_GLOBAL_CAPTURE_SHORTCUT}
-                        className="flex-1"
+                        className="flex-1 font-mono"
                       />
                       <Button onClick={handleSaveHotkey} disabled={!dirty} size="sm">
                         Save
                       </Button>
                     </div>
                     <p className="text-[11px] text-muted-foreground">
-                      Takes effect after restarting Pilog.
+                      Press the keys you want, then save. If the shortcut is already taken by
+                      another app, Pilog will keep listening for the previous one.
                     </p>
                   </section>
 

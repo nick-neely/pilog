@@ -21,7 +21,7 @@ export default async function LandingPage() {
 
   return (
     <>
-      <Hero modKey={modKey} />
+      <Hero />
       <Transformation />
       <Bento modKey={modKey} />
       <KeyboardFirst modKey={modKey} />

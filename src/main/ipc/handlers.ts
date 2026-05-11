@@ -89,13 +89,20 @@ const handlers: { [C in DbChannel]: Handler<C> } = {
 
 export function registerIpcHandlers(
   db: PilogDatabase,
-  options?: { onNoteCreated?: () => void; onIssueDraftsChanged?: () => void }
+  options?: {
+    onNoteCreated?: () => void
+    onIssueDraftsChanged?: () => void
+    onGlobalHotkeyChanged?: () => void
+  }
 ): void {
   for (const channel of Object.keys(handlers) as DbChannel[]) {
     ipcMain.handle(channel, (_event, request) => {
       const handler = handlers[channel] as Handler<typeof channel>
       const result = handler(db, request)
       if (channel === 'note:create') options?.onNoteCreated?.()
+      if (channel === 'setting:set' && request.key === 'hotkey.scratchpad') {
+        options?.onGlobalHotkeyChanged?.()
+      }
       if (ISSUE_DRAFT_CHANGE_CHANNELS.has(channel)) {
         options?.onIssueDraftsChanged?.()
       }

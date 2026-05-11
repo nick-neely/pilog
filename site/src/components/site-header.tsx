@@ -21,18 +21,18 @@ export function SiteHeader() {
           className="group inline-flex items-center gap-2.5 outline-none"
           aria-label="Pilog home"
         >
-          <span aria-hidden className="relative inline-flex size-7 items-center justify-center">
+          <span aria-hidden className="relative inline-flex size-9 items-center justify-center">
             <Image
               src="/pi-mark.png"
               alt=""
-              width={28}
-              height={28}
-              className="size-7 select-none transition-transform duration-300 ease-out group-hover:-rotate-3 motion-reduce:transition-none"
+              width={36}
+              height={36}
+              className="size-9 select-none transition-transform duration-300 ease-out group-hover:-rotate-3 motion-reduce:transition-none"
               draggable={false}
               priority
             />
           </span>
-          <span className="font-heading text-foreground text-[1.05rem] font-medium tracking-tight">
+          <span className="font-heading text-foreground text-[1.25rem] font-medium tracking-tight">
             Pilog
           </span>
         </Link>

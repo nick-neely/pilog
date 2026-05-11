@@ -1,17 +1,14 @@
 import Link from 'next/link'
 import { Button } from '@pilog/ui/button'
-import { Kbd, KbdGroup } from '@pilog/ui/kbd'
 import { PiMark } from '@/components/pi-mark'
-import type { SiteModKeyGlyph } from '@/lib/platform'
 
 /**
  * Hero — asymmetric 7/5 split. Left column carries an oversized Source Serif 4
  * line and the two CTAs; right column carries the Pi mark at hero scale,
  * rotated 2.5° and lifted with the lone documented hover shadow. The mark IS
- * the imagery; no stock photos, no SaaS-cliché abstract gradient. The mod⇧Space
- * Kbd cluster is a quiet tease of the product's defining gesture (mod is ⌘ or Ctrl by UA).
+ * the imagery; no stock photos, no SaaS-cliché abstract gradient.
  */
-export function Hero({ modKey }: { modKey: SiteModKeyGlyph }) {
+export function Hero() {
   return (
     <section
       aria-labelledby="hero-title"
@@ -44,22 +41,6 @@ export function Hero({ modKey }: { modKey: SiteModKeyGlyph }) {
           <Button asChild variant="outline" size="lg">
             <Link href="/docs">Read the docs</Link>
           </Button>
-          <span
-            className="text-muted-foreground ml-1 hidden items-center gap-2 font-mono text-xs sm:inline-flex"
-            aria-label={
-              modKey === '⌘'
-                ? 'The global capture shortcut is Command Shift Space'
-                : 'The global capture shortcut is Control Shift Space'
-            }
-          >
-            or press
-            <KbdGroup>
-              <Kbd>{modKey}</Kbd>
-              <Kbd>⇧</Kbd>
-              <Kbd>Space</Kbd>
-            </KbdGroup>
-            anywhere
-          </span>
         </div>
       </div>
 
@@ -73,10 +54,26 @@ export function Hero({ modKey }: { modKey: SiteModKeyGlyph }) {
           <div className="bg-popover ring-border relative rotate-[2.5deg] rounded-[1.75rem] p-4 shadow-xl ring-1 transition-transform duration-700 ease-out hover:rotate-[1.5deg] motion-reduce:transition-none">
             <PiMark variant="icon" priority className="block h-auto w-full rounded-[1.25rem]" />
           </div>
-          <div className="text-muted-foreground absolute -bottom-2 right-2 font-mono text-[0.7rem] tracking-tight">
-            pilog.app — a desk-side journal
-          </div>
+
         </div>
+      </div>
+
+      <div
+        aria-hidden
+        className="text-muted-foreground/50 absolute bottom-6 left-1/2 -translate-x-1/2 motion-safe:animate-bounce"
+      >
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 18 18"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M3.5 7l5.5 5.5L14.5 7" />
+        </svg>
       </div>
     </section>
   )

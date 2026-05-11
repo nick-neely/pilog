@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   DEFAULT_GLOBAL_CAPTURE_SHORTCUT,
   SHORTCUT_CONTRACT,
+  acceleratorFromKeyEvent,
   formatShortcutForDisplay,
   getShortcutDisplayPlatform
 } from './shortcuts'
@@ -57,5 +58,38 @@ describe('shortcut contract', () => {
     expect(getShortcutDisplayPlatform('MacIntel')).toBe('mac')
     expect(getShortcutDisplayPlatform('Win32')).toBe('windows')
     expect(getShortcutDisplayPlatform('Linux x86_64')).toBe('linux')
+  })
+
+  it('captures an Electron accelerator from a key event', () => {
+    expect(
+      acceleratorFromKeyEvent(
+        { key: ' ', ctrlKey: true, metaKey: false, altKey: false, shiftKey: true },
+        'linux'
+      )
+    ).toBe('CommandOrControl+Shift+Space')
+  })
+
+  it('keeps Control distinct from Command on Mac', () => {
+    expect(
+      acceleratorFromKeyEvent(
+        { key: ' ', ctrlKey: true, metaKey: false, altKey: false, shiftKey: true },
+        'mac'
+      )
+    ).toBe('Control+Shift+Space')
+    expect(
+      acceleratorFromKeyEvent(
+        { key: ' ', ctrlKey: false, metaKey: true, altKey: false, shiftKey: true },
+        'mac'
+      )
+    ).toBe('CommandOrControl+Shift+Space')
+  })
+
+  it('waits for a non-modifier key before capturing an accelerator', () => {
+    expect(
+      acceleratorFromKeyEvent(
+        { key: 'Shift', ctrlKey: true, metaKey: false, altKey: false, shiftKey: true },
+        'windows'
+      )
+    ).toBeNull()
   })
 })

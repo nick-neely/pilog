@@ -18,6 +18,23 @@ export type ShortcutBinding =
     }
 
 const COMMAND_OR_CONTROL_KEYS = new Set(['CommandOrControl', 'CmdOrCtrl'])
+const NON_CAPTURE_KEYS = new Set(['Control', 'Shift', 'Alt', 'Meta'])
+const ELECTRON_KEY_NAMES = new Map<string, string>([
+  [' ', 'Space'],
+  ['ArrowUp', 'Up'],
+  ['ArrowDown', 'Down'],
+  ['ArrowLeft', 'Left'],
+  ['ArrowRight', 'Right'],
+  ['Escape', 'Esc']
+])
+
+export type AcceleratorKeyEvent = {
+  key: string
+  ctrlKey: boolean
+  metaKey: boolean
+  altKey: boolean
+  shiftKey: boolean
+}
 
 export const SHORTCUT_CONTRACT = {
   globalCapture: {
@@ -87,4 +104,34 @@ export function formatShortcutForDisplay(
       return part
     })
     .join(' + ')
+}
+
+export function acceleratorFromKeyEvent(
+  event: AcceleratorKeyEvent,
+  platform: ShortcutDisplayPlatform
+): string | null {
+  if (NON_CAPTURE_KEYS.has(event.key)) return null
+
+  const key = normalizeElectronAcceleratorKey(event.key)
+  if (key === null) return null
+
+  const parts: string[] = []
+  if (event.metaKey) parts.push('CommandOrControl')
+  if (event.ctrlKey) parts.push(platform === 'mac' ? 'Control' : 'CommandOrControl')
+  if (event.altKey) parts.push('Alt')
+  if (event.shiftKey) parts.push('Shift')
+
+  if (parts.includes(key)) return null
+  parts.push(key)
+
+  return Array.from(new Set(parts)).join('+')
+}
+
+function normalizeElectronAcceleratorKey(key: string): string | null {
+  if (ELECTRON_KEY_NAMES.has(key)) return ELECTRON_KEY_NAMES.get(key) ?? null
+  if (/^[a-z]$/i.test(key)) return key.toUpperCase()
+  if (/^[0-9]$/.test(key)) return key
+  if (/^F(?:[1-9]|1[0-9]|2[0-4])$/.test(key)) return key
+  if (key.length === 1) return key.toUpperCase()
+  return key
 }

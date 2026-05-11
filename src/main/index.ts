@@ -81,7 +81,8 @@ app.whenReady().then(() => {
 
   registerIpcHandlers(db, {
     onNoteCreated: broadcastNoteCreated,
-    onIssueDraftsChanged: broadcastIssueDraftsInvalidated
+    onIssueDraftsChanged: broadcastIssueDraftsInvalidated,
+    onGlobalHotkeyChanged: () => registerGlobalHotkeys(db, openScratchpad)
   })
 
   registerGitHubIpcHandlers(
