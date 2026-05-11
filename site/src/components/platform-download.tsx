@@ -69,6 +69,7 @@ export function PlatformDownload({ channel }: { channel: ReleaseChannel }) {
 
   const primary = getPrimaryRelease(channel, detected)
   const alternate = getAlternatePrimaryRelease(channel, detected)
+  const primaries = getPrimaryPlatforms(channel)
   const linux = getLinuxRelease(channel)
 
   return (
@@ -79,10 +80,10 @@ export function PlatformDownload({ channel }: { channel: ReleaseChannel }) {
         <PrimaryCTA release={primary} />
       ) : (
         <div className="mt-10 space-y-4">
-          {getPrimaryPlatforms(channel).map((p) => (
+          {primaries.map((p) => (
             <PlatformSection key={p.platform} release={p} />
           ))}
-          {getPrimaryPlatforms(channel).length === 0 && (
+          {primaries.length === 0 && (
             <p className="text-muted-foreground text-sm italic">
               No downloads available yet.
             </p>

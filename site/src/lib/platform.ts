@@ -38,7 +38,7 @@ export function getLinuxRelease(channel: ReleaseChannel): PlatformRelease | null
 }
 
 export function getPrimaryPlatforms(channel: ReleaseChannel): PlatformRelease[] {
-  return channel.platforms.filter((p) => p.platform === 'macos' || p.platform === 'windows')
+  return channel.platforms.filter((p) => isPrimaryPlatform(p.platform))
 }
 
 export function sortPlatformsForDetected(
