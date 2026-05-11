@@ -24,7 +24,11 @@ import {
 import { createSafeStorageAuthStorage } from '../pi/auth-storage'
 import { setSecret } from '../security/secrets'
 import { getRuntimeHealthCheck } from '../runtime-health'
-import { getBlockingRuntimeReadinessMessage, getRuntimeReadiness } from '../runtime-readiness'
+import {
+  DRAFT_GENERATION_RUNTIME_REQUIREMENTS,
+  getBlockingRuntimeReadinessMessage,
+  getRuntimeReadiness
+} from '../runtime-readiness'
 import {
   getAdvancedSettings,
   getTurnBudget,
@@ -113,12 +117,10 @@ export function registerPiIpcHandlers(
     const { notes, mode } = input
     let repo = input.repo
     const readiness = await getRuntimeReadiness({}, [repo])
-    const readinessMessage = getBlockingRuntimeReadinessMessage(readiness, [
-      'git',
-      'keychain',
-      'localRepositories',
-      'bundledRepoTooling'
-    ])
+    const readinessMessage = getBlockingRuntimeReadinessMessage(
+      readiness,
+      DRAFT_GENERATION_RUNTIME_REQUIREMENTS
+    )
     if (readinessMessage) throw new Error(readinessMessage)
     if (mode === 'auto-publish-preview' && !repo.autoPublishEnabled) {
       throw new Error('Auto-publish is not enabled for this repository.')

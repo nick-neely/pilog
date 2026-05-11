@@ -4,11 +4,15 @@ import { createRepo } from '../db/repositories/repos'
 import type { PilogDatabase } from '../db/client'
 import type { DetectLocalRepoResult, LinkRepoRequest, Repo } from '@shared/ipc'
 import type { GitHubLabel } from '@shared/ipc'
-import { getBlockingRuntimeReadinessMessage, getRuntimeReadiness } from '../runtime-readiness'
+import {
+  REPO_LINK_RUNTIME_REQUIREMENTS,
+  getBlockingRuntimeReadinessMessage,
+  getRuntimeReadiness
+} from '../runtime-readiness'
 
 export async function detectLocalRepo(localPath: string): Promise<DetectLocalRepoResult> {
   const readiness = await getRuntimeReadiness()
-  const message = getBlockingRuntimeReadinessMessage(readiness, ['git', 'keychain'])
+  const message = getBlockingRuntimeReadinessMessage(readiness, REPO_LINK_RUNTIME_REQUIREMENTS)
   if (message) {
     return {
       state: 'runtime-blocked',
@@ -50,7 +54,7 @@ export async function detectLocalRepo(localPath: string): Promise<DetectLocalRep
 
 export async function linkRepo(db: PilogDatabase, request: LinkRepoRequest): Promise<Repo> {
   const readiness = await getRuntimeReadiness()
-  const message = getBlockingRuntimeReadinessMessage(readiness, ['git', 'keychain'])
+  const message = getBlockingRuntimeReadinessMessage(readiness, REPO_LINK_RUNTIME_REQUIREMENTS)
   if (message) throw new Error(message)
 
   const labelCache = await fetchInitialLabelCache(request.githubRepo.owner, request.githubRepo.name)

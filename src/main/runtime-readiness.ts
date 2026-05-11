@@ -2,10 +2,19 @@ import { safeStorage } from 'electron'
 import { accessSync, constants, existsSync } from 'node:fs'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
-import type { RuntimeReadiness } from '@shared/ipc'
+import type { RuntimeReadiness, RuntimeReadinessItem } from '@shared/ipc'
 import { resolveRgPath } from './pi/tools/repo-tools'
 
 const execFileAsync = promisify(execFile)
+const NO_ACTION_NEEDED = 'No action needed.'
+
+export const REPO_LINK_RUNTIME_REQUIREMENTS = ['git', 'keychain'] as const
+export const DRAFT_GENERATION_RUNTIME_REQUIREMENTS = [
+  'git',
+  'keychain',
+  'localRepositories',
+  'bundledRepoTooling'
+] as const
 
 type ReadinessRepo = {
   id: string
@@ -13,11 +22,23 @@ type ReadinessRepo = {
   localPath: string
 }
 
+type GitVersionCheckResult = { ok: true; version: string } | { ok: false; error?: string }
+
+type RepoAccessCheckResult = {
+  checkedCount: number
+  inaccessiblePaths: string[]
+}
+
+type BundledRepoToolingCheckResult = {
+  ok: boolean
+  detail?: string
+}
+
 type RuntimeReadinessDeps = {
-  checkGitVersion?: () => Promise<{ ok: true; version: string } | { ok: false; error?: string }>
+  checkGitVersion?: () => Promise<GitVersionCheckResult>
   isSafeStorageAvailable?: () => boolean
   checkRepoAccess?: (path: string) => Promise<{ ok: boolean }>
-  checkBundledRepoTooling?: () => Promise<{ ok: boolean; detail?: string }>
+  checkBundledRepoTooling?: () => Promise<BundledRepoToolingCheckResult>
   now?: () => Date
 }
 
@@ -33,77 +54,10 @@ export async function getRuntimeReadiness(
   const repoAccess = await checkLocalRepositories(repos, deps.checkRepoAccess ?? checkRepoAccess)
 
   const items: RuntimeReadiness['items'] = {
-    git: git.ok
-      ? {
-          status: 'ready',
-          label: 'Git',
-          detail: git.version,
-          recoveryAction: 'No action needed.',
-          version: git.version
-        }
-      : {
-          status: 'missing',
-          label: 'Git',
-          detail: 'Git is not available to Pilog.',
-          recoveryAction:
-            'Install Git and make sure the git command is available from your system PATH.',
-          version: null
-        },
-    keychain: isSafeStorageAvailable()
-      ? {
-          status: 'ready',
-          label: 'Keychain',
-          detail: 'Secure credential storage is available.',
-          recoveryAction: 'No action needed.'
-        }
-      : {
-          status: 'missing',
-          label: 'Keychain',
-          detail: 'Secure credential storage is unavailable.',
-          recoveryAction:
-            'Enable your OS keychain or credential manager, then restart Pilog before connecting GitHub or saving Pi credentials.'
-        },
-    localRepositories:
-      repoAccess.inaccessiblePaths.length === 0
-        ? {
-            status: 'ready',
-            label: 'Local repositories',
-            detail:
-              repoAccess.checkedCount === 0
-                ? 'No linked repositories to check yet.'
-                : `${repoAccess.checkedCount} linked repository path${
-                    repoAccess.checkedCount === 1 ? '' : 's'
-                  } can be read.`,
-            recoveryAction:
-              repoAccess.checkedCount === 0
-                ? 'Link a local GitHub repository when you are ready to generate drafts.'
-                : 'No action needed.',
-            checkedCount: repoAccess.checkedCount,
-            inaccessiblePaths: []
-          }
-        : {
-            status: 'degraded',
-            label: 'Local repositories',
-            detail: `Pilog cannot read ${repoAccess.inaccessiblePaths.join(', ')}.`,
-            recoveryAction:
-              'Relink the repository from its current folder, restore the missing folder, or remove the stale repository link.',
-            checkedCount: repoAccess.checkedCount,
-            inaccessiblePaths: repoAccess.inaccessiblePaths
-          },
-    bundledRepoTooling: bundledRepoTooling.ok
-      ? {
-          status: 'ready',
-          label: 'Bundled repo tooling',
-          detail: bundledRepoTooling.detail ?? 'Pilog bundled repo tools are available.',
-          recoveryAction: 'No action needed.'
-        }
-      : {
-          status: 'missing',
-          label: 'Bundled repo tooling',
-          detail: bundledRepoTooling.detail ?? 'Pilog bundled repo tools are unavailable.',
-          recoveryAction:
-            'Reinstall Pilog. If the problem continues, keep your notes and share the app logs with support.'
-        }
+    git: buildGitReadinessItem(git),
+    keychain: buildKeychainReadinessItem(isSafeStorageAvailable()),
+    localRepositories: buildLocalRepositoriesReadinessItem(repoAccess),
+    bundledRepoTooling: buildBundledRepoToolingReadinessItem(bundledRepoTooling)
   }
 
   return {
@@ -115,7 +69,7 @@ export async function getRuntimeReadiness(
 
 export function getBlockingRuntimeReadinessMessage(
   readiness: RuntimeReadiness,
-  required: Array<keyof RuntimeReadiness['items']>
+  required: readonly (keyof RuntimeReadiness['items'])[]
 ): string | null {
   const blocked = required
     .map((key) => readiness.items[key])
@@ -125,9 +79,104 @@ export function getBlockingRuntimeReadinessMessage(
   return `${blocked.label} ${verb} attention. ${blocked.detail} ${blocked.recoveryAction}`
 }
 
-async function checkGitVersion(): Promise<
-  { ok: true; version: string } | { ok: false; error?: string }
-> {
+function buildGitReadinessItem(git: GitVersionCheckResult): RuntimeReadiness['items']['git'] {
+  if (!git.ok) {
+    return {
+      status: 'missing',
+      label: 'Git',
+      detail: 'Git is not available to Pilog.',
+      recoveryAction:
+        'Install Git and make sure the git command is available from your system PATH.',
+      version: null
+    }
+  }
+
+  return {
+    status: 'ready',
+    label: 'Git',
+    detail: git.version,
+    recoveryAction: NO_ACTION_NEEDED,
+    version: git.version
+  }
+}
+
+function buildKeychainReadinessItem(isAvailable: boolean): RuntimeReadinessItem {
+  if (!isAvailable) {
+    return {
+      status: 'missing',
+      label: 'Keychain',
+      detail: 'Secure credential storage is unavailable.',
+      recoveryAction:
+        'Enable your OS keychain or credential manager, then restart Pilog before connecting GitHub or saving Pi credentials.'
+    }
+  }
+
+  return {
+    status: 'ready',
+    label: 'Keychain',
+    detail: 'Secure credential storage is available.',
+    recoveryAction: NO_ACTION_NEEDED
+  }
+}
+
+function buildLocalRepositoriesReadinessItem(
+  repoAccess: RepoAccessCheckResult
+): RuntimeReadiness['items']['localRepositories'] {
+  if (repoAccess.inaccessiblePaths.length > 0) {
+    return {
+      status: 'degraded',
+      label: 'Local repositories',
+      detail: `Pilog cannot read ${repoAccess.inaccessiblePaths.join(', ')}.`,
+      recoveryAction:
+        'Relink the repository from its current folder, restore the missing folder, or remove the stale repository link.',
+      checkedCount: repoAccess.checkedCount,
+      inaccessiblePaths: repoAccess.inaccessiblePaths
+    }
+  }
+
+  if (repoAccess.checkedCount === 0) {
+    return {
+      status: 'ready',
+      label: 'Local repositories',
+      detail: 'No linked repositories to check yet.',
+      recoveryAction: 'Link a local GitHub repository when you are ready to generate drafts.',
+      checkedCount: repoAccess.checkedCount,
+      inaccessiblePaths: []
+    }
+  }
+
+  return {
+    status: 'ready',
+    label: 'Local repositories',
+    detail: `${repoAccess.checkedCount} linked repository path${repoAccess.checkedCount === 1 ? '' : 's'} can be read.`,
+    recoveryAction: NO_ACTION_NEEDED,
+    checkedCount: repoAccess.checkedCount,
+    inaccessiblePaths: []
+  }
+}
+
+function buildBundledRepoToolingReadinessItem(
+  bundledRepoTooling: BundledRepoToolingCheckResult
+): RuntimeReadinessItem {
+  if (!bundledRepoTooling.ok) {
+    return {
+      status: 'missing',
+      label: 'Bundled repo tooling',
+      detail: bundledRepoTooling.detail ?? 'Pilog bundled repo tools are unavailable.',
+      recoveryAction:
+        'Reinstall Pilog. If the problem continues, keep your notes and share the app logs with support.'
+    }
+  }
+
+  return {
+    status: 'ready',
+    label: 'Bundled repo tooling',
+    detail: bundledRepoTooling.detail ?? 'Pilog bundled repo tools are available.',
+    recoveryAction: NO_ACTION_NEEDED
+  }
+}
+
+async function checkGitVersion(): Promise<GitVersionCheckResult> {
   try {
     const { stdout } = await execFileAsync('git', ['--version'], { timeout: 5000 })
     return { ok: true, version: stdout.trim() || 'git version unknown' }
@@ -152,7 +201,7 @@ async function checkRepoAccess(path: string): Promise<{ ok: boolean }> {
 async function checkLocalRepositories(
   repos: ReadinessRepo[],
   checkAccess: (path: string) => Promise<{ ok: boolean }>
-): Promise<{ checkedCount: number; inaccessiblePaths: string[] }> {
+): Promise<RepoAccessCheckResult> {
   const inaccessiblePaths: string[] = []
   for (const repo of repos) {
     const result = await checkAccess(repo.localPath)
@@ -161,7 +210,7 @@ async function checkLocalRepositories(
   return { checkedCount: repos.length, inaccessiblePaths }
 }
 
-async function checkBundledRepoTooling(): Promise<{ ok: boolean; detail?: string }> {
+async function checkBundledRepoTooling(): Promise<BundledRepoToolingCheckResult> {
   const ripgrepPath = resolveRgPath()
   if (!existsSync(ripgrepPath)) {
     return { ok: false, detail: 'Pilog could not find its bundled ripgrep executable.' }

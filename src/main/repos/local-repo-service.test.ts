@@ -17,6 +17,7 @@ vi.mock('../github/client', () => ({
 }))
 
 vi.mock('../runtime-readiness', () => ({
+  REPO_LINK_RUNTIME_REQUIREMENTS: ['git', 'keychain'],
   getRuntimeReadiness: vi.fn(),
   getBlockingRuntimeReadinessMessage: vi.fn()
 }))

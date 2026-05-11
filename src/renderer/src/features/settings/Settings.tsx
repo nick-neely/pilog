@@ -109,6 +109,13 @@ type RuntimeReadinessState = {
   refresh: () => Promise<void>
 }
 
+const RUNTIME_READINESS_ITEM_ORDER = [
+  'git',
+  'keychain',
+  'localRepositories',
+  'bundledRepoTooling'
+] as const satisfies readonly (keyof RuntimeReadiness['items'])[]
+
 function useSetting(key: SettingKey): [string | null, (value: string) => Promise<void>] {
   const [value, setValue] = useState<string | null>(null)
   const fetchIdRef = useRef(0)
@@ -251,13 +258,19 @@ function useRuntimeReadiness(): RuntimeReadinessState {
   }, [])
 
   useEffect(() => {
-    void refresh()
-  }, [refresh])
+    let mounted = true
+    window.pilog.invoke('runtime:readiness').then((next) => {
+      if (mounted) setReadiness(next)
+    })
+    return () => {
+      mounted = false
+    }
+  }, [])
 
   return { readiness, refresh }
 }
 
-function statusLabel(status: RuntimeReadinessItem['status']): string {
+function getRuntimeReadinessStatusLabel(status: RuntimeReadinessItem['status']): string {
   switch (status) {
     case 'ready':
       return 'Ready'
@@ -268,11 +281,7 @@ function statusLabel(status: RuntimeReadinessItem['status']): string {
   }
 }
 
-function RuntimeReadinessRow({
-  item
-}: {
-  item: RuntimeReadinessItem
-}): React.JSX.Element {
+function RuntimeReadinessRow({ item }: { item: RuntimeReadinessItem }): React.JSX.Element {
   const ok = item.status === 'ready'
 
   return (
@@ -285,7 +294,9 @@ function RuntimeReadinessRow({
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
           <p className="text-sm font-medium text-foreground">{item.label}</p>
-          <Badge variant={ok ? 'secondary' : 'destructive'}>{statusLabel(item.status)}</Badge>
+          <Badge variant={ok ? 'secondary' : 'destructive'}>
+            {getRuntimeReadinessStatusLabel(item.status)}
+          </Badge>
         </div>
         <p className="mt-1 text-xs text-muted-foreground">{item.detail}</p>
         {!ok && <p className="mt-1 text-xs text-foreground">{item.recoveryAction}</p>}
@@ -332,6 +343,7 @@ export function Settings({
       }`
     : 'Loading…'
   const updateView = getUpdateStatusView(updates.status)
+  const runtimeReadiness = runtime.readiness
 
   const handleHotkeyChange = (value: string): void => {
     setUserEdited(true)
@@ -429,9 +441,9 @@ export function Settings({
                       <CardHeader className="gap-2 pb-2">
                         <CardTitle>Runtime prerequisites</CardTitle>
                         <CardAction>
-                          {runtime.readiness ? (
-                            <Badge variant={runtime.readiness.ready ? 'secondary' : 'destructive'}>
-                              {runtime.readiness.ready ? 'Ready' : 'Needs attention'}
+                          {runtimeReadiness ? (
+                            <Badge variant={runtimeReadiness.ready ? 'secondary' : 'destructive'}>
+                              {runtimeReadiness.ready ? 'Ready' : 'Needs attention'}
                             </Badge>
                           ) : null}
                         </CardAction>
@@ -440,16 +452,11 @@ export function Settings({
                         </CardDescription>
                       </CardHeader>
                       <CardContent className="pt-0">
-                        {runtime.readiness ? (
+                        {runtimeReadiness ? (
                           <ul className="divide-y divide-border/60">
-                            <RuntimeReadinessRow item={runtime.readiness.items.git} />
-                            <RuntimeReadinessRow item={runtime.readiness.items.keychain} />
-                            <RuntimeReadinessRow
-                              item={runtime.readiness.items.localRepositories}
-                            />
-                            <RuntimeReadinessRow
-                              item={runtime.readiness.items.bundledRepoTooling}
-                            />
+                            {RUNTIME_READINESS_ITEM_ORDER.map((key) => (
+                              <RuntimeReadinessRow key={key} item={runtimeReadiness.items[key]} />
+                            ))}
                           </ul>
                         ) : (
                           <p className="py-3 text-sm text-muted-foreground">
