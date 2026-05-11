@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { ChannelDownloads } from '@/components/channel-downloads'
+import { PlatformDownload } from '@/components/platform-download'
 import type { ReleaseManifest } from '@/lib/release-manifest'
 import rawManifest from '@/data/release-manifest.json'
 
@@ -18,12 +18,12 @@ export default function DownloadPage() {
         Download Pilog
       </h1>
       <p className="text-muted-foreground mt-4 text-base leading-relaxed">
-        Pilog is available for macOS and Windows. Linux builds are available as secondary downloads.
+        Available for macOS and Windows. Linux builds are provided as secondary downloads.
       </p>
 
       {channel === null ? (
         <div className="border-border bg-secondary/50 mt-10 rounded-lg border p-5">
-          <p className="text-foreground text-sm font-medium">No stable release yet.</p>
+          <p className="text-foreground text-sm font-medium">No stable release yet</p>
           <p className="text-muted-foreground mt-1 text-sm leading-relaxed">
             The first stable release hasn&apos;t been published. Check back soon, or try a{' '}
             <Link
@@ -36,12 +36,15 @@ export default function DownloadPage() {
           </p>
         </div>
       ) : (
-        <ChannelDownloads channel={channel} />
+        <PlatformDownload channel={channel} />
       )}
 
-      <p className="text-muted-foreground mt-8 text-sm">
+      <p className="text-muted-foreground mt-10 text-sm">
         Looking for pre-release builds?{' '}
-        <Link href="/preview" className="text-primary hover:text-primary/80 underline underline-offset-4">
+        <Link
+          href="/preview"
+          className="text-primary hover:text-primary/80 underline underline-offset-4"
+        >
           Preview downloads
         </Link>
       </p>
