@@ -87,7 +87,7 @@ export function getUpdateStatusView(status: AppUpdateStatus | null): UpdateStatu
       }
     case 'idle':
       return {
-        title: 'Updates',
+        title: 'Ready to check for updates',
         detail: versionDetail(status),
         canCheck: true,
         canDownload: false,

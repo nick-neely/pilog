@@ -46,6 +46,7 @@ Use skills to keep implementation aligned with PiLog’s design system and shadc
 
 ## Learned Workspace Facts
 
+- The impeccable loader at `.agents/skills/impeccable/scripts/load-context.mjs` is not present in this repo; read `PRODUCT.md` and `DESIGN.md` at the repo root when you need design context without that script.
 - `.cursor/hooks/state/` is listed in `.gitignore`; hook state and continual-learning index files stay local and are not committed by default.
 - The shared `Note` type includes `runId: string | null`; main-process mapping from SQLite and test fixtures that construct `Note` values must include `runId` (from `run_id` or `null`).
 - The `.sandcastle/Dockerfile` image is a long-lived sandbox (`sleep infinity`); typical workflow is build, run with the repo mounted at `/home/agent/workspace`, then use `docker exec` for a shell (unless Sandcastle CLI drives mounts for you).

@@ -364,64 +364,60 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
   // Promise.allSettled means one failing pipeline doesn't cancel the others.
   // -------------------------------------------------------------------------
 
-  const settled = await allSettledWithConcurrency(
-    issues,
-    MAX_PARALLEL_ISSUES,
-    async (issue) => {
-      const sandbox = await sandcastle.createSandbox({
-        branch: issue.branch,
-        sandbox: sandboxProvider(),
-        hooks,
-        copyToWorktree
+  const settled = await allSettledWithConcurrency(issues, MAX_PARALLEL_ISSUES, async (issue) => {
+    const sandbox = await sandcastle.createSandbox({
+      branch: issue.branch,
+      sandbox: sandboxProvider(),
+      hooks,
+      copyToWorktree
+    })
+
+    try {
+      // Run the implementer
+      const implementationModel = implementationModelFor(issue)
+      const implementationModelLabel = executionModelLabel(issue)
+      const implementationModelReason = useCodex
+        ? `Codex mode uses a single model (${CODEX_MODEL}) for implementation and review.`
+        : (issue.implementationModelReason ?? 'Default implementation model.')
+      const implement = await sandbox.run({
+        name: 'implementer',
+        maxIterations: 100,
+        agent: agent(implementationModel),
+        promptFile: './.sandcastle/implement-prompt.md',
+        promptArgs: {
+          TASK_ID: issue.id,
+          ISSUE_TITLE: issue.title,
+          BRANCH: issue.branch,
+          IMPLEMENTATION_MODEL: implementationModelLabel,
+          IMPLEMENTATION_MODEL_REASON: implementationModelReason
+        }
       })
 
-      try {
-        // Run the implementer
-        const implementationModel = implementationModelFor(issue)
-        const implementationModelLabel = executionModelLabel(issue)
-        const implementationModelReason = useCodex
-          ? `Codex mode uses a single model (${CODEX_MODEL}) for implementation and review.`
-          : (issue.implementationModelReason ?? 'Default implementation model.')
-        const implement = await sandbox.run({
-          name: 'implementer',
-          maxIterations: 100,
-          agent: agent(implementationModel),
-          promptFile: './.sandcastle/implement-prompt.md',
+      // Only review if the implementer produced commits
+      if (implement.commits.length > 0) {
+        const review = await sandbox.run({
+          name: 'reviewer',
+          maxIterations: 1,
+          agent: agent('opus'),
+          promptFile: './.sandcastle/review-prompt.md',
           promptArgs: {
-            TASK_ID: issue.id,
-            ISSUE_TITLE: issue.title,
-            BRANCH: issue.branch,
-            IMPLEMENTATION_MODEL: implementationModelLabel,
-            IMPLEMENTATION_MODEL_REASON: implementationModelReason
+            BRANCH: issue.branch
           }
         })
 
-        // Only review if the implementer produced commits
-        if (implement.commits.length > 0) {
-          const review = await sandbox.run({
-            name: 'reviewer',
-            maxIterations: 1,
-            agent: agent('opus'),
-            promptFile: './.sandcastle/review-prompt.md',
-            promptArgs: {
-              BRANCH: issue.branch
-            }
-          })
-
-          // Merge commits from both runs so the merge phase sees all of them.
-          // Each sandbox.run() only returns commits from its own run.
-          return {
-            ...review,
-            commits: [...implement.commits, ...review.commits]
-          }
+        // Merge commits from both runs so the merge phase sees all of them.
+        // Each sandbox.run() only returns commits from its own run.
+        return {
+          ...review,
+          commits: [...implement.commits, ...review.commits]
         }
-
-        return implement
-      } finally {
-        await sandbox.close()
       }
+
+      return implement
+    } finally {
+      await sandbox.close()
     }
-  )
+  })
 
   // Log any agents that threw (network error, sandbox crash, etc.).
   for (const [i, outcome] of settled.entries()) {

@@ -75,14 +75,16 @@ function disabledReason(
 export class AppUpdateService {
   private status: AppUpdateStatus
   private initialized = false
+  private readonly updater: AppUpdateUpdater | null
 
   constructor(
     env: AppUpdateEnvironment,
-    private readonly updater: AppUpdateUpdater = autoUpdater,
+    updater?: AppUpdateUpdater,
     private readonly broadcast: (status: AppUpdateStatus) => void = broadcastAppUpdateStatus
   ) {
     const channel = resolveAppUpdateChannel(env)
     const reason = disabledReason(env)
+    this.updater = reason ? null : (updater ?? autoUpdater)
     this.status = {
       state: reason ? 'disabled' : 'idle',
       version: env.version,
@@ -97,6 +99,7 @@ export class AppUpdateService {
 
   initialize(): void {
     if (this.initialized || this.status.state === 'disabled') return
+    if (!this.updater) return
     this.initialized = true
 
     this.updater.autoDownload = false
@@ -134,6 +137,7 @@ export class AppUpdateService {
 
   async checkForUpdates(): Promise<AppUpdateStatus> {
     if (this.status.state === 'disabled') return this.status
+    if (!this.updater) return this.status
     try {
       const result = await this.updater.checkForUpdates()
       this.setStatusFromCheckResult(result)
@@ -145,6 +149,7 @@ export class AppUpdateService {
 
   async downloadUpdate(): Promise<AppUpdateStatus> {
     if (this.status.state !== 'available') return this.status
+    if (!this.updater) return this.status
     this.setStatus({ state: 'downloading', errorMessage: null })
     try {
       await this.updater.downloadUpdate()
@@ -156,6 +161,7 @@ export class AppUpdateService {
 
   restartAndInstall(): AppUpdateStatus {
     if (this.status.state !== 'downloaded') return this.status
+    if (!this.updater) return this.status
     this.updater.quitAndInstall(false, true)
     return this.status
   }

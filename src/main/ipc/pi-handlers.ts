@@ -63,7 +63,7 @@ async function prepareAgentEventForMode(
     return agentEvent
   }
 
-  const repoLabels = await listRepoLabels(repo.owner, repo.name)
+  const repoLabels = await listRepoLabels(repo.owner, repo.name).catch(() => [])
   if (mode !== 'auto-publish-preview') {
     const drafts = agentEvent.drafts.map((draft) => {
       const labelMatches = matchLabelsToRepoLabels(draft.suggestedLabels, repoLabels)

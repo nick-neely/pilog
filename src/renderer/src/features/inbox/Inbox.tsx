@@ -1,5 +1,13 @@
-import { Add01Icon, Cancel01Icon, GithubIcon, SparklesIcon } from '@hugeicons/core-free-icons'
+import {
+  Add01Icon,
+  ArrowLeft01Icon,
+  ArrowRight01Icon,
+  Cancel01Icon,
+  GithubIcon,
+  SparklesIcon
+} from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
+import { Alert, AlertDescription, AlertTitle } from '@renderer/components/ui/alert'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -11,12 +19,14 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger
 } from '@renderer/components/ui/alert-dialog'
-import { Alert, AlertDescription, AlertTitle } from '@renderer/components/ui/alert'
 import { Badge } from '@renderer/components/ui/badge'
 import { Button } from '@renderer/components/ui/button'
 import { Empty, EmptyDescription } from '@renderer/components/ui/empty'
+import { Input } from '@renderer/components/ui/input'
+import { Kbd, KbdGroup } from '@renderer/components/ui/kbd'
+import { Label } from '@renderer/components/ui/label'
+import { Progress } from '@renderer/components/ui/progress'
 import { ScrollArea } from '@renderer/components/ui/scroll-area'
-import { Skeleton } from '@renderer/components/ui/skeleton'
 import {
   Select,
   SelectContent,
@@ -25,26 +35,28 @@ import {
   SelectTrigger,
   SelectValue
 } from '@renderer/components/ui/select'
+import { Separator } from '@renderer/components/ui/separator'
+import { Skeleton } from '@renderer/components/ui/skeleton'
 import { Textarea } from '@renderer/components/ui/textarea'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@renderer/components/ui/tooltip'
 import type { RunNavigationOrigin } from '@renderer/features/agent-runs/navigation'
 import { cn } from '@renderer/lib/utils'
-import type { LabelMatch } from '@shared/labels'
 import type {
   GenerateDraftsMode,
   GitHubStatus,
   ListNotesRequest,
   Note,
-  OnboardingState,
   NoteStatus,
   NoteStatusCounts,
+  OnboardingState,
   PiStatus,
   Repo
 } from '@shared/ipc'
+import type { LabelMatch } from '@shared/labels'
 import {
-  DEFAULT_ONBOARDING_STATE,
   completeOnboardingState,
   confirmHotkeyOnboardingState,
+  DEFAULT_ONBOARDING_STATE,
   getCompletedOnboardingSteps,
   getCurrentOnboardingStep,
   ONBOARDING_STEP_ORDER,
@@ -60,14 +72,17 @@ import type {
   IssueDraftForReview,
   IssueDraftStatus
 } from '@shared/types'
-import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
-import { StatusFilter } from './StatusFilter'
+import { Fragment, useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
 import {
   getErrorMessage,
   getGenerationRecoveryState,
   getPublishRecoveryState,
   type RecoveryState
 } from '../recovery-state'
+import { PiSetupPanel } from '../setup/PiSetupPanel'
+import { RepoLinkFlow } from '../setup/RepoLinkFlow'
+import { usePiConfig, type PiConfigState } from '../setup/use-pi-config'
+import { StatusFilter } from './StatusFilter'
 
 // Status filter rows. Order matches the inbox lifecycle (capture →
 // triage → publish → archive) so the list reads top-to-bottom as a
@@ -146,14 +161,35 @@ type OnboardingPanelProps = {
   step: OnboardingStepId
   signals: OnboardingSignals
   working: boolean
+  hotkey: string | null
+  hotkeyDraft: string
+  hotkeyDirty: boolean
+  noteDraft: string
+  generationPhase: string | null
+  generationError: string | null
+  draftPreview: OnboardingDraftPreview | null
+  pi: PiConfigState
   onConfirmHotkey: () => void
+  onHotkeyChange: (value: string) => void
+  onSaveHotkey: () => void
   onConnectGitHub: () => void
-  onLinkRepo: () => void
-  onConfigurePi: () => void
-  onCreateFirstNote: () => void
-  onGenerateFirstDraft: () => void
-  onOpenDrafts: () => void
+  onRepoLinked: () => Promise<void> | void
+  onPiConfigured: () => Promise<void> | void
+  onGitHubRequired: () => void
+  onNoteDraftChange: (value: string) => void
+  onCreateFirstNote: () => Promise<void> | void
+  onGenerateFirstDraft: () => Promise<void> | void
+  onOpenDrafts: () => Promise<void> | void
   onSkip: () => void
+}
+
+type OnboardingDraftPreview = {
+  title: string
+  summary: string
+  labels: string[]
+  confidence: 'low' | 'medium' | 'high'
+  affectedFiles: Array<{ path: string; reason: string }>
+  acceptanceCriteria: string[]
 }
 
 type GenerationErrorState = RecoveryState & {
@@ -210,9 +246,9 @@ function mapDraftLinksByNote(drafts: IssueDraftForReview[]): Map<string, NoteDra
     }
   }
 
-  for (const links of linksByNote.values()) {
+  linksByNote.forEach((links) => {
     links.sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))
-  }
+  })
 
   return linksByNote
 }
@@ -274,91 +310,464 @@ function getDetailEmptyDescription(input: {
   return 'Select a note to read or edit.'
 }
 
-const ONBOARDING_STEP_LABELS: Record<OnboardingStepId, string> = {
-  hotkey: 'Confirm hotkey',
+const ONBOARDING_STEP_TITLES: Record<OnboardingStepId, string> = {
+  hotkey: 'Set your capture hotkey',
   github: 'Connect GitHub',
-  repo: 'Link a repo',
+  repo: 'Link a local repository',
   pi: 'Configure Pi',
-  note: 'Capture a note',
-  draft: 'Generate a draft',
-  review: 'Review or publish'
+  note: 'Capture your first note',
+  draft: 'Generate your first draft',
+  review: 'Review and publish'
+}
+
+const ONBOARDING_STEP_DESCRIPTIONS: Record<OnboardingStepId, string> = {
+  hotkey:
+    'A global hotkey opens the scratchpad from anywhere. Press it, jot a thought, and get back to work.',
+  github:
+    'Pilog writes issues to GitHub on your behalf. Connect your account so drafts can become real issues.',
+  repo: 'Link a local git repository so Pilog can read your codebase and write repo-aware issue drafts.',
+  pi: 'Pi provides the agent that turns your rough notes into structured issue drafts. Choose a provider and model.',
+  note: 'Capture a quick thought about something you noticed: a broken button, a missing test, a refactor idea.',
+  draft:
+    'Let Pi read your note alongside your repository and produce a structured issue draft with title, body, and suggested labels.',
+  review:
+    'Review the generated draft, edit if needed, and publish it as a GitHub issue when you are ready.'
+}
+
+function formatHotkeyForDisplay(accelerator: string | null): string | null {
+  if (!accelerator) return null
+  return accelerator
+    .replace(/CmdOrCtrl/g, 'Ctrl')
+    .replace(/CommandOrControl/g, 'Ctrl')
+    .replace(/Alt/g, 'Alt')
+    .replace(/Shift/g, 'Shift')
+    .replace(/\+/g, ' + ')
 }
 
 function OnboardingPanel({
   state,
-  step,
+  step: currentStep,
   signals,
   working,
+  hotkey,
+  hotkeyDraft,
+  hotkeyDirty,
+  noteDraft,
+  generationPhase,
+  generationError,
+  draftPreview,
+  pi,
   onConfirmHotkey,
+  onHotkeyChange,
+  onSaveHotkey,
   onConnectGitHub,
-  onLinkRepo,
-  onConfigurePi,
+  onRepoLinked,
+  onPiConfigured,
+  onGitHubRequired,
+  onNoteDraftChange,
   onCreateFirstNote,
   onGenerateFirstDraft,
   onOpenDrafts,
   onSkip
 }: OnboardingPanelProps): React.JSX.Element {
+  const [displayedStep, setDisplayedStep] = useState<OnboardingStepId>(currentStep)
+
   const completedSteps = getCompletedOnboardingSteps(state, signals)
+  const currentIndex = ONBOARDING_STEP_ORDER.indexOf(currentStep)
+  const displayedIndex = ONBOARDING_STEP_ORDER.indexOf(displayedStep)
+  const progressValue = ((displayedIndex + 1) / ONBOARDING_STEP_ORDER.length) * 100
+
+  const handleBack = (): void => {
+    if (displayedIndex > 0) {
+      setDisplayedStep(ONBOARDING_STEP_ORDER[displayedIndex - 1])
+    }
+  }
+
+  const handleContinue = (): void => {
+    if (displayedIndex < ONBOARDING_STEP_ORDER.length - 1) {
+      setDisplayedStep(ONBOARDING_STEP_ORDER[displayedIndex + 1])
+    }
+  }
+
+  const handleStepDotClick = (stepId: OnboardingStepId): void => {
+    const stepIndex = ONBOARDING_STEP_ORDER.indexOf(stepId)
+    if (stepIndex <= currentIndex) {
+      setDisplayedStep(stepId)
+    }
+  }
+
+  const handleRepoLinked = (): void => {
+    void Promise.resolve(onRepoLinked()).finally(() => {
+      setDisplayedStep(currentStep)
+    })
+  }
+
+  const handlePiConfigured = (): void => {
+    void Promise.resolve(onPiConfigured()).finally(() => {
+      setDisplayedStep(currentStep)
+    })
+  }
+
+  const handleNoteCreated = (): void => {
+    void Promise.resolve(onCreateFirstNote()).finally(() => {
+      setDisplayedStep(currentStep)
+    })
+  }
+
+  const handleDraftGenerated = (): void => {
+    void Promise.resolve(onGenerateFirstDraft()).finally(() => {
+      setDisplayedStep(currentStep)
+    })
+  }
+
   const action = getOnboardingAction({
-    step,
+    step: displayedStep,
+    currentStep,
     working,
     onConfirmHotkey,
     onConnectGitHub,
-    onLinkRepo,
-    onConfigurePi,
-    onCreateFirstNote,
-    onGenerateFirstDraft,
-    onOpenDrafts
+    onCreateFirstNote: handleNoteCreated,
+    onGenerateFirstDraft: handleDraftGenerated,
+    onOpenDrafts,
+    onContinue: handleContinue
   })
+
+  const isMac = typeof navigator !== 'undefined' && navigator.platform.toUpperCase().includes('MAC')
+  const metaKey = isMac ? '⌘' : 'Ctrl'
+  const displayHotkey = formatHotkeyForDisplay(hotkey) || `${metaKey} + Alt + N`
+  const noteReady = noteDraft.trim().length > 0
+  const generationRunning = displayedStep === 'draft' && working
+  const preview = draftPreview ?? getLatestOnboardingDraftPreview(signals.drafts)
+  const generationPhaseInfo = generationPhase
+    ? formatOnboardingGenerationPhase(generationPhase)
+    : null
+  const hasExistingDraft = Boolean(preview) || signals.drafts.length > 0
 
   return (
     <section
       data-testid="onboarding-panel"
       aria-labelledby="onboarding-title"
-      className="mx-auto flex h-full w-full max-w-2xl flex-col justify-center px-8 py-10"
+      className="flex h-full w-full flex-col items-center overflow-y-auto px-6 py-10"
     >
-      <div className="flex flex-col gap-6 border-y py-6">
+      <div className="m-auto flex w-full max-w-lg flex-col gap-6">
+        {/* Progress with inline navigation */}
         <div className="flex flex-col gap-2">
-          <p className="text-xs font-medium text-muted-foreground">First run</p>
-          <h2 id="onboarding-title" className="font-heading text-2xl font-normal leading-tight">
-            Start with one useful draft.
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={handleBack}
+                disabled={working || displayedIndex <= 0}
+                className={cn(
+                  'inline-flex size-5 items-center justify-center rounded-sm text-muted-foreground transition-colors',
+                  displayedIndex > 0
+                    ? 'hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30'
+                    : 'invisible'
+                )}
+                aria-label="Previous step"
+              >
+                <HugeiconsIcon icon={ArrowLeft01Icon} className="size-3" aria-hidden />
+              </button>
+              <p className="text-xs font-medium text-muted-foreground">
+                Step {displayedIndex + 1} of {ONBOARDING_STEP_ORDER.length}
+              </p>
+              <button
+                type="button"
+                onClick={handleContinue}
+                disabled={working || displayedIndex >= currentIndex}
+                className={cn(
+                  'inline-flex size-5 items-center justify-center rounded-sm text-muted-foreground transition-colors',
+                  displayedIndex < currentIndex
+                    ? 'hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30'
+                    : 'invisible'
+                )}
+                aria-label="Next step"
+              >
+                <HugeiconsIcon icon={ArrowRight01Icon} className="size-3" aria-hidden />
+              </button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {completedSteps.size} of {ONBOARDING_STEP_ORDER.length} complete
+            </p>
+          </div>
+          <Progress value={progressValue} className="h-1.5" />
+        </div>
+
+        {/* Step dots */}
+        <div className="flex items-center justify-center gap-2">
+          {ONBOARDING_STEP_ORDER.map((id) => {
+            const done = completedSteps.has(id)
+            const current = id === displayedStep
+            const clickable = done || id === currentStep
+            return (
+              <button
+                key={id}
+                type="button"
+                data-testid={`onboarding-step-${id}`}
+                onClick={() => clickable && handleStepDotClick(id)}
+                className={cn(
+                  'size-2 rounded-full transition-colors',
+                  current ? 'bg-primary' : done ? 'bg-primary/40' : 'bg-muted',
+                  clickable && 'cursor-pointer hover:ring-2 hover:ring-primary/30'
+                )}
+                aria-current={current ? 'step' : undefined}
+                disabled={!clickable}
+                aria-label={`Step ${id}${done ? ' (completed)' : ''}`}
+              />
+            )
+          })}
+        </div>
+
+        {/* Title and description */}
+        <div className="flex flex-col gap-2 text-center">
+          <h2
+            id="onboarding-title"
+            className="font-heading text-2xl font-normal leading-tight tracking-tight"
+          >
+            {ONBOARDING_STEP_TITLES[displayedStep]}
           </h2>
-          <p className="max-w-[62ch] text-sm leading-relaxed text-muted-foreground">
-            Pilog needs a hotkey, GitHub, one local repository, Pi credentials, and one note. Each
-            step uses the real app state, so you can leave and come back without losing work.
+          <p className="mx-auto max-w-[50ch] text-sm leading-relaxed text-muted-foreground">
+            {ONBOARDING_STEP_DESCRIPTIONS[displayedStep]}
           </p>
         </div>
 
-        <ol className="grid gap-2 sm:grid-cols-2">
-          {ONBOARDING_STEP_ORDER.map((id, index) => {
-            const done = completedSteps.has(id)
-            const current = id === step
-            return (
-              <li
-                key={id}
-                data-testid={`onboarding-step-${id}`}
-                aria-current={current ? 'step' : undefined}
-                className={cn(
-                  'flex min-h-10 items-center gap-2 rounded-md border px-3 py-2 text-sm',
-                  current ? 'bg-muted text-foreground' : 'text-muted-foreground',
-                  done ? 'border-border' : 'border-transparent'
-                )}
-              >
-                <span className="tabular flex size-5 shrink-0 items-center justify-center rounded-sm border font-mono text-[11px]">
-                  {done ? 'OK' : index + 1}
-                </span>
-                <span>{ONBOARDING_STEP_LABELS[id]}</span>
-              </li>
-            )
-          })}
-        </ol>
+        {/* Step-specific content */}
+        <div className="flex flex-col items-center gap-3">
+          {displayedStep === 'hotkey' ? (
+            <div className="flex flex-col items-center gap-3">
+              <div className="flex items-center gap-2 rounded-lg border bg-muted px-6 py-4">
+                <KbdGroup>
+                  {displayHotkey.split(' + ').map((key, i, arr) => (
+                    <Fragment key={`${key}-${i}`}>
+                      <Kbd className="text-sm">{key}</Kbd>
+                      {i < arr.length - 1 && <span className="text-muted-foreground">+</span>}
+                    </Fragment>
+                  ))}
+                </KbdGroup>
+              </div>
+              <p className="max-w-[42ch] text-center text-xs text-muted-foreground">
+                Press this combination to open the scratchpad from anywhere. Try it now, or change
+                it if you prefer something else.
+              </p>
+              <div className="flex w-full max-w-sm flex-col gap-1.5 text-left">
+                <Label htmlFor="onboarding-hotkey">Capture hotkey</Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    id="onboarding-hotkey"
+                    value={hotkeyDraft}
+                    onChange={(event) => onHotkeyChange(event.target.value)}
+                    placeholder="CommandOrControl+Alt+N"
+                    className="font-mono"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={onSaveHotkey}
+                    disabled={!hotkeyDirty || working}
+                  >
+                    Save
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Hotkey changes take effect after restarting Pilog.
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                <Button onClick={action.onClick} disabled={working}>
+                  {action.label}
+                </Button>
+              </div>
+            </div>
+          ) : displayedStep === 'repo' ? (
+            <div className="w-full max-w-md">
+              <RepoLinkFlow
+                idleLabel="Link a local repo"
+                onLinked={handleRepoLinked}
+                onGitHubRequired={onGitHubRequired}
+              />
+            </div>
+          ) : displayedStep === 'pi' ? (
+            <div className="w-full text-left">
+              <PiSetupPanel
+                pi={pi}
+                description="Choose the provider, model, and API key Pilog should use for draft generation. Credentials stay in OS-backed safe storage."
+                onConfigured={handlePiConfigured}
+              />
+            </div>
+          ) : displayedStep === 'note' ? (
+            <div className="flex w-full flex-col gap-3 text-left">
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="onboarding-first-note">First note</Label>
+                <Textarea
+                  id="onboarding-first-note"
+                  data-testid="onboarding-note-input"
+                  value={noteDraft}
+                  onChange={(event) => onNoteDraftChange(event.target.value)}
+                  placeholder="Example: The settings save button needs a loading state."
+                  className="min-h-28 resize-none font-mono text-sm leading-relaxed"
+                  disabled={working}
+                />
+              </div>
+              <p className="text-xs leading-5 text-muted-foreground">
+                Write the kind of rough thought you would normally lose mid-flow. Pilog keeps it as
+                the source for the draft.
+              </p>
+              <div className="flex justify-center">
+                <Button
+                  onClick={handleNoteCreated}
+                  disabled={working || !noteReady}
+                  className="min-w-[10rem]"
+                >
+                  Save note
+                </Button>
+              </div>
+            </div>
+          ) : displayedStep === 'draft' ? (
+            <div className="flex w-full flex-col gap-4 text-left">
+              {generationRunning ? (
+                <div className="rounded-md border bg-muted/35 p-4" aria-live="polite">
+                  <div className="flex flex-col gap-2">
+                    <p className="text-sm font-medium text-foreground">Generating draft</p>
+                    <p className="text-xs leading-5 text-muted-foreground">
+                      {generationPhaseInfo?.label ?? 'Reading your note and repository context.'}
+                    </p>
+                    {generationPhaseInfo ? (
+                      <Progress value={generationPhaseInfo.progress} className="h-1.5" />
+                    ) : (
+                      <Progress indeterminate className="h-1.5" />
+                    )}
+                  </div>
+                </div>
+              ) : hasExistingDraft ? (
+                <>
+                  <div className="rounded-md border bg-muted/30 p-4">
+                    <p className="text-sm font-medium text-foreground">Draft generated</p>
+                    <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                      Pi read your note and produced a structured issue draft. Review it on the next
+                      step before publishing.
+                    </p>
+                  </div>
+                  {preview ? (
+                    <div className="rounded-md border bg-muted/20 p-4">
+                      <div className="flex flex-col gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge variant="secondary" className="capitalize">
+                            {preview.confidence} confidence
+                          </Badge>
+                          {preview.labels.slice(0, 3).map((label) => (
+                            <Badge key={label} variant="outline">
+                              {label}
+                            </Badge>
+                          ))}
+                        </div>
+                        <h3 className="text-base font-medium leading-snug text-foreground">
+                          {preview.title}
+                        </h3>
+                        <p className="text-sm leading-6 text-muted-foreground">{preview.summary}</p>
+                      </div>
+                    </div>
+                  ) : null}
+                  <div className="flex justify-center">
+                    <Button
+                      onClick={handleContinue}
+                      disabled={working}
+                      className="min-w-[12rem]"
+                      size="lg"
+                    >
+                      Continue to review
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="rounded-md border bg-muted/30 p-4">
+                    <p className="text-sm font-medium text-foreground">Ready to draft</p>
+                    <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                      Pi will read your note with the linked repository and create a GitHub-ready
+                      issue draft. You will review it before anything is published.
+                    </p>
+                  </div>
+                  {generationError ? (
+                    <Alert variant="destructive" className="rounded-md">
+                      <AlertTitle>Draft generation needs attention</AlertTitle>
+                      <AlertDescription>{generationError}</AlertDescription>
+                    </Alert>
+                  ) : null}
+                  <div className="flex justify-center">
+                    <Button
+                      onClick={action.onClick}
+                      disabled={working}
+                      className="min-w-[12rem]"
+                      size="lg"
+                    >
+                      {action.label}
+                    </Button>
+                  </div>
+                </>
+              )}
+            </div>
+          ) : displayedStep === 'review' && preview ? (
+            <div className="flex w-full flex-col gap-4 text-left">
+              <div className="rounded-md border bg-muted/30 p-4">
+                <div className="flex flex-col gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant="secondary" className="capitalize">
+                      {preview.confidence} confidence
+                    </Badge>
+                    {preview.labels.slice(0, 3).map((label) => (
+                      <Badge key={label} variant="outline">
+                        {label}
+                      </Badge>
+                    ))}
+                  </div>
+                  <h3 className="text-base font-medium leading-snug text-foreground">
+                    {preview.title}
+                  </h3>
+                  <p className="text-sm leading-6 text-muted-foreground">{preview.summary}</p>
+                </div>
+                {preview.affectedFiles.length > 0 ? (
+                  <div className="mt-4 flex flex-col gap-1.5">
+                    <p className="text-xs font-medium text-foreground">Likely area</p>
+                    <p className="truncate font-mono text-xs text-muted-foreground">
+                      {preview.affectedFiles[0].path}
+                    </p>
+                  </div>
+                ) : null}
+                {preview.acceptanceCriteria.length > 0 ? (
+                  <div className="mt-4 flex flex-col gap-1.5">
+                    <p className="text-xs font-medium text-foreground">First check</p>
+                    <p className="text-xs leading-5 text-muted-foreground">
+                      {preview.acceptanceCriteria[0]}
+                    </p>
+                  </div>
+                ) : null}
+              </div>
+              <p className="text-center text-xs leading-5 text-muted-foreground">
+                The full draft, source note, files, labels, and review details are saved.
+              </p>
+              <div className="flex justify-center">
+                <Button onClick={action.onClick} disabled={working} className="min-w-[12rem]">
+                  {action.label}
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <Button onClick={action.onClick} disabled={working} className="min-w-[12rem]" size="lg">
+              {working && (
+                <span className="mr-2 inline-block size-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+              )}
+              {action.label}
+            </Button>
+          )}
+        </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <Button onClick={action.onClick} disabled={working}>
-            {action.label}
-          </Button>
-          <Button variant="ghost" onClick={onSkip} disabled={working}>
-            Skip for now
+        <Separator className="w-full max-w-xs self-center" />
+
+        {/* Skip */}
+        <div className="flex justify-center">
+          <Button variant="ghost" size="sm" onClick={onSkip} disabled={working}>
+            Skip setup for now
           </Button>
         </div>
       </div>
@@ -368,37 +777,109 @@ function OnboardingPanel({
 
 function getOnboardingAction(input: {
   step: OnboardingStepId
+  currentStep: OnboardingStepId
   working: boolean
   onConfirmHotkey: () => void
   onConnectGitHub: () => void
-  onLinkRepo: () => void
-  onConfigurePi: () => void
-  onCreateFirstNote: () => void
-  onGenerateFirstDraft: () => void
-  onOpenDrafts: () => void
-}): { label: string; onClick: () => void } {
+  onCreateFirstNote: () => Promise<void> | void
+  onGenerateFirstDraft: () => Promise<void> | void
+  onOpenDrafts: () => Promise<void> | void
+  onContinue: () => void
+}): { label: string; onClick: () => Promise<void> | void } {
+  // When viewing a completed step that is not the current active step,
+  // offer Continue to walk forward instead of repeating the action.
+  if (input.step !== input.currentStep) {
+    return { label: 'Continue', onClick: input.onContinue }
+  }
+
   switch (input.step) {
     case 'hotkey':
-      return { label: 'Confirm CommandOrControl+Alt+N', onClick: input.onConfirmHotkey }
+      return { label: 'This works for me', onClick: input.onConfirmHotkey }
     case 'github':
       return {
-        label: input.working ? 'Connecting' : 'Connect GitHub',
+        label: input.working ? 'Connecting…' : 'Connect GitHub',
         onClick: input.onConnectGitHub
       }
     case 'repo':
-      return { label: 'Link a local repo', onClick: input.onLinkRepo }
+      return { label: 'Link a local repo', onClick: () => undefined }
     case 'pi':
-      return { label: 'Configure Pi', onClick: input.onConfigurePi }
+      return { label: 'Configure Pi', onClick: () => undefined }
     case 'note':
-      return { label: 'Write the first note', onClick: input.onCreateFirstNote }
+      return { label: 'Save note', onClick: input.onCreateFirstNote }
     case 'draft':
       return {
-        label: input.working ? 'Generating' : 'Generate first draft',
+        label: input.working ? 'Generating…' : 'Generate first draft',
         onClick: input.onGenerateFirstDraft
       }
     case 'review':
-      return { label: 'Open Drafts', onClick: input.onOpenDrafts }
+      return { label: 'Open full draft', onClick: input.onOpenDrafts }
   }
+}
+
+function getLatestOnboardingDraftPreview(
+  drafts: IssueDraftForReview[]
+): OnboardingDraftPreview | null {
+  const draft = drafts[0]
+  if (!draft) return null
+  return {
+    title: draft.title,
+    summary: firstBodyParagraph(draft.body) || draft.groupingReason,
+    labels: draft.labels,
+    confidence: draft.confidence,
+    affectedFiles: draft.affectedFiles,
+    acceptanceCriteria: extractAcceptanceCriteria(draft.body)
+  }
+}
+
+function generatedDraftToOnboardingPreview(draft: GeneratedIssueDraft): OnboardingDraftPreview {
+  return {
+    title: draft.title,
+    summary: draft.summary,
+    labels: draft.suggestedLabels,
+    confidence: draft.confidence,
+    affectedFiles: draft.affectedFiles,
+    acceptanceCriteria: draft.acceptanceCriteria
+  }
+}
+
+function formatOnboardingGenerationPhase(phase: string): { label: string; progress: number } {
+  const phaseMap: Record<string, { label: string; progress: number }> = {
+    preparing: { label: 'Preparing your first draft.', progress: 5 },
+    agent_start: { label: 'Starting the draft run.', progress: 10 },
+    turn_start: { label: 'Reading your note and repository context.', progress: 35 },
+    submit_issue_drafts: { label: 'Saving the generated issue draft.', progress: 80 }
+  }
+  return (
+    phaseMap[phase] ?? {
+      label: `Working through ${phase.replace(/[_-]/g, ' ')}.`,
+      progress: 50
+    }
+  )
+}
+
+function firstBodyParagraph(body: string): string {
+  return (
+    body
+      .split(/\n{2,}/)
+      .map((part) => part.replace(/^#+\s+.+\n/, '').trim())
+      .find((part) => part.length > 0 && !part.startsWith('#')) ?? ''
+  )
+}
+
+function extractAcceptanceCriteria(body: string): string[] {
+  const heading = /^##\s+Acceptance Criteria\s*$/im.exec(body)
+  if (!heading) return []
+  const afterHeading = body.slice(heading.index + heading[0].length)
+  const nextHeadingIndex = afterHeading.search(/^##\s+/m)
+  const section = nextHeadingIndex === -1 ? afterHeading : afterHeading.slice(0, nextHeadingIndex)
+  return section
+    .split(/\n{2,}/)
+    .join('\n')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.startsWith('- '))
+    .map((line) => line.slice(2).trim())
+    .filter(Boolean)
 }
 
 function NoteDetail({
@@ -853,6 +1334,14 @@ export function Inbox({
   const [onboardingState, setOnboardingState] = useState<OnboardingState>(DEFAULT_ONBOARDING_STATE)
   const [onboardingNotes, setOnboardingNotes] = useState<Note[]>([])
   const [onboardingDrafts, setOnboardingDrafts] = useState<IssueDraftForReview[]>([])
+  const [onboardingHotkey, setOnboardingHotkey] = useState<string | null>(null)
+  const [onboardingHotkeyDraft, setOnboardingHotkeyDraft] = useState('')
+  const [onboardingHotkeyEdited, setOnboardingHotkeyEdited] = useState(false)
+  const [onboardingNoteDraft, setOnboardingNoteDraft] = useState('')
+  const [onboardingGenerationPhase, setOnboardingGenerationPhase] = useState<string | null>(null)
+  const [onboardingGenerationError, setOnboardingGenerationError] = useState<string | null>(null)
+  const [onboardingDraftPreview, setOnboardingDraftPreview] =
+    useState<OnboardingDraftPreview | null>(null)
   const [githubStatus, setGitHubStatus] = useState<GitHubStatus>({ connected: false })
   const [onboardingWorking, setOnboardingWorking] = useState(false)
   const [draftLinksByNote, setDraftLinksByNote] = useState<Map<string, NoteDraftLink[]>>(
@@ -882,6 +1371,7 @@ export function Inbox({
   const fetchIdRef = useRef(0)
   const countsFetchIdRef = useRef(0)
   const mountedRef = useRef(true)
+  const onboardingPi = usePiConfig()
 
   const reposById = useMemo(() => new Map(repos.map((r) => [r.id, r])), [repos])
   const onboardingSignals = useMemo<OnboardingSignals>(
@@ -908,6 +1398,10 @@ export function Inbox({
     window.pilog.invoke('pi:status').then(setPiStatus)
     window.pilog.invoke('github:status').then(setGitHubStatus)
     window.pilog.invoke('onboarding:get').then(setOnboardingState)
+    window.pilog.invoke('setting:get', { key: 'hotkey.scratchpad' }).then((value) => {
+      setOnboardingHotkey(value)
+      setOnboardingHotkeyDraft(value ?? '')
+    })
   }, [])
 
   const fetchNotes = useCallback(async (): Promise<void> => {
@@ -921,7 +1415,7 @@ export function Inbox({
         setNotes(result)
         setSelectedIds((prev) => {
           const validIds = new Set(result.map((n) => n.id))
-          const next = new Set([...prev].filter((rid) => validIds.has(rid)))
+          const next = new Set(Array.from(prev).filter((rid) => validIds.has(rid)))
           return next.size === prev.size ? prev : next
         })
       })
@@ -975,7 +1469,9 @@ export function Inbox({
   }, [fetchStatusCounts])
 
   useEffect(() => {
-    fetchOnboardingNotes()
+    queueMicrotask(() => {
+      void fetchOnboardingNotes()
+    })
   }, [fetchOnboardingNotes])
 
   const handleFocusNoteHandled = useEffectEvent(() => {
@@ -1020,9 +1516,37 @@ export function Inbox({
     setOnboardingState(saved)
   }, [])
 
-  const handleConfirmHotkey = useCallback((): void => {
-    void persistOnboardingState(confirmHotkeyOnboardingState(onboardingState))
-  }, [onboardingState, persistOnboardingState])
+  const handleConfirmHotkey = useCallback(async (): Promise<void> => {
+    if (onboardingHotkeyEdited && onboardingHotkeyDraft !== (onboardingHotkey ?? '')) {
+      await window.pilog.invoke('setting:set', {
+        key: 'hotkey.scratchpad',
+        value: onboardingHotkeyDraft
+      })
+      setOnboardingHotkey(onboardingHotkeyDraft)
+      setOnboardingHotkeyEdited(false)
+    }
+    await persistOnboardingState(confirmHotkeyOnboardingState(onboardingState))
+  }, [
+    onboardingHotkey,
+    onboardingHotkeyDraft,
+    onboardingHotkeyEdited,
+    onboardingState,
+    persistOnboardingState
+  ])
+
+  const handleOnboardingHotkeyChange = useCallback((value: string): void => {
+    setOnboardingHotkeyEdited(true)
+    setOnboardingHotkeyDraft(value)
+  }, [])
+
+  const handleSaveOnboardingHotkey = useCallback(async (): Promise<void> => {
+    await window.pilog.invoke('setting:set', {
+      key: 'hotkey.scratchpad',
+      value: onboardingHotkeyDraft
+    })
+    setOnboardingHotkey(onboardingHotkeyDraft)
+    setOnboardingHotkeyEdited(false)
+  }, [onboardingHotkeyDraft])
 
   const handleSkipOnboarding = useCallback((): void => {
     void persistOnboardingState(skipOnboardingState(onboardingState))
@@ -1042,15 +1566,32 @@ export function Inbox({
     }
   }, [])
 
+  const handleOnboardingRepoLinked = useCallback(async (): Promise<void> => {
+    const nextRepos = await window.pilog.invoke('repos:list')
+    setRepos(nextRepos)
+  }, [])
+
+  const handleOnboardingGitHubRequired = useCallback((): void => {
+    setGitHubStatus({ connected: false })
+  }, [])
+
+  const handleOnboardingPiConfigured = useCallback(async (): Promise<void> => {
+    setPiStatus(await window.pilog.invoke('pi:status'))
+  }, [])
+
   const handleCreateFirstNote = useCallback(async (): Promise<void> => {
+    const content = onboardingNoteDraft.trim()
+    if (!content) return
     const firstRepo = repos[0]
     const created = await window.pilog.invoke('note:create', {
-      content: '',
+      content,
       repoId: firstRepo?.id ?? null
     })
+    setOnboardingGenerationError(null)
+    setOnboardingDraftPreview(null)
     await Promise.all([fetchNotes(), fetchStatusCounts(), fetchOnboardingNotes()])
     requestAnimationFrame(() => setSelectedIds(new Set([created.id])))
-  }, [fetchNotes, fetchOnboardingNotes, fetchStatusCounts, repos])
+  }, [fetchNotes, fetchOnboardingNotes, fetchStatusCounts, onboardingNoteDraft, repos])
 
   const handleSave = async (id: string, content: string): Promise<void> => {
     await window.pilog.invoke('note:update', { id, content })
@@ -1208,7 +1749,7 @@ export function Inbox({
     if (!canGenerateDrafts) return
     if (mode === 'auto-publish-preview' && !canGenerateAndPublish) return
     const selectedNoteSnapshot = [...selectedNotes]
-    const selectedIdSnapshot = [...selectedIds]
+    const selectedIdSnapshot = Array.from(selectedIds)
     setGenerating(true)
     setGenerationError(null)
     try {
@@ -1264,34 +1805,57 @@ export function Inbox({
 
     setOnboardingWorking(true)
     setGenerating(true)
+    setOnboardingGenerationPhase('preparing')
+    setOnboardingGenerationError(null)
+    setOnboardingDraftPreview(null)
     try {
       await window.pilog.runAgent(
         { noteIds: [firstReadyNote.id], mode: 'review' },
         async (event) => {
+          if (event.type === 'progress') {
+            if (!mountedRef.current) return
+            setOnboardingGenerationPhase(event.phase)
+          }
           if (event.type === 'final') {
             if (!mountedRef.current) return
+            const firstDraft = event.drafts[0]
+            if (firstDraft) {
+              setOnboardingDraftPreview(generatedDraftToOnboardingPreview(firstDraft))
+            }
             await Promise.all([
               fetchNotes(),
               fetchStatusCounts(),
               fetchDraftLinks(),
-              fetchOnboardingNotes(),
-              persistOnboardingState(completeOnboardingState(onboardingState))
+              fetchOnboardingNotes()
             ])
-            onNavigateToDraftReview()
           }
           if (event.type === 'error') {
-            console.error(event.message)
+            if (!mountedRef.current) return
+            setOnboardingGenerationError(event.message)
           }
         }
       )
+    } catch (error) {
+      if (mountedRef.current) {
+        setOnboardingGenerationError(getErrorMessage(error, String(error)))
+      }
     } finally {
       if (mountedRef.current) {
         setGenerating(false)
         setOnboardingWorking(false)
+        setOnboardingGenerationPhase(null)
         window.pilog.invoke('pi:status').then(setPiStatus)
       }
     }
   }
+
+  const handleOpenOnboardingDrafts = useCallback(async (): Promise<void> => {
+    if (!onboardingState.completed) {
+      await persistOnboardingState(completeOnboardingState(onboardingState))
+    }
+    clearSelection()
+    onNavigateToDraftReview()
+  }, [clearSelection, onboardingState, onNavigateToDraftReview, persistOnboardingState])
 
   const handleProcessCurrentInbox = async (): Promise<void> => {
     if (!currentInboxRepo || !canProcessCurrentInbox) return
@@ -1374,374 +1938,404 @@ export function Inbox({
 
   return (
     <div className="flex h-full bg-background text-foreground">
-      {/*
-        Sidebar — overflow-hidden + min-w-0 keep any future toolbar overflow
-        contained instead of bleeding into the detail pane. The sidebar
-        is structured as three regions:
-          (1) filter rail (vertical status list, optional selection row,
-              repo Select)
-          (2) scrolling list (the only region that grows)
-          (3) mode footer that swaps capture <-> triage
-        View nav and global chrome (Settings, Cmd+K) live in AppShell's
-        top bar, not here, so the sidebar never has to fight a tab strip
-        for 320px of width.
-      */}
-      <div className="flex w-80 min-w-0 shrink-0 flex-col overflow-hidden border-r">
-        {/* (1) Filter rail — compact status grid, optional selection
+      {onboardingStep && !onboardingState.skipped ? (
+        <OnboardingPanel
+          key={onboardingStep}
+          state={onboardingState}
+          step={onboardingStep}
+          signals={onboardingSignals}
+          working={onboardingWorking || generating}
+          hotkey={onboardingHotkey}
+          hotkeyDraft={onboardingHotkeyEdited ? onboardingHotkeyDraft : (onboardingHotkey ?? '')}
+          hotkeyDirty={onboardingHotkeyEdited && onboardingHotkeyDraft !== (onboardingHotkey ?? '')}
+          noteDraft={onboardingNoteDraft}
+          generationPhase={onboardingGenerationPhase}
+          generationError={onboardingGenerationError}
+          draftPreview={onboardingDraftPreview}
+          pi={onboardingPi}
+          onConfirmHotkey={handleConfirmHotkey}
+          onHotkeyChange={handleOnboardingHotkeyChange}
+          onSaveHotkey={() => void handleSaveOnboardingHotkey()}
+          onConnectGitHub={() => void handleConnectGitHub()}
+          onRepoLinked={handleOnboardingRepoLinked}
+          onPiConfigured={handleOnboardingPiConfigured}
+          onGitHubRequired={handleOnboardingGitHubRequired}
+          onNoteDraftChange={setOnboardingNoteDraft}
+          onCreateFirstNote={handleCreateFirstNote}
+          onGenerateFirstDraft={handleGenerateFirstDraft}
+          onOpenDrafts={handleOpenOnboardingDrafts}
+          onSkip={handleSkipOnboarding}
+        />
+      ) : (
+        <>
+          {/*
+            Sidebar — overflow-hidden + min-w-0 keep any future toolbar overflow
+            contained instead of bleeding into the detail pane. The sidebar
+            is structured as three regions:
+              (1) filter rail (vertical status list, optional selection row,
+                  repo Select)
+              (2) scrolling list (the only region that grows)
+              (3) mode footer that swaps capture <-> triage
+            View nav and global chrome (Settings, Cmd+K) live in AppShell's
+            top bar, not here, so the sidebar never has to fight a tab strip
+            for 320px of width.
+          */}
+          <div className="flex w-80 min-w-0 shrink-0 flex-col overflow-hidden border-r">
+            {/* (1) Filter rail — compact status grid, optional selection
             row, then the repo Select. Each region owns its own line, so
             the moss "N selected" indicator never reflows the status
             rows when it appears. The shape echoes Things 3's sidebar
             list (PRODUCT.md names it as a reference): type-led, calm,
             and dense with signal (per-status counts) rather than chrome. */}
-        <div className="flex shrink-0 flex-col gap-1 border-b px-2.5 py-2">
-          <StatusFilter
-            rows={STATUS_FILTER_ROWS}
-            counts={statusCounts}
-            active={statusFilter}
-            onToggle={toggleStatus}
-          />
-          {/* Selection row — only renders when there's an active selection.
+            <div className="flex shrink-0 flex-col gap-1 border-b px-2.5 py-2">
+              <StatusFilter
+                rows={STATUS_FILTER_ROWS}
+                counts={statusCounts}
+                active={statusFilter}
+                onToggle={toggleStatus}
+              />
+              {/* Selection row — only renders when there's an active selection.
               Lives on its own line so the status grid above never
               reflow. The moss tint is the system's One-Voice accent
               applied deliberately: at most one of these is visible at a
               time, well within the ≤10% accent budget. Click anywhere on
               the row (or press Esc) to clear. */}
-          {hasSelection ? (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  type="button"
-                  onClick={clearSelection}
-                  aria-label={`Clear ${selectionCount} selected ${
-                    selectionCount === 1 ? 'note' : 'notes'
-                  }`}
-                  className={cn(
-                    'flex h-7 cursor-pointer items-center gap-2 rounded-md px-1.5 text-xs transition-colors',
-                    'bg-primary/10 text-foreground hover:bg-primary/15',
-                    'focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/30'
-                  )}
-                >
-                  <HugeiconsIcon
-                    icon={Cancel01Icon}
-                    aria-hidden
-                    strokeWidth={2}
-                    className="size-3.5 shrink-0 text-primary"
-                  />
-                  {/* The testid lives on the count span (not the button) so the
+              {hasSelection ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      onClick={clearSelection}
+                      aria-label={`Clear ${selectionCount} selected ${
+                        selectionCount === 1 ? 'note' : 'notes'
+                      }`}
+                      className={cn(
+                        'flex h-7 cursor-pointer items-center gap-2 rounded-md px-1.5 text-xs transition-colors',
+                        'bg-primary/10 text-foreground hover:bg-primary/15',
+                        'focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/30'
+                      )}
+                    >
+                      <HugeiconsIcon
+                        icon={Cancel01Icon}
+                        aria-hidden
+                        strokeWidth={2}
+                        className="size-3.5 shrink-0 text-primary"
+                      />
+                      {/* The testid lives on the count span (not the button) so the
                       e2e suite's exact-text match against "{N} selected" stays
                       green even with the trailing "Esc" hint kbd inside the
                       same row. The button's aria-label carries the full
                       intent for assistive tech. */}
-                  <span data-testid="selected-count" className="tabular flex-1 text-left">
-                    {selectionCount} selected
-                  </span>
-                  <span
-                    aria-hidden
-                    className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground/80"
-                  >
-                    Esc
-                  </span>
-                </button>
-              </TooltipTrigger>
-              <TooltipContent>Clear {selectionCount} selected (Esc)</TooltipContent>
-            </Tooltip>
-          ) : null}
-          <Select
-            value={encodeRepoFilter(repoFilter)}
-            onValueChange={(v) => {
-              setRepoFilter(decodeRepoFilter(v))
-              setSelectedIds(new Set())
-              setCurrentInboxMessage(null)
-              lastClickedIndex.current = null
-            }}
-            disabled={repos.length === 0}
-          >
-            <SelectTrigger
-              aria-label="Filter by repository"
-              data-testid="filter-repo"
-              size="sm"
-              className="h-7 w-full max-w-full text-xs text-muted-foreground disabled:opacity-40"
-            >
-              <SelectValue placeholder="All repos" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                <SelectItem value={FILTER_ALL_REPOS}>All repos</SelectItem>
-                <SelectItem value={UNASSIGNED_KEY}>Unassigned</SelectItem>
-                {repos.map((r) => (
-                  <SelectItem key={r.id} value={r.id}>
-                    {r.owner}/{r.name}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* (3) Scrolling list */}
-        <main className="flex-1 min-h-0">
-          <ScrollArea className="h-full">
-            <div className="min-w-0 px-3 py-3 pe-6">
-              {loadingNotes ? (
-                <div className="flex flex-col gap-1" aria-label="Loading inbox notes">
-                  <Skeleton className="h-[76px] rounded-md" />
-                  <Skeleton className="h-[76px] rounded-md" />
-                  <Skeleton className="h-[76px] rounded-md" />
-                </div>
-              ) : notesError ? (
-                <Empty className="mt-12 border-none bg-transparent p-8 shadow-none">
-                  <EmptyDescription>
-                    Inbox notes could not be read. Try loading them again.
-                  </EmptyDescription>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => void fetchNotes()}
-                  >
-                    Try again
-                  </Button>
-                  <p className="line-clamp-3 font-mono text-xs text-muted-foreground">
-                    {notesError}
-                  </p>
-                </Empty>
-              ) : notes.length === 0 ? (
-                <Empty className="mt-12 border-none bg-transparent p-8 shadow-none">
-                  <EmptyDescription>{emptyMessage}</EmptyDescription>
-                </Empty>
-              ) : (
-                <ul className="flex flex-col gap-1">
-                  {notes.map((note, index) => {
-                    const isSelected = selectedIds.has(note.id)
-                    const preview = note.content.trim() || 'Untitled note'
-                    const repo = note.repoId ? reposById.get(note.repoId) : undefined
-                    return (
-                      <li key={note.id}>
-                        <button
-                          type="button"
-                          data-testid="note-row"
-                          onClick={(e) => handleNoteClick(note.id, index, e)}
-                          className={
-                            'flex min-w-0 max-w-full w-full cursor-pointer items-start gap-3 overflow-hidden rounded-md border px-3 py-2.5 text-left transition-colors select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30 ' +
-                            (isSelected
-                              ? 'border-border bg-muted'
-                              : 'border-transparent hover:bg-muted/60')
-                          }
-                        >
-                          <span className="min-w-0 flex flex-1 flex-col gap-1">
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <span className="block truncate text-sm leading-snug">
-                                  {preview}
-                                </span>
-                              </TooltipTrigger>
-                              <TooltipContent>{preview}</TooltipContent>
-                            </Tooltip>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <span className="block truncate font-mono text-xs text-muted-foreground/80">
-                                  {repo ? `${repo.owner}/${repo.name}` : 'Unassigned'}
-                                </span>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                {repo ? `${repo.owner}/${repo.name}` : 'Unassigned'}
-                              </TooltipContent>
-                            </Tooltip>
-                            <span className="flex min-w-0 items-center justify-between gap-2 text-xs">
-                              <Badge
-                                variant="secondary"
-                                className="shrink-0 font-medium text-foreground/80"
-                              >
-                                {STATUS_LABEL[note.status]}
-                              </Badge>
-                              <span className="tabular shrink-0 whitespace-nowrap text-muted-foreground">
-                                {formatNoteTimestamp(note.createdAt)}
-                              </span>
-                            </span>
-                          </span>
-                        </button>
-                      </li>
-                    )
-                  })}
-                </ul>
-              )}
+                      <span data-testid="selected-count" className="tabular flex-1 text-left">
+                        {selectionCount} selected
+                      </span>
+                      <span
+                        aria-hidden
+                        className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground/80"
+                      >
+                        Esc
+                      </span>
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>Clear {selectionCount} selected (Esc)</TooltipContent>
+                </Tooltip>
+              ) : null}
+              <Select
+                value={encodeRepoFilter(repoFilter)}
+                onValueChange={(v) => {
+                  setRepoFilter(decodeRepoFilter(v))
+                  setSelectedIds(new Set())
+                  setCurrentInboxMessage(null)
+                  lastClickedIndex.current = null
+                }}
+                disabled={repos.length === 0}
+              >
+                <SelectTrigger
+                  aria-label="Filter by repository"
+                  data-testid="filter-repo"
+                  size="sm"
+                  className="h-7 w-full max-w-full text-xs text-muted-foreground disabled:opacity-40"
+                >
+                  <SelectValue placeholder="All repos" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem value={FILTER_ALL_REPOS}>All repos</SelectItem>
+                    <SelectItem value={UNASSIGNED_KEY}>Unassigned</SelectItem>
+                    {repos.map((r) => (
+                      <SelectItem key={r.id} value={r.id}>
+                        {r.owner}/{r.name}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
             </div>
-          </ScrollArea>
-        </main>
 
-        {generationError ? (
-          <div className="shrink-0 border-t px-3 py-3">
-            <Alert variant="destructive" className="rounded-md">
-              <AlertTitle>{generationError.title}</AlertTitle>
-              <AlertDescription className="flex flex-col gap-2">
-                <span>{generationError.description}</span>
-                <span className="line-clamp-2 font-mono text-xs">{generationError.message}</span>
-                {generationError.actionLabel ? (
-                  <span>
+            {/* (3) Scrolling list */}
+            <main className="flex-1 min-h-0">
+              <ScrollArea className="h-full">
+                <div className="min-w-0 px-3 py-3 pe-6">
+                  {loadingNotes ? (
+                    <div className="flex flex-col gap-1" aria-label="Loading inbox notes">
+                      <Skeleton className="h-[76px] rounded-md" />
+                      <Skeleton className="h-[76px] rounded-md" />
+                      <Skeleton className="h-[76px] rounded-md" />
+                    </div>
+                  ) : notesError ? (
+                    <Empty className="mt-12 border-none bg-transparent p-8 shadow-none">
+                      <EmptyDescription>
+                        Inbox notes could not be read. Try loading them again.
+                      </EmptyDescription>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => void fetchNotes()}
+                      >
+                        Try again
+                      </Button>
+                      <p className="line-clamp-3 font-mono text-xs text-muted-foreground">
+                        {notesError}
+                      </p>
+                    </Empty>
+                  ) : notes.length === 0 ? (
+                    <Empty className="mt-12 border-none bg-transparent p-8 shadow-none">
+                      <EmptyDescription>{emptyMessage}</EmptyDescription>
+                    </Empty>
+                  ) : (
+                    <ul className="flex flex-col gap-1">
+                      {notes.map((note, index) => {
+                        const isSelected = selectedIds.has(note.id)
+                        const preview = note.content.trim() || 'Untitled note'
+                        const repo = note.repoId ? reposById.get(note.repoId) : undefined
+                        return (
+                          <li key={note.id}>
+                            <button
+                              type="button"
+                              data-testid="note-row"
+                              onClick={(e) => handleNoteClick(note.id, index, e)}
+                              className={
+                                'flex min-w-0 max-w-full w-full cursor-pointer items-start gap-3 overflow-hidden rounded-md border px-3 py-2.5 text-left transition-colors select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30 ' +
+                                (isSelected
+                                  ? 'border-border bg-muted'
+                                  : 'border-transparent hover:bg-muted/60')
+                              }
+                            >
+                              <span className="min-w-0 flex flex-1 flex-col gap-1">
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span className="block truncate text-sm leading-snug">
+                                      {preview}
+                                    </span>
+                                  </TooltipTrigger>
+                                  <TooltipContent>{preview}</TooltipContent>
+                                </Tooltip>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span className="block truncate font-mono text-xs text-muted-foreground/80">
+                                      {repo ? `${repo.owner}/${repo.name}` : 'Unassigned'}
+                                    </span>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    {repo ? `${repo.owner}/${repo.name}` : 'Unassigned'}
+                                  </TooltipContent>
+                                </Tooltip>
+                                <span className="flex min-w-0 items-center justify-between gap-2 text-xs">
+                                  <Badge
+                                    variant="secondary"
+                                    className="shrink-0 font-medium text-foreground/80"
+                                  >
+                                    {STATUS_LABEL[note.status]}
+                                  </Badge>
+                                  <span className="tabular shrink-0 whitespace-nowrap text-muted-foreground">
+                                    {formatNoteTimestamp(note.createdAt)}
+                                  </span>
+                                </span>
+                              </span>
+                            </button>
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  )}
+                </div>
+              </ScrollArea>
+            </main>
+
+            {generationError ? (
+              <div className="shrink-0 border-t px-3 py-3">
+                <Alert variant="destructive" className="rounded-md">
+                  <AlertTitle>{generationError.title}</AlertTitle>
+                  <AlertDescription className="flex flex-col gap-2">
+                    <span>{generationError.description}</span>
+                    <span className="line-clamp-2 font-mono text-xs">
+                      {generationError.message}
+                    </span>
+                    {generationError.actionLabel ? (
+                      <span>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            if (generationError.intent === 'settings') onNavigateToSettings()
+                            if (generationError.intent === 'repositories')
+                              onNavigateToRepositories()
+                            if (generationError.intent === 'agent-runs') {
+                              onNavigateToAgentRuns(undefined, { kind: 'history' })
+                            }
+                          }}
+                        >
+                          {generationError.actionLabel}
+                        </Button>
+                      </span>
+                    ) : null}
+                  </AlertDescription>
+                </Alert>
+              </div>
+            ) : null}
+
+            {/* (4) Mode footer — capture by default, triage on selection */}
+            <footer className="flex min-h-14 shrink-0 items-center border-t bg-background px-6 py-3">
+              {hasSelection ? (
+                // Triage-mode: draft generation (+ optional publish). Clearing the
+                // selection lives on the title strip (the count chip) and on Esc.
+                <div className="flex w-full flex-col gap-1.5">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="flex w-full">
+                        <Button
+                          size="sm"
+                          variant={canGenerateDrafts ? 'default' : 'outline'}
+                          disabled={!canGenerateDrafts}
+                          className="w-full justify-center"
+                          onClick={() => void handleGenerateDrafts('review')}
+                        >
+                          <HugeiconsIcon icon={SparklesIcon} data-icon="inline-start" aria-hidden />
+                          {generating ? 'Generating' : 'Generate Drafts'}
+                        </Button>
+                      </span>
+                    </TooltipTrigger>
+                    {!canGenerateDrafts && <TooltipContent>{generateDraftsReason}</TooltipContent>}
+                  </Tooltip>
+                  {selectedRepo ? (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span>
+                          <Button
+                            size="sm"
+                            variant={canGenerateAndPublish ? 'outline' : 'ghost'}
+                            disabled={!canGenerateAndPublish}
+                            className="w-full justify-center"
+                            onClick={() => void handleGenerateDrafts('auto-publish-preview')}
+                          >
+                            <HugeiconsIcon icon={GithubIcon} data-icon="inline-start" aria-hidden />
+                            {generating ? 'Planning' : 'Generate and Publish'}
+                          </Button>
+                        </span>
+                      </TooltipTrigger>
+                      {!canGenerateAndPublish && (
+                        <TooltipContent>{generateAndPublishReason}</TooltipContent>
+                      )}
+                    </Tooltip>
+                  ) : null}
+                  {!piStatus.configured && selectedNotesShareRepo && (
                     <Button
                       type="button"
-                      variant="outline"
+                      variant="link"
                       size="sm"
-                      onClick={() => {
-                        if (generationError.intent === 'settings') onNavigateToSettings()
-                        if (generationError.intent === 'repositories') onNavigateToRepositories()
-                        if (generationError.intent === 'agent-runs') {
-                          onNavigateToAgentRuns(undefined, { kind: 'history' })
-                        }
-                      }}
+                      className="h-auto justify-start p-0 text-xs"
+                      onClick={onNavigateToSettings}
                     >
-                      {generationError.actionLabel}
+                      Configure Pi to generate drafts
                     </Button>
-                  </span>
-                ) : null}
-              </AlertDescription>
-            </Alert>
-          </div>
-        ) : null}
-
-        {/* (4) Mode footer — capture by default, triage on selection */}
-        <footer className="flex min-h-14 shrink-0 items-center border-t bg-background px-6 py-3">
-          {hasSelection ? (
-            // Triage-mode: draft generation (+ optional publish). Clearing the
-            // selection lives on the title strip (the count chip) and on Esc.
-            <div className="flex w-full flex-col gap-1.5">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span className="flex w-full">
-                    <Button
-                      size="sm"
-                      variant={canGenerateDrafts ? 'default' : 'outline'}
-                      disabled={!canGenerateDrafts}
-                      className="w-full justify-center"
-                      onClick={() => void handleGenerateDrafts('review')}
-                    >
-                      <HugeiconsIcon icon={SparklesIcon} data-icon="inline-start" aria-hidden />
-                      {generating ? 'Generating' : 'Generate Drafts'}
-                    </Button>
-                  </span>
-                </TooltipTrigger>
-                {!canGenerateDrafts && <TooltipContent>{generateDraftsReason}</TooltipContent>}
-              </Tooltip>
-              {selectedRepo ? (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span>
-                      <Button
-                        size="sm"
-                        variant={canGenerateAndPublish ? 'outline' : 'ghost'}
-                        disabled={!canGenerateAndPublish}
-                        className="w-full justify-center"
-                        onClick={() => void handleGenerateDrafts('auto-publish-preview')}
-                      >
-                        <HugeiconsIcon icon={GithubIcon} data-icon="inline-start" aria-hidden />
-                        {generating ? 'Planning' : 'Generate and Publish'}
-                      </Button>
-                    </span>
-                  </TooltipTrigger>
-                  {!canGenerateAndPublish && (
-                    <TooltipContent>{generateAndPublishReason}</TooltipContent>
                   )}
-                </Tooltip>
-              ) : null}
-              {!piStatus.configured && selectedNotesShareRepo && (
-                <Button
-                  type="button"
-                  variant="link"
-                  size="sm"
-                  className="h-auto justify-start p-0 text-xs"
-                  onClick={onNavigateToSettings}
-                >
-                  Configure Pi to generate drafts
-                </Button>
+                </div>
+              ) : (
+                <div className="flex w-full flex-col gap-1.5">
+                  {currentInboxRepo ? (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span>
+                          <Button
+                            size="sm"
+                            variant={canProcessCurrentInbox ? 'default' : 'outline'}
+                            disabled={!canProcessCurrentInbox}
+                            className="w-full justify-center"
+                            onClick={() => void handleProcessCurrentInbox()}
+                          >
+                            <HugeiconsIcon icon={GithubIcon} data-icon="inline-start" aria-hidden />
+                            {generating ? 'Planning' : 'Process Current Inbox'}
+                          </Button>
+                        </span>
+                      </TooltipTrigger>
+                      {!canProcessCurrentInbox && (
+                        <TooltipContent>{processCurrentInboxReason}</TooltipContent>
+                      )}
+                    </Tooltip>
+                  ) : null}
+                  <Button
+                    onClick={handleNewNote}
+                    size="sm"
+                    variant={currentInboxRepo ? 'outline' : 'default'}
+                    className="w-full justify-center"
+                    data-testid="new-note-footer"
+                  >
+                    <HugeiconsIcon icon={Add01Icon} data-icon="inline-start" aria-hidden />
+                    New note
+                  </Button>
+                </div>
               )}
-            </div>
-          ) : (
-            <div className="flex w-full flex-col gap-1.5">
-              {currentInboxRepo ? (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span>
-                      <Button
-                        size="sm"
-                        variant={canProcessCurrentInbox ? 'default' : 'outline'}
-                        disabled={!canProcessCurrentInbox}
-                        className="w-full justify-center"
-                        onClick={() => void handleProcessCurrentInbox()}
-                      >
-                        <HugeiconsIcon icon={GithubIcon} data-icon="inline-start" aria-hidden />
-                        {generating ? 'Planning' : 'Process Current Inbox'}
-                      </Button>
-                    </span>
-                  </TooltipTrigger>
-                  {!canProcessCurrentInbox && (
-                    <TooltipContent>{processCurrentInboxReason}</TooltipContent>
-                  )}
-                </Tooltip>
-              ) : null}
-              <Button
-                onClick={handleNewNote}
-                size="sm"
-                variant={currentInboxRepo ? 'outline' : 'default'}
-                className="w-full justify-center"
-                data-testid="new-note-footer"
-              >
-                <HugeiconsIcon icon={Add01Icon} data-icon="inline-start" aria-hidden />
-                New note
-              </Button>
-            </div>
-          )}
-        </footer>
-      </div>
+            </footer>
+          </div>
 
-      {/*
+          {/*
         Detail pane — flex-1, never a fixed width. The Editor-Gravitational
         Rule: when a note is open, the textarea is the visual centre.
       */}
-      <section className="flex-1 min-w-0">
-        {loadingNotes ? (
-          <div className="flex h-full flex-col gap-4 px-6 py-5" aria-label="Loading note detail">
-            <Skeleton className="h-8 max-w-xs rounded-md" />
-            <Skeleton className="h-[30rem] max-w-[72ch] rounded-md" />
-          </div>
-        ) : selectedNote ? (
-          <NoteDetail
-            key={selectedNote.id}
-            note={selectedNote}
-            repos={repos}
-            onSave={handleSave}
-            onDelete={handleDelete}
-            onRepoChange={handleRepoChange}
-            onNavigateToRepositories={onNavigateToRepositories}
-            onNavigateToAgentRuns={onNavigateToAgentRuns}
-            onNavigateToDraftReview={onNavigateToDraftReview}
-            draftLinks={draftLinksByNote.get(selectedNote.id) ?? []}
-          />
-        ) : onboardingStep && !onboardingState.skipped ? (
-          <OnboardingPanel
-            state={onboardingState}
-            step={onboardingStep}
-            signals={onboardingSignals}
-            working={onboardingWorking || generating}
-            onConfirmHotkey={handleConfirmHotkey}
-            onConnectGitHub={() => void handleConnectGitHub()}
-            onLinkRepo={onNavigateToRepositories}
-            onConfigurePi={onNavigateToSettings}
-            onCreateFirstNote={() => void handleCreateFirstNote()}
-            onGenerateFirstDraft={() => void handleGenerateFirstDraft()}
-            onOpenDrafts={() => onNavigateToDraftReview()}
-            onSkip={handleSkipOnboarding}
-          />
-        ) : (
-          <Empty className="h-full border-none bg-transparent shadow-none">
-            <EmptyDescription className="max-w-[36ch]">{detailEmptyDescription}</EmptyDescription>
-            {!onboardingState.completed && onboardingState.skipped ? (
-              <Button variant="link" size="sm" className="mt-2" onClick={handleResumeOnboarding}>
-                Resume first-run setup
-              </Button>
-            ) : null}
-          </Empty>
-        )}
-      </section>
+          <section className="flex-1 min-w-0">
+            {loadingNotes ? (
+              <div
+                className="flex h-full flex-col gap-4 px-6 py-5"
+                aria-label="Loading note detail"
+              >
+                <Skeleton className="h-8 max-w-xs rounded-md" />
+                <Skeleton className="h-[30rem] max-w-[72ch] rounded-md" />
+              </div>
+            ) : selectedNote ? (
+              <NoteDetail
+                key={selectedNote.id}
+                note={selectedNote}
+                repos={repos}
+                onSave={handleSave}
+                onDelete={handleDelete}
+                onRepoChange={handleRepoChange}
+                onNavigateToRepositories={onNavigateToRepositories}
+                onNavigateToAgentRuns={onNavigateToAgentRuns}
+                onNavigateToDraftReview={onNavigateToDraftReview}
+                draftLinks={draftLinksByNote.get(selectedNote.id) ?? []}
+              />
+            ) : (
+              <Empty className="h-full border-none bg-transparent shadow-none">
+                <EmptyDescription className="max-w-[36ch]">
+                  {detailEmptyDescription}
+                </EmptyDescription>
+                {!onboardingState.completed && onboardingState.skipped ? (
+                  <Button
+                    variant="link"
+                    size="sm"
+                    className="mt-2"
+                    onClick={handleResumeOnboarding}
+                  >
+                    Resume first-run setup
+                  </Button>
+                ) : null}
+              </Empty>
+            )}
+          </section>
+        </>
+      )}
       <AutoPublishPreviewDialog
         open={autoPublishPreview.open}
         summary={autoPublishPreview.summary}

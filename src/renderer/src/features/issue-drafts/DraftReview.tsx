@@ -316,33 +316,16 @@ function labelBadgeState(input: {
 }): {
   match: LabelMatch | undefined
   displayName: string
-  statusText: string | null
   kept: boolean
 } {
   const match = input.matchesByInput.get(input.label)
   const kept = Boolean(match && !match.matched && input.keptUnmatchedLabels?.includes(match.name))
 
   if (!match) {
-    return {
-      match,
-      displayName: input.label,
-      statusText: null,
-      kept
-    }
+    return { match, displayName: input.label, kept }
   }
 
-  return {
-    match,
-    displayName: match.name,
-    statusText: labelMatchStatusText(match, kept),
-    kept
-  }
-}
-
-function labelMatchStatusText(match: LabelMatch, kept: boolean): string {
-  if (kept) return 'Keep'
-  if (match.matched) return 'Matched'
-  return 'Unmatched'
+  return { match, displayName: match.name, kept }
 }
 
 function toggleStringInList(items: readonly string[], item: string): string[] {
@@ -410,28 +393,49 @@ function LabelInput({
       {labels.map((label, index) => {
         const badge = labelBadgeState({ label, matchesByInput, keptUnmatchedLabels })
         const match = badge.match
+        const isUnmatchedToggleable = match && !match.matched && !disabled && onToggleKeepUnmatched
 
-        return (
-          <Badge key={label} variant="secondary" className="gap-1 pr-1">
-            <span>{badge.displayName}</span>
-            {badge.statusText ? (
-              <span className="rounded-sm border border-border/70 bg-background/50 px-1 text-[10px] leading-4 text-muted-foreground">
-                {badge.statusText}
+        const badgeContent = (
+          <Badge
+            key={label}
+            variant="secondary"
+            className={cn(
+              'gap-1 pr-1',
+              isUnmatchedToggleable && !badge.kept && 'border-dashed border-muted-foreground/30',
+              isUnmatchedToggleable && 'cursor-pointer hover:bg-secondary/80'
+            )}
+            {...(isUnmatchedToggleable
+              ? {
+                  role: 'button',
+                  tabIndex: 0,
+                  'aria-pressed': badge.kept,
+                  onClick: () => onToggleKeepUnmatched!(match.name),
+                  onKeyDown: (e: React.KeyboardEvent) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      onToggleKeepUnmatched!(match.name)
+                    }
+                  }
+                }
+              : {})}
+          >
+            {isUnmatchedToggleable ? (
+              <span
+                className={cn(
+                  'inline-flex items-center justify-center',
+                  badge.kept ? 'text-primary' : 'text-muted-foreground'
+                )}
+              >
+                <HugeiconsIcon
+                  icon={badge.kept ? Tick02Icon : InformationCircleIcon}
+                  className="size-3"
+                  aria-hidden
+                />
               </span>
             ) : null}
-            {match && !match.matched && !disabled && onToggleKeepUnmatched ? (
-              <button
-                type="button"
-                aria-pressed={badge.kept}
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onToggleKeepUnmatched(match.name)
-                }}
-                className="rounded-sm px-1 text-[10px] leading-4 text-muted-foreground underline-offset-2 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                {badge.kept ? 'Undo' : 'Keep'}
-              </button>
-            ) : null}
+            <span className={cn(isUnmatchedToggleable && !badge.kept && 'text-muted-foreground')}>
+              {badge.displayName}
+            </span>
             {!disabled && (
               <button
                 type="button"
@@ -446,6 +450,19 @@ function LabelInput({
               </button>
             )}
           </Badge>
+        )
+
+        return isUnmatchedToggleable ? (
+          <Tooltip key={label}>
+            <TooltipTrigger asChild>{badgeContent}</TooltipTrigger>
+            <TooltipContent side="bottom">
+              {badge.kept
+                ? 'Will be included on publish. Click to undo.'
+                : 'Not in repository — will be omitted on publish. Click to keep.'}
+            </TooltipContent>
+          </Tooltip>
+        ) : (
+          badgeContent
         )
       })}
       <input
@@ -1441,7 +1458,8 @@ function DraftEditor({
               </p>
             ) : unmatchedLabels.length > 0 ? (
               <p className="text-xs leading-relaxed text-muted-foreground">
-                Unmatched labels are omitted on publish unless marked Keep.
+                Labels not found in the repository are omitted on publish. Click the info icon on a
+                label to keep it.
               </p>
             ) : null}
           </div>
