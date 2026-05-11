@@ -258,6 +258,90 @@ Or trigger a re-run of the release workflow via GitHub → Actions → **Release
 
 ---
 
+## Release handoff
+
+This section describes how the five pipeline stages connect GitHub Release artifacts to the installed app experience and to `pilog.dev`. A successful release touches all of these handoff points. Understanding them lets a maintainer verify each independently if something looks wrong after a release.
+
+### Handoff map
+
+```
+Tag push / workflow_dispatch
+        │
+        ▼
+┌───────────────┐
+│  Stage 1–2    │  validate + typecheck + test
+│  Validate /   │
+│  Verify       │
+└──────┬────────┘
+       │ tag + version passed downstream
+       ▼
+┌──────────────────────────────────────────────────────────┐
+│  Stage 3 — Build & Publish (macOS / Windows / Linux)     │
+│                                                          │
+│  electron-builder packages the app and publishes:        │
+│    • installer artifacts (DMG, Setup.exe, AppImage, deb) │
+│    • Electron updater metadata (latest.yml, etc.)         │
+│    • per-artifact .sha256 sidecars + checksums-*.txt      │
+│  → GitHub Release assets for the tag                     │
+└──────┬───────────────────────────────────────────────────┘
+       │ all three build jobs succeeded
+       ▼
+┌──────────────────────────────────────────────────────────┐
+│  Stage 4 — Publish Release Manifest                      │
+│                                                          │
+│  generate-release-manifest.ts reads the GitHub Release   │
+│  asset list, builds the updated manifest, and commits    │
+│  site/src/data/release-manifest.json to main.            │
+│  → release-manifest.json is the static index that        │
+│    pilog.dev reads instead of querying GitHub live.       │
+└──────┬───────────────────────────────────────────────────┘
+       │ manifest committed to main
+       ▼
+┌──────────────────────────────────────────────────────────┐
+│  Stage 5 — Deploy Site                                   │
+│                                                          │
+│  Vercel CLI builds and promotes the site package         │
+│  (site/) from the updated main branch.                   │
+│  → pilog.dev download page reflects the new release.     │
+└──────────────────────────────────────────────────────────┘
+```
+
+### Handoff points in detail
+
+**GitHub Release → Electron updater**
+
+electron-builder publishes `latest.yml` / `latest-mac.yml` / `latest-linux.yml` (stable) or `preview.yml` / `preview-mac.yml` / `preview-linux.yml` (preview) as GitHub Release assets. Installed copies of Pilog check the appropriate metadata file from GitHub Releases via `electron-updater`. The channel is baked into the build at packaging time; a stable install never reads preview metadata.
+
+**GitHub Release → Release Manifest**
+
+`scripts/generate-release-manifest.ts` fetches the GitHub Release asset list for the tag, maps artifact filenames to platforms and download URLs, and writes the structured manifest to `site/src/data/release-manifest.json`. This is a repo-versioned static file; `pilog.dev` imports it at build time and requires no live GitHub API calls. See ADR-0006.
+
+**Release Manifest → pilog.dev download pages**
+
+`site/src/app/download/page.tsx` (stable) and `site/src/app/preview/page.tsx` (preview) import the manifest. The `PlatformDownload` and `PreviewDownload` components detect the visitor's OS and surface the matching artifact as the primary CTA. Checksums and alternate platform downloads are also derived from the manifest. Changes to the manifest shape must be reflected in the manifest schema and these components.
+
+**Vercel deployment → live pilog.dev**
+
+Stage 5 runs `vercel pull → vercel build --prod → vercel deploy --prebuilt --prod` against the Vercel project linked to `pilog.dev`. The build always targets the current `main` branch, which includes the manifest commit from Stage 4. A production deployment URL is returned and logged in the workflow run. The Vercel dashboard (Deployments tab) is the canonical source of truth for which commit is live.
+
+**Signing/notarization → trust posture**
+
+macOS DMG and Windows Setup.exe artifacts are currently **unsigned** (tracked by #57 and #58). Unsigned artifacts are suitable for preview downloads with explicit caveats. Public V1 Stable downloads require macOS signing + notarization (Apple Developer Program, `CSC_LINK`, `APPLE_ID`, `APPLE_TEAM_ID`) and Windows signing (`WIN_CSC_LINK`). When those secrets are configured, electron-builder picks them up automatically. The required secrets table above lists all signing secrets and their status.
+
+### What to verify after a release
+
+After any tag push runs to completion:
+
+1. **GitHub Release** — confirm the expected artifacts, updater metadata files, and `.sha256` sidecars appear on the Releases page for the tag.
+2. **Release Manifest** — confirm `site/src/data/release-manifest.json` on `main` contains the new version in the expected channel (`stable` or `preview`).
+3. **pilog.dev** — confirm the live site download page shows the new version. The Vercel dashboard (Deployments) shows which commit is live and any build errors.
+4. **Updater metadata** — download the appropriate `*.yml` file from the GitHub Release and verify `version`, `path`, and `sha512` fields match published artifacts.
+5. **Checksums** — cross-check one artifact against its `.sha256` sidecar.
+
+The full release-candidate checklist lives in `docs/release-checklist.md`.
+
+---
+
 ## Channel separation guarantee
 
 - `electron-builder.yml` sets `channel: latest`, `releaseType: release`. electron-updater reads `latest.yml` / `latest-mac.yml` / `latest-linux.yml`.
