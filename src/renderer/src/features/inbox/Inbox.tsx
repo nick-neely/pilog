@@ -4,7 +4,7 @@ import {
   ArrowRight01Icon,
   Cancel01Icon,
   GithubIcon,
-  SparklesIcon
+  FilePenIcon
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { Alert, AlertDescription, AlertTitle } from '@renderer/components/ui/alert'
@@ -41,6 +41,11 @@ import { Textarea } from '@renderer/components/ui/textarea'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@renderer/components/ui/tooltip'
 import type { RunNavigationOrigin } from '@renderer/features/agent-runs/navigation'
 import { cn } from '@renderer/lib/utils'
+import {
+  AUTO_PUBLISH_EGRESS_DISCLOSURE,
+  GENERATION_EGRESS_DISCLOSURE,
+  LOCAL_FIRST_DISCLOSURE
+} from '@shared/data-boundaries'
 import type {
   GenerateDraftsMode,
   GitHubStatus,
@@ -280,7 +285,7 @@ function getGenerateAndPublishReason(input: {
   if (!input.canGenerateDrafts) return input.generateDraftsReason
   if (!input.repo?.autoPublishEnabled) return 'Enable auto-publish for this repository first.'
   if (input.repo.autoPublishDryRun) return 'Generate a dry-run publish plan for selected notes.'
-  return 'Generate planned drafts for review before GitHub writes.'
+  return 'Generate through your Pi provider, then review planned GitHub writes.'
 }
 
 function getProcessCurrentInboxReason(input: {
@@ -329,7 +334,7 @@ const ONBOARDING_STEP_DESCRIPTIONS: Record<OnboardingStepId, string> = {
   pi: 'Pi provides the agent that turns your rough notes into structured issue drafts. Choose a provider and model.',
   note: 'Capture a quick thought about something you noticed: a broken button, a missing test, a refactor idea.',
   draft:
-    'Let Pi read your note alongside your repository and produce a structured issue draft with title, body, and suggested labels.',
+    'Let Pi read your note and bounded repository context, then produce a structured issue draft with title, body, and suggested labels.',
   review:
     'Review the generated draft, edit if needed, and publish it as a GitHub issue when you are ready.'
 }
@@ -529,6 +534,12 @@ function OnboardingPanel({
           <p className="mx-auto max-w-[50ch] text-sm leading-relaxed text-muted-foreground">
             {ONBOARDING_STEP_DESCRIPTIONS[displayedStep]}
           </p>
+          <p
+            data-testid="onboarding-local-first-disclosure"
+            className="mx-auto max-w-[58ch] text-xs leading-5 text-muted-foreground"
+          >
+            {LOCAL_FIRST_DISCLOSURE}
+          </p>
         </div>
 
         {/* Step-specific content */}
@@ -684,8 +695,8 @@ function OnboardingPanel({
                   <div className="rounded-md border bg-muted/30 p-4">
                     <p className="text-sm font-medium text-foreground">Ready to draft</p>
                     <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                      Pi will read your note with the linked repository and create a GitHub-ready
-                      issue draft. You will review it before anything is published.
+                      {GENERATION_EGRESS_DISCLOSURE} You will review the draft before anything is
+                      published.
                     </p>
                   </div>
                   {generationError ? (
@@ -1085,13 +1096,21 @@ function AutoPublishPreviewDialog({
         {report ? (
           <AutoPublishReport report={report} sourceNotesById={sourceNotesById} />
         ) : summary ? (
-          <div className="flex flex-wrap gap-2 text-xs text-muted-foreground" role="status">
-            <Badge variant="secondary">
-              {summary.plannedDraftCount} planned of {summary.generatedDraftCount}
-            </Badge>
-            <Badge variant="secondary">Limit {summary.maxIssuesPerRun}</Badge>
-            <Badge variant="secondary">Label {summary.defaultLabel}</Badge>
-            {summary.dryRun ? <Badge variant="secondary">Dry run, no GitHub writes</Badge> : null}
+          <div className="flex flex-col gap-3" role="status">
+            <p
+              data-testid="auto-publish-boundary-disclosure"
+              className="max-w-[68ch] text-sm leading-relaxed text-muted-foreground"
+            >
+              {AUTO_PUBLISH_EGRESS_DISCLOSURE}
+            </p>
+            <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+              <Badge variant="secondary">
+                {summary.plannedDraftCount} planned of {summary.generatedDraftCount}
+              </Badge>
+              <Badge variant="secondary">Limit {summary.maxIssuesPerRun}</Badge>
+              <Badge variant="secondary">Label {summary.defaultLabel}</Badge>
+              {summary.dryRun ? <Badge variant="secondary">Dry run, no GitHub writes</Badge> : null}
+            </div>
           </div>
         ) : null}
         {!report ? (
@@ -2212,7 +2231,7 @@ export function Inbox({
                           className="w-full justify-center"
                           onClick={() => void handleGenerateDrafts('review')}
                         >
-                          <HugeiconsIcon icon={SparklesIcon} data-icon="inline-start" aria-hidden />
+                          <HugeiconsIcon icon={FilePenIcon} data-icon="inline-start" aria-hidden />
                           {generating ? 'Generating' : 'Generate Drafts'}
                         </Button>
                       </span>
@@ -2251,6 +2270,14 @@ export function Inbox({
                       Configure Pi to generate drafts
                     </Button>
                   )}
+                  {canGenerateDrafts ? (
+                    <p
+                      data-testid="generation-boundary-disclosure"
+                      className="text-xs leading-5 text-muted-foreground"
+                    >
+                      {GENERATION_EGRESS_DISCLOSURE}
+                    </p>
+                  ) : null}
                 </div>
               ) : (
                 <div className="flex w-full flex-col gap-1.5">
@@ -2274,6 +2301,14 @@ export function Inbox({
                         <TooltipContent>{processCurrentInboxReason}</TooltipContent>
                       )}
                     </Tooltip>
+                  ) : null}
+                  {canProcessCurrentInbox ? (
+                    <p
+                      data-testid="current-inbox-generation-boundary-disclosure"
+                      className="text-xs leading-5 text-muted-foreground"
+                    >
+                      {GENERATION_EGRESS_DISCLOSURE}
+                    </p>
                   ) : null}
                   <Button
                     onClick={handleNewNote}

@@ -37,6 +37,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@renderer/components/ui
 import type { RunNavigationOrigin } from '@renderer/features/agent-runs/navigation'
 import { cn } from '@renderer/lib/utils'
 import { getErrorMessage, getPublishRecoveryState, type RecoveryState } from '../recovery-state'
+import { PUBLISH_EGRESS_DISCLOSURE } from '@shared/data-boundaries'
 import type {
   AgentRunListItem,
   GitHubLabel,
@@ -249,7 +250,7 @@ function publishBlockForDraft(repo: Repo | null, githubStatus: GitHubStatus): Pu
   if (!githubStatus.connected) {
     return {
       title: 'GitHub is not connected.',
-      description: 'Connect GitHub before publishing this draft.',
+      description: 'Connect GitHub before publishing this local draft.',
       actionLabel: 'Open Settings',
       action: 'settings'
     }
@@ -258,7 +259,7 @@ function publishBlockForDraft(repo: Repo | null, githubStatus: GitHubStatus): Pu
   if (!repo) {
     return {
       title: 'The linked repo is missing.',
-      description: 'Reconnect the local repository before publishing this draft.',
+      description: 'Reconnect the local repository before publishing this local draft.',
       actionLabel: 'Open Repositories',
       action: 'repositories'
     }
@@ -267,7 +268,7 @@ function publishBlockForDraft(repo: Repo | null, githubStatus: GitHubStatus): Pu
   if (!repo.githubUrl) {
     return {
       title: 'This repo is not linked to GitHub.',
-      description: 'Link the local repo to a GitHub repository before publishing.',
+      description: 'Link the local repo to a GitHub repository before publishing this local draft.',
       actionLabel: 'Open Repositories',
       action: 'repositories'
     }
@@ -1396,6 +1397,14 @@ function DraftEditor({
             onNavigateToSettings={onNavigateToSettings}
             onNavigateToRepositories={onNavigateToRepositories}
           />
+        ) : null}
+        {!isPublished ? (
+          <p
+            data-testid="publish-boundary-disclosure"
+            className="mt-3 max-w-2xl text-xs leading-5 text-muted-foreground"
+          >
+            {PUBLISH_EGRESS_DISCLOSURE}
+          </p>
         ) : null}
         {publishedUrl ? (
           <p
