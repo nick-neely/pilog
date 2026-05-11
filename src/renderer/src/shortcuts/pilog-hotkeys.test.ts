@@ -11,6 +11,34 @@ import {
   shouldEnablePublishDraftShortcut
 } from './pilog-hotkeys'
 
+class FakeHTMLElement extends EventTarget {
+  constructor(private readonly matched: boolean) {
+    super()
+  }
+
+  closest(): FakeHTMLElement | null {
+    return this.matched ? this : null
+  }
+}
+
+function withFakeHTMLElement(callback: () => void): void {
+  const originalHTMLElement = globalThis.HTMLElement
+
+  Object.defineProperty(globalThis, 'HTMLElement', {
+    configurable: true,
+    value: FakeHTMLElement
+  })
+
+  try {
+    callback()
+  } finally {
+    Object.defineProperty(globalThis, 'HTMLElement', {
+      configurable: true,
+      value: originalHTMLElement
+    })
+  }
+}
+
 describe('PiLog renderer hotkeys', () => {
   it('converts canonical accelerators to TanStack Mod bindings', () => {
     expect(shortcutBindingToTanStackHotkey(SHORTCUT_CONTRACT.openInbox)).toBe('Mod+1')
@@ -38,33 +66,11 @@ describe('PiLog renderer hotkeys', () => {
   })
 
   it('detects editable targets, including editor surfaces', () => {
-    const OriginalHTMLElement = globalThis.HTMLElement
-
-    class FakeHTMLElement extends EventTarget {
-      constructor(private readonly matched: boolean) {
-        super()
-      }
-
-      closest(): FakeHTMLElement | null {
-        return this.matched ? this : null
-      }
-    }
-
-    Object.defineProperty(globalThis, 'HTMLElement', {
-      configurable: true,
-      value: FakeHTMLElement
-    })
-
-    try {
+    withFakeHTMLElement(() => {
       expect(isEditableShortcutTarget(new FakeHTMLElement(true))).toBe(true)
       expect(isEditableShortcutTarget(new FakeHTMLElement(false))).toBe(false)
       expect(isEditableShortcutTarget(new EventTarget())).toBe(false)
-    } finally {
-      Object.defineProperty(globalThis, 'HTMLElement', {
-        configurable: true,
-        value: OriginalHTMLElement
-      })
-    }
+    })
   })
 
   it('enables the generate shortcut only when the visible generate action is enabled', () => {
@@ -88,24 +94,7 @@ describe('PiLog renderer hotkeys', () => {
   })
 
   it('prioritizes transient UI and editable surfaces before contextual selection clearing', () => {
-    const OriginalHTMLElement = globalThis.HTMLElement
-
-    class FakeHTMLElement extends EventTarget {
-      constructor(private readonly matched: boolean) {
-        super()
-      }
-
-      closest(): FakeHTMLElement | null {
-        return this.matched ? this : null
-      }
-    }
-
-    Object.defineProperty(globalThis, 'HTMLElement', {
-      configurable: true,
-      value: FakeHTMLElement
-    })
-
-    try {
+    withFakeHTMLElement(() => {
       expect(
         shouldClearSelectionForContextualEscape({
           selectionCount: 1,
@@ -134,12 +123,7 @@ describe('PiLog renderer hotkeys', () => {
           transientUiOpen: false
         })
       ).toBe(false)
-    } finally {
-      Object.defineProperty(globalThis, 'HTMLElement', {
-        configurable: true,
-        value: OriginalHTMLElement
-      })
-    }
+    })
   })
 
   it('detects open transient UI surfaces', () => {

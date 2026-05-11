@@ -46,7 +46,6 @@ import {
   shouldEnablePublishDraftShortcut,
   usePilogHotkey
 } from '@renderer/shortcuts/pilog-hotkeys'
-import { getErrorMessage, getPublishRecoveryState, type RecoveryState } from '../recovery-state'
 import { PUBLISH_EGRESS_DISCLOSURE } from '@shared/data-boundaries'
 import { SHORTCUT_CONTRACT } from '@shared/shortcuts'
 import type {
@@ -65,6 +64,7 @@ import type {
   IssueDraftStatus
 } from '@shared/types'
 import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
+import { getErrorMessage, getPublishRecoveryState, type RecoveryState } from '../recovery-state'
 
 const EMPTY_STATUS_COUNTS: Record<IssueDraftStatus, number> = {
   draft: 0,
