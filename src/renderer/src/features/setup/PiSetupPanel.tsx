@@ -1,4 +1,9 @@
-import { CheckmarkCircle01Icon, DatabaseImportIcon, FileKeyIcon } from '@hugeicons/core-free-icons'
+import {
+  CheckmarkCircle01Icon,
+  DatabaseImportIcon,
+  FileKeyIcon,
+  InformationCircleIcon
+} from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { Alert, AlertDescription, AlertTitle } from '@renderer/components/ui/alert'
 import { Button } from '@renderer/components/ui/button'
@@ -12,6 +17,8 @@ import {
 } from '@renderer/components/ui/combobox'
 import { Input } from '@renderer/components/ui/input'
 import { Label } from '@renderer/components/ui/label'
+import { Separator } from '@renderer/components/ui/separator'
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '@renderer/components/ui/hover-card'
 import { GENERATION_EGRESS_DISCLOSURE } from '@shared/data-boundaries'
 import { useMemo } from 'react'
 import { getPiSetupRecoveryState } from '../recovery-state'
@@ -171,9 +178,29 @@ export function PiSetupPanel({
           Current: {pi.active?.providerName ?? 'No provider'} · {pi.active?.modelName ?? 'No model'}{' '}
           · key {piCredentialStatus}
         </p>
-        <p className="text-[11px] leading-5 text-muted-foreground">
-          {GENERATION_EGRESS_DISCLOSURE}
-        </p>
+        <div className="flex items-center gap-1.5">
+          <HoverCard>
+            <HoverCardTrigger asChild>
+              <button
+                type="button"
+                className="inline-flex items-center justify-center rounded-sm text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                aria-label="Data sharing information"
+              >
+                <HugeiconsIcon icon={InformationCircleIcon} className="size-4" aria-hidden />
+              </button>
+            </HoverCardTrigger>
+            <HoverCardContent side="top" className="w-80 rounded-xl">
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Data sharing</p>
+                <Separator />
+                <p className="text-xs leading-relaxed text-muted-foreground">
+                  {GENERATION_EGRESS_DISCLOSURE}
+                </p>
+              </div>
+            </HoverCardContent>
+          </HoverCard>
+          <span className="text-[11px] text-muted-foreground">Data sharing</span>
+        </div>
       </div>
 
       {piRecovery ? (

@@ -395,10 +395,6 @@ export function Settings({
         <ScrollArea className="h-full">
           <div className="p-6">
             <div className="mx-auto flex max-w-2xl flex-col gap-6">
-              <p className="max-w-[68ch] text-xs text-muted-foreground">
-                Daily habits, GitHub access, and draft generation are grouped below so one surface
-                does not turn into an endless form.
-              </p>
               <Alert data-testid="settings-local-first-disclosure" className="rounded-md">
                 <AlertTitle>Local records</AlertTitle>
                 <AlertDescription>{LOCAL_FIRST_DISCLOSURE}</AlertDescription>

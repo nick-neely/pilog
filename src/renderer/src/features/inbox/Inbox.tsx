@@ -4,7 +4,8 @@ import {
   ArrowRight01Icon,
   Cancel01Icon,
   GithubIcon,
-  FilePenIcon
+  FilePenIcon,
+  InformationCircleIcon
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { Alert, AlertDescription, AlertTitle } from '@renderer/components/ui/alert'
@@ -22,6 +23,7 @@ import {
 import { Badge } from '@renderer/components/ui/badge'
 import { Button } from '@renderer/components/ui/button'
 import { Empty, EmptyDescription } from '@renderer/components/ui/empty'
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '@renderer/components/ui/hover-card'
 import { Input } from '@renderer/components/ui/input'
 import { Kbd, KbdGroup } from '@renderer/components/ui/kbd'
 import { Label } from '@renderer/components/ui/label'
@@ -693,10 +695,35 @@ function OnboardingPanel({
               ) : (
                 <>
                   <div className="rounded-md border bg-muted/30 p-4">
-                    <p className="text-sm font-medium text-foreground">Ready to draft</p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium text-foreground">Ready to draft</p>
+                      <HoverCard>
+                        <HoverCardTrigger asChild>
+                          <button
+                            type="button"
+                            className="inline-flex items-center justify-center rounded-sm text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            aria-label="Data sharing information"
+                          >
+                            <HugeiconsIcon
+                              icon={InformationCircleIcon}
+                              className="size-4"
+                              aria-hidden
+                            />
+                          </button>
+                        </HoverCardTrigger>
+                        <HoverCardContent side="top" className="w-80 rounded-xl">
+                          <div className="space-y-2">
+                            <p className="text-sm font-medium">Data sharing</p>
+                            <Separator />
+                            <p className="text-xs leading-relaxed text-muted-foreground">
+                              {GENERATION_EGRESS_DISCLOSURE}
+                            </p>
+                          </div>
+                        </HoverCardContent>
+                      </HoverCard>
+                    </div>
                     <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                      {GENERATION_EGRESS_DISCLOSURE} You will review the draft before anything is
-                      published.
+                      You will review the draft before anything is published.
                     </p>
                   </div>
                   {generationError ? (
@@ -2258,43 +2285,90 @@ export function Inbox({
                 // Triage-mode: draft generation (+ optional publish). Clearing the
                 // selection lives on the title strip (the count chip) and on Esc.
                 <div className="flex w-full flex-col gap-1.5">
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span className="flex w-full">
-                        <Button
-                          size="sm"
-                          variant={canGenerateDrafts ? 'default' : 'outline'}
-                          disabled={!canGenerateDrafts}
-                          className="w-full justify-center"
-                          onClick={() => void handleGenerateDrafts('review')}
-                        >
-                          <HugeiconsIcon icon={FilePenIcon} data-icon="inline-start" aria-hidden />
-                          {generating ? 'Generating' : 'Generate Drafts'}
-                        </Button>
-                      </span>
-                    </TooltipTrigger>
-                    {!canGenerateDrafts && <TooltipContent>{generateDraftsReason}</TooltipContent>}
-                  </Tooltip>
-                  {selectedRepo ? (
+                  <div className="flex w-full items-center gap-2">
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <span>
+                        <span className="flex-1">
                           <Button
                             size="sm"
-                            variant={canGenerateAndPublish ? 'outline' : 'ghost'}
-                            disabled={!canGenerateAndPublish}
+                            variant={canGenerateDrafts ? 'default' : 'outline'}
+                            disabled={!canGenerateDrafts}
                             className="w-full justify-center"
-                            onClick={() => void handleGenerateDrafts('auto-publish-preview')}
+                            onClick={() => void handleGenerateDrafts('review')}
                           >
-                            <HugeiconsIcon icon={GithubIcon} data-icon="inline-start" aria-hidden />
-                            {generating ? 'Planning' : 'Generate and Publish'}
+                            <HugeiconsIcon
+                              icon={FilePenIcon}
+                              data-icon="inline-start"
+                              aria-hidden
+                            />
+                            {generating ? 'Generating' : 'Generate Drafts'}
                           </Button>
                         </span>
                       </TooltipTrigger>
-                      {!canGenerateAndPublish && (
-                        <TooltipContent>{generateAndPublishReason}</TooltipContent>
+                      {!canGenerateDrafts && (
+                        <TooltipContent>{generateDraftsReason}</TooltipContent>
                       )}
                     </Tooltip>
+                    {canGenerateDrafts ? (
+                      <HoverCard>
+                        <HoverCardTrigger asChild>
+                          <button
+                            type="button"
+                            data-testid="generation-boundary-disclosure"
+                            className="inline-flex shrink-0 items-center justify-center rounded-sm text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            aria-label="Data sharing information"
+                          >
+                            <HugeiconsIcon
+                              icon={InformationCircleIcon}
+                              className="size-4"
+                              aria-hidden
+                            />
+                          </button>
+                        </HoverCardTrigger>
+                        <HoverCardContent side="top" className="w-80 rounded-xl">
+                          <div className="space-y-2">
+                            <p className="text-sm font-medium">Data sharing</p>
+                            <Separator />
+                            <p className="text-xs leading-relaxed text-muted-foreground">
+                              {GENERATION_EGRESS_DISCLOSURE}
+                            </p>
+                          </div>
+                        </HoverCardContent>
+                      </HoverCard>
+                    ) : null}
+                  </div>
+                  {selectedRepo ? (
+                    <div className="flex w-full items-center gap-2">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="flex-1">
+                            <Button
+                              size="sm"
+                              variant={canGenerateAndPublish ? 'outline' : 'ghost'}
+                              disabled={!canGenerateAndPublish}
+                              className="w-full justify-center"
+                              onClick={() => void handleGenerateDrafts('auto-publish-preview')}
+                            >
+                              <HugeiconsIcon
+                                icon={GithubIcon}
+                                data-icon="inline-start"
+                                aria-hidden
+                              />
+                              {generating ? 'Planning' : 'Generate and Publish'}
+                            </Button>
+                          </span>
+                        </TooltipTrigger>
+                        {!canGenerateAndPublish && (
+                          <TooltipContent>{generateAndPublishReason}</TooltipContent>
+                        )}
+                      </Tooltip>
+                      {canGenerateAndPublish ? (
+                        <span
+                          className="inline-flex size-4 shrink-0 items-center justify-center"
+                          aria-hidden
+                        />
+                      ) : null}
+                    </div>
                   ) : null}
                   {!piStatus.configured && selectedNotesShareRepo && (
                     <Button
@@ -2307,45 +2381,62 @@ export function Inbox({
                       Configure Pi to generate drafts
                     </Button>
                   )}
-                  {canGenerateDrafts ? (
-                    <p
-                      data-testid="generation-boundary-disclosure"
-                      className="text-xs leading-5 text-muted-foreground"
-                    >
-                      {GENERATION_EGRESS_DISCLOSURE}
-                    </p>
-                  ) : null}
                 </div>
               ) : (
                 <div className="flex w-full flex-col gap-1.5">
                   {currentInboxRepo ? (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <span>
-                          <Button
-                            size="sm"
-                            variant={canProcessCurrentInbox ? 'default' : 'outline'}
-                            disabled={!canProcessCurrentInbox}
-                            className="w-full justify-center"
-                            onClick={() => void handleProcessCurrentInbox()}
-                          >
-                            <HugeiconsIcon icon={GithubIcon} data-icon="inline-start" aria-hidden />
-                            {generating ? 'Planning' : 'Process Current Inbox'}
-                          </Button>
-                        </span>
-                      </TooltipTrigger>
-                      {!canProcessCurrentInbox && (
-                        <TooltipContent>{processCurrentInboxReason}</TooltipContent>
-                      )}
-                    </Tooltip>
-                  ) : null}
-                  {canProcessCurrentInbox ? (
-                    <p
-                      data-testid="current-inbox-generation-boundary-disclosure"
-                      className="text-xs leading-5 text-muted-foreground"
-                    >
-                      {GENERATION_EGRESS_DISCLOSURE}
-                    </p>
+                    <div className="flex w-full items-center gap-2">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="flex-1">
+                            <Button
+                              size="sm"
+                              variant={canProcessCurrentInbox ? 'default' : 'outline'}
+                              disabled={!canProcessCurrentInbox}
+                              className="w-full justify-center"
+                              onClick={() => void handleProcessCurrentInbox()}
+                            >
+                              <HugeiconsIcon
+                                icon={GithubIcon}
+                                data-icon="inline-start"
+                                aria-hidden
+                              />
+                              {generating ? 'Planning' : 'Process Current Inbox'}
+                            </Button>
+                          </span>
+                        </TooltipTrigger>
+                        {!canProcessCurrentInbox && (
+                          <TooltipContent>{processCurrentInboxReason}</TooltipContent>
+                        )}
+                      </Tooltip>
+                      {canProcessCurrentInbox ? (
+                        <HoverCard>
+                          <HoverCardTrigger asChild>
+                            <button
+                              type="button"
+                              data-testid="current-inbox-generation-boundary-disclosure"
+                              className="inline-flex shrink-0 items-center justify-center rounded-sm text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                              aria-label="Data sharing information"
+                            >
+                              <HugeiconsIcon
+                                icon={InformationCircleIcon}
+                                className="size-4"
+                                aria-hidden
+                              />
+                            </button>
+                          </HoverCardTrigger>
+                          <HoverCardContent side="top" className="w-80 rounded-xl">
+                            <div className="space-y-2">
+                              <p className="text-sm font-medium">Data sharing</p>
+                              <Separator />
+                              <p className="text-xs leading-relaxed text-muted-foreground">
+                                {GENERATION_EGRESS_DISCLOSURE}
+                              </p>
+                            </div>
+                          </HoverCardContent>
+                        </HoverCard>
+                      ) : null}
+                    </div>
                   ) : null}
                   <Button
                     onClick={handleNewNote}
