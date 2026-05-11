@@ -36,6 +36,13 @@ export type AutoPublishPreviewPlan = {
 
 export const GITHUB_LABEL_CACHE_REFRESH_INTERVAL_MS = 6 * 60 * 60 * 1000
 
+type ListRepoLabels = (owner: string, repo: string) => Promise<GitHubLabel[]>
+
+type RepoLabelRefreshOptions = {
+  now?: Date
+  refreshIntervalMs?: number
+}
+
 export function buildIssueGenerationPrompt(input: { repo: Repo; notes: Note[] }): string {
   const labelBlock = formatRepoLabelVocabulary(input.repo.githubLabels)
   const noteBlock = input.notes
@@ -89,27 +96,38 @@ export function buildIssueGenerationPrompt(input: { repo: Repo; notes: Note[] })
 export async function hydrateRepoLabelsIfNeeded(
   db: PilogDatabase,
   repo: Repo,
-  listRepoLabels: (owner: string, repo: string) => Promise<GitHubLabel[]>
+  listRepoLabels: ListRepoLabels
 ): Promise<Repo> {
-  return refreshRepoLabelsIfStale(db, repo, listRepoLabels, {
-    refreshIntervalMs: Number.POSITIVE_INFINITY
-  })
+  if (repo.githubLabels.length > 0 || repo.githubLabelsSyncedAt) return repo
+
+  return fetchAndPersistRepoLabels(db, repo, listRepoLabels)
 }
 
 export async function refreshRepoLabelsIfStale(
   db: PilogDatabase,
   repo: Repo,
-  listRepoLabels: (owner: string, repo: string) => Promise<GitHubLabel[]>,
-  options?: { now?: Date; refreshIntervalMs?: number }
+  listRepoLabels: ListRepoLabels,
+  options?: RepoLabelRefreshOptions
 ): Promise<Repo> {
-  if (!shouldRefreshRepoLabels(repo, options)) return repo
+  const now = options?.now ?? new Date()
+  const refreshIntervalMs = options?.refreshIntervalMs ?? GITHUB_LABEL_CACHE_REFRESH_INTERVAL_MS
+  if (!shouldRefreshRepoLabels(repo, now, refreshIntervalMs)) return repo
 
+  return fetchAndPersistRepoLabels(db, repo, listRepoLabels, now)
+}
+
+async function fetchAndPersistRepoLabels(
+  db: PilogDatabase,
+  repo: Repo,
+  listRepoLabels: ListRepoLabels,
+  syncedAt = new Date()
+): Promise<Repo> {
   try {
     const labels = await listRepoLabels(repo.owner, repo.name)
     return (
       updateRepoGithubLabels(db, repo.id, {
         githubLabels: labels,
-        githubLabelsSyncedAt: new Date().toISOString()
+        githubLabelsSyncedAt: syncedAt.toISOString()
       }) ?? repo
     )
   } catch {
@@ -117,11 +135,7 @@ export async function refreshRepoLabelsIfStale(
   }
 }
 
-function shouldRefreshRepoLabels(
-  repo: Repo,
-  options?: { now?: Date; refreshIntervalMs?: number }
-): boolean {
-  const refreshIntervalMs = options?.refreshIntervalMs ?? GITHUB_LABEL_CACHE_REFRESH_INTERVAL_MS
+function shouldRefreshRepoLabels(repo: Repo, now: Date, refreshIntervalMs: number): boolean {
   if (refreshIntervalMs === Number.POSITIVE_INFINITY) {
     return repo.githubLabels.length === 0 && !repo.githubLabelsSyncedAt
   }
@@ -133,7 +147,7 @@ function shouldRefreshRepoLabels(
 
   // Generation is the automatic refresh trigger. The 6-hour staleness guard keeps repeated
   // runs from calling GitHub's labels endpoint on every draft generation.
-  return (options?.now ?? new Date()).getTime() - syncedAt >= refreshIntervalMs
+  return now.getTime() - syncedAt >= refreshIntervalMs
 }
 
 function formatRepoLabelVocabulary(labels: GitHubLabel[]): string {
