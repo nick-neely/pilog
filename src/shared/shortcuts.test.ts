@@ -22,6 +22,18 @@ describe('shortcut contract', () => {
     expect(SHORTCUT_CONTRACT.contextualEscape.key).toBe('Esc')
   })
 
+  it('keeps Run History command-palette-only for route switching', () => {
+    expect(
+      Object.values(SHORTCUT_CONTRACT).some((binding) => String(binding.id) === 'route.runs')
+    ).toBe(false)
+    expect(
+      Object.values(SHORTCUT_CONTRACT).some(
+        (binding) =>
+          'accelerator' in binding && String(binding.accelerator) === 'CommandOrControl+3'
+      )
+    ).toBe(false)
+  })
+
   it('formats accelerators for Mac display', () => {
     expect(formatShortcutForDisplay('CommandOrControl+Shift+Space', 'mac')).toBe(
       '⌘ + Shift + Space'

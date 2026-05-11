@@ -49,6 +49,11 @@ import {
   usePilogHotkey
 } from '@renderer/shortcuts/pilog-hotkeys'
 import {
+  getListNavigationIndex,
+  shouldHandleListNavigationShortcut,
+  type ListNavigationDirection
+} from '@renderer/shortcuts/list-navigation'
+import {
   AUTO_PUBLISH_EGRESS_DISCLOSURE,
   GENERATION_EGRESS_DISCLOSURE,
   LOCAL_FIRST_DISCLOSURE
@@ -1807,6 +1812,45 @@ export function Inbox({
   usePilogHotkey(SHORTCUT_CONTRACT.contextualEscape, (e) => handleInboxEscape(e), {
     enabled: selectedIds.size > 0
   })
+
+  const handleListNavigation = useCallback(
+    (event: KeyboardEvent, direction: ListNavigationDirection): void => {
+      if (!shouldHandleListNavigationShortcut(event)) return
+
+      const selectedIndexes = notes
+        .map((note, index) => (selectedIds.has(note.id) ? index : -1))
+        .filter((index) => index >= 0)
+      const currentIndex =
+        selectedIndexes.length === 0
+          ? -1
+          : direction === 'next'
+            ? Math.max(...selectedIndexes)
+            : Math.min(...selectedIndexes)
+      const nextIndex = getListNavigationIndex({
+        currentIndex,
+        itemCount: notes.length,
+        direction
+      })
+      const nextNote = notes[nextIndex]
+      if (!nextNote) return
+
+      event.preventDefault()
+      setSelectedIds(new Set([nextNote.id]))
+      lastClickedIndex.current = nextIndex
+    },
+    [notes, selectedIds]
+  )
+
+  usePilogHotkey(SHORTCUT_CONTRACT.listNext, (event) => handleListNavigation(event, 'next'), {
+    enabled: notes.length > 0
+  })
+  usePilogHotkey(
+    SHORTCUT_CONTRACT.listPrevious,
+    (event) => handleListNavigation(event, 'previous'),
+    {
+      enabled: notes.length > 0
+    }
+  )
 
   const emptyMessage = useMemo(() => {
     const filtered = Boolean(statusFilter || repoFilter !== undefined)

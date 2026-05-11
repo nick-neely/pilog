@@ -37,6 +37,11 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@renderer/components/ui
 import type { RunNavigationOrigin } from '@renderer/features/agent-runs/navigation'
 import { cn } from '@renderer/lib/utils'
 import { PILOG_APP_SHORTCUTS, usePilogHotkey } from '@renderer/shortcuts/pilog-hotkeys'
+import {
+  getListNavigationIndex,
+  shouldHandleListNavigationShortcut,
+  type ListNavigationDirection
+} from '@renderer/shortcuts/list-navigation'
 import { getErrorMessage, getPublishRecoveryState, type RecoveryState } from '../recovery-state'
 import { PUBLISH_EGRESS_DISCLOSURE } from '@shared/data-boundaries'
 import type {
@@ -54,6 +59,7 @@ import type {
   IssueDraftSourceNote,
   IssueDraftStatus
 } from '@shared/types'
+import { SHORTCUT_CONTRACT } from '@shared/shortcuts'
 import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
 
 const EMPTY_STATUS_COUNTS: Record<IssueDraftStatus, number> = {
@@ -588,6 +594,36 @@ export function DraftReview({
     : null
   const emptyDescription = emptyDraftDescription(statusFilter, statusCounts)
   const emptyTitle = emptyDraftTitle(statusFilter, statusCounts)
+
+  const handleListNavigation = useCallback(
+    (event: KeyboardEvent, direction: ListNavigationDirection): void => {
+      if (!shouldHandleListNavigationShortcut(event)) return
+
+      const currentIndex = drafts.findIndex((draft) => draft.id === selectedDraftId)
+      const nextIndex = getListNavigationIndex({
+        currentIndex,
+        itemCount: drafts.length,
+        direction
+      })
+      const nextDraft = drafts[nextIndex]
+      if (!nextDraft) return
+
+      event.preventDefault()
+      setSelectedDraftId(nextDraft.id)
+    },
+    [drafts, selectedDraftId]
+  )
+
+  usePilogHotkey(SHORTCUT_CONTRACT.listNext, (event) => handleListNavigation(event, 'next'), {
+    enabled: drafts.length > 0
+  })
+  usePilogHotkey(
+    SHORTCUT_CONTRACT.listPrevious,
+    (event) => handleListNavigation(event, 'previous'),
+    {
+      enabled: drafts.length > 0
+    }
+  )
 
   return (
     <div className="flex h-full bg-background text-foreground">

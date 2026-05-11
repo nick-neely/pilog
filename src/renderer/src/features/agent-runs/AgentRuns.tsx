@@ -21,12 +21,19 @@ import { Separator } from '@renderer/components/ui/separator'
 import { Skeleton } from '@renderer/components/ui/skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@renderer/components/ui/tabs'
 import { cn } from '@renderer/lib/utils'
+import {
+  getListNavigationIndex,
+  shouldHandleListNavigationShortcut,
+  type ListNavigationDirection
+} from '@renderer/shortcuts/list-navigation'
+import { usePilogHotkey } from '@renderer/shortcuts/pilog-hotkeys'
 import type {
   AgentRunDetail,
   AgentRunListItem,
   AgentRunStatus,
   AgentRunStatusCounts
 } from '@shared/ipc'
+import { SHORTCUT_CONTRACT } from '@shared/shortcuts'
 import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
 import { getErrorMessage } from '../recovery-state'
 
@@ -215,6 +222,36 @@ export function AgentRuns({
   }, [runs, scrollTop, viewportHeight])
 
   const selectedDraft = detail?.outputDrafts.find((draft) => draft.id === selectedDraftId) ?? null
+
+  const handleListNavigation = useCallback(
+    (event: KeyboardEvent, direction: ListNavigationDirection): void => {
+      if (!shouldHandleListNavigationShortcut(event)) return
+
+      const currentIndex = runs.findIndex((run) => run.id === selectedRunId)
+      const nextIndex = getListNavigationIndex({
+        currentIndex,
+        itemCount: runs.length,
+        direction
+      })
+      const nextRun = runs[nextIndex]
+      if (!nextRun) return
+
+      event.preventDefault()
+      setSelectedRunId(nextRun.id)
+    },
+    [runs, selectedRunId]
+  )
+
+  usePilogHotkey(SHORTCUT_CONTRACT.listNext, (event) => handleListNavigation(event, 'next'), {
+    enabled: runs.length > 0
+  })
+  usePilogHotkey(
+    SHORTCUT_CONTRACT.listPrevious,
+    (event) => handleListNavigation(event, 'previous'),
+    {
+      enabled: runs.length > 0
+    }
+  )
 
   return (
     <div className="flex h-full bg-background text-foreground">
