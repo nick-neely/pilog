@@ -6,8 +6,11 @@ export interface ReleaseArtifact {
   sha256?: string
 }
 
+const VALID_PLATFORMS = ['macos', 'windows', 'linux'] as const
+type Platform = (typeof VALID_PLATFORMS)[number]
+
 export interface PlatformRelease {
-  platform: 'macos' | 'windows' | 'linux'
+  platform: Platform
   label: string
   description: string
   artifacts: ReleaseArtifact[]
@@ -62,7 +65,7 @@ function validateArtifact(value: unknown, path: string): ManifestValidationError
 function validatePlatform(value: unknown, path: string): ManifestValidationError[] {
   if (!isObject(value)) return [{ path, message: 'must be an object' }]
   const errors: ManifestValidationError[] = []
-  if (!['macos', 'windows', 'linux'].includes(value.platform as string))
+  if (!isString(value.platform) || !(VALID_PLATFORMS as readonly string[]).includes(value.platform))
     errors.push({ path: `${path}.platform`, message: 'must be macos, windows, or linux' })
   if (!isString(value.label) || value.label.length === 0)
     errors.push({ path: `${path}.label`, message: 'must be a non-empty string' })
