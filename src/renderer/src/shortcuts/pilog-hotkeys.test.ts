@@ -46,14 +46,20 @@ describe('PiLog renderer hotkeys', () => {
       }
     }
 
-    globalThis.HTMLElement = FakeHTMLElement as unknown as typeof HTMLElement
+    Object.defineProperty(globalThis, 'HTMLElement', {
+      configurable: true,
+      value: FakeHTMLElement
+    })
 
     try {
       expect(isEditableShortcutTarget(new FakeHTMLElement(true))).toBe(true)
       expect(isEditableShortcutTarget(new FakeHTMLElement(false))).toBe(false)
       expect(isEditableShortcutTarget(new EventTarget())).toBe(false)
     } finally {
-      globalThis.HTMLElement = OriginalHTMLElement
+      Object.defineProperty(globalThis, 'HTMLElement', {
+        configurable: true,
+        value: OriginalHTMLElement
+      })
     }
   })
 })

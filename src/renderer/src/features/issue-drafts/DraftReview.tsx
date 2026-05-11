@@ -1260,9 +1260,9 @@ function DraftEditor({
     saving
   ])
 
-  const handleSaveShortcut = useEffectEvent(() => {
+  const handleSaveShortcut = useCallback((): void => {
     if (dirty && !saving) void handleSave()
-  })
+  }, [dirty, handleSave, saving])
 
   const handlePathAction = useCallback(
     async (file: IssueDraft['affectedFiles'][number], action: PathAction): Promise<void> => {

@@ -979,9 +979,9 @@ function NoteDetail({
   const handleSave = useCallback(async (): Promise<void> => {
     await onSave(note.id, draft)
   }, [draft, note.id, onSave])
-  const handleSaveShortcut = useEffectEvent(() => {
+  const handleSaveShortcut = useCallback((): void => {
     if (dirty) void handleSave()
-  })
+  }, [dirty, handleSave])
 
   // Mod+S saves this note even while focus is in the note textarea. That
   // shortcut is an explicit editor-surface opt-in, unlike navigation keys.
@@ -1791,15 +1791,18 @@ export function Inbox({
     selectionCount
   })
 
-  const handleInboxEscape = useEffectEvent((e: KeyboardEvent): void => {
-    if (selectedIds.size === 0) return
-    if (document.querySelector('[data-slot="select-content"][data-state="open"]')) {
-      return
-    }
-    if (isEditableShortcutTarget(e.target)) return
-    e.preventDefault()
-    clearSelection()
-  })
+  const handleInboxEscape = useCallback(
+    (e: KeyboardEvent): void => {
+      if (selectedIds.size === 0) return
+      if (document.querySelector('[data-slot="select-content"][data-state="open"]')) {
+        return
+      }
+      if (isEditableShortcutTarget(e.target)) return
+      e.preventDefault()
+      clearSelection()
+    },
+    [clearSelection, selectedIds.size]
+  )
 
   usePilogHotkey(SHORTCUT_CONTRACT.contextualEscape, (e) => handleInboxEscape(e), {
     enabled: selectedIds.size > 0

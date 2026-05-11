@@ -1,5 +1,4 @@
 import {
-  HotkeysProvider,
   useHotkey,
   useHotkeySequence,
   type UseHotkeyOptions,
@@ -14,9 +13,13 @@ import {
   type ShortcutBinding,
   type ShortcutDisplayPlatform
 } from '@shared/shortcuts'
-import type { ReactNode } from 'react'
 
 type ShortcutCallback = (event: KeyboardEvent) => void
+type ShortcutBindingMeta = {
+  name: string
+  description: string
+  pilogShortcutId: string
+}
 
 type PilogHotkeyOptions = Omit<
   UseHotkeyOptions,
@@ -34,29 +37,9 @@ type PilogHotkeySequenceOptions = Omit<
   preventDefault?: boolean
 }
 
-export function PilogHotkeysProvider({ children }: { children: ReactNode }): React.JSX.Element {
-  return (
-    <HotkeysProvider
-      defaultOptions={{
-        hotkey: {
-          conflictBehavior: import.meta.env.DEV ? 'warn' : 'allow',
-          ignoreInputs: true,
-          preventDefault: true,
-          stopPropagation: true
-        },
-        hotkeySequence: {
-          conflictBehavior: import.meta.env.DEV ? 'warn' : 'allow',
-          ignoreInputs: true,
-          preventDefault: true,
-          stopPropagation: true,
-          timeout: 1500
-        }
-      }}
-    >
-      {children}
-    </HotkeysProvider>
-  )
-}
+export const HOTKEY_CONFLICT_BEHAVIOR = import.meta.env.DEV ? 'warn' : 'allow'
+const EDITABLE_SHORTCUT_TARGET_SELECTOR =
+  'input, textarea, select, [contenteditable=""], [contenteditable="true"], .cm-editor, .cm-content'
 
 export function usePilogHotkey(
   binding: ShortcutBinding,
@@ -73,7 +56,7 @@ export function usePilogHotkey(
     ...hotkeyOptions,
     preventDefault,
     ignoreInputs: !allowInEditable,
-    conflictBehavior: import.meta.env.DEV ? 'warn' : 'allow',
+    conflictBehavior: HOTKEY_CONFLICT_BEHAVIOR,
     meta: shortcutBindingMeta(binding)
   })
 }
@@ -96,7 +79,7 @@ export function usePilogHotkeySequence(
       ...sequenceOptions,
       preventDefault,
       ignoreInputs: !allowInEditable,
-      conflictBehavior: import.meta.env.DEV ? 'warn' : 'allow',
+      conflictBehavior: HOTKEY_CONFLICT_BEHAVIOR,
       meta: shortcutBindingMeta(binding)
     }
   )
@@ -115,7 +98,7 @@ export function shortcutBindingToTanStackHotkey(binding: ShortcutBinding): strin
 export function shortcutBindingMeta(
   binding: ShortcutBinding,
   platform: ShortcutDisplayPlatform = getCurrentShortcutDisplayPlatform()
-): { name: string; description: string; pilogShortcutId: string } {
+): ShortcutBindingMeta {
   return {
     name: binding.label,
     description: formatShortcutForDisplay(shortcutBindingDisplayValue(binding), platform),
@@ -131,9 +114,7 @@ export function getCurrentShortcutDisplayPlatform(): ShortcutDisplayPlatform {
 export function isEditableShortcutTarget(target: EventTarget | null): boolean {
   if (typeof HTMLElement === 'undefined' || !(target instanceof HTMLElement)) return false
 
-  const editable = target.closest(
-    'input, textarea, select, [contenteditable=""], [contenteditable="true"], .cm-editor, .cm-content'
-  )
+  const editable = target.closest(EDITABLE_SHORTCUT_TARGET_SELECTOR)
 
   return editable !== null
 }
