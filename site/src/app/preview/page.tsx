@@ -6,6 +6,12 @@ export const metadata: Metadata = {
   robots: { index: false }
 }
 
+const platforms = [
+  { title: 'macOS (Preview)', description: 'Unsigned universal build.' },
+  { title: 'Windows (Preview)', description: 'Unsigned 64-bit installer.' },
+  { title: 'Linux (Preview)', description: 'AppImage and .deb packages.' }
+]
+
 export default function PreviewPage() {
   return (
     <div className="mx-auto max-w-3xl px-6 py-16">
@@ -22,29 +28,15 @@ export default function PreviewPage() {
       </div>
 
       <div className="mt-10 space-y-4">
-        <div className="border-border rounded-lg border p-5">
-          <h2 className="text-foreground text-base font-semibold">macOS (Preview)</h2>
-          <p className="text-muted-foreground mt-1 text-sm">Unsigned universal build.</p>
-          <p className="text-muted-foreground mt-3 text-sm italic">
-            Preview builds available once the first pre-release is published.
-          </p>
-        </div>
-
-        <div className="border-border rounded-lg border p-5">
-          <h2 className="text-foreground text-base font-semibold">Windows (Preview)</h2>
-          <p className="text-muted-foreground mt-1 text-sm">Unsigned 64-bit installer.</p>
-          <p className="text-muted-foreground mt-3 text-sm italic">
-            Preview builds available once the first pre-release is published.
-          </p>
-        </div>
-
-        <div className="border-border rounded-lg border p-5">
-          <h2 className="text-foreground text-base font-semibold">Linux (Preview)</h2>
-          <p className="text-muted-foreground mt-1 text-sm">AppImage and .deb packages.</p>
-          <p className="text-muted-foreground mt-3 text-sm italic">
-            Preview builds available once the first pre-release is published.
-          </p>
-        </div>
+        {platforms.map((platform) => (
+          <div key={platform.title} className="border-border rounded-lg border p-5">
+            <h2 className="text-foreground text-base font-semibold">{platform.title}</h2>
+            <p className="text-muted-foreground mt-1 text-sm">{platform.description}</p>
+            <p className="text-muted-foreground mt-3 text-sm italic">
+              Preview builds available once the first pre-release is published.
+            </p>
+          </div>
+        ))}
       </div>
 
       <p className="text-muted-foreground mt-8 text-sm">

@@ -5,6 +5,12 @@ export const metadata: Metadata = {
   title: 'Download'
 }
 
+const platforms = [
+  { title: 'macOS', description: 'Universal build for Apple Silicon and Intel Macs.' },
+  { title: 'Windows', description: '64-bit installer for Windows 10+.' },
+  { title: 'Linux', description: 'AppImage and .deb packages.' }
+]
+
 export default function DownloadPage() {
   return (
     <div className="mx-auto max-w-3xl px-6 py-16">
@@ -16,31 +22,15 @@ export default function DownloadPage() {
       </p>
 
       <div className="mt-10 space-y-4">
-        <div className="border-border rounded-lg border p-5">
-          <h2 className="text-foreground text-base font-semibold">macOS</h2>
-          <p className="text-muted-foreground mt-1 text-sm">
-            Universal build for Apple Silicon and Intel Macs.
-          </p>
-          <p className="text-muted-foreground mt-3 text-sm italic">
-            Download available once the first stable release is published.
-          </p>
-        </div>
-
-        <div className="border-border rounded-lg border p-5">
-          <h2 className="text-foreground text-base font-semibold">Windows</h2>
-          <p className="text-muted-foreground mt-1 text-sm">64-bit installer for Windows 10+.</p>
-          <p className="text-muted-foreground mt-3 text-sm italic">
-            Download available once the first stable release is published.
-          </p>
-        </div>
-
-        <div className="border-border rounded-lg border p-5">
-          <h2 className="text-foreground text-base font-semibold">Linux</h2>
-          <p className="text-muted-foreground mt-1 text-sm">AppImage and .deb packages.</p>
-          <p className="text-muted-foreground mt-3 text-sm italic">
-            Download available once the first stable release is published.
-          </p>
-        </div>
+        {platforms.map((platform) => (
+          <div key={platform.title} className="border-border rounded-lg border p-5">
+            <h2 className="text-foreground text-base font-semibold">{platform.title}</h2>
+            <p className="text-muted-foreground mt-1 text-sm">{platform.description}</p>
+            <p className="text-muted-foreground mt-3 text-sm italic">
+              Download available once the first stable release is published.
+            </p>
+          </div>
+        ))}
       </div>
 
       <p className="text-muted-foreground mt-8 text-sm">
