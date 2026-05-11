@@ -9,4 +9,3 @@ export const PUBLISH_EGRESS_DISCLOSURE =
 
 export const AUTO_PUBLISH_EGRESS_DISCLOSURE =
   'This plan was generated through your Pi provider. Publishing writes the selected drafts to GitHub; closing keeps them as local drafts.'
-
