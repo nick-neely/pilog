@@ -10,12 +10,12 @@ References: [ADR-0006](adr/0006-release-distribution-architecture.md) · [releas
 
 ### 1. CI pipeline
 
-- [ ] `Release — Stable` workflow completed with all five stages green (validate, verify, build-mac, build-win, build-linux, publish-manifest, deploy-site).
+- [ ] `Release — Stable` workflow completed with all jobs green (validate, verify, build-mac, build-win, build-linux, publish-manifest, deploy-site).
 - [ ] No unexpected job re-runs were required to reach a clean state.
 
 ### 2. GitHub Release artifacts
 
-Open the GitHub Release for the tag (`v X.Y.Z`) and confirm:
+Open the GitHub Release for the tag (`vX.Y.Z`) and confirm:
 
 - [ ] Stable release is marked as a **Release** (not pre-release).
 - [ ] macOS: `Pilog-X.Y.Z.dmg`, `Pilog-X.Y.Z-mac.zip`, `latest-mac.yml`, `Pilog-X.Y.Z.dmg.sha256`, `Pilog-X.Y.Z-mac.zip.sha256`, `checksums-mac.txt` are present.
