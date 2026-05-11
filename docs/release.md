@@ -78,6 +78,9 @@ GitHub → Actions → **Release — Preview** → Run workflow → enter the ex
 | Secret | Used for | Status |
 |--------|---------|--------|
 | `GITHUB_TOKEN` | Creating/updating GitHub Releases, uploading assets | Automatically provided — no setup needed |
+| `VERCEL_TOKEN` | Authenticating Vercel CLI for site deployments | Must be added — see Vercel setup below |
+| `VERCEL_ORG_ID` | Vercel team/org that owns the `pilog.dev` project | Must be added — see Vercel setup below |
+| `VERCEL_PROJECT_ID` | Vercel project ID for `pilog.dev` | Must be added — see Vercel setup below |
 | `CSC_LINK` | macOS code-signing certificate (base64-encoded p12) | Pending — tracked by #45 |
 | `CSC_KEY_PASSWORD` | macOS signing certificate password | Pending — tracked by #45 |
 | `WIN_CSC_LINK` | Windows code-signing certificate | Pending — tracked by #45 |
@@ -96,7 +99,7 @@ Each release workflow (stable or preview) runs these stages in order:
 
 ```
 validate → verify → build-mac ┐
-                    build-win  ├── (parallel)
+                    build-win  ├── publish-manifest → deploy-site
                     build-linux┘
 ```
 
@@ -121,6 +124,23 @@ Each platform job:
 4. Packages and publishes artifacts to the GitHub Release with `electron-builder --publish always`.
 5. Generates SHA-256 checksums with `pnpm run build:checksums`.
 6. Uploads per-artifact `.sha256` sidecar files and a platform-scoped `checksums-<platform>.txt` to the GitHub Release.
+
+### Stage 4 — Publish Release Manifest
+
+- Checks out `main` (not the tag) so the manifest commit lands on the default branch.
+- Installs dependencies and runs `pnpm run generate:manifest` with the release tag and channel.
+- Validates the updated manifest with `pnpm run test`.
+- Commits and pushes `site/src/data/release-manifest.json` to `main`. If the manifest was already current, no commit is made.
+
+### Stage 5 — Deploy Site to Vercel
+
+- Checks out the latest `main` (which includes the manifest commit from Stage 4).
+- Installs the Vercel CLI.
+- Runs `vercel pull` to sync project settings from Vercel.
+- Runs `vercel build --prod` to produce the `.vercel/output` artifact.
+- Runs `vercel deploy --prebuilt --prod` to promote the build to Vercel Production.
+
+Requires `VERCEL_TOKEN`, `VERCEL_ORG_ID`, and `VERCEL_PROJECT_ID` to be set as GitHub Actions secrets (see Vercel setup below).
 
 ---
 
@@ -156,6 +176,72 @@ Same set of artifacts with `-preview` embedded before the extension:
 
 ---
 
+## Vercel setup
+
+`pilog.dev` is deployed via the Vercel CLI in Stage 5. The site package lives in `site/` and `site/vercel.json` tells Vercel which framework to use.
+
+### One-time project configuration
+
+1. **Create the Vercel project** — Import the repository in the Vercel dashboard. Set **Root Directory** to `site/`. Vercel will auto-detect Next.js from `site/vercel.json`.
+2. **Link the domain** — Add `pilog.dev` as a custom domain in the Vercel project settings.
+3. **Retrieve project IDs** — From the Vercel dashboard (Project → Settings → General), copy the **Team ID** (or personal account ID) and **Project ID**.
+4. **Create a Vercel token** — Account → Settings → Tokens → create a token with scope limited to the `pilog.dev` project.
+5. **Add GitHub secrets** — In the GitHub repository (Settings → Secrets and variables → Actions), add:
+   - `VERCEL_TOKEN` — the token created above
+   - `VERCEL_ORG_ID` — the Vercel team/account ID
+   - `VERCEL_PROJECT_ID` — the Vercel project ID
+
+These values are never committed to source. The `site/vercel.json` file contains only non-secret framework configuration.
+
+### Preview deployments
+
+Vercel's GitHub integration auto-deploys every branch push and pull request to a preview URL without publishing desktop releases. No extra configuration is required — preview deployments happen on all branches, while production deployments are reserved for the Release Actions.
+
+### Inspecting a production deployment
+
+```bash
+# List recent deployments for the project
+vercel ls --prod --token "$VERCEL_TOKEN"
+
+# Open the Vercel dashboard for the project
+open https://vercel.com/<team>/<project>
+```
+
+The Vercel dashboard (Deployments tab) shows every deployment with its status, build logs, and the git commit it was built from.
+
+### Rolling back a deployment
+
+To revert `pilog.dev` to a previous deployment:
+
+1. In the Vercel dashboard, open the Deployments tab.
+2. Find the last known-good deployment.
+3. Click the three-dot menu → **Promote to Production**.
+
+Or with the CLI:
+
+```bash
+# List recent deployments and find the deployment URL to revert to
+vercel ls --prod --token "$VERCEL_TOKEN"
+
+# Promote a previous deployment URL to production
+vercel promote <deployment-url> --token "$VERCEL_TOKEN"
+```
+
+### Manually redeploying
+
+To redeploy the current `main` branch without pushing a new release:
+
+```bash
+cd site
+vercel pull --yes --environment=production --token "$VERCEL_TOKEN"
+vercel build --prod --token "$VERCEL_TOKEN"
+vercel deploy --prebuilt --prod --token "$VERCEL_TOKEN"
+```
+
+Or trigger a re-run of the release workflow via GitHub → Actions → **Release — Stable** (or Preview) → Run workflow → enter the existing tag.
+
+---
+
 ## Failure diagnosis
 
 | Failing stage | What to check |
@@ -167,6 +253,8 @@ Same set of artifacts with `-preview` embedded before the extension:
 | Publish (electron-builder) | Packaging errors, code-signing failures, or GitHub API upload errors. Check `GH_TOKEN` permissions (`contents: write`). Rate limits may require re-running the job. |
 | Checksums | `pnpm run build:checksums` failure means no artifacts were found in `dist/`. The preceding publish step likely failed. |
 | Checksum upload | `gh release upload` failure — the GitHub Release may not exist yet (publish step failed) or a network issue occurred. |
+| Publish manifest | `generate:manifest` script failure or manifest validation failure. Check the manifest script logs for missing release assets. |
+| Deploy site | `vercel` CLI failure. Verify that `VERCEL_TOKEN`, `VERCEL_ORG_ID`, and `VERCEL_PROJECT_ID` secrets are set in the repository. Check the Vercel dashboard for build errors. |
 
 ---
 
