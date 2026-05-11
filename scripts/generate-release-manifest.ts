@@ -53,17 +53,10 @@ const PLATFORM_DESCRIPTIONS: Record<Platform, string> = {
 
 // ── Pure functions (exported for testing) ─────────────────────────────────
 
-/**
- * Returns true if the asset name is a downloadable artifact (not a checksum
- * sidecar, updater metadata yml, or text summary file).
- */
 export function isArtifactAsset(name: string): boolean {
   return ARTIFACT_EXTENSIONS.some((ext) => name.endsWith(ext))
 }
 
-/**
- * Maps a filename to its target platform, or null if unrecognised.
- */
 export function detectPlatform(name: string): Platform | null {
   if (name.endsWith('.dmg') || name.endsWith('-mac.zip')) return 'macos'
   if (name.endsWith('.exe')) return 'windows'
@@ -71,9 +64,6 @@ export function detectPlatform(name: string): Platform | null {
   return null
 }
 
-/**
- * Returns a human-readable label for a given artifact filename.
- */
 export function detectLabel(name: string): string {
   if (name.endsWith('.dmg')) return 'DMG installer'
   if (name.endsWith('-mac.zip') || name.endsWith('.zip')) return 'ZIP archive'
@@ -84,13 +74,6 @@ export function detectLabel(name: string): string {
   return name
 }
 
-/**
- * Builds a ReleaseChannel from a flat list of GitHub Release assets and a
- * map of pre-downloaded SHA-256 checksums keyed by artifact filename.
- *
- * Non-artifact assets (checksums, yml metadata, txt summaries) are silently
- * ignored. Platforms with no matching artifacts are omitted from the result.
- */
 export function buildChannel(params: {
   version: string
   releaseUrl: string
@@ -121,22 +104,16 @@ export function buildChannel(params: {
     byPlatform.set(platform, existing)
   }
 
-  const platforms: PlatformRelease[] = PLATFORM_ORDER.filter((p) => byPlatform.has(p)).map(
-    (p) => ({
-      platform: p,
-      label: PLATFORM_LABELS[p],
-      description: PLATFORM_DESCRIPTIONS[p],
-      artifacts: byPlatform.get(p)!
-    })
-  )
+  const platforms: PlatformRelease[] = PLATFORM_ORDER.filter((p) => byPlatform.has(p)).map((p) => ({
+    platform: p,
+    label: PLATFORM_LABELS[p],
+    description: PLATFORM_DESCRIPTIONS[p],
+    artifacts: byPlatform.get(p)!
+  }))
 
   return { version, releaseUrl, publishedAt, platforms }
 }
 
-/**
- * Returns a new manifest with the given channel updated. Does not mutate the
- * original.
- */
 export function updateManifest(
   current: ReleaseManifest,
   channel: 'stable' | 'preview',
@@ -160,15 +137,7 @@ function fetchReleaseInfo(
   repo: string,
   tag: string
 ): { assets: AssetInfo[]; publishedAt: string; url: string } {
-  const raw = runGh([
-    'release',
-    'view',
-    tag,
-    '--repo',
-    repo,
-    '--json',
-    'assets,publishedAt,url'
-  ])
+  const raw = runGh(['release', 'view', tag, '--repo', repo, '--json', 'assets,publishedAt,url'])
   const data = JSON.parse(raw) as {
     assets: Array<{ name: string; size: number }>
     publishedAt: string
@@ -188,7 +157,18 @@ function fetchReleaseInfo(
 function fetchChecksums(repo: string, tag: string, dir: string): Map<string, string> {
   spawnSync(
     'gh',
-    ['release', 'download', tag, '--repo', repo, '--pattern', '*.sha256', '--dir', dir, '--clobber'],
+    [
+      'release',
+      'download',
+      tag,
+      '--repo',
+      repo,
+      '--pattern',
+      '*.sha256',
+      '--dir',
+      dir,
+      '--clobber'
+    ],
     { encoding: 'utf8' }
   )
 
@@ -269,7 +249,9 @@ async function main(): Promise<void> {
 
   if (!isValidReleaseManifest(existing)) {
     const errs = validateReleaseManifest(existing)
-    throw new Error(`Existing manifest is invalid:\n${errs.map((e) => `  ${e.path}: ${e.message}`).join('\n')}`)
+    throw new Error(
+      `Existing manifest is invalid:\n${errs.map((e) => `  ${e.path}: ${e.message}`).join('\n')}`
+    )
   }
 
   const updated = updateManifest(existing, channel, channelData)
