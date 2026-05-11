@@ -1,5 +1,11 @@
 import { ipcMain, shell } from 'electron'
-import { startDeviceFlow, startOAuthFlow, signOut, getGitHubStatus } from '../github/auth'
+import {
+  startDeviceFlow,
+  startOAuthFlow,
+  signOut,
+  getGitHubStatus,
+  type GitHubAuthRuntimeOptions
+} from '../github/auth'
 import { resetClient, listLabels, createIssue } from '../github/client'
 import type { PilogDatabase } from '../db/client'
 import type { CreateIssueRequest } from '@shared/ipc'
@@ -7,7 +13,7 @@ import { recordPublish } from '../db/repositories/publish-log'
 import { publishAutoPublishRun, publishReviewedDraft } from '../github/publish-draft'
 
 export function registerGitHubIpcHandlers(
-  options: { clientId: string; clientSecret: string; authFlow: 'device' | 'loopback' },
+  options: GitHubAuthRuntimeOptions,
   db: PilogDatabase,
   callbacks?: { onIssueDraftsChanged?: () => void; onNoteChanged?: () => void }
 ): void {
@@ -18,17 +24,21 @@ export function registerGitHubIpcHandlers(
       return startOAuthFlow(options.clientId, options.clientSecret)
     }
 
+    const controller = new AbortController()
     activeDeviceFlow?.abort()
-    activeDeviceFlow = new AbortController()
+    activeDeviceFlow = controller
+
     try {
       return await startDeviceFlow(options.clientId, {
-        signal: activeDeviceFlow.signal,
+        signal: controller.signal,
         onProgress: (progress) => {
           event.sender.send('github:authProgress', progress)
         }
       })
     } finally {
-      activeDeviceFlow = null
+      if (activeDeviceFlow === controller) {
+        activeDeviceFlow = null
+      }
     }
   })
 

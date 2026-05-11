@@ -12,16 +12,17 @@ const DEVICE_GRANT_TYPE = 'urn:ietf:params:oauth:grant-type:device_code'
 
 type FetchLike = typeof fetch
 type Delay = (ms: number) => Promise<void>
+type GitHubDeviceFlowErrorState =
+  | 'denied'
+  | 'expired'
+  | 'cancelled'
+  | 'network_error'
+  | 'authorization_pending'
+  | 'slow_down'
 
 export class GitHubDeviceFlowError extends Error {
   constructor(
-    public readonly state:
-      | 'denied'
-      | 'expired'
-      | 'cancelled'
-      | 'network_error'
-      | 'authorization_pending'
-      | 'slow_down',
+    public readonly state: GitHubDeviceFlowErrorState,
     message: string
   ) {
     super(message)
@@ -49,14 +50,13 @@ export function resolveGitHubAuthOptions(input: {
   bundledClientId: string
 }): GitHubAuthRuntimeOptions {
   const clientSecret = input.env.GITHUB_CLIENT_SECRET?.trim() ?? ''
+  const requestedLoopback =
+    input.isDev && input.env.PILOG_GITHUB_AUTH_FLOW === 'loopback' && Boolean(clientSecret)
 
   return {
     clientId: input.env.GITHUB_CLIENT_ID?.trim() || input.bundledClientId.trim(),
     clientSecret,
-    authFlow:
-      input.isDev && input.env.PILOG_GITHUB_AUTH_FLOW === 'loopback' && Boolean(clientSecret)
-        ? 'loopback'
-        : 'device'
+    authFlow: requestedLoopback ? 'loopback' : 'device'
   }
 }
 
@@ -240,31 +240,29 @@ export async function startDeviceFlow(
   const fetchImpl = options.fetchImpl ?? fetch
   const delay = options.delay ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)))
   const now = options.now ?? (() => new Date())
+  const emitProgress = options.onProgress ?? (() => undefined)
   const device = await requestDeviceCode(clientId, { fetchImpl })
   let intervalSeconds = device.interval
   const expiresAtMs = now().getTime() + device.expiresIn * 1000
 
-  const deviceProgress: GitHubAuthProgress = {
+  emitProgress({
     state: 'device_code',
     userCode: device.userCode,
     verificationUri: device.verificationUri,
     expiresAt: new Date(expiresAtMs).toISOString(),
     intervalSeconds
-  }
-  options.onProgress?.(deviceProgress)
+  })
   await (options.openExternal ?? shell.openExternal)(device.verificationUri)
 
   while (now().getTime() < expiresAtMs) {
     if (options.signal?.aborted) {
-      const event: GitHubAuthProgress = {
-        state: 'cancelled',
-        message: 'GitHub authorization was cancelled.'
-      }
-      options.onProgress?.(event)
-      throw new GitHubDeviceFlowError('cancelled', event.message)
+      const message = 'GitHub authorization was cancelled.'
+      const cancelled = errorToProgress(new GitHubDeviceFlowError('cancelled', message))
+      emitProgress(cancelled)
+      throw new GitHubDeviceFlowError('cancelled', message)
     }
 
-    options.onProgress?.({ state: 'polling', message: 'Waiting for GitHub authorization.' })
+    emitProgress({ state: 'polling', message: 'Waiting for GitHub authorization.' })
 
     try {
       const token = await exchangeDeviceCodeForToken(device.deviceCode, clientId, { fetchImpl })
@@ -274,12 +272,12 @@ export async function startDeviceFlow(
       setSecret(SECRET_KEY_LOGIN, login)
 
       const event: GitHubAuthProgress = { state: 'authorized', login }
-      options.onProgress?.(event)
+      emitProgress(event)
       return { connected: true, login, auth: event }
     } catch (err) {
       if (!(err instanceof GitHubDeviceFlowError)) {
         const deviceError = new GitHubDeviceFlowError('network_error', getErrorMessage(err))
-        options.onProgress?.(errorToProgress(deviceError))
+        emitProgress(errorToProgress(deviceError))
         throw deviceError
       }
 
@@ -290,7 +288,7 @@ export async function startDeviceFlow(
 
       if (err.state === 'slow_down') {
         intervalSeconds += 5
-        options.onProgress?.({
+        emitProgress({
           state: 'slow_down',
           intervalSeconds,
           message: 'GitHub asked Pilog to wait a little longer before checking again.'
@@ -300,7 +298,7 @@ export async function startDeviceFlow(
       }
 
       const event = errorToProgress(err)
-      options.onProgress?.(event)
+      emitProgress(event)
       throw err
     }
   }
@@ -309,7 +307,7 @@ export async function startDeviceFlow(
     state: 'expired',
     message: 'The GitHub device code expired. Start a new connection to try again.'
   }
-  options.onProgress?.(event)
+  emitProgress(event)
   throw new GitHubDeviceFlowError('expired', event.message)
 }
 
@@ -463,7 +461,11 @@ function getErrorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err)
 }
 
-async function waitBeforeNextPoll(ms: number, delay: Delay, signal: AbortSignal | undefined) {
+async function waitBeforeNextPoll(
+  ms: number,
+  delay: Delay,
+  signal: AbortSignal | undefined
+): Promise<void> {
   if (!signal) {
     await delay(ms)
     return
