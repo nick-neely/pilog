@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
+import { sql } from 'drizzle-orm'
 import { createInMemoryDatabase, type PilogDatabase } from '../client'
 import { runMigrations } from '../migrations'
 import {
@@ -26,7 +27,14 @@ describe('repos repository', () => {
   }
 
   it('creates a repo and returns it with all fields populated', () => {
-    const repo = createRepo(db, sampleInput)
+    const repo = createRepo(db, {
+      ...sampleInput,
+      githubLabels: [
+        { id: 1, name: 'bug', color: 'd73a4a', description: 'Something is broken' },
+        { id: 2, name: 'ready-for-agent', color: '0e8a16', description: null }
+      ],
+      githubLabelsSyncedAt: '2026-05-11T00:00:00.000Z'
+    })
 
     expect(repo.id).toBeDefined()
     expect(repo.name).toBe('pilog')
@@ -39,8 +47,63 @@ describe('repos repository', () => {
     expect(repo.autoPublishDefaultLabel).toBe('triaged-by-pilog')
     expect(repo.autoPublishDryRun).toBe(false)
     expect(repo.autoPublishRequireConfirmation).toBe(true)
+    expect(repo.githubLabels).toEqual([
+      { id: 1, name: 'bug', color: 'd73a4a', description: 'Something is broken' },
+      { id: 2, name: 'ready-for-agent', color: '0e8a16', description: null }
+    ])
+    expect(repo.githubLabelsSyncedAt).toBe('2026-05-11T00:00:00.000Z')
     expect(repo.createdAt).toBeDefined()
     expect(repo.updatedAt).toBeDefined()
+  })
+
+  it('migrates and defaults cached GitHub labels for existing repos', () => {
+    const legacyDb = createInMemoryDatabase()
+    legacyDb.run(sql`
+      CREATE TABLE repos (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        owner TEXT NOT NULL,
+        local_path TEXT NOT NULL,
+        github_url TEXT,
+        default_branch TEXT,
+        auto_publish_enabled INTEGER NOT NULL DEFAULT 0,
+        auto_publish_max_issues_per_run INTEGER NOT NULL DEFAULT 5,
+        auto_publish_default_label TEXT NOT NULL DEFAULT 'triaged-by-pilog',
+        auto_publish_dry_run INTEGER NOT NULL DEFAULT 0,
+        auto_publish_require_confirmation INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    `)
+    legacyDb.run(sql`
+      INSERT INTO repos (
+        id,
+        name,
+        owner,
+        local_path,
+        github_url,
+        default_branch,
+        created_at,
+        updated_at
+      )
+      VALUES (
+        'repo-legacy',
+        'pilog',
+        'nick-neely',
+        '/home/user/projects/pilog',
+        'https://github.com/nick-neely/pilog',
+        'main',
+        '2026-05-10T00:00:00.000Z',
+        '2026-05-10T00:00:00.000Z'
+      )
+    `)
+
+    runMigrations(legacyDb)
+
+    expect(getRepoById(legacyDb, 'repo-legacy')).toMatchObject({
+      githubLabels: [],
+      githubLabelsSyncedAt: null
+    })
   })
 
   it('persists conservative auto-publish defaults', () => {

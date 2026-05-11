@@ -21,6 +21,8 @@ export function runMigrations(db: PilogDatabase): void {
       local_path TEXT NOT NULL,
       github_url TEXT,
       default_branch TEXT,
+      github_labels TEXT NOT NULL DEFAULT '[]',
+      github_labels_synced_at TEXT,
       auto_publish_enabled INTEGER NOT NULL DEFAULT 0,
       auto_publish_max_issues_per_run INTEGER NOT NULL DEFAULT 5,
       auto_publish_default_label TEXT NOT NULL DEFAULT 'triaged-by-pilog',
@@ -68,6 +70,8 @@ export function runMigrations(db: PilogDatabase): void {
 
   addColumnIfMissing(db, 'notes', 'run_id', 'TEXT')
   addColumnIfMissing(db, 'repos', 'auto_publish_enabled', 'INTEGER NOT NULL DEFAULT 0')
+  addColumnIfMissing(db, 'repos', 'github_labels', "TEXT NOT NULL DEFAULT '[]'")
+  addColumnIfMissing(db, 'repos', 'github_labels_synced_at', 'TEXT')
   addColumnIfMissing(db, 'repos', 'auto_publish_max_issues_per_run', 'INTEGER NOT NULL DEFAULT 5')
   addColumnIfMissing(
     db,

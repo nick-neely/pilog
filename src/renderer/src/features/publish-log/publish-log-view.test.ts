@@ -14,6 +14,8 @@ const baseEntry: PublishAuditLogEntry = {
     localPath: '/tmp/pilog',
     githubUrl: 'https://github.com/nick-neely/pilog',
     defaultBranch: 'main',
+    githubLabels: [],
+    githubLabelsSyncedAt: null,
     autoPublishEnabled: false,
     autoPublishMaxIssuesPerRun: 5,
     autoPublishDefaultLabel: 'triaged-by-pilog',

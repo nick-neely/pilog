@@ -19,6 +19,8 @@ runIfEnabled('issue generation integration', () => {
       localPath: repoPath,
       githubUrl: 'https://github.com/pilog/fixture',
       defaultBranch: 'main',
+      githubLabels: [],
+      githubLabelsSyncedAt: null,
       autoPublishEnabled: false,
       autoPublishMaxIssuesPerRun: 5,
       autoPublishDefaultLabel: 'triaged-by-pilog',

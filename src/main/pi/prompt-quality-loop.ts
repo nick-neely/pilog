@@ -133,6 +133,8 @@ async function exerciseGenerationTools(
         localPath: repoPath,
         githubUrl: createFixtureGithubUrl(fixture.id),
         defaultBranch: 'main',
+        githubLabels: [],
+        githubLabelsSyncedAt: null,
         autoPublishEnabled: false,
         autoPublishMaxIssuesPerRun: 5,
         autoPublishDefaultLabel: 'triaged-by-pilog',

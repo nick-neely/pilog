@@ -16,6 +16,7 @@ Each draft must have non-empty affectedFiles, acceptanceCriteria, and groupingRe
 Prefer concrete acceptance criteria.
 Avoid overclaiming certainty.
 Use repo context when available.
+Prefer exact label names from the cached GitHub label vocabulary when they fit, but you may suggest other labels when none of the cached labels apply.
 Include concise rationale, not hidden reasoning.
 Mark vague notes as needing clarification.
 Return structured JSON only by calling submit_issue_drafts with data matching the provided schema; do not emit prose outside the tool call.
@@ -25,6 +26,11 @@ owner: nick-neely
 name: pilog
 localPath: /workspace/pilog
 defaultBranch: main
+githubLabelsSyncedAt: 2026-05-11T00:00:00.000Z
+
+Cached GitHub label vocabulary:
+- bug: Something is broken
+- ready-for-agent
 
 Selected notes:
 Note 1

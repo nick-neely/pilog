@@ -21,6 +21,7 @@ import {
   planAutoPublishPreviewDrafts,
   buildIssueGenerationPrompt,
   createSubmitIssueDraftsTool,
+  hydrateRepoLabelsIfNeeded,
   getCurrentInboxNotesForGeneration,
   persistGeneratedIssueDrafts,
   validateAndCollectSourceNoteIds
@@ -55,6 +56,11 @@ describe('issue generation', () => {
         autoPublishDefaultLabel: 'triaged-by-pilog',
         autoPublishDryRun: false,
         autoPublishRequireConfirmation: true,
+        githubLabels: [
+          { id: 1, name: 'bug', color: 'd73a4a', description: 'Something is broken' },
+          { id: 2, name: 'ready-for-agent', color: '0e8a16', description: null }
+        ],
+        githubLabelsSyncedAt: '2026-05-11T00:00:00.000Z',
         createdAt: '2026-05-08T00:00:00.000Z',
         updatedAt: '2026-05-08T00:00:00.000Z'
       },
@@ -78,6 +84,36 @@ describe('issue generation', () => {
     expect(prompt).toContain('parent issue with checklist subtasks')
     expect(prompt).toContain('Return structured JSON only')
     expect(prompt).toContain('Mark vague notes as needing clarification.')
+    expect(prompt).toContain('Prefer exact label names from the cached GitHub label vocabulary')
+    expect(prompt).toContain('- bug: Something is broken')
+    expect(prompt).toContain('- ready-for-agent')
+  })
+
+  it('lazily hydrates empty migrated repo label caches before generation', async () => {
+    const db = createInMemoryDatabase()
+    runMigrations(db)
+    const repo = createRepo(db, {
+      owner: 'nick-neely',
+      name: 'pilog',
+      localPath: '/workspace/pilog',
+      githubUrl: 'https://github.com/nick-neely/pilog',
+      defaultBranch: 'main'
+    })
+    const listLabels = vi.fn().mockResolvedValue([
+      { id: 1, name: 'bug', color: 'd73a4a', description: 'Something is broken' }
+    ])
+
+    const hydrated = await hydrateRepoLabelsIfNeeded(db, repo, listLabels)
+
+    expect(listLabels).toHaveBeenCalledWith('nick-neely', 'pilog')
+    expect(hydrated.githubLabels).toEqual([
+      { id: 1, name: 'bug', color: 'd73a4a', description: 'Something is broken' }
+    ])
+    expect(hydrated.githubLabelsSyncedAt).toBeDefined()
+
+    const persisted = await hydrateRepoLabelsIfNeeded(db, hydrated, listLabels)
+    expect(persisted.githubLabels).toEqual(hydrated.githubLabels)
+    expect(listLabels).toHaveBeenCalledTimes(1)
   })
 
   it('persists final drafts and finalizes the run in one transaction', () => {

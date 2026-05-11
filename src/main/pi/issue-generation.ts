@@ -1,5 +1,5 @@
 import type { AgentTool } from '@earendil-works/pi-agent-core'
-import type { Note, Repo } from '@shared/ipc'
+import type { GitHubLabel, Note, Repo } from '@shared/ipc'
 import type { AutoPublishPreviewSummary, SearchProvider } from '@shared/types'
 import type { RepoLabelLike } from '@shared/labels'
 import { matchLabelsToRepoLabels } from '@shared/labels'
@@ -12,7 +12,7 @@ import {
 import { and, eq, inArray } from 'drizzle-orm'
 import type { PilogDatabase } from '../db/client'
 import { formatIssueDraftBody } from '../db/repositories/issue-drafts'
-import { getRepoById } from '../db/repositories/repos'
+import { getRepoById, updateRepoGithubLabels } from '../db/repositories/repos'
 import { agentRuns, issueDrafts, notes } from '../db/schema'
 import { resolveDefaultIssueTemplate } from '../github/issue-templates'
 
@@ -35,6 +35,7 @@ export type AutoPublishPreviewPlan = {
 }
 
 export function buildIssueGenerationPrompt(input: { repo: Repo; notes: Note[] }): string {
+  const labelBlock = formatRepoLabelVocabulary(input.repo.githubLabels)
   const noteBlock = input.notes
     .map((note, index) => {
       return [
@@ -63,6 +64,7 @@ export function buildIssueGenerationPrompt(input: { repo: Repo; notes: Note[] })
     'Prefer concrete acceptance criteria.',
     'Avoid overclaiming certainty.',
     'Use repo context when available.',
+    'Prefer exact label names from the cached GitHub label vocabulary when they fit, but you may suggest other labels when none of the cached labels apply.',
     'Include concise rationale, not hidden reasoning.',
     'Mark vague notes as needing clarification.',
     'Return structured JSON only by calling submit_issue_drafts with data matching the provided schema; do not emit prose outside the tool call.',
@@ -72,10 +74,45 @@ export function buildIssueGenerationPrompt(input: { repo: Repo; notes: Note[] })
     `name: ${input.repo.name}`,
     `localPath: ${input.repo.localPath}`,
     `defaultBranch: ${input.repo.defaultBranch ?? '(unknown)'}`,
+    `githubLabelsSyncedAt: ${input.repo.githubLabelsSyncedAt ?? '(never)'}`,
+    '',
+    'Cached GitHub label vocabulary:',
+    labelBlock,
     '',
     'Selected notes:',
     noteBlock
   ].join('\n')
+}
+
+export async function hydrateRepoLabelsIfNeeded(
+  db: PilogDatabase,
+  repo: Repo,
+  listRepoLabels: (owner: string, repo: string) => Promise<GitHubLabel[]>
+): Promise<Repo> {
+  if (repo.githubLabels.length > 0 || repo.githubLabelsSyncedAt) return repo
+
+  try {
+    const labels = await listRepoLabels(repo.owner, repo.name)
+    return (
+      updateRepoGithubLabels(db, repo.id, {
+        githubLabels: labels,
+        githubLabelsSyncedAt: new Date().toISOString()
+      }) ?? repo
+    )
+  } catch {
+    return repo
+  }
+}
+
+function formatRepoLabelVocabulary(labels: GitHubLabel[]): string {
+  if (labels.length === 0) return '(no cached GitHub labels)'
+
+  return labels
+    .map((label) => {
+      const description = label.description?.trim()
+      return description ? `- ${label.name}: ${description}` : `- ${label.name}`
+    })
+    .join('\n')
 }
 
 export function createSubmitIssueDraftsTool(

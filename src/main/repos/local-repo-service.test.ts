@@ -12,7 +12,8 @@ vi.mock('./git', () => ({
 
 vi.mock('../github/client', () => ({
   getOctokitClient: vi.fn(),
-  listRepos: vi.fn()
+  listRepos: vi.fn(),
+  listLabels: vi.fn()
 }))
 
 const mockGitHubRepo: GitHubRepo = {
@@ -34,6 +35,7 @@ describe('local-repo-service', () => {
   let clientMock: {
     getOctokitClient: ReturnType<typeof vi.fn>
     listRepos: ReturnType<typeof vi.fn>
+    listLabels: ReturnType<typeof vi.fn>
   }
   let service: typeof import('./local-repo-service')
 
@@ -146,8 +148,14 @@ describe('local-repo-service', () => {
   })
 
   describe('linkRepo', () => {
-    it('persists a repo row and returns the Repo', () => {
-      const repo = service.linkRepo(db, {
+    it('persists a repo row with GitHub labels and returns the Repo', async () => {
+      clientMock.getOctokitClient.mockReturnValue({})
+      clientMock.listLabels.mockResolvedValue([
+        { id: 1, name: 'bug', color: 'd73a4a', description: 'Something is broken' },
+        { id: 2, name: 'ready-for-agent', color: '0e8a16', description: null }
+      ])
+
+      const repo = await service.linkRepo(db, {
         localPath: '/projects/pilog',
         githubRepo: mockGitHubRepo,
         defaultBranch: 'main'
@@ -159,10 +167,19 @@ describe('local-repo-service', () => {
       expect(repo.localPath).toBe('/projects/pilog')
       expect(repo.githubUrl).toBe('https://github.com/nick-neely/pilog')
       expect(repo.defaultBranch).toBe('main')
+      expect(repo.githubLabels).toEqual([
+        { id: 1, name: 'bug', color: 'd73a4a', description: 'Something is broken' },
+        { id: 2, name: 'ready-for-agent', color: '0e8a16', description: null }
+      ])
+      expect(repo.githubLabelsSyncedAt).toBeDefined()
+      expect(clientMock.listLabels).toHaveBeenCalledWith('nick-neely', 'pilog')
     })
 
-    it('is the only path that writes to the repos table', () => {
-      service.linkRepo(db, {
+    it('is the only path that writes to the repos table', async () => {
+      clientMock.getOctokitClient.mockReturnValue({})
+      clientMock.listLabels.mockResolvedValue([])
+
+      await service.linkRepo(db, {
         localPath: '/projects/pilog',
         githubRepo: mockGitHubRepo,
         defaultBranch: 'main'

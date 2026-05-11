@@ -33,12 +33,13 @@ import {
 import {
   getCurrentInboxNotesForGeneration,
   getSelectedNotesForGeneration,
+  hydrateRepoLabelsIfNeeded,
   planAutoPublishPreviewDrafts,
   persistGeneratedIssueDrafts,
   type RunAgent
 } from '../pi/issue-generation'
 import { runAgent } from '../pi/runtime'
-import { listLabels } from '../github/client'
+import { getOctokitClient, listLabels } from '../github/client'
 import { matchLabelsToRepoLabels } from '@shared/labels'
 
 type ActiveRun = {
@@ -63,7 +64,10 @@ async function prepareAgentEventForMode(
     return agentEvent
   }
 
-  const repoLabels = await listRepoLabels(repo.owner, repo.name).catch(() => [])
+  const repoLabels =
+    repo.githubLabels.length > 0
+      ? repo.githubLabels
+      : await listRepoLabels(repo.owner, repo.name).catch(() => [])
   if (mode !== 'auto-publish-preview') {
     const drafts = agentEvent.drafts.map((draft) => {
       const labelMatches = matchLabelsToRepoLabels(draft.suggestedLabels, repoLabels)
@@ -105,7 +109,8 @@ export function registerPiIpcHandlers(
     event: IpcMainInvokeEvent,
     input: { repo: Repo; notes: Note[]; mode: GenerateDraftsMode }
   ): Promise<IpcResponse<'pi:generateDrafts:start'>> => {
-    const { repo, notes, mode } = input
+    const { notes, mode } = input
+    let repo = input.repo
     if (!existsSync(repo.localPath)) throw new Error('The linked repository path no longer exists.')
     if (mode === 'auto-publish-preview' && !repo.autoPublishEnabled) {
       throw new Error('Auto-publish is not enabled for this repository.')
@@ -119,6 +124,10 @@ export function registerPiIpcHandlers(
     const authStorage = await createSafeStorageAuthStorage()
     if (!authStorage.hasAuth(provider))
       throw new Error('Configure Pi credentials before generating drafts.')
+
+    if (getOctokitClient()) {
+      repo = await hydrateRepoLabelsIfNeeded(db, repo, listLabelsImpl)
+    }
 
     const run = createAgentRun(db, {
       repoId: repo.id,

@@ -19,7 +19,7 @@ export function registerRepoIpcHandlers(db: PilogDatabase): void {
     return detectLocalRepo(request.localPath)
   })
 
-  ipcMain.handle('repos:link', (_event, request: LinkRepoRequest) => {
+  ipcMain.handle('repos:link', async (_event, request: LinkRepoRequest) => {
     return linkRepo(db, request)
   })
 

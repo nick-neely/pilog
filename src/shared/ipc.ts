@@ -85,6 +85,8 @@ export type Repo = {
   localPath: string
   githubUrl: string | null
   defaultBranch: string | null
+  githubLabels: GitHubLabel[]
+  githubLabelsSyncedAt: string | null
   autoPublishEnabled: boolean
   autoPublishMaxIssuesPerRun: number
   autoPublishDefaultLabel: string

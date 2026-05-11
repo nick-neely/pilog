@@ -19,6 +19,8 @@ export const repos = sqliteTable('repos', {
   localPath: text('local_path').notNull(),
   githubUrl: text('github_url'),
   defaultBranch: text('default_branch'),
+  githubLabels: text('github_labels').notNull().default('[]'),
+  githubLabelsSyncedAt: text('github_labels_synced_at'),
   autoPublishEnabled: integer('auto_publish_enabled', { mode: 'boolean' }).notNull().default(false),
   autoPublishMaxIssuesPerRun: integer('auto_publish_max_issues_per_run').notNull().default(5),
   autoPublishDefaultLabel: text('auto_publish_default_label').notNull().default('triaged-by-pilog'),
