@@ -72,6 +72,11 @@ import {
   type OnboardingSignals,
   type OnboardingStepId
 } from '@shared/onboarding'
+import {
+  DEFAULT_GLOBAL_CAPTURE_SHORTCUT,
+  formatShortcutForDisplay,
+  getShortcutDisplayPlatform
+} from '@shared/shortcuts'
 import type {
   AutoPublishPreviewSummary,
   AutoPublishPublishReport,
@@ -341,16 +346,6 @@ const ONBOARDING_STEP_DESCRIPTIONS: Record<OnboardingStepId, string> = {
     'Review the generated draft, edit if needed, and publish it as a GitHub issue when you are ready.'
 }
 
-function formatHotkeyForDisplay(accelerator: string | null): string | null {
-  if (!accelerator) return null
-  return accelerator
-    .replace(/CmdOrCtrl/g, 'Ctrl')
-    .replace(/CommandOrControl/g, 'Ctrl')
-    .replace(/Alt/g, 'Alt')
-    .replace(/Shift/g, 'Shift')
-    .replace(/\+/g, ' + ')
-}
-
 function OnboardingPanel({
   state,
   step: currentStep,
@@ -439,9 +434,12 @@ function OnboardingPanel({
     onContinue: handleContinue
   })
 
-  const isMac = typeof navigator !== 'undefined' && navigator.platform.toUpperCase().includes('MAC')
-  const metaKey = isMac ? '⌘' : 'Ctrl'
-  const displayHotkey = formatHotkeyForDisplay(hotkey) || `${metaKey} + Alt + N`
+  const shortcutPlatform =
+    typeof navigator === 'undefined' ? 'linux' : getShortcutDisplayPlatform(navigator.platform)
+  const displayHotkey = formatShortcutForDisplay(
+    hotkey || DEFAULT_GLOBAL_CAPTURE_SHORTCUT,
+    shortcutPlatform
+  )
   const noteReady = noteDraft.trim().length > 0
   const generationRunning = displayedStep === 'draft' && working
   const preview = draftPreview ?? getLatestOnboardingDraftPreview(signals.drafts)
@@ -569,7 +567,7 @@ function OnboardingPanel({
                     id="onboarding-hotkey"
                     value={hotkeyDraft}
                     onChange={(event) => onHotkeyChange(event.target.value)}
-                    placeholder="CommandOrControl+Alt+N"
+                    placeholder={DEFAULT_GLOBAL_CAPTURE_SHORTCUT}
                     className="font-mono"
                   />
                   <Button

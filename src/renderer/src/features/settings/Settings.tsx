@@ -65,6 +65,7 @@ import type {
   SearchProvider,
   SettingKey
 } from '@shared/ipc'
+import { DEFAULT_GLOBAL_CAPTURE_SHORTCUT } from '@shared/shortcuts'
 import {
   DEFAULT_TURN_BUDGET,
   MAX_TURN_BUDGET,
@@ -426,7 +427,7 @@ export function Settings({
                         aria-label="Scratchpad hotkey"
                         value={displayValue}
                         onChange={(e) => handleHotkeyChange(e.target.value)}
-                        placeholder="CommandOrControl+Alt+N"
+                        placeholder={DEFAULT_GLOBAL_CAPTURE_SHORTCUT}
                         className="flex-1"
                       />
                       <Button onClick={handleSaveHotkey} disabled={!dirty} size="sm">
