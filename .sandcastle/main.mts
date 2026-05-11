@@ -323,6 +323,7 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
       IMPLEMENTATION_SELECTION_POLICY: useCodex
         ? `Set "implementationModel" to "${CODEX_MODEL}" for every issue (single-model Codex mode).`
         : 'Use "sonnet" by default. Use "opus" only when the issue is architecturally risky, cross-cutting, security-sensitive, likely to touch unfamiliar core abstractions, likely to require a data migration, or explicitly asks for deeper implementation reasoning.',
+      MAX_PARALLEL_ISSUES: String(MAX_PARALLEL_ISSUES),
       PLAN_OUTPUT_EXAMPLE: useCodex
         ? `{"issues": [{"id": "42", "title": "Fix auth bug", "branch": "sandcastle/issue-42-fix-auth-bug", "implementationModel": "${CODEX_MODEL}", "implementationModelReason": "Codex single-model mode for this run."}]}`
         : '{"issues": [{"id": "42", "title": "Fix auth bug", "branch": "sandcastle/issue-42-fix-auth-bug", "implementationModel": "sonnet", "implementationModelReason": "Small localized bug fix."}]}'
