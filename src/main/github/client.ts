@@ -72,13 +72,23 @@ export async function listLabels(owner: string, repo: string): Promise<GitHubLab
   const client = getOctokitClient()
   if (!client) return []
 
-  const { data } = await client.rest.issues.listLabelsForRepo({ owner, repo, per_page: 100 })
-  return data.map((label) => ({
-    id: label.id,
-    name: label.name,
-    color: label.color,
-    description: label.description ?? null
-  }))
+  const labels: GitHubLabel[] = []
+  for await (const response of client.paginate.iterator(client.rest.issues.listLabelsForRepo, {
+    owner,
+    repo,
+    per_page: 100
+  })) {
+    for (const label of response.data) {
+      labels.push({
+        id: label.id,
+        name: label.name,
+        color: label.color,
+        description: label.description ?? null
+      })
+    }
+  }
+
+  return labels
 }
 
 export async function createIssue(

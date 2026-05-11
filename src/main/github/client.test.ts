@@ -34,6 +34,7 @@ const mockLabelsPage = [
   { id: 1, name: 'bug', color: 'ff0000', description: 'Something is broken' },
   { id: 2, name: 'enhancement', color: '00ff00', description: null }
 ]
+let mockLabelPages = [mockLabelsPage]
 
 // Controls for issue mock behavior — closures capture by reference so tests can mutate these
 let mockIssueCreateReject = false
@@ -70,11 +71,19 @@ vi.mock('@octokit/rest', () => {
       }
     }
     paginate = {
-      iterator: vi.fn().mockReturnValue(
-        (async function* () {
+      iterator: vi.fn((endpoint) => {
+        if (endpoint === this.rest.issues.listLabelsForRepo) {
+          return (async function* () {
+            for (const page of mockLabelPages) {
+              yield { data: page }
+            }
+          })()
+        }
+
+        return (async function* () {
           yield { data: mockRepoPage }
         })()
-      )
+      })
     }
   }
   return { Octokit: MockOctokit }
@@ -89,6 +98,7 @@ describe('github client', () => {
     mockIssueCreateReject = false
     mockIssueCreateStatus = 422
     mockIssueCreateMessage = 'Validation Failed'
+    mockLabelPages = [mockLabelsPage]
     const secrets = await import('../security/secrets')
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     secretsStore = (secrets as any).__store
@@ -184,6 +194,37 @@ describe('github client', () => {
       color: '00ff00',
       description: null
     })
+  })
+
+  it('listLabels returns mapped labels across all paginated responses', async () => {
+    mockLabelPages = [
+      mockLabelsPage,
+      [{ id: 101, name: 'ready-for-agent', color: '123456', description: 'Prepared for Codex' }]
+    ]
+    secretsStore.set('github_token', 'gho_abc')
+
+    const labels = await client.listLabels('nick-neely', 'pilog')
+
+    expect(labels).toEqual([
+      {
+        id: 1,
+        name: 'bug',
+        color: 'ff0000',
+        description: 'Something is broken'
+      },
+      {
+        id: 2,
+        name: 'enhancement',
+        color: '00ff00',
+        description: null
+      },
+      {
+        id: 101,
+        name: 'ready-for-agent',
+        color: '123456',
+        description: 'Prepared for Codex'
+      }
+    ])
   })
 
   // createIssue tests
