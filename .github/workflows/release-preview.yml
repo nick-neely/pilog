@@ -1,0 +1,224 @@
+name: Release — Preview
+
+# Triggered by an explicit vX.Y.Z-preview.N tag push or a manual re-trigger.
+# Preview releases are published as GitHub pre-releases and feed the preview
+# update channel (preview.yml), keeping stable installs unaffected.
+#
+# Preview artifact names embed "-preview" before the extension so stable and
+# preview assets coexist in the GitHub Release asset list without collision.
+
+on:
+  push:
+    tags:
+      - 'v[0-9]*.[0-9]*.[0-9]*-preview*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag (e.g. v1.2.3-preview.4) — must already exist in the repo'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+# Prevent concurrent preview releases; never cancel an in-flight release.
+concurrency:
+  group: release-preview
+  cancel-in-progress: false
+
+jobs:
+  # ── Stage 1: Validate the tag format ──────────────────────────────────────
+  validate:
+    name: Validate tag
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.resolve.outputs.tag }}
+      version: ${{ steps.resolve.outputs.version }}
+    steps:
+      - name: Resolve and validate preview tag
+        id: resolve
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "push" ]]; then
+            TAG="${GITHUB_REF_NAME}"
+          else
+            TAG="${{ inputs.tag }}"
+          fi
+
+          # Preview tags must contain -preview.
+          if [[ "$TAG" != *-preview* ]]; then
+            echo "::error::Tag '$TAG' is not a preview tag. Use the Release — Stable workflow instead."
+            exit 1
+          fi
+
+          # Preview tags must match vX.Y.Z-preview.N exactly.
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-preview\.[0-9]+$ ]]; then
+            echo "::error::Tag '$TAG' does not match preview format vX.Y.Z-preview.N (e.g. v1.2.3-preview.4)."
+            exit 1
+          fi
+
+          VERSION="${TAG#v}"
+          echo "tag=$TAG"       >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Preview release: $TAG (version $VERSION)"
+
+  # ── Stage 2: Verify — typecheck + tests ───────────────────────────────────
+  verify:
+    name: Typecheck & Test
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validate.outputs.tag }}
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+        env:
+          # Skip the Electron native-module rebuild — not needed for typecheck/test.
+          PILOG_SANDBOX: '1'
+
+      - name: Typecheck
+        run: pnpm run typecheck
+
+      - name: Test
+        run: pnpm run test
+
+  # ── Stage 3: Build & Publish — macOS ──────────────────────────────────────
+  build-mac:
+    name: Build & Publish — macOS
+    needs: [validate, verify]
+    runs-on: macos-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validate.outputs.tag }}
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build app
+        run: pnpm exec electron-vite build
+
+      - name: Publish macOS preview artifacts
+        # Uses electron-builder.preview.yml: channel=preview, releaseType=prerelease.
+        # Uploads Pilog-X.Y.Z-preview.dmg, Pilog-X.Y.Z-preview-mac.zip, and preview-mac.yml.
+        run: pnpm exec electron-builder --mac --config electron-builder.preview.yml --publish always
+
+      - name: Generate checksums
+        run: pnpm run build:checksums
+
+      - name: Upload checksums to release
+        shell: bash
+        run: |
+          TAG="${{ needs.validate.outputs.tag }}"
+          find dist -maxdepth 1 -name "*.sha256" | while read -r f; do
+            gh release upload "$TAG" "$f" --clobber
+          done
+          if [[ -f dist/checksums.txt ]]; then
+            cp dist/checksums.txt dist/checksums-preview-mac.txt
+            gh release upload "$TAG" dist/checksums-preview-mac.txt --clobber
+          fi
+
+  # ── Stage 3: Build & Publish — Windows ────────────────────────────────────
+  build-win:
+    name: Build & Publish — Windows
+    needs: [validate, verify]
+    runs-on: windows-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validate.outputs.tag }}
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build app
+        run: pnpm exec electron-vite build
+
+      - name: Publish Windows preview artifacts
+        # Uploads Pilog-X.Y.Z-preview-Setup.exe and preview.yml updater metadata.
+        run: pnpm exec electron-builder --win --config electron-builder.preview.yml --publish always
+
+      - name: Generate checksums
+        run: pnpm run build:checksums
+
+      - name: Upload checksums to release
+        shell: bash
+        run: |
+          TAG="${{ needs.validate.outputs.tag }}"
+          find dist -maxdepth 1 -name "*.sha256" | while read -r f; do
+            gh release upload "$TAG" "$f" --clobber
+          done
+          if [[ -f dist/checksums.txt ]]; then
+            cp dist/checksums.txt dist/checksums-preview-win.txt
+            gh release upload "$TAG" dist/checksums-preview-win.txt --clobber
+          fi
+
+  # ── Stage 3: Build & Publish — Linux ──────────────────────────────────────
+  build-linux:
+    name: Build & Publish — Linux
+    needs: [validate, verify]
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validate.outputs.tag }}
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build app
+        run: pnpm exec electron-vite build
+
+      - name: Publish Linux preview artifacts
+        # Uploads Pilog-X.Y.Z-preview.AppImage, .deb, .snap and preview-linux.yml.
+        run: pnpm exec electron-builder --linux --config electron-builder.preview.yml --publish always
+
+      - name: Generate checksums
+        run: pnpm run build:checksums
+
+      - name: Upload checksums to release
+        run: |
+          TAG="${{ needs.validate.outputs.tag }}"
+          find dist -maxdepth 1 -name "*.sha256" | while read -r f; do
+            gh release upload "$TAG" "$f" --clobber
+          done
+          if [[ -f dist/checksums.txt ]]; then
+            cp dist/checksums.txt dist/checksums-preview-linux.txt
+            gh release upload "$TAG" dist/checksums-preview-linux.txt --clobber
+          fi

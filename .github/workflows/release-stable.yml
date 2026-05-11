@@ -1,0 +1,225 @@
+name: Release — Stable
+
+# Triggered by an explicit vX.Y.Z tag push or a manual re-trigger for an existing tag.
+# Never triggers on ordinary branch pushes or pull requests.
+#
+# IMPORTANT: this workflow also fires when a preview tag (vX.Y.Z-preview.N) is pushed
+# because GitHub Actions glob patterns cannot express negation. The validate job rejects
+# preview tags immediately with a clear error so the preview release workflow can handle them.
+
+on:
+  push:
+    tags:
+      - 'v[0-9]*.[0-9]*.[0-9]*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag (e.g. v1.2.3) — must already exist in the repo'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+# Prevent concurrent stable releases; never cancel an in-flight release.
+concurrency:
+  group: release-stable
+  cancel-in-progress: false
+
+jobs:
+  # ── Stage 1: Validate the tag format ──────────────────────────────────────
+  validate:
+    name: Validate tag
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.resolve.outputs.tag }}
+      version: ${{ steps.resolve.outputs.version }}
+    steps:
+      - name: Resolve and validate stable tag
+        id: resolve
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "push" ]]; then
+            TAG="${GITHUB_REF_NAME}"
+          else
+            TAG="${{ inputs.tag }}"
+          fi
+
+          # Reject preview tags — use the release-preview workflow instead.
+          if [[ "$TAG" == *-preview* ]]; then
+            echo "::error::Tag '$TAG' is a preview tag. Use the Release — Preview workflow instead."
+            exit 1
+          fi
+
+          # Stable tags must match vX.Y.Z exactly (no pre-release suffix).
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Tag '$TAG' does not match the stable format vX.Y.Z (e.g. v1.2.3)."
+            exit 1
+          fi
+
+          VERSION="${TAG#v}"
+          echo "tag=$TAG"       >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Stable release: $TAG (version $VERSION)"
+
+  # ── Stage 2: Verify — typecheck + tests ───────────────────────────────────
+  verify:
+    name: Typecheck & Test
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validate.outputs.tag }}
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+        env:
+          # Skip the Electron native-module rebuild — not needed for typecheck/test.
+          PILOG_SANDBOX: '1'
+
+      - name: Typecheck
+        run: pnpm run typecheck
+
+      - name: Test
+        run: pnpm run test
+
+  # ── Stage 3: Build & Publish — macOS ──────────────────────────────────────
+  build-mac:
+    name: Build & Publish — macOS
+    needs: [validate, verify]
+    runs-on: macos-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validate.outputs.tag }}
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        # Postinstall runs app:rebuild for better-sqlite3 against the current Electron.
+        run: pnpm install --frozen-lockfile
+
+      - name: Build app
+        run: pnpm exec electron-vite build
+
+      - name: Publish macOS artifacts
+        # electron-builder creates/finds the GitHub Release for this tag and uploads
+        # the DMG, mac.zip, and latest-mac.yml updater metadata.
+        run: pnpm exec electron-builder --mac --publish always
+
+      - name: Generate checksums
+        run: pnpm run build:checksums
+
+      - name: Upload checksums to release
+        shell: bash
+        run: |
+          TAG="${{ needs.validate.outputs.tag }}"
+          find dist -maxdepth 1 -name "*.sha256" | while read -r f; do
+            gh release upload "$TAG" "$f" --clobber
+          done
+          if [[ -f dist/checksums.txt ]]; then
+            cp dist/checksums.txt dist/checksums-mac.txt
+            gh release upload "$TAG" dist/checksums-mac.txt --clobber
+          fi
+
+  # ── Stage 3: Build & Publish — Windows ────────────────────────────────────
+  build-win:
+    name: Build & Publish — Windows
+    needs: [validate, verify]
+    runs-on: windows-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validate.outputs.tag }}
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build app
+        run: pnpm exec electron-vite build
+
+      - name: Publish Windows artifacts
+        # Uploads the NSIS installer (Setup.exe) and latest.yml updater metadata.
+        run: pnpm exec electron-builder --win --publish always
+
+      - name: Generate checksums
+        run: pnpm run build:checksums
+
+      - name: Upload checksums to release
+        shell: bash
+        run: |
+          TAG="${{ needs.validate.outputs.tag }}"
+          find dist -maxdepth 1 -name "*.sha256" | while read -r f; do
+            gh release upload "$TAG" "$f" --clobber
+          done
+          if [[ -f dist/checksums.txt ]]; then
+            cp dist/checksums.txt dist/checksums-win.txt
+            gh release upload "$TAG" dist/checksums-win.txt --clobber
+          fi
+
+  # ── Stage 3: Build & Publish — Linux ──────────────────────────────────────
+  build-linux:
+    name: Build & Publish — Linux
+    needs: [validate, verify]
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validate.outputs.tag }}
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build app
+        run: pnpm exec electron-vite build
+
+      - name: Publish Linux artifacts
+        # Uploads AppImage, deb, snap and latest-linux.yml updater metadata.
+        run: pnpm exec electron-builder --linux --publish always
+
+      - name: Generate checksums
+        run: pnpm run build:checksums
+
+      - name: Upload checksums to release
+        run: |
+          TAG="${{ needs.validate.outputs.tag }}"
+          find dist -maxdepth 1 -name "*.sha256" | while read -r f; do
+            gh release upload "$TAG" "$f" --clobber
+          done
+          if [[ -f dist/checksums.txt ]]; then
+            cp dist/checksums.txt dist/checksums-linux.txt
+            gh release upload "$TAG" dist/checksums-linux.txt --clobber
+          fi
