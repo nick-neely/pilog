@@ -52,16 +52,7 @@ export async function listRepos(): Promise<GitHubRepo[]> {
     client.rest.repos.listForAuthenticatedUser,
     { per_page: 100, affiliation: 'owner,collaborator,organization_member' }
   )) {
-    for (const repo of response.data) {
-      repos.push({
-        id: repo.id,
-        name: repo.name,
-        owner: repo.owner.login,
-        fullName: repo.full_name,
-        url: repo.html_url,
-        defaultBranch: repo.default_branch
-      })
-    }
+    repos.push(...response.data.map(mapGitHubRepo))
   }
 
   cachedRepos = repos
@@ -78,17 +69,42 @@ export async function listLabels(owner: string, repo: string): Promise<GitHubLab
     repo,
     per_page: 100
   })) {
-    for (const label of response.data) {
-      labels.push({
-        id: label.id,
-        name: label.name,
-        color: label.color,
-        description: label.description ?? null
-      })
-    }
+    labels.push(...response.data.map(mapGitHubLabel))
   }
 
   return labels
+}
+
+function mapGitHubRepo(repo: {
+  id: number
+  name: string
+  owner: { login: string }
+  full_name: string
+  html_url: string
+  default_branch: string
+}): GitHubRepo {
+  return {
+    id: repo.id,
+    name: repo.name,
+    owner: repo.owner.login,
+    fullName: repo.full_name,
+    url: repo.html_url,
+    defaultBranch: repo.default_branch
+  }
+}
+
+function mapGitHubLabel(label: {
+  id: number
+  name: string
+  color: string
+  description?: string | null
+}): GitHubLabel {
+  return {
+    id: label.id,
+    name: label.name,
+    color: label.color,
+    description: label.description ?? null
+  }
 }
 
 export async function createIssue(
