@@ -23,6 +23,7 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
         env:
+          # Skip the Electron native-module rebuild — not needed for typecheck/test.
           PILOG_SANDBOX: '1'
 
       - name: Typecheck

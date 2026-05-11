@@ -38,11 +38,13 @@ jobs:
       - name: Resolve and validate preview tag
         id: resolve
         shell: bash
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
         run: |
-          if [[ "${{ github.event_name }}" == "push" ]]; then
+          if [[ "$GITHUB_EVENT_NAME" == "push" ]]; then
             TAG="${GITHUB_REF_NAME}"
           else
-            TAG="${{ inputs.tag }}"
+            TAG="${INPUT_TAG}"
           fi
 
           # Preview tags must contain -preview.
@@ -126,8 +128,9 @@ jobs:
 
       - name: Upload checksums to release
         shell: bash
+        env:
+          TAG: ${{ needs.validate.outputs.tag }}
         run: |
-          TAG="${{ needs.validate.outputs.tag }}"
           find dist -maxdepth 1 -name "*.sha256" | while read -r f; do
             gh release upload "$TAG" "$f" --clobber
           done
@@ -170,8 +173,9 @@ jobs:
 
       - name: Upload checksums to release
         shell: bash
+        env:
+          TAG: ${{ needs.validate.outputs.tag }}
         run: |
-          TAG="${{ needs.validate.outputs.tag }}"
           find dist -maxdepth 1 -name "*.sha256" | while read -r f; do
             gh release upload "$TAG" "$f" --clobber
           done
@@ -213,8 +217,10 @@ jobs:
         run: pnpm run build:checksums
 
       - name: Upload checksums to release
+        shell: bash
+        env:
+          TAG: ${{ needs.validate.outputs.tag }}
         run: |
-          TAG="${{ needs.validate.outputs.tag }}"
           find dist -maxdepth 1 -name "*.sha256" | while read -r f; do
             gh release upload "$TAG" "$f" --clobber
           done
