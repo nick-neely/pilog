@@ -42,10 +42,7 @@ const drafts: Draft[] = [
  */
 export function Transformation() {
   return (
-    <section
-      aria-labelledby="transformation-title"
-      className="border-border/60 border-t"
-    >
+    <section aria-labelledby="transformation-title" className="border-border/60 border-t">
       <div className="mx-auto max-w-6xl px-6 py-20 md:py-28">
         <div className="grid grid-cols-1 gap-12 md:grid-cols-12 md:gap-10">
           <header className="md:col-span-12 md:mb-2">
@@ -90,10 +87,7 @@ export function Transformation() {
             <p className="text-muted-foreground mb-4 font-mono text-xs">what Pilog drafts</p>
             <div className="space-y-5">
               {drafts.map((d) => (
-                <article
-                  key={d.title}
-                  className="border-border bg-popover rounded-xl border p-5"
-                >
+                <article key={d.title} className="border-border bg-popover rounded-xl border p-5">
                   <div className="mb-2 flex flex-wrap items-center gap-2">
                     <Badge variant="secondary" className="font-mono">
                       issue draft

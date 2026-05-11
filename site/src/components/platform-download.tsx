@@ -28,7 +28,11 @@ function PrimaryCTA({ release }: { release: PlatformRelease }) {
       <p className="text-muted-foreground mt-2 text-sm">
         {firstArtifact.label ?? firstArtifact.fileName}
         {release.artifacts.length > 1 && (
-          <> &mdash; {release.artifacts.length - 1} other format{release.artifacts.length > 2 ? 's' : ''} available below</>
+          <>
+            {' '}
+            &mdash; {release.artifacts.length - 1} other format
+            {release.artifacts.length > 2 ? 's' : ''} available below
+          </>
         )}
       </p>
     </div>
@@ -84,9 +88,7 @@ export function PlatformDownload({ channel }: { channel: ReleaseChannel }) {
             <PlatformSection key={p.platform} release={p} />
           ))}
           {primaries.length === 0 && (
-            <p className="text-muted-foreground text-sm italic">
-              No downloads available yet.
-            </p>
+            <p className="text-muted-foreground text-sm italic">No downloads available yet.</p>
           )}
         </div>
       )}

@@ -4,6 +4,8 @@ import { Bento } from '@/components/landing/bento'
 import { KeyboardFirst } from '@/components/landing/keyboard'
 import { Principles } from '@/components/landing/principles'
 import { Closing } from '@/components/landing/closing'
+import { modKeyLabel } from '@/lib/platform'
+import { getServerDetectedPlatform } from '@/lib/server-detected-platform'
 
 /**
  * pilog.dev — the brand surface. The Electron app is the product; this page
@@ -13,15 +15,18 @@ import { Closing } from '@/components/landing/closing'
  * @pilog/ui share a single source of truth with the Electron renderer
  * (see packages/ui/README.md).
  */
-export default function LandingPage() {
+export default async function LandingPage() {
+  const platform = await getServerDetectedPlatform()
+  const modKey = modKeyLabel(platform)
+
   return (
     <>
-      <Hero />
+      <Hero modKey={modKey} />
       <Transformation />
-      <Bento />
-      <KeyboardFirst />
+      <Bento modKey={modKey} />
+      <KeyboardFirst modKey={modKey} />
       <Principles />
-      <Closing />
+      <Closing modKey={modKey} />
     </>
   )
 }

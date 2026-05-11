@@ -232,8 +232,8 @@ Linux is explicitly out of scope for the first-class signed-download path. If Li
 
 ## Signing / Notarization Status Reference
 
-| Platform | Current state | Required for Public V1 Download | Tracked by |
-|----------|--------------|----------------------------------|------------|
+| Platform | Current state | Required for Public V1 Download  | Tracked by |
+| -------- | ------------- | -------------------------------- | ---------- |
 | macOS    | Unsigned      | Signing + notarization required  | #57        |
 | Windows  | Unsigned      | Code signing required            | #58        |
 | Linux    | Unsigned      | Not required (V1 secondary path) | —          |

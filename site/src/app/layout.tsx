@@ -5,7 +5,7 @@ import { SiteFooter } from '@/components/site-footer'
 
 export const metadata: Metadata = {
   title: {
-    default: "Pilog — Capture before you forget, triage when you’re ready",
+    default: 'Pilog — Capture before you forget, triage when you’re ready',
     template: '%s — Pilog'
   },
   description:

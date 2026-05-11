@@ -2,6 +2,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { Button } from '@pilog/ui/button'
 import { Kbd, KbdGroup } from '@pilog/ui/kbd'
+import type { SiteModKeyGlyph } from '@/lib/platform'
 
 /**
  * Closing — a single Source Serif 4 line at hero scale, with a faint Pi-mark
@@ -9,7 +10,7 @@ import { Kbd, KbdGroup } from '@pilog/ui/kbd'
  * second accent, no marquee, no horizon-line illustration. The page resolves
  * the way the product resolves: a written-down thought, then a clean exit.
  */
-export function Closing() {
+export function Closing({ modKey }: { modKey: SiteModKeyGlyph }) {
   return (
     <section
       aria-labelledby="closing-title"
@@ -48,12 +49,10 @@ export function Closing() {
           >
             See it on GitHub →
           </Link>
-          <span
-            className="text-muted-foreground ml-auto hidden items-center gap-2 font-mono text-xs md:inline-flex"
-          >
+          <span className="text-muted-foreground ml-auto hidden items-center gap-2 font-mono text-xs md:inline-flex">
             installed?
             <KbdGroup>
-              <Kbd>⌘</Kbd>
+              <Kbd>{modKey}</Kbd>
               <Kbd>⇧</Kbd>
               <Kbd>Space</Kbd>
             </KbdGroup>

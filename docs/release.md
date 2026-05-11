@@ -10,10 +10,10 @@ This is per ADR-0006: GitHub Releases are the V1 canonical release/update source
 
 ## Channels
 
-| Channel | Tag format | GitHub Release type | Updater metadata file |
-|---------|-----------|---------------------|-----------------------|
-| Stable  | `vX.Y.Z`  | Release (non-draft) | `latest.yml` / `latest-mac.yml` / `latest-linux.yml` |
-| Preview | `vX.Y.Z-preview.N` | Pre-release | `preview.yml` / `preview-mac.yml` / `preview-linux.yml` |
+| Channel | Tag format         | GitHub Release type | Updater metadata file                                   |
+| ------- | ------------------ | ------------------- | ------------------------------------------------------- |
+| Stable  | `vX.Y.Z`           | Release (non-draft) | `latest.yml` / `latest-mac.yml` / `latest-linux.yml`    |
+| Preview | `vX.Y.Z-preview.N` | Pre-release         | `preview.yml` / `preview-mac.yml` / `preview-linux.yml` |
 
 Stable and preview artifacts coexist in GitHub Releases without collision because preview artifact names embed `-preview` before the extension (e.g. `Pilog-1.2.3-preview.dmg` vs `Pilog-1.2.3.dmg`).
 
@@ -75,19 +75,19 @@ GitHub → Actions → **Release — Preview** → Run workflow → enter the ex
 
 ## Required secrets
 
-| Secret | Used for | Status |
-|--------|---------|--------|
-| `GITHUB_TOKEN` | Creating/updating GitHub Releases, uploading assets | Automatically provided — no setup needed |
-| `VERCEL_TOKEN` | Authenticating Vercel CLI for site deployments | Must be added — see Vercel setup below |
-| `VERCEL_ORG_ID` | Vercel team/org that owns the `pilog.dev` project | Must be added — see Vercel setup below |
-| `VERCEL_PROJECT_ID` | Vercel project ID for `pilog.dev` | Must be added — see Vercel setup below |
-| `CSC_LINK` | macOS code-signing certificate (base64-encoded p12) | Pending — tracked by #45 |
-| `CSC_KEY_PASSWORD` | macOS signing certificate password | Pending — tracked by #45 |
-| `WIN_CSC_LINK` | Windows code-signing certificate | Pending — tracked by #45 |
-| `WIN_CSC_KEY_PASSWORD` | Windows signing certificate password | Pending — tracked by #45 |
-| `APPLE_ID` | macOS notarization Apple ID | Pending — tracked by #45 |
-| `APPLE_APP_SPECIFIC_PASSWORD` | macOS notarization app-specific password | Pending — tracked by #45 |
-| `APPLE_TEAM_ID` | macOS notarization team ID | Pending — tracked by #45 |
+| Secret                        | Used for                                            | Status                                   |
+| ----------------------------- | --------------------------------------------------- | ---------------------------------------- |
+| `GITHUB_TOKEN`                | Creating/updating GitHub Releases, uploading assets | Automatically provided — no setup needed |
+| `VERCEL_TOKEN`                | Authenticating Vercel CLI for site deployments      | Must be added — see Vercel setup below   |
+| `VERCEL_ORG_ID`               | Vercel team/org that owns the `pilog.dev` project   | Must be added — see Vercel setup below   |
+| `VERCEL_PROJECT_ID`           | Vercel project ID for `pilog.dev`                   | Must be added — see Vercel setup below   |
+| `CSC_LINK`                    | macOS code-signing certificate (base64-encoded p12) | Pending — tracked by #45                 |
+| `CSC_KEY_PASSWORD`            | macOS signing certificate password                  | Pending — tracked by #45                 |
+| `WIN_CSC_LINK`                | Windows code-signing certificate                    | Pending — tracked by #45                 |
+| `WIN_CSC_KEY_PASSWORD`        | Windows signing certificate password                | Pending — tracked by #45                 |
+| `APPLE_ID`                    | macOS notarization Apple ID                         | Pending — tracked by #45                 |
+| `APPLE_APP_SPECIFIC_PASSWORD` | macOS notarization app-specific password            | Pending — tracked by #45                 |
+| `APPLE_TEAM_ID`               | macOS notarization team ID                          | Pending — tracked by #45                 |
 
 Signing and notarization secrets are **not required for the release workflow to run**. Unsigned builds are still produced and published; the signing/notarization gate is tracked separately by issue #45. When those secrets are added, electron-builder will pick them up from the environment automatically.
 
@@ -118,6 +118,7 @@ validate → verify → build-mac ┐
 ### Stage 3 — Build & Publish (one job per platform)
 
 Each platform job:
+
 1. Checks out the tagged commit.
 2. Installs dependencies (including native-module rebuild for Electron via postinstall).
 3. Builds the renderer and main bundles with `electron-vite build`.
@@ -148,28 +149,29 @@ Requires `VERCEL_TOKEN`, `VERCEL_ORG_ID`, and `VERCEL_PROJECT_ID` to be set as G
 
 ### Stable release (`vX.Y.Z`)
 
-| Platform | Artifact | Purpose |
-|----------|----------|---------|
-| macOS    | `Pilog-X.Y.Z.dmg` | Installer |
-| macOS    | `Pilog-X.Y.Z-mac.zip` | Auto-updater archive |
-| macOS    | `latest-mac.yml` | Updater metadata |
-| macOS    | `Pilog-X.Y.Z.dmg.sha256` | Checksum sidecar |
-| macOS    | `Pilog-X.Y.Z-mac.zip.sha256` | Checksum sidecar |
-| macOS    | `checksums-mac.txt` | Combined macOS checksums |
-| Windows  | `Pilog-X.Y.Z-Setup.exe` | NSIS installer |
-| Windows  | `latest.yml` | Updater metadata |
-| Windows  | `Pilog-X.Y.Z-Setup.exe.sha256` | Checksum sidecar |
-| Windows  | `checksums-win.txt` | Combined Windows checksums |
-| Linux    | `Pilog-X.Y.Z.AppImage` | AppImage |
-| Linux    | `Pilog-X.Y.Z.deb` | Debian package |
-| Linux    | `Pilog-X.Y.Z.snap` | Snap package |
-| Linux    | `latest-linux.yml` | Updater metadata |
-| Linux    | `*.sha256` (per artifact) | Checksum sidecars |
-| Linux    | `checksums-linux.txt` | Combined Linux checksums |
+| Platform | Artifact                       | Purpose                    |
+| -------- | ------------------------------ | -------------------------- |
+| macOS    | `Pilog-X.Y.Z.dmg`              | Installer                  |
+| macOS    | `Pilog-X.Y.Z-mac.zip`          | Auto-updater archive       |
+| macOS    | `latest-mac.yml`               | Updater metadata           |
+| macOS    | `Pilog-X.Y.Z.dmg.sha256`       | Checksum sidecar           |
+| macOS    | `Pilog-X.Y.Z-mac.zip.sha256`   | Checksum sidecar           |
+| macOS    | `checksums-mac.txt`            | Combined macOS checksums   |
+| Windows  | `Pilog-X.Y.Z-Setup.exe`        | NSIS installer             |
+| Windows  | `latest.yml`                   | Updater metadata           |
+| Windows  | `Pilog-X.Y.Z-Setup.exe.sha256` | Checksum sidecar           |
+| Windows  | `checksums-win.txt`            | Combined Windows checksums |
+| Linux    | `Pilog-X.Y.Z.AppImage`         | AppImage                   |
+| Linux    | `Pilog-X.Y.Z.deb`              | Debian package             |
+| Linux    | `Pilog-X.Y.Z.snap`             | Snap package               |
+| Linux    | `latest-linux.yml`             | Updater metadata           |
+| Linux    | `*.sha256` (per artifact)      | Checksum sidecars          |
+| Linux    | `checksums-linux.txt`          | Combined Linux checksums   |
 
 ### Preview release (`vX.Y.Z-preview.N`)
 
 Same set of artifacts with `-preview` embedded before the extension:
+
 - `Pilog-X.Y.Z-preview.dmg`, `Pilog-X.Y.Z-preview-mac.zip`, `preview-mac.yml`, …
 - `Pilog-X.Y.Z-preview-Setup.exe`, `preview.yml`, …
 - `Pilog-X.Y.Z-preview.AppImage`, `Pilog-X.Y.Z-preview.deb`, `preview-linux.yml`, …
@@ -244,17 +246,17 @@ Or trigger a re-run of the release workflow via GitHub → Actions → **Release
 
 ## Failure diagnosis
 
-| Failing stage | What to check |
-|--------------|---------------|
-| Validate | Tag format in the push ref or `workflow_dispatch` input. Stable workflow rejects preview tags by design. |
-| Verify — Typecheck | TypeScript errors in the workflow log. Fix and push a corrected commit, then re-tag. |
-| Verify — Test | Failing Vitest tests in the log. |
-| Build (electron-vite) | Compilation errors in the `Build app` step. |
-| Publish (electron-builder) | Packaging errors, code-signing failures, or GitHub API upload errors. Check `GH_TOKEN` permissions (`contents: write`). Rate limits may require re-running the job. |
-| Checksums | `pnpm run build:checksums` failure means no artifacts were found in `dist/`. The preceding publish step likely failed. |
-| Checksum upload | `gh release upload` failure — the GitHub Release may not exist yet (publish step failed) or a network issue occurred. |
-| Publish manifest | `generate:manifest` script failure or manifest validation failure. Check the manifest script logs for missing release assets. |
-| Deploy site | `vercel` CLI failure. Verify that `VERCEL_TOKEN`, `VERCEL_ORG_ID`, and `VERCEL_PROJECT_ID` secrets are set in the repository. Check the Vercel dashboard for build errors. |
+| Failing stage              | What to check                                                                                                                                                              |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Validate                   | Tag format in the push ref or `workflow_dispatch` input. Stable workflow rejects preview tags by design.                                                                   |
+| Verify — Typecheck         | TypeScript errors in the workflow log. Fix and push a corrected commit, then re-tag.                                                                                       |
+| Verify — Test              | Failing Vitest tests in the log.                                                                                                                                           |
+| Build (electron-vite)      | Compilation errors in the `Build app` step.                                                                                                                                |
+| Publish (electron-builder) | Packaging errors, code-signing failures, or GitHub API upload errors. Check `GH_TOKEN` permissions (`contents: write`). Rate limits may require re-running the job.        |
+| Checksums                  | `pnpm run build:checksums` failure means no artifacts were found in `dist/`. The preceding publish step likely failed.                                                     |
+| Checksum upload            | `gh release upload` failure — the GitHub Release may not exist yet (publish step failed) or a network issue occurred.                                                      |
+| Publish manifest           | `generate:manifest` script failure or manifest validation failure. Check the manifest script logs for missing release assets.                                              |
+| Deploy site                | `vercel` CLI failure. Verify that `VERCEL_TOKEN`, `VERCEL_ORG_ID`, and `VERCEL_PROJECT_ID` secrets are set in the repository. Check the Vercel dashboard for build errors. |
 
 ---
 

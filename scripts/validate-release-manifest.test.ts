@@ -61,7 +61,8 @@ describe('validateReleaseManifest', () => {
             artifacts: [
               {
                 fileName: 'Pilog-1.0.0.dmg',
-                downloadUrl: 'https://github.com/nick-neely/pilog/releases/download/v1.0.0/Pilog-1.0.0.dmg',
+                downloadUrl:
+                  'https://github.com/nick-neely/pilog/releases/download/v1.0.0/Pilog-1.0.0.dmg',
                 label: 'DMG installer',
                 sha256: 'abc123'
               }

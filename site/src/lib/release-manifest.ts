@@ -107,12 +107,10 @@ export function validateReleaseManifest(value: unknown): ManifestValidationError
     errors.push({ path: 'schemaVersion', message: 'must be a positive number' })
   if (!('stable' in value))
     errors.push({ path: 'stable', message: 'field is required (use null for no stable release)' })
-  else if (value.stable !== null)
-    errors.push(...validateChannel(value.stable, 'stable'))
+  else if (value.stable !== null) errors.push(...validateChannel(value.stable, 'stable'))
   if (!('preview' in value))
     errors.push({ path: 'preview', message: 'field is required (use null for no preview release)' })
-  else if (value.preview !== null)
-    errors.push(...validateChannel(value.preview, 'preview'))
+  else if (value.preview !== null) errors.push(...validateChannel(value.preview, 'preview'))
   return errors
 }
 

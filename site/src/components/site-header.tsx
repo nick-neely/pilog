@@ -21,10 +21,7 @@ export function SiteHeader() {
           className="group inline-flex items-center gap-2.5 outline-none"
           aria-label="Pilog home"
         >
-          <span
-            aria-hidden
-            className="relative inline-flex size-7 items-center justify-center"
-          >
+          <span aria-hidden className="relative inline-flex size-7 items-center justify-center">
             <Image
               src="/pi-mark.png"
               alt=""

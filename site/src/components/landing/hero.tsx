@@ -2,15 +2,16 @@ import Link from 'next/link'
 import { Button } from '@pilog/ui/button'
 import { Kbd, KbdGroup } from '@pilog/ui/kbd'
 import { PiMark } from '@/components/pi-mark'
+import type { SiteModKeyGlyph } from '@/lib/platform'
 
 /**
  * Hero — asymmetric 7/5 split. Left column carries an oversized Source Serif 4
  * line and the two CTAs; right column carries the Pi mark at hero scale,
  * rotated 2.5° and lifted with the lone documented hover shadow. The mark IS
- * the imagery; no stock photos, no SaaS-cliché abstract gradient. The `⌘⇧Space`
- * Kbd cluster is a quiet tease of the product's defining gesture.
+ * the imagery; no stock photos, no SaaS-cliché abstract gradient. The mod⇧Space
+ * Kbd cluster is a quiet tease of the product's defining gesture (mod is ⌘ or Ctrl by UA).
  */
-export function Hero() {
+export function Hero({ modKey }: { modKey: SiteModKeyGlyph }) {
   return (
     <section
       aria-labelledby="hero-title"
@@ -18,8 +19,8 @@ export function Hero() {
     >
       <div className="md:col-span-7 md:pt-6">
         <p className="text-muted-foreground mb-6 inline-flex items-center gap-2 font-mono text-xs">
-          <span aria-hidden className="bg-primary inline-block size-1.5 rounded-full" />
-          a local-first developer journal
+          <span aria-hidden className="bg-primary inline-block size-1.5 rounded-full" />a
+          local-first developer journal
         </p>
         <h1
           id="hero-title"
@@ -45,11 +46,15 @@ export function Hero() {
           </Button>
           <span
             className="text-muted-foreground ml-1 hidden items-center gap-2 font-mono text-xs sm:inline-flex"
-            aria-label="The global capture shortcut is Command Shift Space"
+            aria-label={
+              modKey === '⌘'
+                ? 'The global capture shortcut is Command Shift Space'
+                : 'The global capture shortcut is Control Shift Space'
+            }
           >
             or press
             <KbdGroup>
-              <Kbd>⌘</Kbd>
+              <Kbd>{modKey}</Kbd>
               <Kbd>⇧</Kbd>
               <Kbd>Space</Kbd>
             </KbdGroup>

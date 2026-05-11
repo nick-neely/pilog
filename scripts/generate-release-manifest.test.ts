@@ -121,14 +121,12 @@ describe('buildChannel', () => {
     },
     {
       name: 'latest-mac.yml',
-      downloadUrl:
-        'https://github.com/nick-neely/pilog/releases/download/v1.0.0/latest-mac.yml',
+      downloadUrl: 'https://github.com/nick-neely/pilog/releases/download/v1.0.0/latest-mac.yml',
       fileSize: 500
     },
     {
       name: 'checksums-mac.txt',
-      downloadUrl:
-        'https://github.com/nick-neely/pilog/releases/download/v1.0.0/checksums-mac.txt',
+      downloadUrl: 'https://github.com/nick-neely/pilog/releases/download/v1.0.0/checksums-mac.txt',
       fileSize: 200
     }
   ]

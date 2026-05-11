@@ -1,5 +1,6 @@
 import { Kbd, KbdGroup } from '@pilog/ui/kbd'
 import { Badge } from '@pilog/ui/badge'
+import type { SiteModKeyGlyph } from '@/lib/platform'
 
 /**
  * Bento — four cells, deliberately varied sizes; not an identical-card grid.
@@ -8,12 +9,9 @@ import { Badge } from '@pilog/ui/badge'
  * permitted only inside the Capture cell, since "Capture is the gesture" is
  * the primary affordance.
  */
-export function Bento() {
+export function Bento({ modKey }: { modKey: SiteModKeyGlyph }) {
   return (
-    <section
-      aria-labelledby="bento-title"
-      className="bg-secondary/30 border-border/60 border-t"
-    >
+    <section aria-labelledby="bento-title" className="bg-secondary/30 border-border/60 border-t">
       <div className="mx-auto max-w-6xl px-6 py-20 md:py-28">
         <header className="mb-12 max-w-3xl">
           <p className="text-muted-foreground mb-3 font-mono text-xs">03 — what&#8217;s inside</p>
@@ -39,7 +37,7 @@ export function Bento() {
               you&#8217;re writing. The window is waiting for you, not demanding attention. Hit
               <span className="mx-1 inline-flex translate-y-[2px] items-center">
                 <KbdGroup>
-                  <Kbd>⌘</Kbd>
+                  <Kbd>{modKey}</Kbd>
                   <Kbd>S</Kbd>
                 </KbdGroup>
               </span>
@@ -52,13 +50,13 @@ export function Bento() {
               <div className="text-muted-foreground mb-3 flex items-center justify-between font-mono text-[0.7rem]">
                 <span>scratchpad</span>
                 <KbdGroup>
-                  <Kbd>⌘</Kbd>
+                  <Kbd>{modKey}</Kbd>
                   <Kbd>⇧</Kbd>
                   <Kbd>Space</Kbd>
                 </KbdGroup>
               </div>
               <pre className="text-foreground/90 font-mono text-[0.85rem] leading-[1.65] whitespace-pre-wrap">
-{`save btn → no loading state
+                {`save btn → no loading state
 ghost click on offline submit
 queue dedup by payload hash?
 
@@ -135,8 +133,8 @@ same root as <SettingsRow/>`}
               The agent reads the active repository alongside your notes — affected files, labels,
               owners, prior issues — and proposes drafts that actually fit.
             </p>
-                    <pre className="bg-secondary/50 text-foreground/90 overflow-x-auto rounded-md p-3 font-mono text-[0.75rem] leading-[1.6]">
-{`repo: nick-neely/pilog
+            <pre className="bg-secondary/50 text-foreground/90 overflow-x-auto rounded-md p-3 font-mono text-[0.75rem] leading-[1.6]">
+              {`repo: nick-neely/pilog
 labels: bug, ux-polish
 codeowners: @nick-neely
 prior: #142 (similar)`}

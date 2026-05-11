@@ -11,17 +11,17 @@ type SiteShortcutExpectation = {
 
 const SITE_SHORTCUT_EXPECTATIONS: readonly SiteShortcutExpectation[] = [
   {
-    siteKeys: "['⌘/Ctrl', '⇧', 'Space']",
+    siteKeys: "['MOD', '⇧', 'Space']",
     binding: SHORTCUT_CONTRACT.globalCapture,
     contractValue: 'CommandOrControl+Shift+Space'
   },
   {
-    siteKeys: "['⌘/Ctrl', '1']",
+    siteKeys: "['MOD', '1']",
     binding: SHORTCUT_CONTRACT.openInbox,
     contractValue: 'CommandOrControl+1'
   },
   {
-    siteKeys: "['⌘/Ctrl', '2']",
+    siteKeys: "['MOD', '2']",
     binding: SHORTCUT_CONTRACT.openDrafts,
     contractValue: 'CommandOrControl+2'
   },
@@ -31,7 +31,7 @@ const SITE_SHORTCUT_EXPECTATIONS: readonly SiteShortcutExpectation[] = [
     contractValue: ['G', 'D']
   },
   {
-    siteKeys: "['⌘/Ctrl', '↵']",
+    siteKeys: "['MOD', '↵']",
     binding: SHORTCUT_CONTRACT.publishDraft,
     contractValue: 'CommandOrControl+Enter'
   },

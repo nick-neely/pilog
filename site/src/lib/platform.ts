@@ -2,6 +2,9 @@ import type { PlatformRelease, ReleaseChannel } from './release-manifest'
 
 export type DetectedPlatform = 'macos' | 'windows' | 'linux' | 'unknown'
 
+/** Modifier glyph for marketing key chips (from `modKeyLabel`). */
+export type SiteModKeyGlyph = '⌘' | 'Ctrl'
+
 const PRIMARY_PLATFORMS: ReadonlySet<DetectedPlatform> = new Set(['macos', 'windows'])
 
 export function detectPlatform(userAgent?: string): DetectedPlatform {
@@ -10,6 +13,11 @@ export function detectPlatform(userAgent?: string): DetectedPlatform {
   if (/Windows/i.test(ua)) return 'windows'
   if (/Linux/i.test(ua)) return 'linux'
   return 'unknown'
+}
+
+/** Modifier shown in marketing key chips: Command on Mac, Control elsewhere (matches Electron shortcut labeling). */
+export function modKeyLabel(platform: DetectedPlatform): SiteModKeyGlyph {
+  return platform === 'macos' ? '⌘' : 'Ctrl'
 }
 
 export function isPrimaryPlatform(platform: DetectedPlatform): boolean {

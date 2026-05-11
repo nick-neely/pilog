@@ -12,9 +12,7 @@ export function SiteFooter() {
     <footer className="border-border/60 mt-auto border-t">
       <div className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-10 md:flex-row md:items-end md:justify-between">
         <div>
-          <p className="font-heading text-foreground text-base font-medium tracking-tight">
-            Pilog
-          </p>
+          <p className="font-heading text-foreground text-base font-medium tracking-tight">Pilog</p>
           <p className="text-muted-foreground mt-1 max-w-[40ch] text-sm leading-relaxed">
             A local-first developer journal. Made by Nick Neely.
           </p>

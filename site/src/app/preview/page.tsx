@@ -25,7 +25,9 @@ export default function PreviewPage() {
       <div className="border-border bg-secondary/50 mt-6 rounded-lg border p-5" role="status">
         <p className="text-foreground text-sm font-medium">Before you install</p>
         <ul className="text-muted-foreground mt-2 list-inside list-disc space-y-1 text-sm leading-relaxed">
-          <li>Preview builds are not code-signed or notarized. Your OS will show a security warning.</li>
+          <li>
+            Preview builds are not code-signed or notarized. Your OS will show a security warning.
+          </li>
           <li>These builds may contain bugs, incomplete features, or breaking changes.</li>
           <li>Data created in a preview build may not migrate to the stable release.</li>
           <li>Use these only if you are comfortable running unsigned pre-release software.</li>

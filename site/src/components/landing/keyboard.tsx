@@ -1,19 +1,25 @@
 import { Kbd, KbdGroup } from '@pilog/ui/kbd'
+import type { SiteModKeyGlyph } from '@/lib/platform'
 
 type Shortcut = {
   keys: string[]
   verb: string
 }
 
+/** `MOD` is replaced at render with ⌘ (macOS) or Ctrl (Windows/Linux) from UA. */
 const shortcuts: Shortcut[] = [
-  { keys: ['⌘/Ctrl', '⇧', 'Space'], verb: 'open the scratchpad' },
-  { keys: ['⌘/Ctrl', '1'], verb: 'open Inbox' },
-  { keys: ['⌘/Ctrl', '2'], verb: 'open Drafts' },
+  { keys: ['MOD', '⇧', 'Space'], verb: 'open the scratchpad' },
+  { keys: ['MOD', '1'], verb: 'open Inbox' },
+  { keys: ['MOD', '2'], verb: 'open Drafts' },
   { keys: ['G', 'D'], verb: 'generate drafts' },
-  { keys: ['⌘/Ctrl', '↵'], verb: 'publish the draft you’re reading' },
+  { keys: ['MOD', '↵'], verb: 'publish the draft you’re reading' },
   { keys: ['J', 'K'], verb: 'move through notes and drafts' },
   { keys: ['Esc'], verb: 'step back or clear context' }
 ]
+
+function keyChip(token: string, modKey: SiteModKeyGlyph): string {
+  return token === 'MOD' ? modKey : token
+}
 
 /**
  * Keyboard-first row. PRODUCT.md commits the product to "Keyboard-first,
@@ -21,12 +27,9 @@ const shortcuts: Shortcut[] = [
  * horizontal flow on desktop, two-column wrap on small viewports — no card
  * grid, no decorative icons. Kbd + verb is the whole pattern.
  */
-export function KeyboardFirst() {
+export function KeyboardFirst({ modKey }: { modKey: SiteModKeyGlyph }) {
   return (
-    <section
-      aria-labelledby="keyboard-title"
-      className="border-border/60 border-t"
-    >
+    <section aria-labelledby="keyboard-title" className="border-border/60 border-t">
       <div className="mx-auto max-w-6xl px-6 py-20 md:py-28">
         <div className="grid grid-cols-1 gap-10 md:grid-cols-12 md:gap-12">
           <header className="md:col-span-4">
@@ -38,8 +41,8 @@ export function KeyboardFirst() {
               Every action has a key.
             </h2>
             <p className="text-muted-foreground mt-4 max-w-[40ch] text-base leading-relaxed">
-              The hotkey-driven scratchpad is the product&#8217;s defining gesture. The rest of
-              the app honors it. The few you&#8217;ll learn first:
+              The hotkey-driven scratchpad is the product&#8217;s defining gesture. The rest of the
+              app honors it. The few you&#8217;ll learn first:
             </p>
           </header>
 
@@ -53,8 +56,8 @@ export function KeyboardFirst() {
                   {String(i + 1).padStart(2, '0')}
                 </span>
                 <KbdGroup className="shrink-0">
-                  {s.keys.map((k) => (
-                    <Kbd key={k}>{k}</Kbd>
+                  {s.keys.map((k, ki) => (
+                    <Kbd key={`${s.verb}-${ki}-${k}`}>{keyChip(k, modKey)}</Kbd>
                   ))}
                 </KbdGroup>
                 <span className="text-foreground/85 text-sm">{s.verb}</span>

@@ -24,9 +24,7 @@ export function PreviewDownload({ channel }: { channel: ReleaseChannel }) {
   return (
     <>
       <div className="border-border mt-6 flex items-baseline gap-3 rounded-lg border p-5">
-        <span className="text-foreground font-mono text-sm font-medium">
-          v{channel.version}
-        </span>
+        <span className="text-foreground font-mono text-sm font-medium">v{channel.version}</span>
         <span className="bg-secondary text-muted-foreground rounded px-1.5 py-0.5 font-mono text-xs">
           preview
         </span>
