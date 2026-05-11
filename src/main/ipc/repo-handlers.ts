@@ -9,10 +9,15 @@ import {
 } from '../db/repositories/repos'
 import { detectLocalRepo, linkRepo } from '../repos/local-repo-service'
 import { resolveDefaultIssueTemplate } from '../github/issue-templates'
+import { getRuntimeReadiness } from '../runtime-readiness'
 
 export function registerRepoIpcHandlers(db: PilogDatabase): void {
   ipcMain.handle('repos:list', () => {
     return listRepos(db)
+  })
+
+  ipcMain.handle('runtime:readiness', () => {
+    return getRuntimeReadiness({}, listRepos(db))
   })
 
   ipcMain.handle('repos:detectLocal', (_event, request: { localPath: string }) => {

@@ -16,6 +16,11 @@ vi.mock('../github/client', () => ({
   listLabels: vi.fn()
 }))
 
+vi.mock('../runtime-readiness', () => ({
+  getRuntimeReadiness: vi.fn(),
+  getBlockingRuntimeReadinessMessage: vi.fn()
+}))
+
 const mockGitHubRepo: GitHubRepo = {
   id: 1,
   name: 'pilog',
@@ -37,6 +42,10 @@ describe('local-repo-service', () => {
     listRepos: ReturnType<typeof vi.fn>
     listLabels: ReturnType<typeof vi.fn>
   }
+  let readinessMock: {
+    getRuntimeReadiness: ReturnType<typeof vi.fn>
+    getBlockingRuntimeReadinessMessage: ReturnType<typeof vi.fn>
+  }
   let service: typeof import('./local-repo-service')
 
   beforeEach(async () => {
@@ -46,10 +55,28 @@ describe('local-repo-service', () => {
 
     gitMock = (await import('./git')) as unknown as typeof gitMock
     clientMock = (await import('../github/client')) as unknown as typeof clientMock
+    readinessMock = (await import('../runtime-readiness')) as unknown as typeof readinessMock
+    readinessMock.getRuntimeReadiness.mockResolvedValue({ ready: true, items: {} })
+    readinessMock.getBlockingRuntimeReadinessMessage.mockReturnValue(null)
     service = await import('./local-repo-service')
   })
 
   describe('detectLocalRepo', () => {
+    it('returns runtime-blocked when shared readiness has a blocking prerequisite', async () => {
+      readinessMock.getBlockingRuntimeReadinessMessage.mockReturnValue(
+        'Git needs attention. Git is not available to Pilog. Install Git.'
+      )
+
+      const result = await service.detectLocalRepo('/some/path')
+
+      expect(result).toEqual({
+        state: 'runtime-blocked',
+        message: 'Git needs attention. Git is not available to Pilog. Install Git.',
+        recoveryAction: 'Open Settings and follow the runtime readiness recovery action.'
+      })
+      expect(gitMock.isGitRepo).not.toHaveBeenCalled()
+    })
+
     it('returns unauthenticated when no GitHub client', async () => {
       clientMock.getOctokitClient.mockReturnValue(null)
 
@@ -148,6 +175,21 @@ describe('local-repo-service', () => {
   })
 
   describe('linkRepo', () => {
+    it('rejects when shared readiness has a blocking prerequisite', async () => {
+      readinessMock.getBlockingRuntimeReadinessMessage.mockReturnValue(
+        'Keychain needs attention. Secure credential storage is unavailable.'
+      )
+
+      await expect(
+        service.linkRepo(db, {
+          localPath: '/projects/pilog',
+          githubRepo: mockGitHubRepo,
+          defaultBranch: 'main'
+        })
+      ).rejects.toThrow('Keychain needs attention')
+      expect(clientMock.listLabels).not.toHaveBeenCalled()
+    })
+
     it('persists a repo row with GitHub labels and returns the Repo', async () => {
       clientMock.getOctokitClient.mockReturnValue({})
       clientMock.listLabels.mockResolvedValue([

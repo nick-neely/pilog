@@ -136,6 +136,7 @@ export type UpdateRepoAutoPublishSettingsRequest = {
 } & RepoAutoPublishSettings
 
 export type DetectLocalRepoResult =
+  | { state: 'runtime-blocked'; message: string; recoveryAction: string }
   | { state: 'unauthenticated' }
   | { state: 'not-git' }
   | { state: 'no-remote' }
@@ -190,6 +191,29 @@ export type RuntimeHealthCheck = {
   piAi: { ok: boolean; error?: string }
   ripgrep: { ok: boolean; path: string; fromAsarUnpacked: boolean }
   boilerplateFree: { appId: boolean; productName: boolean }
+}
+
+export type RuntimeReadinessStatus = 'ready' | 'degraded' | 'missing'
+
+export type RuntimeReadinessItem = {
+  status: RuntimeReadinessStatus
+  label: string
+  detail: string
+  recoveryAction: string
+}
+
+export type RuntimeReadiness = {
+  ready: boolean
+  checkedAt: string
+  items: {
+    git: RuntimeReadinessItem & { version: string | null }
+    keychain: RuntimeReadinessItem
+    localRepositories: RuntimeReadinessItem & {
+      checkedCount: number
+      inaccessiblePaths: string[]
+    }
+    bundledRepoTooling: RuntimeReadinessItem
+  }
 }
 
 export type PublishLogEntry = {
@@ -377,6 +401,7 @@ export type IpcContract = {
   'app-updates:check': { request: void; response: AppUpdateStatus }
   'app-updates:download': { request: void; response: AppUpdateStatus }
   'app-updates:restart': { request: void; response: AppUpdateStatus }
+  'runtime:readiness': { request: void; response: RuntimeReadiness }
   'path:copy': {
     request: PathActionRequest
     response: PathActionResult

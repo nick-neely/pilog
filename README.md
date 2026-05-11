@@ -26,6 +26,16 @@ node --version
 pnpm --version
 ```
 
+## Runtime Prerequisites
+
+Pilog checks these in Settings before repository linking and draft generation:
+
+- **Windows:** Git for Windows must be installed and `git` must be on `PATH`. Secure storage uses Windows DPAPI through Electron `safeStorage`; sign into Windows normally and avoid running Pilog in a locked-down service session.
+- **macOS:** Xcode Command Line Tools or Git must provide `git` on `PATH`. Secure storage uses Keychain through Electron `safeStorage`; allow Pilog to use Keychain when prompted.
+- **Linux:** `git` must be installed through your distribution package manager. Secure storage needs a desktop keyring available to Electron, typically GNOME Keyring or KWallet with `libsecret`. Headless sessions, minimal containers, and some WSL2 setups may not expose a keyring.
+- **Linked repositories:** linked local repository folders must still exist and be readable by your user account.
+- **Bundled repo tooling:** Pilog ships its own repo-search tooling and Pi runtime packages. If Settings reports these missing, reinstall Pilog.
+
 ## Setup
 
 ```bash

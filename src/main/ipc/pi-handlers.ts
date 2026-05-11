@@ -1,5 +1,5 @@
 import { BrowserWindow, MessageChannelMain, ipcMain, type IpcMainInvokeEvent } from 'electron'
-import { existsSync, mkdirSync } from 'node:fs'
+import { mkdirSync } from 'node:fs'
 import type { IpcRequest, IpcResponse, Note, Repo } from '@shared/ipc'
 import type { AgentEvent, ErrorCause, GenerateDraftsMode } from '@shared/types'
 import type { PilogDatabase } from '../db/client'
@@ -24,6 +24,7 @@ import {
 import { createSafeStorageAuthStorage } from '../pi/auth-storage'
 import { setSecret } from '../security/secrets'
 import { getRuntimeHealthCheck } from '../runtime-health'
+import { getBlockingRuntimeReadinessMessage, getRuntimeReadiness } from '../runtime-readiness'
 import {
   getAdvancedSettings,
   getTurnBudget,
@@ -111,7 +112,14 @@ export function registerPiIpcHandlers(
   ): Promise<IpcResponse<'pi:generateDrafts:start'>> => {
     const { notes, mode } = input
     let repo = input.repo
-    if (!existsSync(repo.localPath)) throw new Error('The linked repository path no longer exists.')
+    const readiness = await getRuntimeReadiness({}, [repo])
+    const readinessMessage = getBlockingRuntimeReadinessMessage(readiness, [
+      'git',
+      'keychain',
+      'localRepositories',
+      'bundledRepoTooling'
+    ])
+    if (readinessMessage) throw new Error(readinessMessage)
     if (mode === 'auto-publish-preview' && !repo.autoPublishEnabled) {
       throw new Error('Auto-publish is not enabled for this repository.')
     }

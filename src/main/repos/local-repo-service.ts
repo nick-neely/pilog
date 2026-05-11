@@ -4,8 +4,19 @@ import { createRepo } from '../db/repositories/repos'
 import type { PilogDatabase } from '../db/client'
 import type { DetectLocalRepoResult, LinkRepoRequest, Repo } from '@shared/ipc'
 import type { GitHubLabel } from '@shared/ipc'
+import { getBlockingRuntimeReadinessMessage, getRuntimeReadiness } from '../runtime-readiness'
 
 export async function detectLocalRepo(localPath: string): Promise<DetectLocalRepoResult> {
+  const readiness = await getRuntimeReadiness()
+  const message = getBlockingRuntimeReadinessMessage(readiness, ['git', 'keychain'])
+  if (message) {
+    return {
+      state: 'runtime-blocked',
+      message,
+      recoveryAction: 'Open Settings and follow the runtime readiness recovery action.'
+    }
+  }
+
   if (!getOctokitClient()) {
     return { state: 'unauthenticated' }
   }
@@ -38,6 +49,10 @@ export async function detectLocalRepo(localPath: string): Promise<DetectLocalRep
 }
 
 export async function linkRepo(db: PilogDatabase, request: LinkRepoRequest): Promise<Repo> {
+  const readiness = await getRuntimeReadiness()
+  const message = getBlockingRuntimeReadinessMessage(readiness, ['git', 'keychain'])
+  if (message) throw new Error(message)
+
   const labelCache = await fetchInitialLabelCache(request.githubRepo.owner, request.githubRepo.name)
 
   return createRepo(db, {

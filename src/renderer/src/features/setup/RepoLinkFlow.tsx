@@ -26,6 +26,27 @@ function DetectResultInline({
   onGitHubRequired?: () => void
   githubRequiredLabel?: string
 }): React.JSX.Element {
+  if (result.state === 'runtime-blocked') {
+    return (
+      <Alert variant="destructive">
+        <AlertDescription>
+          <span className="block">{result.message}</span>
+          {onGitHubRequired ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="mt-2"
+              onClick={onGitHubRequired}
+            >
+              {githubRequiredLabel}
+            </Button>
+          ) : null}
+        </AlertDescription>
+      </Alert>
+    )
+  }
+
   if (result.state === 'unauthenticated') {
     return (
       <Alert variant="destructive">

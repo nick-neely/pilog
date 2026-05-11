@@ -1,10 +1,12 @@
 import {
   Activity01Icon,
   ArrowDown01Icon,
+  CheckmarkCircle01Icon,
   Delete02Icon,
   Download01Icon,
   EyeIcon,
   GithubIcon,
+  InformationCircleIcon,
   ListRestartIcon,
   Refresh01Icon,
   Search01Icon
@@ -53,7 +55,14 @@ import {
 import { Separator } from '@renderer/components/ui/separator'
 import { Switch } from '@renderer/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@renderer/components/ui/tabs'
-import type { AdvancedSettings, AppUpdateStatus, SearchProvider, SettingKey } from '@shared/ipc'
+import type {
+  AdvancedSettings,
+  AppUpdateStatus,
+  RuntimeReadiness,
+  RuntimeReadinessItem,
+  SearchProvider,
+  SettingKey
+} from '@shared/ipc'
 import {
   DEFAULT_TURN_BUDGET,
   MAX_TURN_BUDGET,
@@ -93,6 +102,11 @@ type UpdateState = {
   check: () => Promise<void>
   download: () => Promise<void>
   restart: () => Promise<void>
+}
+
+type RuntimeReadinessState = {
+  readiness: RuntimeReadiness | null
+  refresh: () => Promise<void>
 }
 
 function useSetting(key: SettingKey): [string | null, (value: string) => Promise<void>] {
@@ -229,6 +243,57 @@ function useAppUpdates(): UpdateState {
   return { status, check, download, restart }
 }
 
+function useRuntimeReadiness(): RuntimeReadinessState {
+  const [readiness, setReadiness] = useState<RuntimeReadiness | null>(null)
+
+  const refresh = useCallback(async () => {
+    setReadiness(await window.pilog.invoke('runtime:readiness'))
+  }, [])
+
+  useEffect(() => {
+    void refresh()
+  }, [refresh])
+
+  return { readiness, refresh }
+}
+
+function statusLabel(status: RuntimeReadinessItem['status']): string {
+  switch (status) {
+    case 'ready':
+      return 'Ready'
+    case 'degraded':
+      return 'Needs attention'
+    case 'missing':
+      return 'Missing'
+  }
+}
+
+function RuntimeReadinessRow({
+  item
+}: {
+  item: RuntimeReadinessItem
+}): React.JSX.Element {
+  const ok = item.status === 'ready'
+
+  return (
+    <li className="flex gap-3 py-3">
+      <HugeiconsIcon
+        icon={ok ? CheckmarkCircle01Icon : InformationCircleIcon}
+        aria-hidden
+        className="mt-0.5 size-4 shrink-0 text-muted-foreground"
+      />
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+          <p className="text-sm font-medium text-foreground">{item.label}</p>
+          <Badge variant={ok ? 'secondary' : 'destructive'}>{statusLabel(item.status)}</Badge>
+        </div>
+        <p className="mt-1 text-xs text-muted-foreground">{item.detail}</p>
+        {!ok && <p className="mt-1 text-xs text-foreground">{item.recoveryAction}</p>}
+      </div>
+    </li>
+  )
+}
+
 export function Settings({
   onBack,
   onNavigateRepositories,
@@ -248,6 +313,7 @@ export function Settings({
   const pi = usePiConfig()
   const advanced = useAdvancedSettings()
   const updates = useAppUpdates()
+  const runtime = useRuntimeReadiness()
 
   const displayValue = userEdited ? (hotkeyDraft ?? '') : (hotkey ?? '')
   const dirty = userEdited && hotkeyDraft !== (hotkey ?? '')
@@ -356,6 +422,60 @@ export function Settings({
                     <p className="text-xs text-muted-foreground">
                       When disabled, Pilog starts in the system tray only.
                     </p>
+                  </section>
+
+                  <section aria-live="polite" data-testid="runtime-readiness-section">
+                    <Card size="sm" className="shadow-none ring-1 ring-border">
+                      <CardHeader className="gap-2 pb-2">
+                        <CardTitle>Runtime prerequisites</CardTitle>
+                        <CardAction>
+                          {runtime.readiness ? (
+                            <Badge variant={runtime.readiness.ready ? 'secondary' : 'destructive'}>
+                              {runtime.readiness.ready ? 'Ready' : 'Needs attention'}
+                            </Badge>
+                          ) : null}
+                        </CardAction>
+                        <CardDescription>
+                          Git, secure storage, linked folders, and bundled repo tools.
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="pt-0">
+                        {runtime.readiness ? (
+                          <ul className="divide-y divide-border/60">
+                            <RuntimeReadinessRow item={runtime.readiness.items.git} />
+                            <RuntimeReadinessRow item={runtime.readiness.items.keychain} />
+                            <RuntimeReadinessRow
+                              item={runtime.readiness.items.localRepositories}
+                            />
+                            <RuntimeReadinessRow
+                              item={runtime.readiness.items.bundledRepoTooling}
+                            />
+                          </ul>
+                        ) : (
+                          <p className="py-3 text-sm text-muted-foreground">
+                            Checking runtime prerequisites.
+                          </p>
+                        )}
+                      </CardContent>
+                      <CardFooter className="flex flex-wrap gap-2 border-t border-border/60 pt-4">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => void runtime.refresh()}
+                        >
+                          <HugeiconsIcon
+                            icon={Refresh01Icon}
+                            data-icon="inline-start"
+                            aria-hidden
+                          />
+                          Refresh
+                        </Button>
+                        <p className="text-xs text-muted-foreground">
+                          Used before repo linking and draft generation.
+                        </p>
+                      </CardFooter>
+                    </Card>
                   </section>
 
                   <section aria-live="polite" data-testid="settings-updates-section">
