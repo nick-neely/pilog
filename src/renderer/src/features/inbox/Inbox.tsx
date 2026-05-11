@@ -50,6 +50,7 @@ import {
 } from '@renderer/shortcuts/pilog-hotkeys'
 import {
   getListNavigationIndex,
+  getSelectedListNavigationIndex,
   shouldHandleListNavigationShortcut,
   type ListNavigationDirection
 } from '@renderer/shortcuts/list-navigation'
@@ -1820,12 +1821,7 @@ export function Inbox({
       const selectedIndexes = notes
         .map((note, index) => (selectedIds.has(note.id) ? index : -1))
         .filter((index) => index >= 0)
-      const currentIndex =
-        selectedIndexes.length === 0
-          ? -1
-          : direction === 'next'
-            ? Math.max(...selectedIndexes)
-            : Math.min(...selectedIndexes)
+      const currentIndex = getSelectedListNavigationIndex({ selectedIndexes, direction })
       const nextIndex = getListNavigationIndex({
         currentIndex,
         itemCount: notes.length,

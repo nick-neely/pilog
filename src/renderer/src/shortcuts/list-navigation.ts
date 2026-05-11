@@ -2,6 +2,13 @@ import { isEditableShortcutTarget } from './pilog-hotkeys'
 
 export type ListNavigationDirection = 'next' | 'previous'
 
+const KEYBOARD_OWNING_SURFACE_SELECTORS = [
+  '[data-slot="select-content"][data-state="open"]',
+  '[data-slot="alert-dialog-content"]',
+  '[data-slot="dialog-content"]',
+  '[data-slot="command-dialog-content"]'
+] as const
+
 export function getListNavigationIndex(input: {
   currentIndex: number
   itemCount: number
@@ -15,13 +22,31 @@ export function getListNavigationIndex(input: {
   return Math.max(0, currentIndex - 1)
 }
 
+export function getSelectedListNavigationIndex(input: {
+  selectedIndexes: readonly number[]
+  direction: ListNavigationDirection
+}): number {
+  const { selectedIndexes, direction } = input
+
+  if (selectedIndexes.length === 0) return -1
+
+  switch (direction) {
+    case 'next':
+      return Math.max(...selectedIndexes)
+    case 'previous':
+      return Math.min(...selectedIndexes)
+  }
+}
+
 export function shouldHandleListNavigationShortcut(event: KeyboardEvent): boolean {
   if (isEditableShortcutTarget(event.target)) return false
   if (typeof document === 'undefined') return true
-  if (document.querySelector('[data-slot="select-content"][data-state="open"]')) return false
-  if (document.querySelector('[data-slot="alert-dialog-content"]')) return false
-  if (document.querySelector('[data-slot="dialog-content"]')) return false
-  if (document.querySelector('[data-slot="command-dialog-content"]')) return false
+
+  const keyboardOwningSurfaceIsOpen = KEYBOARD_OWNING_SURFACE_SELECTORS.some((selector) =>
+    document.querySelector(selector)
+  )
+
+  if (keyboardOwningSurfaceIsOpen) return false
 
   return true
 }

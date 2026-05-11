@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { getListNavigationIndex, shouldHandleListNavigationShortcut } from './list-navigation'
+import {
+  getListNavigationIndex,
+  getSelectedListNavigationIndex,
+  shouldHandleListNavigationShortcut
+} from './list-navigation'
 
 describe('list navigation shortcuts', () => {
   it('moves within list boundaries', () => {
@@ -14,8 +18,16 @@ describe('list navigation shortcuts', () => {
     expect(getListNavigationIndex({ currentIndex: -1, itemCount: 0, direction: 'next' })).toBe(-1)
   })
 
+  it('uses the selected boundary in the movement direction', () => {
+    expect(getSelectedListNavigationIndex({ selectedIndexes: [], direction: 'next' })).toBe(-1)
+    expect(getSelectedListNavigationIndex({ selectedIndexes: [1, 3], direction: 'next' })).toBe(3)
+    expect(getSelectedListNavigationIndex({ selectedIndexes: [1, 3], direction: 'previous' })).toBe(
+      1
+    )
+  })
+
   it('suppresses list movement inside editable and transient keyboard-owning UI', () => {
-    const OriginalHTMLElement = globalThis.HTMLElement
+    const originalHTMLElement = globalThis.HTMLElement
     const originalDocument = globalThis.document
 
     class FakeHTMLElement extends EventTarget {
@@ -57,7 +69,7 @@ describe('list navigation shortcuts', () => {
     } finally {
       Object.defineProperty(globalThis, 'HTMLElement', {
         configurable: true,
-        value: OriginalHTMLElement
+        value: originalHTMLElement
       })
       Object.defineProperty(globalThis, 'document', {
         configurable: true,
