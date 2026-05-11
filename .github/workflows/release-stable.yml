@@ -229,3 +229,52 @@ jobs:
             cp dist/checksums.txt dist/checksums-linux.txt
             gh release upload "$TAG" dist/checksums-linux.txt --clobber
           fi
+
+  # ── Stage 4: Generate & Commit Release Manifest ───────────────────────────
+  publish-manifest:
+    name: Publish Release Manifest
+    needs: [validate, build-mac, build-win, build-linux]
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+        env:
+          PILOG_SANDBOX: '1'
+
+      - name: Generate release manifest
+        shell: bash
+        env:
+          TAG: ${{ needs.validate.outputs.tag }}
+        run: pnpm run generate:manifest -- --tag "$TAG" --channel stable
+
+      - name: Validate updated manifest
+        run: pnpm run test
+
+      - name: Commit and push manifest
+        shell: bash
+        env:
+          TAG: ${{ needs.validate.outputs.tag }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add site/src/data/release-manifest.json
+          if git diff --staged --quiet; then
+            echo "No manifest changes to commit."
+          else
+            git commit -m "chore: update release manifest for $TAG"
+            git push origin main
+          fi
