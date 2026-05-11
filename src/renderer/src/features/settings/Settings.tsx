@@ -53,6 +53,7 @@ import {
 import { Separator } from '@renderer/components/ui/separator'
 import { Switch } from '@renderer/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@renderer/components/ui/tabs'
+import { LOCAL_FIRST_DISCLOSURE } from '@shared/data-boundaries'
 import type { AdvancedSettings, AppUpdateStatus, SearchProvider, SettingKey } from '@shared/ipc'
 import {
   DEFAULT_TURN_BUDGET,
@@ -299,6 +300,10 @@ export function Settings({
                 Daily habits, GitHub access, and draft generation are grouped below so one surface
                 does not turn into an endless form.
               </p>
+              <Alert data-testid="settings-local-first-disclosure" className="rounded-md">
+                <AlertTitle>Local records</AlertTitle>
+                <AlertDescription>{LOCAL_FIRST_DISCLOSURE}</AlertDescription>
+              </Alert>
               <Tabs defaultValue="general" className="flex flex-col gap-6">
                 <TabsList
                   variant="line"

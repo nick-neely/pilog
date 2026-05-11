@@ -12,6 +12,7 @@ import {
 } from '@renderer/components/ui/combobox'
 import { Input } from '@renderer/components/ui/input'
 import { Label } from '@renderer/components/ui/label'
+import { GENERATION_EGRESS_DISCLOSURE } from '@shared/data-boundaries'
 import { useMemo } from 'react'
 import { getPiSetupRecoveryState } from '../recovery-state'
 import type { PiConfigState } from './use-pi-config'
@@ -169,6 +170,9 @@ export function PiSetupPanel({
         <p className="text-[11px] text-muted-foreground">
           Current: {pi.active?.providerName ?? 'No provider'} · {pi.active?.modelName ?? 'No model'}{' '}
           · key {piCredentialStatus}
+        </p>
+        <p className="text-[11px] leading-5 text-muted-foreground">
+          {GENERATION_EGRESS_DISCLOSURE}
         </p>
       </div>
 
