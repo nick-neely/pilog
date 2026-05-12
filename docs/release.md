@@ -24,126 +24,83 @@ Do **not** tag the first preview as `v0.1.0`. That is a stable tag and will run 
 
 1. Start from an up-to-date, clean `main` branch.
 
-   ```bash
-   git switch main
-   git pull --ff-only
-   git status --short
-   ```
+```bash
+ git switch main
+ git pull --ff-only
+ git status --short
+```
 
-   Stop if `git status --short` shows unexpected changes. Commit, stash, or intentionally keep only the release changes before continuing.
+Stop if `git status --short` shows unexpected changes. Commit, stash, or intentionally keep only the release changes before continuing. 2. Confirm the required GitHub Actions secrets are set.
+In GitHub, open **Settings → Secrets and variables → Actions** and confirm:
 
-2. Confirm the required GitHub Actions secrets are set.
-
-   In GitHub, open **Settings → Secrets and variables → Actions** and confirm:
-
-   - `VERCEL_TOKEN`
-   - `VERCEL_ORG_ID`
-   - `VERCEL_PROJECT_ID`
-
-   Signing secrets are not required for this first preview. The macOS and Windows artifacts are expected to be unsigned until signing is configured.
+- `VERCEL_TOKEN`
+- `VERCEL_ORG_ID`
+- `VERCEL_PROJECT_ID`
+  Signing secrets are not required for this first preview. The macOS and Windows artifacts are expected to be unsigned until signing is configured.
 
 3. Set the preview version in `package.json`.
-
    For the first preview, `package.json` must say `0.1.0-preview.1`, not plain `0.1.0`.
-
-   ```bash
-   npm version 0.1.0-preview.1 --no-git-tag-version
-   ```
-
    Or edit `package.json` directly and set:
-
-   ```json
-   "version": "0.1.0-preview.1"
-   ```
-
 4. Run the local release checks.
 
-   ```bash
-   pnpm install
-   pnpm run typecheck
-   pnpm run test
-   pnpm run build
-   ```
+```bash
+ pnpm install
+ pnpm run typecheck
+ pnpm run build
+```
 
-   If any command fails, fix it before creating the release tag.
+If any command fails, fix it before creating the release tag. 5. Commit the version change.
 
-5. Commit the version change.
-
-   ```bash
-   git add package.json
-   git commit -m "chore: bump version to 0.1.0-preview.1"
-   ```
+```bash
+ git add package.json
+ git commit -m "chore: bump version to 0.1.0-preview.1"
+```
 
 6. Create the preview tag.
 
-   ```bash
-   git tag v0.1.0-preview.1
-   ```
+```bash
+ git tag v0.1.0-preview.1
+```
 
 7. Push `main`, then push the tag.
 
-   ```bash
-   git push origin main
-   git push origin v0.1.0-preview.1
-   ```
+```bash
+ git push origin main
+ git push origin v0.1.0-preview.1
+```
 
-   The tag push starts **Release — Preview** automatically.
+The tag push starts **Release — Preview** automatically. 8. Watch the workflow.
+In GitHub, open **Actions → Release — Preview** and wait for all jobs to pass: 9. Verify the GitHub pre-release.
+Open the GitHub Release for `v0.1.0-preview.1` and confirm:
 
-8. Watch the workflow.
-
-   In GitHub, open **Actions → Release — Preview** and wait for all jobs to pass:
-
-   ```text
-   validate → verify → build-mac / build-win / build-linux → publish-manifest → deploy-site
-   ```
-
-9. Verify the GitHub pre-release.
-
-   Open the GitHub Release for `v0.1.0-preview.1` and confirm:
-
-   - The release is marked **Pre-release**.
-   - macOS artifacts exist: `Pilog-0.1.0-preview.dmg`, `Pilog-0.1.0-preview-mac.zip`, `preview-mac.yml`.
-   - Windows artifacts exist: `Pilog-0.1.0-preview-Setup.exe`, `preview.yml`.
-   - Linux artifacts exist: `Pilog-0.1.0-preview.AppImage`, `Pilog-0.1.0-preview.deb`, `preview-linux.yml`.
-   - `.sha256` files and `checksums-preview-*.txt` files are present.
+- The release is marked **Pre-release**.
+- macOS artifacts exist: `Pilog-0.1.0-preview.dmg`, `Pilog-0.1.0-preview-mac.zip`, `preview-mac.yml`.
+- Windows artifacts exist: `Pilog-0.1.0-preview-Setup.exe`, `preview.yml`.
+- Linux artifacts exist: `Pilog-0.1.0-preview.AppImage`, `Pilog-0.1.0-preview.deb`, `preview-linux.yml`.
+- `.sha256` files and `checksums-preview-*.txt` files are present.
 
 10. Verify the manifest commit on `main`.
-
     After the workflow finishes, GitHub Actions should commit an updated `site/src/data/release-manifest.json` to `main`.
-
     Confirm the manifest contains:
-
-    ```json
-    "preview": {
-      "version": "0.1.0-preview.1"
-    }
-    ```
-
     The `stable` field should stay `null` or stay on the last stable version. A preview release must not overwrite stable.
-
 11. Verify `pilog.dev`.
-
     Open `https://pilog.dev/preview` and confirm it shows `0.1.0-preview.1`.
-
     Also open `https://pilog.dev/download` and confirm it does **not** present the preview as the stable download.
-
 12. Install and smoke-test the preview.
-
     On the platforms you can access:
 
-    - Download from `https://pilog.dev/preview`.
-    - Verify the checksum against the GitHub Release `.sha256` sidecar.
-    - Install the app.
-    - Expect unsigned-app warnings on macOS and Windows.
-    - Launch Pilog.
-    - Open Settings → Software updates and confirm the installed version is `0.1.0-preview.1` and the channel is **Preview**.
-    - Create a note.
-    - Link a repository.
-    - Generate a draft.
-    - If you are ready to test publishing, publish one draft to GitHub and confirm the issue URL is saved in Pilog.
+- Download from `https://pilog.dev/preview`.
+- Verify the checksum against the GitHub Release `.sha256` sidecar.
+- Install the app.
+- Expect unsigned-app warnings on macOS and Windows.
+- Launch Pilog.
+- Open Settings → Software updates and confirm the installed version is `0.1.0-preview.1` and the channel is **Preview**.
+- Create a note.
+- Link a repository.
+- Generate a draft.
+- If you are ready to test publishing, publish one draft to GitHub and confirm the issue URL is saved in Pilog.
 
 13. Share the preview.
-
     Send testers the `https://pilog.dev/preview` link and tell them this is an unsigned preview build. For macOS, they may need **System Settings → Privacy & Security → Open Anyway**. For Windows, they may need **More info → Run anyway** in SmartScreen.
 
 ### If the first preview needs a fix
@@ -357,9 +314,10 @@ Same set of artifacts with `-preview` embedded before the extension:
 3. **Retrieve project IDs** — From the Vercel dashboard (Project → Settings → General), copy the **Team ID** (or personal account ID) and **Project ID**.
 4. **Create a Vercel token** — Account → Settings → Tokens → create a token with scope limited to the `pilog.dev` project.
 5. **Add GitHub secrets** — In the GitHub repository (Settings → Secrets and variables → Actions), add:
-   - `VERCEL_TOKEN` — the token created above
-   - `VERCEL_ORG_ID` — the Vercel team/account ID
-   - `VERCEL_PROJECT_ID` — the Vercel project ID
+
+- `VERCEL_TOKEN` — the token created above
+- `VERCEL_ORG_ID` — the Vercel team/account ID
+- `VERCEL_PROJECT_ID` — the Vercel project ID
 
 These values are never committed to source. The `site/vercel.json` file contains only non-secret framework configuration.
 
