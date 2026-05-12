@@ -119,9 +119,9 @@ describe('findArtifacts', () => {
   })
 
   it('recognizes preview artifact names', async () => {
-    await writeFile(join(tmpDir, 'Pilog-1.0.0-preview.dmg'), '')
-    await writeFile(join(tmpDir, 'Pilog-1.0.0-preview-Setup.exe'), '')
-    await writeFile(join(tmpDir, 'Pilog-1.0.0-preview.AppImage'), '')
+    await writeFile(join(tmpDir, 'Pilog-1.0.0-preview.1.dmg'), '')
+    await writeFile(join(tmpDir, 'Pilog-1.0.0-preview.1-Setup.exe'), '')
+    await writeFile(join(tmpDir, 'Pilog-1.0.0-preview.1.AppImage'), '')
     const found = await findArtifacts(tmpDir)
     expect(found).toHaveLength(3)
   })

@@ -2,15 +2,12 @@ name: Release — Stable
 
 # Triggered by an explicit vX.Y.Z tag push or a manual re-trigger for an existing tag.
 # Never triggers on ordinary branch pushes or pull requests.
-#
-# IMPORTANT: this workflow also fires when a preview tag (vX.Y.Z-preview.N) is pushed
-# because GitHub Actions glob patterns cannot express negation. The validate job rejects
-# preview tags immediately with a clear error so the preview release workflow can handle them.
 
 on:
   push:
     tags:
       - 'v[0-9]*.[0-9]*.[0-9]*'
+      - '!v[0-9]*.[0-9]*.[0-9]*-preview*'
   workflow_dispatch:
     inputs:
       tag:
@@ -86,6 +83,11 @@ jobs:
         env:
           # Skip the Electron native-module rebuild — not needed for typecheck/test.
           PILOG_SANDBOX: '1'
+
+      - name: Validate release package versions
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: node scripts/validate-release-version.mjs "$VERSION"
 
       - name: Typecheck
         run: pnpm run typecheck
@@ -211,7 +213,7 @@ jobs:
         run: pnpm exec electron-vite build
 
       - name: Publish Linux artifacts
-        # Uploads AppImage, deb, snap and latest-linux.yml updater metadata.
+        # Uploads AppImage, deb and latest-linux.yml updater metadata.
         run: pnpm exec electron-builder --linux --publish always
 
       - name: Generate checksums

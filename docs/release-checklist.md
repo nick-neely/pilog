@@ -20,7 +20,7 @@ Open the GitHub Release for the tag (`vX.Y.Z`) and confirm:
 - [ ] Stable release is marked as a **Release** (not pre-release).
 - [ ] macOS: `Pilog-X.Y.Z.dmg`, `Pilog-X.Y.Z-mac.zip`, `latest-mac.yml`, `Pilog-X.Y.Z.dmg.sha256`, `Pilog-X.Y.Z-mac.zip.sha256`, `checksums-mac.txt` are present.
 - [ ] Windows: `Pilog-X.Y.Z-Setup.exe`, `latest.yml`, `Pilog-X.Y.Z-Setup.exe.sha256`, `checksums-win.txt` are present.
-- [ ] Linux: `Pilog-X.Y.Z.AppImage`, `Pilog-X.Y.Z.deb`, `Pilog-X.Y.Z.snap`, `latest-linux.yml`, per-artifact `.sha256` sidecars, `checksums-linux.txt` are present.
+- [ ] Linux: `Pilog-X.Y.Z.AppImage`, `Pilog-X.Y.Z.deb`, `latest-linux.yml`, per-artifact `.sha256` sidecars, `checksums-linux.txt` are present.
 - [ ] No preview artifacts (`-preview` names) appear in this release.
 - [ ] Updater metadata: download `latest-mac.yml` and confirm `version: X.Y.Z` and the `path` fields point to macOS artifacts. Repeat for `latest.yml` (Windows) and `latest-linux.yml` (Linux).
 
@@ -148,9 +148,9 @@ Test on a machine or user account with **no existing Pilog data** (or delete `~/
 
 Open the GitHub Release for the tag (`vX.Y.Z-preview.N`) and confirm:
 
-- [ ] macOS: `Pilog-X.Y.Z-preview.dmg`, `Pilog-X.Y.Z-preview-mac.zip`, `preview-mac.yml`.
-- [ ] Windows: `Pilog-X.Y.Z-preview-Setup.exe`, `preview.yml`.
-- [ ] Linux: `Pilog-X.Y.Z-preview.AppImage`, `Pilog-X.Y.Z-preview.deb`, `preview-linux.yml`.
+- [ ] macOS: `Pilog-X.Y.Z-preview.N.dmg`, `Pilog-X.Y.Z-preview.N-mac.zip`, `preview-mac.yml`.
+- [ ] Windows: `Pilog-X.Y.Z-preview.N-Setup.exe`, `preview.yml`.
+- [ ] Linux: `Pilog-X.Y.Z-preview.N.AppImage`, `Pilog-X.Y.Z-preview.N.deb`, `preview-linux.yml`.
 - [ ] Per-artifact `.sha256` sidecars and `checksums-*.txt` files are present.
 - [ ] No stable artifact names (without `-preview`) appear in this release.
 - [ ] Updater metadata: download `preview-mac.yml` and confirm `version: X.Y.Z-preview.N` and `path` fields point to preview-named artifacts. Repeat for `preview.yml` and `preview-linux.yml`.

@@ -5,12 +5,5 @@ publish:
   repo: pilog
   channel: preview
   releaseType: prerelease
-# Preview artifact names embed "-preview" before the extension so stable and
-# preview artifacts can coexist in the same GitHub Release asset list without
-# colliding. electron-updater reads preview.yml which references these names.
-nsis:
-  artifactName: Pilog-${version}-preview-Setup.${ext}
-dmg:
-  artifactName: Pilog-${version}-preview.${ext}
-appImage:
-  artifactName: Pilog-${version}-preview.${ext}
+# Preview artifacts use the full prerelease package version, e.g.
+# Pilog-0.1.0-preview.1.dmg. electron-updater reads preview.yml.

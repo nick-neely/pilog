@@ -87,6 +87,11 @@ jobs:
           # Skip the Electron native-module rebuild — not needed for typecheck/test.
           PILOG_SANDBOX: '1'
 
+      - name: Validate release package versions
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: node scripts/validate-release-version.mjs "$VERSION"
+
       - name: Typecheck
         run: pnpm run typecheck
 
@@ -120,7 +125,7 @@ jobs:
 
       - name: Publish macOS preview artifacts
         # Uses electron-builder.preview.yml: channel=preview, releaseType=prerelease.
-        # Uploads Pilog-X.Y.Z-preview.dmg, Pilog-X.Y.Z-preview-mac.zip, and preview-mac.yml.
+        # Uploads Pilog-X.Y.Z-preview.N.dmg, Pilog-X.Y.Z-preview.N-mac.zip, and preview-mac.yml.
         run: pnpm exec electron-builder --mac --config electron-builder.preview.yml --publish always
 
       - name: Generate checksums
@@ -165,7 +170,7 @@ jobs:
         run: pnpm exec electron-vite build
 
       - name: Publish Windows preview artifacts
-        # Uploads Pilog-X.Y.Z-preview-Setup.exe and preview.yml updater metadata.
+        # Uploads Pilog-X.Y.Z-preview.N-Setup.exe and preview.yml updater metadata.
         run: pnpm exec electron-builder --win --config electron-builder.preview.yml --publish always
 
       - name: Generate checksums
@@ -210,7 +215,7 @@ jobs:
         run: pnpm exec electron-vite build
 
       - name: Publish Linux preview artifacts
-        # Uploads Pilog-X.Y.Z-preview.AppImage, .deb, .snap and preview-linux.yml.
+        # Uploads Pilog-X.Y.Z-preview.N.AppImage, .deb and preview-linux.yml.
         run: pnpm exec electron-builder --linux --config electron-builder.preview.yml --publish always
 
       - name: Generate checksums

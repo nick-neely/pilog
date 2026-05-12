@@ -24,83 +24,121 @@ Do **not** tag the first preview as `v0.1.0`. That is a stable tag and will run 
 
 1. Start from an up-to-date, clean `main` branch.
 
-```bash
- git switch main
- git pull --ff-only
- git status --short
-```
+   ```bash
+   git switch main
+   git pull --ff-only
+   git status --short
+   ```
 
-Stop if `git status --short` shows unexpected changes. Commit, stash, or intentionally keep only the release changes before continuing. 2. Confirm the required GitHub Actions secrets are set.
-In GitHub, open **Settings → Secrets and variables → Actions** and confirm:
+   Stop if `git status --short` shows unexpected changes. Commit, stash, or intentionally keep only the release changes before continuing.
 
-- `VERCEL_TOKEN`
-- `VERCEL_ORG_ID`
-- `VERCEL_PROJECT_ID`
-  Signing secrets are not required for this first preview. The macOS and Windows artifacts are expected to be unsigned until signing is configured.
+2. Confirm the required GitHub Actions secrets are set.
 
-3. Set the preview version in `package.json`.
-   For the first preview, `package.json` must say `0.1.0-preview.1`, not plain `0.1.0`.
-   Or edit `package.json` directly and set:
+   In GitHub, open **Settings → Secrets and variables → Actions** and confirm:
+
+   - `VERCEL_TOKEN`
+   - `VERCEL_ORG_ID`
+   - `VERCEL_PROJECT_ID`
+
+   Signing secrets are not required for this first preview. The macOS and Windows artifacts are expected to be unsigned until signing is configured.
+
+3. Set the preview version in both package files.
+
+   For the first preview, both `package.json` and `app/package.json` must say `0.1.0-preview.1`, not plain `0.1.0`. electron-builder reads the runtime package in `app/`, so both files must stay in sync.
+
+   ```bash
+   npm version 0.1.0-preview.1 --no-git-tag-version
+   npm --prefix app version 0.1.0-preview.1 --no-git-tag-version
+   ```
+
 4. Run the local release checks.
 
-```bash
- pnpm install
- pnpm run typecheck
- pnpm run build
-```
+   ```bash
+   pnpm install
+   pnpm run typecheck
+   pnpm run test
+   pnpm run build
+   ```
 
-If any command fails, fix it before creating the release tag. 5. Commit the version change.
+   If any command fails, fix it before creating the release tag.
 
-```bash
- git add package.json
- git commit -m "chore: bump version to 0.1.0-preview.1"
-```
+5. Commit the version change.
+
+   ```bash
+   git add package.json app/package.json
+   git commit -m "chore: bump version to 0.1.0-preview.1"
+   ```
 
 6. Create the preview tag.
 
-```bash
- git tag v0.1.0-preview.1
-```
+   ```bash
+   git tag v0.1.0-preview.1
+   ```
 
 7. Push `main`, then push the tag.
 
-```bash
- git push origin main
- git push origin v0.1.0-preview.1
-```
+   ```bash
+   git push origin main
+   git push origin v0.1.0-preview.1
+   ```
 
-The tag push starts **Release — Preview** automatically. 8. Watch the workflow.
-In GitHub, open **Actions → Release — Preview** and wait for all jobs to pass: 9. Verify the GitHub pre-release.
-Open the GitHub Release for `v0.1.0-preview.1` and confirm:
+   The tag push starts **Release — Preview** automatically.
 
-- The release is marked **Pre-release**.
-- macOS artifacts exist: `Pilog-0.1.0-preview.dmg`, `Pilog-0.1.0-preview-mac.zip`, `preview-mac.yml`.
-- Windows artifacts exist: `Pilog-0.1.0-preview-Setup.exe`, `preview.yml`.
-- Linux artifacts exist: `Pilog-0.1.0-preview.AppImage`, `Pilog-0.1.0-preview.deb`, `preview-linux.yml`.
-- `.sha256` files and `checksums-preview-*.txt` files are present.
+8. Watch the workflow.
+
+   In GitHub, open **Actions → Release — Preview** and wait for all jobs to pass:
+
+   ```text
+   validate → verify → build-mac / build-win / build-linux → publish-manifest → deploy-site
+   ```
+
+9. Verify the GitHub pre-release.
+
+   Open the GitHub Release for `v0.1.0-preview.1` and confirm:
+
+   - The release is marked **Pre-release**.
+   - macOS artifacts exist: `Pilog-0.1.0-preview.1.dmg`, `Pilog-0.1.0-preview.1-mac.zip`, `preview-mac.yml`.
+   - Windows artifacts exist: `Pilog-0.1.0-preview.1-Setup.exe`, `preview.yml`.
+   - Linux artifacts exist: `Pilog-0.1.0-preview.1.AppImage`, `Pilog-0.1.0-preview.1.deb`, `preview-linux.yml`.
+   - `.sha256` files and `checksums-preview-*.txt` files are present.
 
 10. Verify the manifest commit on `main`.
+
     After the workflow finishes, GitHub Actions should commit an updated `site/src/data/release-manifest.json` to `main`.
+
     Confirm the manifest contains:
+
+    ```json
+    "preview": {
+      "version": "0.1.0-preview.1"
+    }
+    ```
+
     The `stable` field should stay `null` or stay on the last stable version. A preview release must not overwrite stable.
+
 11. Verify `pilog.dev`.
+
     Open `https://pilog.dev/preview` and confirm it shows `0.1.0-preview.1`.
+
     Also open `https://pilog.dev/download` and confirm it does **not** present the preview as the stable download.
+
 12. Install and smoke-test the preview.
+
     On the platforms you can access:
 
-- Download from `https://pilog.dev/preview`.
-- Verify the checksum against the GitHub Release `.sha256` sidecar.
-- Install the app.
-- Expect unsigned-app warnings on macOS and Windows.
-- Launch Pilog.
-- Open Settings → Software updates and confirm the installed version is `0.1.0-preview.1` and the channel is **Preview**.
-- Create a note.
-- Link a repository.
-- Generate a draft.
-- If you are ready to test publishing, publish one draft to GitHub and confirm the issue URL is saved in Pilog.
+    - Download from `https://pilog.dev/preview`.
+    - Verify the checksum against the GitHub Release `.sha256` sidecar.
+    - Install the app.
+    - Expect unsigned-app warnings on macOS and Windows.
+    - Launch Pilog.
+    - Open Settings → Software updates and confirm the installed version is `0.1.0-preview.1` and the channel is **Preview**.
+    - Create a note.
+    - Link a repository.
+    - Generate a draft.
+    - If you are ready to test publishing, publish one draft to GitHub and confirm the issue URL is saved in Pilog.
 
 13. Share the preview.
+
     Send testers the `https://pilog.dev/preview` link and tell them this is an unsigned preview build. For macOS, they may need **System Settings → Privacy & Security → Open Anyway**. For Windows, they may need **More info → Run anyway** in SmartScreen.
 
 ### If the first preview needs a fix
@@ -109,7 +147,8 @@ Do not move or reuse the old tag. Make the fix on `main`, then publish the next 
 
 ```bash
 npm version 0.1.0-preview.2 --no-git-tag-version
-git add package.json
+npm --prefix app version 0.1.0-preview.2 --no-git-tag-version
+git add package.json app/package.json
 git commit -m "chore: bump version to 0.1.0-preview.2"
 git tag v0.1.0-preview.2
 git push origin main
@@ -122,7 +161,8 @@ Publish stable `0.1.0` only after the preview build has been tested enough that 
 
 ```bash
 npm version 0.1.0 --no-git-tag-version
-git add package.json
+npm --prefix app version 0.1.0 --no-git-tag-version
+git add package.json app/package.json
 git commit -m "chore: bump version to 0.1.0"
 git tag v0.1.0
 git push origin main
@@ -140,7 +180,7 @@ That tag starts **Release — Stable** and updates `https://pilog.dev/download`.
 | Stable  | `vX.Y.Z`           | Release (non-draft) | `latest.yml` / `latest-mac.yml` / `latest-linux.yml`    |
 | Preview | `vX.Y.Z-preview.N` | Pre-release         | `preview.yml` / `preview-mac.yml` / `preview-linux.yml` |
 
-Stable and preview artifacts coexist in GitHub Releases without collision because preview artifact names embed `-preview` before the extension (e.g. `Pilog-1.2.3-preview.dmg` vs `Pilog-1.2.3.dmg`).
+Stable and preview artifacts coexist in GitHub Releases without collision because preview package versions include the prerelease suffix (e.g. `Pilog-1.2.3-preview.4.dmg` vs `Pilog-1.2.3.dmg`).
 
 ---
 
@@ -183,7 +223,8 @@ The tag must already exist in the repo. The workflow re-uses the same GitHub Rel
 
 ```bash
 npm version X.Y.Z-preview.N --no-git-tag-version
-git add package.json
+npm --prefix app version X.Y.Z-preview.N --no-git-tag-version
+git add package.json app/package.json
 git commit -m "chore: bump version to X.Y.Z-preview.N"
 git tag vX.Y.Z-preview.N
 git push origin main
@@ -231,7 +272,8 @@ validate → verify → build-mac ┐
 ### Stage 1 — Validate
 
 - Resolves the tag from the push event or `workflow_dispatch` input.
-- Rejects misrouted tags: stable workflow rejects `-preview` tags; preview workflow rejects tags without `-preview`.
+- Rejects misrouted manual runs: stable workflow rejects `-preview` tags; preview workflow rejects tags without `-preview`.
+- Preview tag pushes are excluded from the stable workflow trigger, so a `vX.Y.Z-preview.N` push should start only **Release — Preview**.
 - Validates the exact tag format (`vX.Y.Z` or `vX.Y.Z-preview.N`).
 
 ### Stage 2 — Verify
@@ -288,18 +330,17 @@ Requires `VERCEL_TOKEN`, `VERCEL_ORG_ID`, and `VERCEL_PROJECT_ID` to be set as G
 | Windows  | `checksums-win.txt`            | Combined Windows checksums |
 | Linux    | `Pilog-X.Y.Z.AppImage`         | AppImage                   |
 | Linux    | `Pilog-X.Y.Z.deb`              | Debian package             |
-| Linux    | `Pilog-X.Y.Z.snap`             | Snap package               |
 | Linux    | `latest-linux.yml`             | Updater metadata           |
 | Linux    | `*.sha256` (per artifact)      | Checksum sidecars          |
 | Linux    | `checksums-linux.txt`          | Combined Linux checksums   |
 
 ### Preview release (`vX.Y.Z-preview.N`)
 
-Same set of artifacts with `-preview` embedded before the extension:
+Same set of artifacts with the full prerelease version in the filename:
 
-- `Pilog-X.Y.Z-preview.dmg`, `Pilog-X.Y.Z-preview-mac.zip`, `preview-mac.yml`, …
-- `Pilog-X.Y.Z-preview-Setup.exe`, `preview.yml`, …
-- `Pilog-X.Y.Z-preview.AppImage`, `Pilog-X.Y.Z-preview.deb`, `preview-linux.yml`, …
+- `Pilog-X.Y.Z-preview.N.dmg`, `Pilog-X.Y.Z-preview.N-mac.zip`, `preview-mac.yml`, …
+- `Pilog-X.Y.Z-preview.N-Setup.exe`, `preview.yml`, …
+- `Pilog-X.Y.Z-preview.N.AppImage`, `Pilog-X.Y.Z-preview.N.deb`, `preview-linux.yml`, …
 
 ---
 
@@ -382,7 +423,7 @@ Only re-run **Release — Stable** or **Release — Preview** when you need to r
 
 | Failing stage              | What to check                                                                                                                                                              |
 | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Validate                   | Tag format in the push ref or `workflow_dispatch` input. Stable workflow rejects preview tags by design.                                                                   |
+| Validate                   | Tag format in the push ref or `workflow_dispatch` input. Stable workflow rejects preview tags in manual runs; preview tag pushes should be excluded by the workflow trigger. |
 | Verify — Typecheck         | TypeScript errors in the workflow log. Fix and push a corrected commit, then re-tag.                                                                                       |
 | Verify — Test              | Failing Vitest tests in the log.                                                                                                                                           |
 | Build (electron-vite)      | Compilation errors in the `Build app` step.                                                                                                                                |

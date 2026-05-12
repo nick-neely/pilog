@@ -36,11 +36,12 @@ dmg:
 linux:
   target:
     - AppImage
-    - snap
     - deb
   executableName: pilog
   maintainer: Nick Neely
   category: Development
 appImage:
+  artifactName: Pilog-${version}.${ext}
+deb:
   artifactName: Pilog-${version}.${ext}
 npmRebuild: true

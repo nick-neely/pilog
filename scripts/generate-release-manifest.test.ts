@@ -16,15 +16,14 @@ describe('isArtifactAsset', () => {
     expect(isArtifactAsset('Pilog-1.0.0-Setup.exe')).toBe(true)
     expect(isArtifactAsset('Pilog-1.0.0.AppImage')).toBe(true)
     expect(isArtifactAsset('Pilog-1.0.0.deb')).toBe(true)
-    expect(isArtifactAsset('Pilog-1.0.0.snap')).toBe(true)
   })
 
   it('returns true for preview artifact files', () => {
-    expect(isArtifactAsset('Pilog-0.1.0-preview.dmg')).toBe(true)
-    expect(isArtifactAsset('Pilog-0.1.0-preview-mac.zip')).toBe(true)
-    expect(isArtifactAsset('Pilog-0.1.0-preview-Setup.exe')).toBe(true)
-    expect(isArtifactAsset('Pilog-0.1.0-preview.AppImage')).toBe(true)
-    expect(isArtifactAsset('Pilog-0.1.0-preview.deb')).toBe(true)
+    expect(isArtifactAsset('Pilog-0.1.0-preview.1.dmg')).toBe(true)
+    expect(isArtifactAsset('Pilog-0.1.0-preview.1-mac.zip')).toBe(true)
+    expect(isArtifactAsset('Pilog-0.1.0-preview.1-Setup.exe')).toBe(true)
+    expect(isArtifactAsset('Pilog-0.1.0-preview.1.AppImage')).toBe(true)
+    expect(isArtifactAsset('Pilog-0.1.0-preview.1.deb')).toBe(true)
   })
 
   it('returns false for checksum sidecars, updater metadata, and text files', () => {
@@ -43,21 +42,20 @@ describe('detectPlatform', () => {
   it('identifies macOS artifacts', () => {
     expect(detectPlatform('Pilog-1.0.0.dmg')).toBe('macos')
     expect(detectPlatform('Pilog-1.0.0-mac.zip')).toBe('macos')
-    expect(detectPlatform('Pilog-0.1.0-preview.dmg')).toBe('macos')
-    expect(detectPlatform('Pilog-0.1.0-preview-mac.zip')).toBe('macos')
+    expect(detectPlatform('Pilog-0.1.0-preview.1.dmg')).toBe('macos')
+    expect(detectPlatform('Pilog-0.1.0-preview.1-mac.zip')).toBe('macos')
   })
 
   it('identifies Windows artifacts', () => {
     expect(detectPlatform('Pilog-1.0.0-Setup.exe')).toBe('windows')
-    expect(detectPlatform('Pilog-0.1.0-preview-Setup.exe')).toBe('windows')
+    expect(detectPlatform('Pilog-0.1.0-preview.1-Setup.exe')).toBe('windows')
   })
 
   it('identifies Linux artifacts', () => {
     expect(detectPlatform('Pilog-1.0.0.AppImage')).toBe('linux')
     expect(detectPlatform('Pilog-1.0.0.deb')).toBe('linux')
-    expect(detectPlatform('Pilog-1.0.0.snap')).toBe('linux')
-    expect(detectPlatform('Pilog-0.1.0-preview.AppImage')).toBe('linux')
-    expect(detectPlatform('Pilog-0.1.0-preview.deb')).toBe('linux')
+    expect(detectPlatform('Pilog-0.1.0-preview.1.AppImage')).toBe('linux')
+    expect(detectPlatform('Pilog-0.1.0-preview.1.deb')).toBe('linux')
   })
 
   it('returns null for non-artifact files', () => {
@@ -71,14 +69,13 @@ describe('detectPlatform', () => {
 describe('detectLabel', () => {
   it('returns correct labels for each artifact type', () => {
     expect(detectLabel('Pilog-1.0.0.dmg')).toBe('DMG installer')
-    expect(detectLabel('Pilog-0.1.0-preview.dmg')).toBe('DMG installer')
+    expect(detectLabel('Pilog-0.1.0-preview.1.dmg')).toBe('DMG installer')
     expect(detectLabel('Pilog-1.0.0-mac.zip')).toBe('ZIP archive')
-    expect(detectLabel('Pilog-0.1.0-preview-mac.zip')).toBe('ZIP archive')
+    expect(detectLabel('Pilog-0.1.0-preview.1-mac.zip')).toBe('ZIP archive')
     expect(detectLabel('Pilog-1.0.0-Setup.exe')).toBe('Installer')
-    expect(detectLabel('Pilog-0.1.0-preview-Setup.exe')).toBe('Installer')
+    expect(detectLabel('Pilog-0.1.0-preview.1-Setup.exe')).toBe('Installer')
     expect(detectLabel('Pilog-1.0.0.AppImage')).toBe('AppImage')
     expect(detectLabel('Pilog-1.0.0.deb')).toBe('.deb package')
-    expect(detectLabel('Pilog-1.0.0.snap')).toBe('.snap package')
   })
 })
 
@@ -228,18 +225,18 @@ describe('buildChannel', () => {
   it('handles preview artifacts correctly', () => {
     const previewAssets: AssetInfo[] = [
       {
-        name: 'Pilog-0.1.0-preview.dmg',
-        downloadUrl: 'https://example.com/Pilog-0.1.0-preview.dmg',
+        name: 'Pilog-0.1.0-preview.1.dmg',
+        downloadUrl: 'https://example.com/Pilog-0.1.0-preview.1.dmg',
         fileSize: 100000
       },
       {
-        name: 'Pilog-0.1.0-preview-mac.zip',
-        downloadUrl: 'https://example.com/Pilog-0.1.0-preview-mac.zip',
+        name: 'Pilog-0.1.0-preview.1-mac.zip',
+        downloadUrl: 'https://example.com/Pilog-0.1.0-preview.1-mac.zip',
         fileSize: 80000
       },
       {
-        name: 'Pilog-0.1.0-preview-Setup.exe',
-        downloadUrl: 'https://example.com/Pilog-0.1.0-preview-Setup.exe',
+        name: 'Pilog-0.1.0-preview.1-Setup.exe',
+        downloadUrl: 'https://example.com/Pilog-0.1.0-preview.1-Setup.exe',
         fileSize: 90000
       }
     ]
@@ -254,7 +251,7 @@ describe('buildChannel', () => {
     expect(platformIds).toContain('macos')
     expect(platformIds).toContain('windows')
     const macos = ch.platforms.find((p) => p.platform === 'macos')!
-    expect(macos.artifacts.map((a) => a.fileName)).toContain('Pilog-0.1.0-preview.dmg')
+    expect(macos.artifacts.map((a) => a.fileName)).toContain('Pilog-0.1.0-preview.1.dmg')
     const manifest: ReleaseManifest = { schemaVersion: 1, stable: null, preview: ch }
     expect(validateReleaseManifest(manifest)).toEqual([])
   })

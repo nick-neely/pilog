@@ -60,7 +60,7 @@ export function isArtifactAsset(name: string): boolean {
 export function detectPlatform(name: string): Platform | null {
   if (name.endsWith('.dmg') || name.endsWith('-mac.zip')) return 'macos'
   if (name.endsWith('.exe')) return 'windows'
-  if (name.endsWith('.AppImage') || name.endsWith('.deb') || name.endsWith('.snap')) return 'linux'
+  if (name.endsWith('.AppImage') || name.endsWith('.deb')) return 'linux'
   return null
 }
 
@@ -70,7 +70,6 @@ export function detectLabel(name: string): string {
   if (name.endsWith('.exe')) return 'Installer'
   if (name.endsWith('.AppImage')) return 'AppImage'
   if (name.endsWith('.deb')) return '.deb package'
-  if (name.endsWith('.snap')) return '.snap package'
   return name
 }
 

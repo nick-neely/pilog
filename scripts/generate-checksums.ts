@@ -7,9 +7,9 @@
  *   Linux:   Pilog-<version>.AppImage  |  Pilog-<version>.deb
  *
  * Preview artifact names (electron-builder.preview.yml):
- *   macOS:   Pilog-<version>-preview.dmg  |  Pilog-<version>-preview-mac.zip
- *   Windows: Pilog-<version>-preview-Setup.exe
- *   Linux:   Pilog-<version>-preview.AppImage  |  Pilog-<version>-preview.deb
+ *   macOS:   Pilog-<version>.dmg  |  Pilog-<version>-mac.zip
+ *   Windows: Pilog-<version>-Setup.exe
+ *   Linux:   Pilog-<version>.AppImage  |  Pilog-<version>.deb
  *
  * Output per artifact: <artifact>.sha256
  * Output combined:     <distDir>/checksums.txt  (sha256sum-compatible format)
@@ -21,7 +21,7 @@ import { readdir, stat, writeFile } from 'node:fs/promises'
 import { basename, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-export const ARTIFACT_EXTENSIONS = ['.dmg', '.exe', '.AppImage', '.deb', '.snap', '.zip']
+export const ARTIFACT_EXTENSIONS = ['.dmg', '.exe', '.AppImage', '.deb', '.zip']
 
 export interface ChecksumEntry {
   sha256: string
