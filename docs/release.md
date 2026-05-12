@@ -35,7 +35,6 @@ Do **not** tag the first preview as `v0.1.0`. That is a stable tag and will run 
 2. Confirm the required GitHub Actions secrets are set.
 
    In GitHub, open **Settings → Secrets and variables → Actions** and confirm:
-
    - `VERCEL_TOKEN`
    - `VERCEL_ORG_ID`
    - `VERCEL_PROJECT_ID`
@@ -47,8 +46,7 @@ Do **not** tag the first preview as `v0.1.0`. That is a stable tag and will run 
    For the first preview, both `package.json` and `app/package.json` must say `0.1.0-preview.1`, not plain `0.1.0`. electron-builder reads the runtime package in `app/`, so both files must stay in sync.
 
    ```bash
-   npm version 0.1.0-preview.1 --no-git-tag-version
-   npm --prefix app version 0.1.0-preview.1 --no-git-tag-version
+   pnpm release:bump preview 0.1.0-preview.1
    ```
 
 4. Run the local release checks.
@@ -95,7 +93,6 @@ Do **not** tag the first preview as `v0.1.0`. That is a stable tag and will run 
 9. Verify the GitHub pre-release.
 
    Open the GitHub Release for `v0.1.0-preview.1` and confirm:
-
    - The release is marked **Pre-release**.
    - macOS artifacts exist: `Pilog-0.1.0-preview.1.dmg`, `Pilog-0.1.0-preview.1-mac.zip`, `preview-mac.yml`.
    - Windows artifacts exist: `Pilog-0.1.0-preview.1-Setup.exe`, `preview.yml`.
@@ -125,7 +122,6 @@ Do **not** tag the first preview as `v0.1.0`. That is a stable tag and will run 
 12. Install and smoke-test the preview.
 
     On the platforms you can access:
-
     - Download from `https://pilog.dev/preview`.
     - Verify the checksum against the GitHub Release `.sha256` sidecar.
     - Install the app.
@@ -146,13 +142,7 @@ Do **not** tag the first preview as `v0.1.0`. That is a stable tag and will run 
 Do not move or reuse the old tag. Make the fix on `main`, then publish the next preview:
 
 ```bash
-npm version 0.1.0-preview.2 --no-git-tag-version
-npm --prefix app version 0.1.0-preview.2 --no-git-tag-version
-git add package.json app/package.json
-git commit -m "chore: bump version to 0.1.0-preview.2"
-git tag v0.1.0-preview.2
-git push origin main
-git push origin v0.1.0-preview.2
+pnpm release:bump preview 0.1.0-preview.2 --commit --tag --push
 ```
 
 ### When the preview is ready to promote
@@ -160,13 +150,7 @@ git push origin v0.1.0-preview.2
 Publish stable `0.1.0` only after the preview build has been tested enough that you want it on the main download page:
 
 ```bash
-npm version 0.1.0 --no-git-tag-version
-npm --prefix app version 0.1.0 --no-git-tag-version
-git add package.json app/package.json
-git commit -m "chore: bump version to 0.1.0"
-git tag v0.1.0
-git push origin main
-git push origin v0.1.0
+pnpm release:bump stable 0.1.0 --commit --tag --push
 ```
 
 That tag starts **Release — Stable** and updates `https://pilog.dev/download`.
@@ -193,18 +177,25 @@ The version in `package.json` must match the tag before publishing. electron-bui
 
 ---
 
+## Release bump helper
+
+Use `pnpm release:bump` to update both package files and optionally create the commit, tag, and push:
+
+```bash
+pnpm release:bump preview 1.2.3-preview.4 --commit --tag --push
+pnpm release:bump stable 1.2.3 --commit --tag --push
+```
+
+The helper validates stable vs preview version formats, updates `package.json` and `app/package.json` together, runs `scripts/validate-release-version.mjs`, stages only those package files, and refuses to tag or push unless `--commit` is also present. Use `--dry-run` to preview the exact changes and git commands without writing anything.
+
+---
+
 ## Publishing a stable release
 
 ### 1. Bump the version
 
 ```bash
-# Update package.json version to X.Y.Z, commit, tag, and push
-npm version X.Y.Z --no-git-tag-version   # or edit package.json directly
-git add package.json
-git commit -m "chore: bump version to X.Y.Z"
-git tag vX.Y.Z
-git push origin main
-git push origin vX.Y.Z
+pnpm release:bump stable X.Y.Z --commit --tag --push
 ```
 
 The `Release — Stable` workflow triggers automatically on the tag push.
@@ -222,13 +213,7 @@ The tag must already exist in the repo. The workflow re-uses the same GitHub Rel
 ### 1. Bump the version
 
 ```bash
-npm version X.Y.Z-preview.N --no-git-tag-version
-npm --prefix app version X.Y.Z-preview.N --no-git-tag-version
-git add package.json app/package.json
-git commit -m "chore: bump version to X.Y.Z-preview.N"
-git tag vX.Y.Z-preview.N
-git push origin main
-git push origin vX.Y.Z-preview.N
+pnpm release:bump preview X.Y.Z-preview.N --commit --tag --push
 ```
 
 The `Release — Preview` workflow triggers automatically.
@@ -421,17 +406,17 @@ Only re-run **Release — Stable** or **Release — Preview** when you need to r
 
 ## Failure diagnosis
 
-| Failing stage              | What to check                                                                                                                                                              |
-| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Failing stage              | What to check                                                                                                                                                                |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Validate                   | Tag format in the push ref or `workflow_dispatch` input. Stable workflow rejects preview tags in manual runs; preview tag pushes should be excluded by the workflow trigger. |
-| Verify — Typecheck         | TypeScript errors in the workflow log. Fix and push a corrected commit, then re-tag.                                                                                       |
-| Verify — Test              | Failing Vitest tests in the log.                                                                                                                                           |
-| Build (electron-vite)      | Compilation errors in the `Build app` step.                                                                                                                                |
-| Publish (electron-builder) | Packaging errors, code-signing failures, or GitHub API upload errors. Check `GH_TOKEN` permissions (`contents: write`). Rate limits may require re-running the job.        |
-| Checksums                  | `pnpm run build:checksums` failure means no artifacts were found in `dist/`. The preceding publish step likely failed.                                                     |
-| Checksum upload            | `gh release upload` failure — the GitHub Release may not exist yet (publish step failed) or a network issue occurred.                                                      |
-| Publish manifest           | `generate:manifest` script failure or manifest validation failure. Check the manifest script logs for missing release assets.                                              |
-| Deploy site                | `vercel` CLI failure. Verify that `VERCEL_TOKEN`, `VERCEL_ORG_ID`, and `VERCEL_PROJECT_ID` secrets are set in the repository. Check the Vercel dashboard for build errors. |
+| Verify — Typecheck         | TypeScript errors in the workflow log. Fix and push a corrected commit, then re-tag.                                                                                         |
+| Verify — Test              | Failing Vitest tests in the log.                                                                                                                                             |
+| Build (electron-vite)      | Compilation errors in the `Build app` step.                                                                                                                                  |
+| Publish (electron-builder) | Packaging errors, code-signing failures, or GitHub API upload errors. Check `GH_TOKEN` permissions (`contents: write`). Rate limits may require re-running the job.          |
+| Checksums                  | `pnpm run build:checksums` failure means no artifacts were found in `dist/`. The preceding publish step likely failed.                                                       |
+| Checksum upload            | `gh release upload` failure — the GitHub Release may not exist yet (publish step failed) or a network issue occurred.                                                        |
+| Publish manifest           | `generate:manifest` script failure or manifest validation failure. Check the manifest script logs for missing release assets.                                                |
+| Deploy site                | `vercel` CLI failure. Verify that `VERCEL_TOKEN`, `VERCEL_ORG_ID`, and `VERCEL_PROJECT_ID` secrets are set in the repository. Check the Vercel dashboard for build errors.   |
 
 ---
 

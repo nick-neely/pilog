@@ -37,6 +37,7 @@
     "test:e2e": "playwright test",
     "test:e2e:packaged": "pnpm run build:unpack && playwright test e2e/packaged-runtime.spec.ts",
     "build:checksums": "tsx scripts/generate-checksums.ts",
+    "release:bump": "node scripts/bump-release.mjs",
     "generate:manifest": "tsx scripts/generate-release-manifest.ts"
   },
   "devDependencies": {

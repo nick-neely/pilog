@@ -13,7 +13,9 @@ let failed = false
 for (const packagePath of packagePaths) {
   const pkg = JSON.parse(readFileSync(packagePath, 'utf8'))
   if (pkg.version !== expectedVersion) {
-    console.error(`${packagePath} version ${pkg.version} does not match release version ${expectedVersion}`)
+    console.error(
+      `${packagePath} version ${pkg.version} does not match release version ${expectedVersion}`
+    )
     failed = true
   }
 }
