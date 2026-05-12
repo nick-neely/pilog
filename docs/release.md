@@ -197,7 +197,15 @@ These values are never committed to source. The `site/vercel.json` file contains
 
 ### Preview deployments
 
-Vercel's GitHub integration auto-deploys every branch push and pull request to a preview URL without publishing desktop releases. No extra configuration is required — preview deployments happen on all branches, while production deployments are reserved for the Release Actions.
+Vercel's GitHub integration auto-deploys every branch push and pull request to a preview URL without publishing desktop releases. No extra configuration is required — preview deployments happen on all branches, while production deployments happen through GitHub Actions: Release Actions for desktop releases, and **Deploy Site — Production** for site-only changes.
+
+### Site-only production deployments
+
+For changes under `site/` that do not require a new desktop app version, push the change to `main` and let the **Deploy Site — Production** workflow publish `pilog.dev`.
+
+The workflow triggers on `main` when files under `site/` change, excluding the generated `site/src/data/release-manifest.json`. Release workflows already deploy the site after updating that manifest, so manifest-only release commits do not start a duplicate site-only deployment.
+
+You can also run **Deploy Site — Production** manually from GitHub Actions to redeploy the current `main` branch without creating or re-running an Electron release.
 
 ### Inspecting a production deployment
 
@@ -229,9 +237,9 @@ vercel ls --prod --token "$VERCEL_TOKEN"
 vercel promote <deployment-url> --token "$VERCEL_TOKEN"
 ```
 
-### Manually redeploying
+### Manually redeploying from a workstation
 
-To redeploy the current `main` branch without pushing a new release:
+Prefer the **Deploy Site — Production** workflow for normal site-only production deploys. To redeploy from a workstation with access to the Vercel secrets:
 
 ```bash
 cd site
@@ -240,7 +248,7 @@ vercel build --prod --token "$VERCEL_TOKEN"
 vercel deploy --prebuilt --prod --token "$VERCEL_TOKEN"
 ```
 
-Or trigger a re-run of the release workflow via GitHub → Actions → **Release — Stable** (or Preview) → Run workflow → enter the existing tag.
+Only re-run **Release — Stable** or **Release — Preview** when you need to repair or repeat a desktop release.
 
 ---
 
