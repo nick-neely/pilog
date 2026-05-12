@@ -2,9 +2,9 @@
   "schemaVersion": 1,
   "stable": null,
   "preview": {
-    "version": "0.1.0-preview.1",
-    "releaseUrl": "https://github.com/nick-neely/pilog/releases/tag/v0.1.0-preview.1",
-    "publishedAt": "2026-05-11T00:00:00Z",
+    "version": "0.1.0-preview.2",
+    "releaseUrl": "https://github.com/nick-neely/pilog/releases/tag/v0.1.0-preview.2",
+    "publishedAt": "2026-05-12T17:39:37Z",
     "platforms": [
       {
         "platform": "macos",
@@ -12,14 +12,18 @@
         "description": "Unsigned universal build for Apple Silicon and Intel Macs.",
         "artifacts": [
           {
-            "fileName": "Pilog-0.1.0-preview.dmg",
-            "downloadUrl": "https://github.com/nick-neely/pilog/releases/download/v0.1.0-preview.1/Pilog-0.1.0-preview.dmg",
-            "label": "DMG installer"
+            "fileName": "Pilog-0.1.0-preview.2-arm64-mac.zip",
+            "downloadUrl": "https://github.com/nick-neely/pilog/releases/download/v0.1.0-preview.2/Pilog-0.1.0-preview.2-arm64-mac.zip",
+            "label": "ZIP archive",
+            "fileSize": 132123032,
+            "sha256": "574713328550e4d64001438b2ebaba76fe900273d0f60e81a44dc9ba4c36520c"
           },
           {
-            "fileName": "Pilog-0.1.0-preview-mac.zip",
-            "downloadUrl": "https://github.com/nick-neely/pilog/releases/download/v0.1.0-preview.1/Pilog-0.1.0-preview-mac.zip",
-            "label": "ZIP archive"
+            "fileName": "Pilog-0.1.0-preview.2.dmg",
+            "downloadUrl": "https://github.com/nick-neely/pilog/releases/download/v0.1.0-preview.2/Pilog-0.1.0-preview.2.dmg",
+            "label": "DMG installer",
+            "fileSize": 137983469,
+            "sha256": "f55355f1dbf667956ba6d4d4a7365c8b1277b0be1108dc024e2cab7bf2a9f5bd"
           }
         ]
       },
@@ -29,9 +33,11 @@
         "description": "Unsigned 64-bit installer for Windows 10+.",
         "artifacts": [
           {
-            "fileName": "Pilog-0.1.0-preview-Setup.exe",
-            "downloadUrl": "https://github.com/nick-neely/pilog/releases/download/v0.1.0-preview.1/Pilog-0.1.0-preview-Setup.exe",
-            "label": "Installer"
+            "fileName": "Pilog-0.1.0-preview.2-Setup.exe",
+            "downloadUrl": "https://github.com/nick-neely/pilog/releases/download/v0.1.0-preview.2/Pilog-0.1.0-preview.2-Setup.exe",
+            "label": "Installer",
+            "fileSize": 113285694,
+            "sha256": "01da2081007bfb2ff39593c94223fc09ba13a93695dad2b13dd8886ed6d64c4a"
           }
         ]
       },
@@ -41,14 +47,18 @@
         "description": "AppImage and .deb packages.",
         "artifacts": [
           {
-            "fileName": "Pilog-0.1.0-preview.AppImage",
-            "downloadUrl": "https://github.com/nick-neely/pilog/releases/download/v0.1.0-preview.1/Pilog-0.1.0-preview.AppImage",
-            "label": "AppImage"
+            "fileName": "Pilog-0.1.0-preview.2.AppImage",
+            "downloadUrl": "https://github.com/nick-neely/pilog/releases/download/v0.1.0-preview.2/Pilog-0.1.0-preview.2.AppImage",
+            "label": "AppImage",
+            "fileSize": 140422930,
+            "sha256": "66364c0f4d894e452f6779797fb60692e503f8e7b5a13d8f7a37bd16f1bf444a"
           },
           {
-            "fileName": "Pilog-0.1.0-preview.deb",
-            "downloadUrl": "https://github.com/nick-neely/pilog/releases/download/v0.1.0-preview.1/Pilog-0.1.0-preview.deb",
-            "label": ".deb package"
+            "fileName": "Pilog-0.1.0-preview.2.deb",
+            "downloadUrl": "https://github.com/nick-neely/pilog/releases/download/v0.1.0-preview.2/Pilog-0.1.0-preview.2.deb",
+            "label": ".deb package",
+            "fileSize": 108173832,
+            "sha256": "6de4bd40faa066545b52925fd889f93a4533cbb73d0d9d9801f6e9514e499a79"
           }
         ]
       }
