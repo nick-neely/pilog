@@ -124,7 +124,11 @@ export function PlatformDownload({ channel }: { channel: ReleaseChannel }) {
         </p>
         <div className="mt-4 space-y-4">
           {channel.platforms.map((platform) => (
-            <PlatformSection key={platform.platform} release={platform} />
+            <PlatformSection
+              key={platform.platform}
+              release={platform}
+              highlighted={detected !== 'unknown' && platform.platform === detected}
+            />
           ))}
         </div>
       </div>

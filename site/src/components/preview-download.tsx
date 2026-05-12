@@ -47,15 +47,13 @@ export function PreviewDownload({ channel }: { channel: ReleaseChannel }) {
         </Link>
       </div>
 
-      {primary && (
-        <p className="text-muted-foreground mt-4 text-sm">
-          Detected platform: <span className="text-foreground font-medium">{primary.label}</span>
-        </p>
-      )}
-
-      <div className="mt-4 space-y-4">
+      <div className="mt-6 space-y-4">
         {sortedPlatforms.map((platform) => (
-          <PlatformSection key={platform.platform} release={platform} />
+          <PlatformSection
+            key={platform.platform}
+            release={platform}
+            highlighted={detected !== 'unknown' && platform.platform === detected}
+          />
         ))}
       </div>
     </>
