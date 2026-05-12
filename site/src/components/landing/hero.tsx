@@ -71,7 +71,6 @@ export function Hero() {
           <div className="bg-popover ring-border relative rotate-[2.5deg] rounded-[1.75rem] p-4 shadow-xl ring-1 transition-transform duration-700 ease-out hover:rotate-[1.5deg] motion-reduce:transition-none">
             <PiMark variant="icon" priority className="block h-auto w-full rounded-[1.25rem]" />
           </div>
-
         </div>
       </div>
 

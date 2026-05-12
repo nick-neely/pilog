@@ -39,6 +39,12 @@
   --ring: oklch(0.48 0.08 145);
 
   --radius: 0.5rem;
+
+  /* Scrollbar — warm neutral thumb, subtle hover lift. Mirrors the Electron
+     app (src/renderer/src/assets/main.css) so the page and the in-app
+     surfaces feel like the same product. */
+  --scrollbar-thumb: oklch(0.75 0.009 70);
+  --scrollbar-thumb-hover: oklch(0.65 0.011 70);
 }
 
 .dark {
@@ -64,6 +70,10 @@
   --border: oklch(0.92 0.008 75 / 8%);
   --input: oklch(0.92 0.008 75 / 12%);
   --ring: oklch(0.6 0.085 145);
+
+  /* Scrollbar — warm-tinted alpha for dark surfaces */
+  --scrollbar-thumb: oklch(0.92 0.008 75 / 25%);
+  --scrollbar-thumb-hover: oklch(0.92 0.008 75 / 40%);
 }
 
 @layer base {
@@ -85,6 +95,34 @@
   pre,
   samp {
     font-family: var(--font-mono);
+  }
+
+  /* Page-level scrollbar — warm neutrals, Reading-Room palette.
+     WebKit for Chromium/Safari; scrollbar-color for Firefox. The renderer's
+     radix ScrollArea component (consumed via @pilog/ui/scroll-area) reads
+     the same --scrollbar-thumb tokens for in-component scroll surfaces. */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--scrollbar-thumb);
+    border-radius: 9999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--scrollbar-thumb-hover);
+  }
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  /* Firefox */
+  html {
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-thumb) transparent;
   }
 }
 

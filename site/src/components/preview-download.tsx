@@ -3,12 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import type { ReleaseChannel } from '@/lib/release-manifest'
-import {
-  detectPlatform,
-  getPrimaryRelease,
-  sortPlatformsForDetected,
-  type DetectedPlatform
-} from '@/lib/platform'
+import { detectPlatform, sortPlatformsForDetected, type DetectedPlatform } from '@/lib/platform'
 import { PlatformSection } from './artifact-list'
 
 export function PreviewDownload({ channel }: { channel: ReleaseChannel }) {
@@ -18,7 +13,6 @@ export function PreviewDownload({ channel }: { channel: ReleaseChannel }) {
     setDetected(detectPlatform())
   }, [])
 
-  const primary = getPrimaryRelease(channel, detected)
   const sortedPlatforms = sortPlatformsForDetected(channel.platforms, detected)
 
   return (

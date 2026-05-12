@@ -35,9 +35,7 @@ export function PlatformSection({
 }) {
   return (
     <div>
-      {highlighted && (
-        <p className="text-primary mb-1.5 font-mono text-xs">for your system</p>
-      )}
+      {highlighted && <p className="text-primary mb-1.5 font-mono text-xs">for your system</p>}
       <div
         className={
           highlighted

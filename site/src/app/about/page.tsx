@@ -28,7 +28,7 @@ const principles = [
   {
     num: '04',
     title: 'Restraint over reflex.',
-    body: "When the easy answer is \"add another card,\" \"open a modal,\" or \"add a gradient,\" it is usually the wrong answer. The product earns weight through typography, rhythm, and considered surfaces. Density comes from signal, never from chrome.",
+    body: 'When the easy answer is "add another card," "open a modal," or "add a gradient," it is usually the wrong answer. The product earns weight through typography, rhythm, and considered surfaces. Density comes from signal, never from chrome.',
     indent: 'md:pl-[15%]'
   },
   {
@@ -96,21 +96,21 @@ export default function AboutPage() {
                 just want to write one sentence. So the thought gets lost.
               </p>
               <p className="text-muted-foreground">
-                Pilog&#8217;s answer is a global hotkey scratchpad. Open it, write the note in
-                plain markdown, save, and the window disappears. No required fields. No repo
-                selector. No form. Just the note.
+                Pilog&#8217;s answer is a global hotkey scratchpad. Open it, write the note in plain
+                markdown, save, and the window disappears. No required fields. No repo selector. No
+                form. Just the note.
               </p>
             </div>
             <div className="space-y-5 text-base leading-relaxed">
               <p className="text-muted-foreground">
                 The inbox is the other half. When you have a moment, select the notes you want to
                 work through and let the draft generator read them alongside your active repository.
-                It groups related notes, names affected files, and writes structured issue drafts you
-                can review before anything is published.
+                It groups related notes, names affected files, and writes structured issue drafts
+                you can review before anything is published.
               </p>
               <p className="text-muted-foreground">
-                Nothing leaves your machine until you explicitly publish a specific draft. That
-                is not a setting you enable. It is how the product works by default.
+                Nothing leaves your machine until you explicitly publish a specific draft. That is
+                not a setting you enable. It is how the product works by default.
               </p>
             </div>
           </div>
@@ -118,7 +118,10 @@ export default function AboutPage() {
       </section>
 
       {/* Principles */}
-      <section aria-labelledby="principles-title" className="bg-secondary/40 border-border/60 border-t">
+      <section
+        aria-labelledby="principles-title"
+        className="bg-secondary/40 border-border/60 border-t"
+      >
         <div className="mx-auto max-w-6xl px-6 py-16 md:py-28">
           <p id="principles-title" className="text-muted-foreground mb-12 font-mono text-xs">
             02 — principles

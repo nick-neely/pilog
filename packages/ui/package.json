@@ -9,7 +9,9 @@
     "./badge": "./src/badge.tsx",
     "./kbd": "./src/kbd.tsx",
     "./card": "./src/card.tsx",
+    "./scroll-area": "./src/scroll-area.tsx",
     "./separator": "./src/separator.tsx",
+    "./tabs": "./src/tabs.tsx",
     "./utils": "./src/utils.ts"
   },
   "peerDependencies": {
