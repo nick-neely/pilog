@@ -8,6 +8,174 @@ This is per ADR-0006: GitHub Releases are the V1 canonical release/update source
 
 ---
 
+## First preview release: `0.1.0-preview.1`
+
+Use `0.1.0` as the first public release line, but publish the first preview as `0.1.0-preview.1`.
+
+That means:
+
+- `0.1.0-preview.1` = first preview build for trusted testers.
+- `0.1.0-preview.2` = second preview build if the first preview needs fixes.
+- `0.1.0` = first non-preview release on the same line, only after the preview is good enough to promote.
+
+Do **not** tag the first preview as `v0.1.0`. That is a stable tag and will run the stable release workflow. Preview tags must include `-preview.N`.
+
+### Step-by-step
+
+1. Start from an up-to-date, clean `main` branch.
+
+   ```bash
+   git switch main
+   git pull --ff-only
+   git status --short
+   ```
+
+   Stop if `git status --short` shows unexpected changes. Commit, stash, or intentionally keep only the release changes before continuing.
+
+2. Confirm the required GitHub Actions secrets are set.
+
+   In GitHub, open **Settings → Secrets and variables → Actions** and confirm:
+
+   - `VERCEL_TOKEN`
+   - `VERCEL_ORG_ID`
+   - `VERCEL_PROJECT_ID`
+
+   Signing secrets are not required for this first preview. The macOS and Windows artifacts are expected to be unsigned until signing is configured.
+
+3. Set the preview version in `package.json`.
+
+   For the first preview, `package.json` must say `0.1.0-preview.1`, not plain `0.1.0`.
+
+   ```bash
+   npm version 0.1.0-preview.1 --no-git-tag-version
+   ```
+
+   Or edit `package.json` directly and set:
+
+   ```json
+   "version": "0.1.0-preview.1"
+   ```
+
+4. Run the local release checks.
+
+   ```bash
+   pnpm install
+   pnpm run typecheck
+   pnpm run test
+   pnpm run build
+   ```
+
+   If any command fails, fix it before creating the release tag.
+
+5. Commit the version change.
+
+   ```bash
+   git add package.json
+   git commit -m "chore: bump version to 0.1.0-preview.1"
+   ```
+
+6. Create the preview tag.
+
+   ```bash
+   git tag v0.1.0-preview.1
+   ```
+
+7. Push `main`, then push the tag.
+
+   ```bash
+   git push origin main
+   git push origin v0.1.0-preview.1
+   ```
+
+   The tag push starts **Release — Preview** automatically.
+
+8. Watch the workflow.
+
+   In GitHub, open **Actions → Release — Preview** and wait for all jobs to pass:
+
+   ```text
+   validate → verify → build-mac / build-win / build-linux → publish-manifest → deploy-site
+   ```
+
+9. Verify the GitHub pre-release.
+
+   Open the GitHub Release for `v0.1.0-preview.1` and confirm:
+
+   - The release is marked **Pre-release**.
+   - macOS artifacts exist: `Pilog-0.1.0-preview.dmg`, `Pilog-0.1.0-preview-mac.zip`, `preview-mac.yml`.
+   - Windows artifacts exist: `Pilog-0.1.0-preview-Setup.exe`, `preview.yml`.
+   - Linux artifacts exist: `Pilog-0.1.0-preview.AppImage`, `Pilog-0.1.0-preview.deb`, `preview-linux.yml`.
+   - `.sha256` files and `checksums-preview-*.txt` files are present.
+
+10. Verify the manifest commit on `main`.
+
+    After the workflow finishes, GitHub Actions should commit an updated `site/src/data/release-manifest.json` to `main`.
+
+    Confirm the manifest contains:
+
+    ```json
+    "preview": {
+      "version": "0.1.0-preview.1"
+    }
+    ```
+
+    The `stable` field should stay `null` or stay on the last stable version. A preview release must not overwrite stable.
+
+11. Verify `pilog.dev`.
+
+    Open `https://pilog.dev/preview` and confirm it shows `0.1.0-preview.1`.
+
+    Also open `https://pilog.dev/download` and confirm it does **not** present the preview as the stable download.
+
+12. Install and smoke-test the preview.
+
+    On the platforms you can access:
+
+    - Download from `https://pilog.dev/preview`.
+    - Verify the checksum against the GitHub Release `.sha256` sidecar.
+    - Install the app.
+    - Expect unsigned-app warnings on macOS and Windows.
+    - Launch Pilog.
+    - Open Settings → Software updates and confirm the installed version is `0.1.0-preview.1` and the channel is **Preview**.
+    - Create a note.
+    - Link a repository.
+    - Generate a draft.
+    - If you are ready to test publishing, publish one draft to GitHub and confirm the issue URL is saved in Pilog.
+
+13. Share the preview.
+
+    Send testers the `https://pilog.dev/preview` link and tell them this is an unsigned preview build. For macOS, they may need **System Settings → Privacy & Security → Open Anyway**. For Windows, they may need **More info → Run anyway** in SmartScreen.
+
+### If the first preview needs a fix
+
+Do not move or reuse the old tag. Make the fix on `main`, then publish the next preview:
+
+```bash
+npm version 0.1.0-preview.2 --no-git-tag-version
+git add package.json
+git commit -m "chore: bump version to 0.1.0-preview.2"
+git tag v0.1.0-preview.2
+git push origin main
+git push origin v0.1.0-preview.2
+```
+
+### When the preview is ready to promote
+
+Publish stable `0.1.0` only after the preview build has been tested enough that you want it on the main download page:
+
+```bash
+npm version 0.1.0 --no-git-tag-version
+git add package.json
+git commit -m "chore: bump version to 0.1.0"
+git tag v0.1.0
+git push origin main
+git push origin v0.1.0
+```
+
+That tag starts **Release — Stable** and updates `https://pilog.dev/download`.
+
+---
+
 ## Channels
 
 | Channel | Tag format         | GitHub Release type | Updater metadata file                                   |
