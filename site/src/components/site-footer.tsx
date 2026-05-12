@@ -14,7 +14,16 @@ export function SiteFooter() {
         <div>
           <p className="font-heading text-foreground text-base font-medium tracking-tight">Pilog</p>
           <p className="text-muted-foreground mt-1 max-w-[40ch] text-sm leading-relaxed">
-            A local-first developer journal. Made by Nick Neely.
+            A local-first developer journal. Made by{' '}
+            <Link
+              href="https://www.linkedin.com/in/nick-neely/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-inherit hover:text-primary transition-colors"
+            >
+              Nick Neely
+            </Link>
+            .
           </p>
         </div>
         <div className="flex flex-col items-start gap-4 md:items-end">
