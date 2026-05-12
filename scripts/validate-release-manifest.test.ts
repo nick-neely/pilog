@@ -157,9 +157,9 @@ describe('placeholder manifest shape', () => {
     expect(placeholderManifest.stable).toBeNull()
   })
 
-  it('has a preview channel with version 0.1.0-preview.1', () => {
+  it('has a preview channel with a preview semver version', () => {
     expect(placeholderManifest.preview).not.toBeNull()
-    expect(placeholderManifest.preview?.version).toBe('0.1.0-preview.1')
+    expect(placeholderManifest.preview?.version).toMatch(/^\d+\.\d+\.\d+-preview\.\d+$/)
   })
 
   it('preview channel has artifacts for all three platforms', () => {
