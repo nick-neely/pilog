@@ -1,13 +1,11 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { PreviewDownload } from '@/components/preview-download'
+import { previewMetadata } from '@/lib/metadata'
 import type { ReleaseManifest } from '@/lib/release-manifest'
 import rawManifest from '@/data/release-manifest.json'
 
-export const metadata: Metadata = {
-  title: 'Preview Downloads',
-  robots: { index: false }
-}
+export const metadata: Metadata = previewMetadata
 
 const manifest = rawManifest as ReleaseManifest
 const channel = manifest.preview

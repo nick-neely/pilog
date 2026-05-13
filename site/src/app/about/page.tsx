@@ -1,10 +1,9 @@
 import Link from 'next/link'
 import type { Metadata } from 'next'
 import { Button } from '@pilog/ui/button'
+import { aboutMetadata } from '@/lib/metadata'
 
-export const metadata: Metadata = {
-  title: 'About'
-}
+export const metadata: Metadata = aboutMetadata
 
 const principles = [
   {

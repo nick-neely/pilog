@@ -1,12 +1,11 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { PlatformDownload } from '@/components/platform-download'
+import { downloadMetadata } from '@/lib/metadata'
 import type { ReleaseManifest } from '@/lib/release-manifest'
 import rawManifest from '@/data/release-manifest.json'
 
-export const metadata: Metadata = {
-  title: 'Download'
-}
+export const metadata: Metadata = downloadMetadata
 
 const manifest = rawManifest as ReleaseManifest
 const channel = manifest.stable

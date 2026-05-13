@@ -3,16 +3,13 @@ import Link from 'next/link'
 import { Kbd, KbdGroup } from '@pilog/ui/kbd'
 import { DocsDownloadCard } from '@/components/docs/docs-download-card'
 import { DocsSidebar, type DocsNavItem } from '@/components/docs/docs-sidebar'
+import { docsMetadata } from '@/lib/metadata'
 import { modKeyLabel, type SiteModKeyGlyph } from '@/lib/platform'
 import { getServerDetectedPlatform } from '@/lib/server-detected-platform'
 import type { ReleaseManifest } from '@/lib/release-manifest'
 import rawManifest from '@/data/release-manifest.json'
 
-export const metadata: Metadata = {
-  title: 'Docs',
-  description:
-    'Install Pilog, connect GitHub, configure the Pi draft agent, and turn rough notes into clean GitHub issues without leaving flow.'
-}
+export const metadata: Metadata = docsMetadata
 
 const manifest = rawManifest as ReleaseManifest
 // Prefer stable; fall back to preview so the install card is always useful.
