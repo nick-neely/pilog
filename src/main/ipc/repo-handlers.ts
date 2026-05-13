@@ -37,7 +37,7 @@ export function registerRepoIpcHandlers(db: PilogDatabase): void {
 
   ipcMain.handle('repos:getDefaultIssueTemplate', (_event, request: { id: string }) => {
     const repo = getRepoById(db, request.id)
-    return repo ? resolveDefaultIssueTemplate(repo.localPath) : null
+    return repo ? resolveDefaultIssueTemplate(repo) : null
   })
 
   ipcMain.handle('repos:unlink', (_event, request: { id: string }) => {

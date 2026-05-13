@@ -1,6 +1,8 @@
+import { execFileSync } from 'node:child_process'
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import path from 'node:path'
 import type { GeneratedIssueDraft, GitHubIssueTemplate } from '@shared/types'
+import type { Repo, RepoAccessDescriptor } from '@shared/ipc'
 
 type FrontMatter = {
   body: string
@@ -12,44 +14,95 @@ type DraftSection = {
   content: string
 }
 
+export type IssueTemplateFileSystem = {
+  isDirectory(relativePath: string): boolean
+  isFile(relativePath: string): boolean
+  readDir(relativePath: string): string[]
+  readFile(relativePath: string): string
+}
+
+type IssueTemplateLookupInput = string | Repo | RepoAccessDescriptor
+
+type ExecFileSync = (
+  file: string,
+  args: string[],
+  options?: {
+    encoding?: BufferEncoding
+    windowsHide?: boolean
+    timeout?: number
+    maxBuffer?: number
+  }
+) => string | Buffer
+
+type IssueTemplateLookupDeps = {
+  fileSystem?: IssueTemplateFileSystem
+  execFileSync?: ExecFileSync
+}
+
 const ISSUE_TEMPLATE_DIR = path.join('.github', 'ISSUE_TEMPLATE')
 const SINGLE_ISSUE_TEMPLATE = path.join('.github', 'ISSUE_TEMPLATE.md')
 const CONFIG_TEMPLATE_NAMES = new Set(['config.yml', 'config.yaml'])
 
 export function listLocalIssueTemplates(repoPath: string): GitHubIssueTemplate[] {
+  return listIssueTemplates(repoPath)
+}
+
+export function listIssueTemplates(
+  input: IssueTemplateLookupInput,
+  deps: IssueTemplateLookupDeps = {}
+): GitHubIssueTemplate[] {
+  const access = resolveIssueTemplateAccess(input)
+  const fileSystem = deps.fileSystem ?? createIssueTemplateFileSystem(access, deps)
   const templates: GitHubIssueTemplate[] = []
-  const templateDir = path.join(repoPath, ISSUE_TEMPLATE_DIR)
 
-  if (existsSync(templateDir) && statSync(templateDir).isDirectory()) {
-    const templateFiles = readdirSync(templateDir)
-      .filter((file) => isTemplateFile(file) && !CONFIG_TEMPLATE_NAMES.has(file.toLowerCase()))
-      .sort((a, b) => a.localeCompare(b))
+  try {
+    if (access.kind === 'wsl' && !fileSystem.isDirectory('.')) {
+      throw new Error('Repository path is not readable from WSL.')
+    }
 
-    for (const file of templateFiles) {
-      const relativePath = path.join(ISSUE_TEMPLATE_DIR, file)
-      const fullPath = path.join(repoPath, relativePath)
-      const content = readFileSync(fullPath, 'utf8')
+    if (fileSystem.isDirectory(ISSUE_TEMPLATE_DIR)) {
+      const templateFiles = fileSystem
+        .readDir(ISSUE_TEMPLATE_DIR)
+        .filter((file) => isTemplateFile(file) && !CONFIG_TEMPLATE_NAMES.has(file.toLowerCase()))
+        .sort((a, b) => a.localeCompare(b))
 
-      if (isYamlTemplate(file)) {
-        templates.push(parseYamlIssueTemplate(relativePath, content))
-      } else {
-        templates.push(parseMarkdownIssueTemplate(relativePath, content))
+      for (const file of templateFiles) {
+        const relativePath = path.join(ISSUE_TEMPLATE_DIR, file)
+        const content = fileSystem.readFile(relativePath)
+
+        if (isYamlTemplate(file)) {
+          templates.push(parseYamlIssueTemplate(relativePath, content))
+        } else {
+          templates.push(parseMarkdownIssueTemplate(relativePath, content))
+        }
       }
     }
-  }
 
-  const singleTemplatePath = path.join(repoPath, SINGLE_ISSUE_TEMPLATE)
-  if (existsSync(singleTemplatePath) && statSync(singleTemplatePath).isFile()) {
-    templates.push(
-      parseMarkdownIssueTemplate(SINGLE_ISSUE_TEMPLATE, readFileSync(singleTemplatePath, 'utf8'))
-    )
+    if (fileSystem.isFile(SINGLE_ISSUE_TEMPLATE)) {
+      templates.push(
+        parseMarkdownIssueTemplate(
+          SINGLE_ISSUE_TEMPLATE,
+          fileSystem.readFile(SINGLE_ISSUE_TEMPLATE)
+        )
+      )
+    }
+  } catch (error) {
+    if (access.kind === 'wsl') {
+      throw new Error(
+        `Unable to inspect WSL issue templates for ${access.distro} at ${access.linuxPath}. ${formatErrorMessage(error)}`
+      )
+    }
+    throw error
   }
 
   return templates
 }
 
-export function resolveDefaultIssueTemplate(repoPath: string): GitHubIssueTemplate | null {
-  return listLocalIssueTemplates(repoPath)[0] ?? null
+export function resolveDefaultIssueTemplate(
+  input: IssueTemplateLookupInput,
+  deps: IssueTemplateLookupDeps = {}
+): GitHubIssueTemplate | null {
+  return listIssueTemplates(input, deps)[0] ?? null
 }
 
 export function applyIssueTemplateToDraftBody(
@@ -294,6 +347,116 @@ function formatMarkdownListLines(items: string[]): string[] {
 
 function normalizeTemplatePath(templatePath: string): string {
   return templatePath.split(path.sep).join('/')
+}
+
+function resolveIssueTemplateAccess(input: IssueTemplateLookupInput): RepoAccessDescriptor {
+  if (typeof input === 'string') return { kind: 'host', displayPath: input }
+  if ('kind' in input) return input
+  if (input.accessKind === 'wsl' && input.wslDistro && input.wslPath) {
+    return {
+      kind: 'wsl',
+      displayPath: input.localPath,
+      distro: input.wslDistro,
+      linuxPath: input.wslPath
+    }
+  }
+  return { kind: 'host', displayPath: input.localPath }
+}
+
+function createIssueTemplateFileSystem(
+  access: RepoAccessDescriptor,
+  deps: IssueTemplateLookupDeps
+): IssueTemplateFileSystem {
+  if (access.kind === 'host') return createHostIssueTemplateFileSystem(access.displayPath)
+  return createWslIssueTemplateFileSystem(access, deps.execFileSync ?? execFileSync)
+}
+
+function createHostIssueTemplateFileSystem(repoPath: string): IssueTemplateFileSystem {
+  return {
+    isDirectory(relativePath) {
+      const fullPath = path.join(repoPath, relativePath)
+      return existsSync(fullPath) && statSync(fullPath).isDirectory()
+    },
+    isFile(relativePath) {
+      const fullPath = path.join(repoPath, relativePath)
+      return existsSync(fullPath) && statSync(fullPath).isFile()
+    },
+    readDir(relativePath) {
+      return readdirSync(path.join(repoPath, relativePath))
+    },
+    readFile(relativePath) {
+      return readFileSync(path.join(repoPath, relativePath), 'utf8')
+    }
+  }
+}
+
+function createWslIssueTemplateFileSystem(
+  access: Extract<RepoAccessDescriptor, { kind: 'wsl' }>,
+  runExecFileSync: ExecFileSync
+): IssueTemplateFileSystem {
+  const runWsl = (args: string[]): string =>
+    String(
+      runExecFileSync('wsl.exe', ['-d', access.distro, '--cd', access.linuxPath, '--', ...args], {
+        encoding: 'utf8',
+        windowsHide: true,
+        timeout: 10000,
+        maxBuffer: 1024 * 1024
+      })
+    )
+
+  const testPath = (flag: '-d' | '-f', relativePath: string): boolean => {
+    try {
+      runWsl(['test', flag, normalizeRelativeTemplatePath(relativePath)])
+      return true
+    } catch (error) {
+      if (isExpectedMissingPathError(error)) return false
+      throw error
+    }
+  }
+
+  return {
+    isDirectory(relativePath) {
+      return testPath('-d', relativePath)
+    },
+    isFile(relativePath) {
+      return testPath('-f', relativePath)
+    },
+    readDir(relativePath) {
+      return runWsl([
+        'find',
+        normalizeRelativeTemplatePath(relativePath),
+        '-maxdepth',
+        '1',
+        '-type',
+        'f',
+        '-printf',
+        '%f\n'
+      ])
+        .split('\n')
+        .map((item) => item.trim())
+        .filter(Boolean)
+    },
+    readFile(relativePath) {
+      return runWsl(['cat', normalizeRelativeTemplatePath(relativePath)])
+    }
+  }
+}
+
+function normalizeRelativeTemplatePath(relativePath: string): string {
+  return relativePath.split(path.sep).join('/')
+}
+
+function isExpectedMissingPathError(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'status' in error &&
+    (error as { status?: unknown }).status === 1
+  )
+}
+
+function formatErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
 }
 
 function unquoteYamlScalar(value: string): string {

@@ -257,7 +257,7 @@ export function persistGeneratedIssueDrafts(
   }
 ): string[] {
   const repo = getRepoById(db, input.repoId)
-  const template = repo ? resolveDefaultIssueTemplate(repo.localPath) : null
+  const template = repo ? resolveDefaultIssueTemplate(repo) : null
 
   return db.transaction((tx) => {
     const now = new Date().toISOString()
