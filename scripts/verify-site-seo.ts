@@ -5,6 +5,18 @@ const SITE_ORIGIN = 'https://pilog.dev'
 const PUBLIC_ROUTES = ['/', '/download', '/docs', '/about'] as const
 const STRUCTURED_DATA_ROUTES = PUBLIC_ROUTES
 const PREVIEW_ROUTE = '/preview'
+const REQUIRED_SOCIAL_META_KEYS = [
+  'og:title',
+  'og:description',
+  'og:url',
+  'og:site_name',
+  'og:type',
+  'og:image',
+  'twitter:card',
+  'twitter:title',
+  'twitter:description',
+  'twitter:image'
+] as const
 
 type MetaMap = Map<string, string>
 
@@ -17,6 +29,10 @@ function assert(condition: unknown, message: string): asserts condition {
   if (!condition) {
     throw new Error(message)
   }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
 }
 
 function run(command: string, args: readonly string[], cwd: string): Promise<void> {
@@ -157,33 +173,17 @@ function expectedSitemapUrl(path: string): string {
 
 function assertPublicRouteSeo({ path, html }: RouteHtml): void {
   const { title, canonical, meta } = parseMetadata(html)
+  const expectedUrl = expectedCanonical(path)
 
   assert(title.trim().length > 0, `${path} is missing a non-empty title`)
   assert(meta.get('description')?.trim(), `${path} is missing a non-empty description`)
-  assert(
-    canonical === expectedCanonical(path),
-    `${path} canonical should be ${expectedCanonical(path)}`
-  )
+  assert(canonical === expectedUrl, `${path} canonical should be ${expectedUrl}`)
 
-  for (const key of [
-    'og:title',
-    'og:description',
-    'og:url',
-    'og:site_name',
-    'og:type',
-    'og:image',
-    'twitter:card',
-    'twitter:title',
-    'twitter:description',
-    'twitter:image'
-  ]) {
+  for (const key of REQUIRED_SOCIAL_META_KEYS) {
     assert(meta.get(key)?.trim(), `${path} is missing ${key}`)
   }
 
-  assert(
-    meta.get('og:url') === expectedCanonical(path),
-    `${path} Open Graph URL does not match canonical`
-  )
+  assert(meta.get('og:url') === expectedUrl, `${path} Open Graph URL does not match canonical`)
 }
 
 function assertStructuredData({ path, html }: RouteHtml): void {
@@ -192,9 +192,9 @@ function assertStructuredData({ path, html }: RouteHtml): void {
   assert(scripts.length > 0, `${path} is missing JSON-LD structured data`)
 
   for (const script of scripts) {
-    assert(typeof script === 'object' && script !== null, `${path} JSON-LD is not an object`)
+    assert(isRecord(script), `${path} JSON-LD is not an object`)
     assert(
-      (script as Record<string, unknown>)['@context'] === 'https://schema.org',
+      script['@context'] === 'https://schema.org',
       `${path} JSON-LD is missing schema.org context`
     )
   }
@@ -243,13 +243,14 @@ async function main(): Promise<void> {
     const publicPages = await Promise.all(
       PUBLIC_ROUTES.map(async (path) => ({ path, html: await fetchText(baseUrl, path) }))
     )
+    const publicPagesByPath = new Map(publicPages.map((page) => [page.path, page]))
 
     for (const page of publicPages) {
       assertPublicRouteSeo(page)
     }
 
     for (const path of STRUCTURED_DATA_ROUTES) {
-      const page = publicPages.find((candidate) => candidate.path === path)
+      const page = publicPagesByPath.get(path)
       assert(page, `Missing fetched page for ${path}`)
       assertStructuredData(page)
     }
