@@ -2,9 +2,9 @@
   "schemaVersion": 1,
   "stable": null,
   "preview": {
-    "version": "0.0.1-preview.10",
-    "releaseUrl": "https://github.com/nick-neely/pilog/releases/tag/v0.0.1-preview.10",
-    "publishedAt": "2026-05-13T22:21:07Z",
+    "version": "0.1.0-preview.1",
+    "releaseUrl": "https://github.com/nick-neely/pilog/releases/tag/v0.1.0-preview.1",
+    "publishedAt": "2026-05-13T22:45:56Z",
     "platforms": [
       {
         "platform": "macos",
@@ -12,18 +12,18 @@
         "description": "Unsigned universal build for Apple Silicon and Intel Macs.",
         "artifacts": [
           {
-            "fileName": "Pilog-0.0.1-preview.10-arm64-mac.zip",
-            "downloadUrl": "https://github.com/nick-neely/pilog/releases/download/v0.0.1-preview.10/Pilog-0.0.1-preview.10-arm64-mac.zip",
+            "fileName": "Pilog-0.1.0-preview.1-arm64-mac.zip",
+            "downloadUrl": "https://github.com/nick-neely/pilog/releases/download/v0.1.0-preview.1/Pilog-0.1.0-preview.1-arm64-mac.zip",
             "label": "ZIP archive",
-            "fileSize": 123324603,
-            "sha256": "69f0b646935dac10f06299cbc73ded71fc366991a6eab2e89d8cfcc418ed9a31"
+            "fileSize": 123324594,
+            "sha256": "464d019db66477db53738b12f39865d3b1a2fd57aee6189d167fc2019d664565"
           },
           {
-            "fileName": "Pilog-0.0.1-preview.10.dmg",
-            "downloadUrl": "https://github.com/nick-neely/pilog/releases/download/v0.0.1-preview.10/Pilog-0.0.1-preview.10.dmg",
+            "fileName": "Pilog-0.1.0-preview.1.dmg",
+            "downloadUrl": "https://github.com/nick-neely/pilog/releases/download/v0.1.0-preview.1/Pilog-0.1.0-preview.1.dmg",
             "label": "DMG installer",
-            "fileSize": 128618042,
-            "sha256": "af9797458d96f21bc3c07ebce48f58ff4017b6b505df6a0bb2e0f1dc8cb0f2a9"
+            "fileSize": 128618224,
+            "sha256": "a39448cdc82b17de862b76fef98abc63fcc74836432a4e02e6c142d891d1c4ab"
           }
         ]
       },
@@ -33,11 +33,11 @@
         "description": "Unsigned 64-bit installer for Windows 10+.",
         "artifacts": [
           {
-            "fileName": "Pilog-0.0.1-preview.10-Setup.exe",
-            "downloadUrl": "https://github.com/nick-neely/pilog/releases/download/v0.0.1-preview.10/Pilog-0.0.1-preview.10-Setup.exe",
+            "fileName": "Pilog-0.1.0-preview.1-Setup.exe",
+            "downloadUrl": "https://github.com/nick-neely/pilog/releases/download/v0.1.0-preview.1/Pilog-0.1.0-preview.1-Setup.exe",
             "label": "Installer",
-            "fileSize": 108180045,
-            "sha256": "8e86f03f40172fb84eb6948e516619d348a96c54c2aaf158218e3535c53a485b"
+            "fileSize": 108180012,
+            "sha256": "bbc7b7d0ad3c3c5d1ca6c613702210a99a9863a464a01475a9ad3ba472765323"
           }
         ]
       },
@@ -47,18 +47,18 @@
         "description": "AppImage and .deb packages.",
         "artifacts": [
           {
-            "fileName": "Pilog-0.0.1-preview.10.AppImage",
-            "downloadUrl": "https://github.com/nick-neely/pilog/releases/download/v0.0.1-preview.10/Pilog-0.0.1-preview.10.AppImage",
+            "fileName": "Pilog-0.1.0-preview.1.AppImage",
+            "downloadUrl": "https://github.com/nick-neely/pilog/releases/download/v0.1.0-preview.1/Pilog-0.1.0-preview.1.AppImage",
             "label": "AppImage",
-            "fileSize": 131053242,
-            "sha256": "588441a7368ca1dc7e1da8cb8e86c6264c184cf7967faa63150319034e5d6505"
+            "fileSize": 131053226,
+            "sha256": "2e0b38c0e88125706bb1c421848471a3faf013e74549d95d982ff41f784eb158"
           },
           {
-            "fileName": "Pilog-0.0.1-preview.10.deb",
-            "downloadUrl": "https://github.com/nick-neely/pilog/releases/download/v0.0.1-preview.10/Pilog-0.0.1-preview.10.deb",
+            "fileName": "Pilog-0.1.0-preview.1.deb",
+            "downloadUrl": "https://github.com/nick-neely/pilog/releases/download/v0.1.0-preview.1/Pilog-0.1.0-preview.1.deb",
             "label": ".deb package",
-            "fileSize": 103396104,
-            "sha256": "d0bafcdccdf4bf8732e75338ea4998ec5ee938bc58aa77b75b458cc0b44f7065"
+            "fileSize": 103395152,
+            "sha256": "9ff7022ee036342b3d79d6bf2f4ddb72f9ee72841cba7a9078aeaff85a782a77"
           }
         ]
       }
