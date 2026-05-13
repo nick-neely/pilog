@@ -3,6 +3,7 @@ import { AlertDialog as AlertDialogPrimitive } from 'radix-ui'
 
 import { cn } from '@renderer/lib/utils'
 import { Button } from '@renderer/components/ui/button'
+import { MODAL_CHROME_SCRIM_CLASS } from '@shared/window-chrome'
 
 function AlertDialog({ ...props }: React.ComponentProps<typeof AlertDialogPrimitive.Root>) {
   return <AlertDialogPrimitive.Root data-slot="alert-dialog" {...props} />
@@ -30,7 +31,8 @@ function AlertDialogOverlay({
       // is the same warm-ink hue family as the rest of the system, and
       // explicitly drop `backdrop-blur`.
       className={cn(
-        'fixed inset-0 z-50 bg-foreground/40 duration-100 dark:bg-background/70 data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0',
+        'data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0',
+        MODAL_CHROME_SCRIM_CLASS,
         className
       )}
       {...props}
