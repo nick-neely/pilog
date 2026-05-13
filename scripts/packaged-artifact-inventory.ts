@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs'
+import { existsSync, readdirSync } from 'node:fs'
 import { readdir, stat } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { basename, dirname, join, relative, resolve, sep } from 'node:path'
@@ -176,6 +176,11 @@ export function resolvePackagedAppOutDir(inputPath = 'dist'): string {
     return absoluteInput
   }
 
+  const packagedAppOutDir = findPackagedAppOutDir(absoluteInput)
+  if (packagedAppOutDir) {
+    return packagedAppOutDir
+  }
+
   return resolveDefaultPlatformAppOutDir(absoluteInput)
 }
 
@@ -276,6 +281,47 @@ function resolveResourcesDir(appOutDir: string): string {
       .map((candidate) => join(candidate, 'app.asar'))
       .join(', ')}`
   )
+}
+
+function findPackagedAppOutDir(distDir: string): string | null {
+  if (!existsSync(distDir)) return null
+
+  const candidates = [
+    join(distDir, 'win-unpacked'),
+    join(distDir, 'linux-unpacked'),
+    join(distDir, 'mac', 'Pilog.app')
+  ]
+
+  for (const entry of readdirSyncSafe(distDir)) {
+    if (entry.startsWith('mac-')) {
+      candidates.push(join(distDir, entry, 'Pilog.app'))
+    }
+  }
+
+  const existingCandidates = candidates.filter(
+    (candidate) =>
+      existsSync(join(candidate, 'resources', 'app.asar')) ||
+      existsSync(join(candidate, 'Contents', 'Resources', 'app.asar'))
+  )
+
+  if (existingCandidates.length === 1) return existingCandidates[0]
+
+  const platformCandidate = existingCandidates.find((candidate) => {
+    if (process.platform === 'win32') return basename(candidate) === 'win-unpacked'
+    if (process.platform === 'linux') return basename(candidate) === 'linux-unpacked'
+    if (process.platform === 'darwin') return candidate.includes(`${sep}mac`)
+    return false
+  })
+
+  return platformCandidate ?? null
+}
+
+function readdirSyncSafe(path: string): string[] {
+  try {
+    return existsSync(path) ? readdirSync(path) : []
+  } catch {
+    return []
+  }
 }
 
 function resolveDefaultPlatformAppOutDir(distDir: string): string {

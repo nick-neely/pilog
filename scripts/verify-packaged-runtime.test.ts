@@ -8,10 +8,16 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 const require = createRequire(import.meta.url)
 const asar = require('@electron/asar') as {
   createPackage(source: string, destination: string): Promise<void>
+  createPackageWithOptions(
+    source: string,
+    destination: string,
+    options: { unpackDir?: string }
+  ): Promise<void>
 }
 const {
   findPackagedFileHygieneViolations,
   enforcePackagedFileHygiene,
+  verifyPackagedImports,
   prunePackagedRuntimeBloat
 }: {
   findPackagedFileHygieneViolations: (
@@ -19,6 +25,10 @@ const {
     options?: { allowSourceMaps?: boolean }
   ) => Array<{ category: string; location: string; path: string }>
   enforcePackagedFileHygiene: (appOutDir: string, options?: { allowSourceMaps?: boolean }) => void
+  verifyPackagedImports: (
+    appAsar: string,
+    options?: { resourcesDir?: string; requiredImports?: string[] }
+  ) => void
   prunePackagedRuntimeBloat: (
     appOutDir: string,
     options?: { platform?: string; arch?: string }
@@ -114,6 +124,35 @@ describe('packaged runtime file hygiene', () => {
     await chmod(join(resourcesDir, 'app.asar.unpacked/node_modules/@vscode/ripgrep/bin/rg'), 0o755)
 
     expect(() => enforcePackagedFileHygiene(appOutDir, { allowSourceMaps: true })).not.toThrow()
+  })
+
+  it('checks imports when package files are represented by unpacked asar entries', async () => {
+    const appOutDir = join(tmpDir, 'win-unpacked')
+    const resourcesDir = join(appOutDir, 'resources')
+    const appAsar = join(resourcesDir, 'app.asar')
+    const asarSource = join(tmpDir, 'asar-source')
+
+    await writeFixtureFile(
+      asarSource,
+      'node_modules/@scope/unpacked-package/package.json',
+      '{"name":"@scope/unpacked-package","type":"module","main":"./dist/index.js"}'
+    )
+    await writeFixtureFile(
+      asarSource,
+      'node_modules/@scope/unpacked-package/dist/index.js',
+      'export const ok = true'
+    )
+    await mkdir(resourcesDir, { recursive: true })
+    await asar.createPackageWithOptions(asarSource, appAsar, {
+      unpackDir: 'node_modules/@scope/unpacked-package'
+    })
+
+    expect(() =>
+      verifyPackagedImports(appAsar, {
+        resourcesDir,
+        requiredImports: ['@scope/unpacked-package']
+      })
+    ).not.toThrow()
   })
 })
 

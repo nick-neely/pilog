@@ -192,6 +192,19 @@ describe('packaged artifact inventory', () => {
     })
   })
 
+  it('resolves an arch-suffixed macOS app under dist', async () => {
+    const distDir = join(tmpDir, 'dist')
+    const appOutDir = join(distDir, 'mac-arm64', 'Pilog.app')
+    const resourcesDir = join(appOutDir, 'Contents', 'Resources')
+    const asarSource = join(tmpDir, 'asar-macos-arm64')
+
+    await writeFixtureFile(asarSource, 'out/main/index.js', 'main')
+    await mkdir(resourcesDir, { recursive: true })
+    await asar.createPackage(asarSource, join(resourcesDir, 'app.asar'))
+
+    expect(resolvePackagedAppOutDir(distDir)).toBe(appOutDir)
+  })
+
   it('resolves the current platform unpacked build under dist by default', () => {
     const distDir = join(tmpDir, 'dist')
     let expected = join(distDir, 'linux-unpacked')

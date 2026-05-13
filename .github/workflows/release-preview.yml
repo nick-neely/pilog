@@ -137,8 +137,8 @@ jobs:
         run: |
           REPORT_DIR=dist/reports/preview-mac
           mkdir -p "$REPORT_DIR"
-          pnpm inventory:packaged dist/mac/Pilog.app > "$REPORT_DIR/packaged-artifact-inventory.txt"
-          pnpm budget:packaged -- dist/mac/Pilog.app --dist-dir dist --output "$REPORT_DIR/packaged-size-budget-report.json" > "$REPORT_DIR/packaged-size-budget-report.txt"
+          pnpm inventory:packaged dist > "$REPORT_DIR/packaged-artifact-inventory.txt"
+          pnpm budget:packaged -- dist --dist-dir dist --output "$REPORT_DIR/packaged-size-budget-report.json" > "$REPORT_DIR/packaged-size-budget-report.txt"
 
       - name: Upload macOS preview size reports
         uses: actions/upload-artifact@v4

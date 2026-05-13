@@ -2,6 +2,7 @@ const {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readFileSync,
   readdirSync,
   rmSync,
   statSync,
@@ -107,7 +108,7 @@ function verifyPackagedRuntime(appOutDir, options = {}) {
   const appAsar = join(resourcesDir, 'app.asar')
   verifyPackagedRuntimeFiles(appOutDir, options)
 
-  verifyPackagedImports(appAsar)
+  verifyPackagedImports(appAsar, { resourcesDir })
 
   console.log('[verify-packaged-runtime] required runtime files and imports are packaged')
 }
@@ -411,13 +412,15 @@ function inferPackagedPlatform(appOutDir) {
   return process.platform
 }
 
-function verifyPackagedImports(appAsar) {
+function verifyPackagedImports(appAsar, options = {}) {
   const tempDir = mkdtempSync(join(tmpdir(), 'pilog-packaged-runtime-'))
+  const requiredImports = options.requiredImports ?? REQUIRED_IMPORTS
 
   try {
     extractAsarForImportCheck(appAsar, tempDir)
+    copyUnpackedAsarForImportCheck(options.resourcesDir ?? dirname(appAsar), tempDir)
     const script = `
-      for (const packageName of ${JSON.stringify(REQUIRED_IMPORTS)}) {
+      for (const packageName of ${JSON.stringify(requiredImports)}) {
         await import(packageName)
       }
     `
@@ -440,6 +443,32 @@ function verifyPackagedImports(appAsar) {
     }
   } finally {
     rmSync(tempDir, { recursive: true, force: true })
+  }
+}
+
+function copyUnpackedAsarForImportCheck(resourcesDir, destinationDir) {
+  const unpackedDir = join(resourcesDir, 'app.asar.unpacked')
+  if (!existsSync(unpackedDir)) return
+
+  copyDirectoryContents(unpackedDir, destinationDir)
+}
+
+function copyDirectoryContents(sourceDir, destinationDir) {
+  for (const entry of readdirSync(sourceDir)) {
+    const sourcePath = join(sourceDir, entry)
+    const destinationPath = join(destinationDir, entry)
+    const info = statSync(sourcePath)
+
+    if (info.isDirectory()) {
+      mkdirSync(destinationPath, { recursive: true })
+      copyDirectoryContents(sourcePath, destinationPath)
+      continue
+    }
+
+    if (info.isFile()) {
+      mkdirSync(dirname(destinationPath), { recursive: true })
+      writeFileSync(destinationPath, readFileSync(sourcePath))
+    }
   }
 }
 
@@ -524,6 +553,7 @@ module.exports = afterPack
 module.exports.verifyPackagedRuntime = verifyPackagedRuntime
 module.exports.enforcePackagedFileHygiene = enforcePackagedFileHygiene
 module.exports.findPackagedFileHygieneViolations = findPackagedFileHygieneViolations
+module.exports.verifyPackagedImports = verifyPackagedImports
 module.exports.verifyPackagedRuntimeFiles = verifyPackagedRuntimeFiles
 module.exports.prunePackagedRuntimeBloat = prunePackagedRuntimeBloat
 
