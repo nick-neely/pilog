@@ -5,11 +5,20 @@ const SITE_NAME = 'Pilog'
 const DEFAULT_DESCRIPTION =
   'Pilog is the Public Download Path for a local-first developer journal that captures rough notes and turns them into GitHub-ready issues.'
 
-const OPEN_GRAPH_IMAGE = {
-  url: '/pi-icon.png',
-  width: 1000,
-  height: 1000,
-  alt: 'Pilog, a local-first developer journal'
+const PREVIEW_IMAGE_DETAILS = {
+  width: 1200,
+  height: 630,
+  alt: 'Pilog preview: a warm parchment note stack with a Reading-Room Moss pi mark'
+}
+
+const OPEN_GRAPH_PREVIEW_IMAGE = {
+  url: '/opengraph-image.jpg',
+  ...PREVIEW_IMAGE_DETAILS
+}
+
+const TWITTER_PREVIEW_IMAGE = {
+  url: '/twitter-image.jpg',
+  ...PREVIEW_IMAGE_DETAILS
 }
 
 type PageMetadataOptions = {
@@ -37,9 +46,19 @@ function createPageMetadata({
     },
     ...(robots ? { robots } : {}),
     openGraph: {
+      type: 'website',
+      locale: 'en_US',
       url: canonical,
+      siteName: SITE_NAME,
       title: openGraphTitle,
-      description: openGraphDescription
+      description: openGraphDescription,
+      images: [OPEN_GRAPH_PREVIEW_IMAGE]
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: openGraphTitle,
+      description: openGraphDescription,
+      images: [TWITTER_PREVIEW_IMAGE]
     }
   }
 }
@@ -82,13 +101,13 @@ export const rootMetadata: Metadata = {
     siteName: SITE_NAME,
     title: 'Pilog: Local-first developer journal',
     description: DEFAULT_DESCRIPTION,
-    images: [OPEN_GRAPH_IMAGE]
+    images: [OPEN_GRAPH_PREVIEW_IMAGE]
   },
   twitter: {
     card: 'summary_large_image',
     title: 'Pilog: Local-first developer journal',
     description: DEFAULT_DESCRIPTION,
-    images: [OPEN_GRAPH_IMAGE.url]
+    images: [TWITTER_PREVIEW_IMAGE]
   }
 }
 
