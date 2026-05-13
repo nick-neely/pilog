@@ -37,6 +37,24 @@ const FIXTURE_DIRECTORY_SEGMENTS = new Set(['fixtures', '__fixtures__'])
 const DEVELOPMENT_CACHE_SEGMENTS = new Set(['.cache', '.vite', '.turbo'])
 const BUILD_LEFTOVER_SEGMENTS = new Set(['coverage', '.nyc_output'])
 const TEST_FILE_PATTERN = /\.(test|spec)\.[cm]?[jt]sx?$/
+const PRUNED_UNPACKED_PATHS = [
+  ['better-sqlite3', 'deps'],
+  ['better-sqlite3', 'src'],
+  ['better-sqlite3', 'build', 'Release', 'obj.target'],
+  ['koffi', 'doc'],
+  ['koffi', 'src'],
+  ['koffi', 'vendor']
+]
+
+const PRUNED_UNPACKED_ENTRY_PREFIXES = [
+  'node_modules/better-sqlite3/deps/',
+  'node_modules/better-sqlite3/src/',
+  'node_modules/better-sqlite3/build/Release/obj.target/',
+  'node_modules/koffi/doc/',
+  'node_modules/koffi/src/',
+  'node_modules/koffi/vendor/',
+  'node_modules/koffi/build/koffi/'
+]
 
 function resolveResourcesDir(appOutDir) {
   const candidates = [join(appOutDir, 'resources'), join(appOutDir, 'Contents', 'Resources')]
@@ -145,17 +163,9 @@ function prunePackagedRuntimeBloat(appOutDir, options = {}) {
   const arch = options.arch ?? process.arch
   const removed = []
 
-  removePackagedPath(appOutDir, join(unpackedNodeModules, 'better-sqlite3', 'deps'), removed)
-  removePackagedPath(appOutDir, join(unpackedNodeModules, 'better-sqlite3', 'src'), removed)
-  removePackagedPath(
-    appOutDir,
-    join(unpackedNodeModules, 'better-sqlite3', 'build', 'Release', 'obj.target'),
-    removed
-  )
-
-  removePackagedPath(appOutDir, join(unpackedNodeModules, 'koffi', 'doc'), removed)
-  removePackagedPath(appOutDir, join(unpackedNodeModules, 'koffi', 'src'), removed)
-  removePackagedPath(appOutDir, join(unpackedNodeModules, 'koffi', 'vendor'), removed)
+  for (const pathSegments of PRUNED_UNPACKED_PATHS) {
+    removePackagedPath(appOutDir, join(unpackedNodeModules, ...pathSegments), removed)
+  }
   pruneKoffiPlatformBinaries(
     appOutDir,
     join(unpackedNodeModules, 'koffi', 'build', 'koffi'),
@@ -183,15 +193,7 @@ function pruneKoffiPlatformBinaries(appOutDir, koffiBuildDir, options, removed) 
 }
 
 function resolveKoffiPlatformDirectory({ platform, arch }) {
-  const normalizedPlatform = platform === 'win32' ? 'win32' : platform
-  const normalizedArch = normalizeElectronBuilderArch(arch)
-
-  if (normalizedPlatform === 'darwin') return `darwin_${normalizedArch}`
-  if (normalizedPlatform === 'win32') return `win32_${normalizedArch}`
-  if (normalizedPlatform === 'linux') return `linux_${normalizedArch}`
-  if (normalizedPlatform === 'freebsd') return `freebsd_${normalizedArch}`
-  if (normalizedPlatform === 'openbsd') return `openbsd_${normalizedArch}`
-  return `${normalizedPlatform}_${normalizedArch}`
+  return `${platform}_${normalizeElectronBuilderArch(arch)}`
 }
 
 function resolveKoffiNativeBinary(resourcesDir, options) {
@@ -461,15 +463,7 @@ function isAsarDirectoryEntry(error) {
 
 function isExpectedPrunedUnpackedEntry(packagePath, error) {
   if (!error || error.code !== 'ENOENT') return false
-  return (
-    packagePath.startsWith('node_modules/better-sqlite3/deps/') ||
-    packagePath.startsWith('node_modules/better-sqlite3/src/') ||
-    packagePath.startsWith('node_modules/better-sqlite3/build/Release/obj.target/') ||
-    packagePath.startsWith('node_modules/koffi/doc/') ||
-    packagePath.startsWith('node_modules/koffi/src/') ||
-    packagePath.startsWith('node_modules/koffi/vendor/') ||
-    packagePath.startsWith('node_modules/koffi/build/koffi/')
-  )
+  return PRUNED_UNPACKED_ENTRY_PREFIXES.some((prefix) => packagePath.startsWith(prefix))
 }
 
 function normalizeAsarEntry(entry) {

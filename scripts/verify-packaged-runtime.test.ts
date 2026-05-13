@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs'
 import { chmod, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -170,8 +171,21 @@ describe('packaged runtime pruning', () => {
         'resources/app.asar.unpacked/node_modules/koffi/vendor'
       ])
     )
-    await expect(
-      writeFile(
+    expect(
+      existsSync(
+        join(
+          resourcesDir,
+          'app.asar.unpacked',
+          'node_modules',
+          'better-sqlite3',
+          'build',
+          'Release',
+          'better_sqlite3.node'
+        )
+      )
+    ).toBe(true)
+    expect(
+      existsSync(
         join(
           resourcesDir,
           'app.asar.unpacked',
@@ -180,11 +194,10 @@ describe('packaged runtime pruning', () => {
           'build',
           'koffi',
           'linux_x64',
-          'runtime-check'
-        ),
-        'still present'
+          'koffi.node'
+        )
       )
-    ).resolves.toBeUndefined()
+    ).toBe(true)
   })
 })
 
