@@ -124,9 +124,9 @@ describe('read-only repo tools', () => {
     const tools = createReadOnlyRepoTools(wslAccess(), {
       execFileSync: mockExecFileSync as unknown as typeof execFileSync
     })
-    const readFile = tools.find((tool) => tool.name === 'read_file')
+    const readFile = getTool(tools, 'read_file')
 
-    const result = await readFile!.execute('tool', { path: 'src/app.ts' })
+    const result = await readFile.execute('tool', { path: 'src/app.ts' })
 
     expect(result.details).toEqual({
       path: 'src/app.ts',
@@ -257,6 +257,15 @@ function wslAccess(): {
     distro: 'Ubuntu',
     linuxPath: '/home/neely/dev/pi log;rm -rf nope'
   }
+}
+
+function getTool(
+  tools: ReturnType<typeof createReadOnlyRepoTools>,
+  name: string
+): ReturnType<typeof createReadOnlyRepoTools>[number] {
+  const tool = tools.find((candidate) => candidate.name === name)
+  if (!tool) throw new Error(`Expected ${name} tool to be registered.`)
+  return tool
 }
 
 function createFixtureRepo(): { repoPath: string } {

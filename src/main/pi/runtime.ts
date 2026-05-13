@@ -181,14 +181,14 @@ export function repoToToolAccessDescriptor(
 ): RepoAccessDescriptor {
   if (input.accessKind === 'wsl' && input.wslDistro && input.wslPath) {
     return {
-      kind: 'wsl' as const,
+      kind: 'wsl',
       displayPath: input.localPath,
       distro: input.wslDistro,
       linuxPath: input.wslPath
     }
   }
 
-  return { kind: 'host' as const, displayPath: input.localPath }
+  return { kind: 'host', displayPath: input.localPath }
 }
 
 async function* runFixtureAgent(input: IssueGenerationInput): AsyncIterable<AgentEvent> {

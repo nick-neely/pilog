@@ -19,11 +19,9 @@ const WSL_COMMAND_TIMEOUT_MS = 10000
 type WslRepoAccessDescriptor = Extract<RepoAccessDescriptor, { kind: 'wsl' }>
 type RepoToolAccess = string | RepoAccessDescriptor
 type ExecFileSync = typeof execFileSync
-type SpawnSync = typeof spawnSync
 
 type RepoToolOptions = {
   execFileSync?: ExecFileSync
-  spawnSync?: SpawnSync
 }
 
 const ReadFileParameters = Type.Object({
@@ -262,7 +260,11 @@ export function createGitStatusTool(
       const access = normalizeRepoToolAccess(accessInput)
       if (access.kind === 'wsl') {
         return textResult(
-          runWslJson(access, ['git', 'status', '--short', '--branch'], options.execFileSync)
+          createWslOutputDetails(
+            access,
+            ['git', 'status', '--short', '--branch'],
+            options.execFileSync
+          )
         )
       }
 
@@ -325,13 +327,7 @@ export function createGitLogTool(
       ]
       if (input.path) args.push('--', sandbox.assertResolvedPath(sandbox.resolvePath(input.path)))
       const output = await simpleGit({ baseDir: sandbox.root }).raw(args)
-      const commits: Array<{ hash: string; author: string; date: string; subject: string }> = []
-      for (const line of output.trim().split('\n')) {
-        if (!line) continue
-        const [hash, author, date, ...subjectParts] = line.split('\t')
-        commits.push({ hash, author, date, subject: subjectParts.join('\t').slice(0, 200) })
-      }
-      return textResult({ commits })
+      return textResult({ commits: parseGitLogOutput(output) })
     }
   }
 }
@@ -410,12 +406,7 @@ function executeWslListDir(
       const relativePath = assertWslRelativeAllowed(entryPath ?? '.')
       return {
         path: relativePath,
-        type:
-          kind === 'd'
-            ? ('directory' as const)
-            : kind === 'f'
-              ? ('file' as const)
-              : ('other' as const)
+        type: getWslFindEntryType(kind)
       }
     })
   return textResult({ entries, truncated: entries.length >= MAX_DIR_ENTRIES })
@@ -509,13 +500,19 @@ function executeWslGitLog(
   ]
   if (input.path) args.push('--', resolveWslRelativePath(access, input.path, runExecFileSync))
   const output = runWsl(access, args, runExecFileSync, MAX_GIT_OUTPUT_BYTES)
+  return textResult({ commits: parseGitLogOutput(output) })
+}
+
+function parseGitLogOutput(
+  output: string
+): Array<{ hash: string; author: string; date: string; subject: string }> {
   const commits: Array<{ hash: string; author: string; date: string; subject: string }> = []
   for (const line of output.trim().split('\n')) {
     if (!line) continue
     const [hash, author, date, ...subjectParts] = line.split('\t')
     commits.push({ hash, author, date, subject: subjectParts.join('\t').slice(0, 200) })
   }
-  return textResult({ commits })
+  return commits
 }
 
 function executeWslGitBlame(
@@ -531,7 +528,7 @@ function executeWslGitBlame(
   return textResult({ blame: truncate(blame, MAX_GIT_OUTPUT_BYTES) })
 }
 
-function runWslJson(
+function createWslOutputDetails(
   access: WslRepoAccessDescriptor,
   args: string[],
   runExecFileSync = execFileSync
@@ -623,6 +620,17 @@ function globPatternToRegExp(pattern: string): RegExp {
     .replace(/\?/g, '[^/]')
     .replace(/\0/g, '.*')
   return new RegExp(`^${escaped}$`)
+}
+
+function getWslFindEntryType(kind: string | undefined): 'file' | 'directory' | 'other' {
+  switch (kind) {
+    case 'd':
+      return 'directory'
+    case 'f':
+      return 'file'
+    default:
+      return 'other'
+  }
 }
 
 function getDirEntryType(entry: {
