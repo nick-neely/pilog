@@ -47,14 +47,14 @@ export function AppShell({
 
   return (
     <div className="flex h-screen flex-col bg-background text-foreground">
-      <header className="flex h-12 shrink-0 items-center justify-between gap-4 border-b bg-background pl-4 pr-[calc(env(titlebar-area-width,0px)+1rem)] [app-region:drag]">
-        <div className="min-w-0 [app-region:no-drag]">
+      <header className="grid h-12 shrink-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-4 border-b bg-background pl-4 pr-36 [-webkit-app-region:drag]">
+        <div className="min-w-0 [-webkit-app-region:no-drag]">
           {navigationSlot ??
             (tabs && activeTab ? (
               <ViewTabs tabs={tabs} active={activeTab} onChange={onTabChange} />
             ) : null)}
         </div>
-        <div className="flex shrink-0 items-center gap-1 [app-region:no-drag]">
+        <div className="flex shrink-0 items-center gap-1 [-webkit-app-region:no-drag]">
           {onOpenCommandPalette ? (
             <Tooltip>
               <TooltipTrigger asChild>

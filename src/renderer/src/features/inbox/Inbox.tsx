@@ -107,6 +107,7 @@ import {
   type RecoveryState
 } from '../recovery-state'
 import { PiSetupPanel } from '../setup/PiSetupPanel'
+import { GitHubDeviceCode } from '../setup/GitHubDeviceCode'
 import { RepoLinkFlow } from '../setup/RepoLinkFlow'
 import { usePiConfig, type PiConfigState } from '../setup/use-pi-config'
 import { StatusFilter } from './StatusFilter'
@@ -803,7 +804,9 @@ function OnboardingPanel({
             </div>
           ) : (
             <div className="flex w-full flex-col items-center gap-3">
-              {displayedStep === 'github' && getGitHubAuthText(signals.github) ? (
+              {displayedStep === 'github' && signals.github.auth?.state === 'device_code' ? (
+                <GitHubDeviceCode auth={signals.github.auth} className="w-full max-w-md" />
+              ) : displayedStep === 'github' && getGitHubAuthText(signals.github) ? (
                 <div
                   className="w-full max-w-md rounded-md border bg-muted/30 p-3"
                   aria-live="polite"

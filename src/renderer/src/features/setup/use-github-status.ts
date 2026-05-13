@@ -31,11 +31,20 @@ export function useGitHubStatus(): {
 
   useEffect(() => {
     return window.pilog.onGitHubAuthProgress((auth) => {
-      setStatus((current) => ({
-        connected: current?.connected ?? false,
-        login: current?.login,
-        auth
-      }))
+      setStatus((current) => {
+        if (
+          current?.auth?.state === 'device_code' &&
+          (auth.state === 'polling' || auth.state === 'slow_down')
+        ) {
+          return current
+        }
+
+        return {
+          connected: current?.connected ?? false,
+          login: current?.login,
+          auth
+        }
+      })
       if (
         auth.state === 'denied' ||
         auth.state === 'expired' ||

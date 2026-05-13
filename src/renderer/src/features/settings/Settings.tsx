@@ -76,6 +76,7 @@ import {
 } from '@shared/types'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { PiSetupPanel } from '../setup/PiSetupPanel'
+import { GitHubDeviceCode } from '../setup/GitHubDeviceCode'
 import { useGitHubStatus } from '../setup/use-github-status'
 import { usePiConfig } from '../setup/use-pi-config'
 import { getUpdateStatusView } from './update-status-view'
@@ -636,27 +637,19 @@ export function Settings({
                           ) : null}
                         </div>
                         {github.status?.auth ? (
-                          <div className="rounded-md border bg-muted/40 p-3" aria-live="polite">
-                            {github.status.auth.state === 'device_code' ? (
-                              <div className="flex flex-col gap-2">
-                                <p className="text-xs text-muted-foreground">
-                                  {githubAuthMessage(github.status.auth)}
-                                </p>
-                                <div className="flex flex-wrap items-center gap-3">
-                                  <code className="rounded-sm border bg-background px-2 py-1 font-mono text-sm text-foreground">
-                                    {github.status.auth.userCode}
-                                  </code>
-                                  <span className="text-xs text-muted-foreground">
-                                    {github.status.auth.verificationUri}
-                                  </span>
-                                </div>
-                              </div>
-                            ) : (
+                          github.status.auth.state === 'device_code' ? (
+                            <GitHubDeviceCode
+                              auth={github.status.auth}
+                              align="start"
+                              message={githubAuthMessage(github.status.auth) ?? undefined}
+                            />
+                          ) : (
+                            <div className="rounded-md border bg-muted/40 p-3" aria-live="polite">
                               <p className="text-xs text-muted-foreground">
                                 {githubAuthMessage(github.status.auth)}
                               </p>
-                            )}
-                          </div>
+                            </div>
+                          )
                         ) : null}
                       </div>
                     )}
