@@ -284,9 +284,10 @@ Each platform job:
 
 The release jobs publish size reports before release assets so artifact growth
 is inspectable before users receive the installer. Packaged performance reports
-are not produced by the stable or preview Release Actions yet; the packaged
-performance baseline is a local/manual report until Issue #69 defines
-performance budgets and any release enforcement policy.
+are still produced locally or manually unless a release lane explicitly opts in,
+but the runner now writes both a baseline and budget report. Local performance
+budget findings are informational; release enforcement requires the intentional
+`--enforce-budgets` flag.
 
 ### Stage 3 reports
 
@@ -322,9 +323,12 @@ against the same platform output when possible:
 pnpm perf:packaged -- --app-out-dir dist/linux-unpacked --output dist/packaged-performance-baseline.json
 ```
 
-If a future release run attaches `packaged-performance-baseline.json`, keep it
-next to the size reports for the same channel/platform and compare scenario
-names rather than internal runner details.
+This also writes `packaged-performance-budget-report.json` unless
+`--skip-budget-report` is used. Keep the baseline and budget reports next to the
+size reports for the same channel/platform and compare scenario names rather
+than internal runner details. If a release lane intentionally enforces
+performance budgets, run the same command with `--enforce-budgets` so missing or
+over-budget scenarios fail before artifacts are published.
 
 ### Stage 4 — Publish Release Manifest
 

@@ -41,6 +41,7 @@
     "test:e2e:packaged": "pnpm run build:unpack && playwright test e2e/packaged-runtime.spec.ts",
     "perf:packaged": "node scripts/packaged-performance.cjs",
     "perf:packaged:build": "pnpm run build:unpack && pnpm run perf:packaged",
+    "perf:packaged:enforce": "node scripts/packaged-performance.cjs --enforce-budgets",
     "inventory:packaged": "tsx scripts/packaged-artifact-inventory.ts",
     "budget:packaged": "tsx scripts/packaged-size-budget.ts",
     "budget:packaged:build": "pnpm run build:unpack && pnpm run budget:packaged",

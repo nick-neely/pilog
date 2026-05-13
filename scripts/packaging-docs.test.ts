@@ -22,9 +22,11 @@ describe('packaging and release workflow documentation', () => {
     expect(release).toContain('packaged-size-reports-stable-<platform>')
     expect(release).toContain('packaged-size-reports-preview-<platform>')
     expect(release).toContain('packaged performance baseline')
-    expect(release).toContain('Issue #69')
+    expect(release).toContain('packaged-performance-budget-report.json')
+    expect(release).toContain('--enforce-budgets')
 
     expect(checklist).toContain('packaged-size-reports-')
     expect(checklist).toContain('packaged-performance-baseline.json')
+    expect(checklist).toContain('packaged-performance-budget-report.json')
   })
 })

@@ -22,9 +22,11 @@ References: [ADR-0006](adr/0006-release-distribution-architecture.md) · [releas
       `packaged-size-budget-report.json` for unexpected tests, fixtures,
       caches, source maps, native payload growth, or budget findings.
 - [ ] If release performance is under review, run or attach the local
-      `packaged-performance-baseline.json` for the same packaged target and
-      compare scenario timings against the previous release notes. Performance
-      thresholds remain informational until issue #69 defines enforcement.
+      `packaged-performance-baseline.json` and
+      `packaged-performance-budget-report.json` for the same packaged target.
+      Review missing or over-budget scenarios before publishing. Use
+      `--enforce-budgets` only when the release lane is intentionally enforcing
+      the calibrated platform budget.
 
 ### 2. GitHub Release artifacts
 
@@ -166,8 +168,10 @@ Test on a machine or user account with **no existing Pilog data** (or delete `~/
       `packaged-size-budget-report.json` for unexpected tests, fixtures,
       caches, source maps, native payload growth, or budget findings.
 - [ ] If preview performance is under review, run or attach the local
-      `packaged-performance-baseline.json` for the same packaged target and
-      compare scenario timings against the previous preview.
+      `packaged-performance-baseline.json` and
+      `packaged-performance-budget-report.json` for the same packaged target.
+      Compare scenario timings against the previous preview and investigate any
+      missing or over-budget scenario before publishing.
 
 ### 2. GitHub Release artifacts (preview)
 
