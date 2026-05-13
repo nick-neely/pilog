@@ -19,7 +19,18 @@ function getOrCreateWindow(icon: string): BrowserWindow {
     width: 900,
     height: 670,
     show: false,
-    autoHideMenuBar: false,
+    backgroundColor: '#f2eee5',
+    autoHideMenuBar: process.platform !== 'darwin',
+    titleBarStyle: 'hidden',
+    ...(process.platform !== 'darwin'
+      ? {
+          titleBarOverlay: {
+            color: '#f2eee5',
+            symbolColor: '#38322b',
+            height: 48
+          }
+        }
+      : {}),
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
