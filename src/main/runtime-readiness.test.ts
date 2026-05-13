@@ -2,6 +2,22 @@ import { describe, expect, it, vi } from 'vitest'
 import { getRuntimeReadiness } from './runtime-readiness'
 import type { RepoAccessDescriptor } from '@shared/ipc'
 
+const GIT_READY = { ok: true, version: 'git version 2.45.0' } as const
+const WSL_DISPLAY_PATH = '\\\\wsl.localhost\\Ubuntu\\home\\neely\\dev\\pilog'
+const WSL_LINUX_PATH = '/home/neely/dev/pilog'
+
+function readyDeps(): {
+  checkGitVersion: () => Promise<typeof GIT_READY>
+  isSafeStorageAvailable: () => boolean
+  checkBundledRepoTooling: () => Promise<{ ok: boolean }>
+} {
+  return {
+    checkGitVersion: vi.fn(async () => GIT_READY),
+    isSafeStorageAvailable: vi.fn(() => true),
+    checkBundledRepoTooling: vi.fn(async () => ({ ok: true }))
+  }
+}
+
 describe('runtime readiness', () => {
   it('surfaces missing git with an end-user recovery action', async () => {
     const readiness = await getRuntimeReadiness({
@@ -24,10 +40,9 @@ describe('runtime readiness', () => {
 
   it('allows unavailable safeStorage when the development credential fallback is active', async () => {
     const readiness = await getRuntimeReadiness({
-      checkGitVersion: vi.fn(async () => ({ ok: true, version: 'git version 2.45.0' })),
+      ...readyDeps(),
       isSafeStorageAvailable: vi.fn(() => false),
       canUseInsecureCredentialFallback: vi.fn(() => true),
-      checkBundledRepoTooling: vi.fn(async () => ({ ok: true })),
       checkRepoAccess: vi.fn()
     })
 
@@ -38,10 +53,9 @@ describe('runtime readiness', () => {
 
   it('surfaces unavailable safeStorage as a keychain prerequisite in packaged mode', async () => {
     const readiness = await getRuntimeReadiness({
-      checkGitVersion: vi.fn(async () => ({ ok: true, version: 'git version 2.45.0' })),
+      ...readyDeps(),
       isSafeStorageAvailable: vi.fn(() => false),
       canUseInsecureCredentialFallback: vi.fn(() => false),
-      checkBundledRepoTooling: vi.fn(async () => ({ ok: true })),
       checkRepoAccess: vi.fn()
     })
 
@@ -53,9 +67,7 @@ describe('runtime readiness', () => {
   it('surfaces inaccessible linked repository paths', async () => {
     const readiness = await getRuntimeReadiness(
       {
-        checkGitVersion: vi.fn(async () => ({ ok: true, version: 'git version 2.45.0' })),
-        isSafeStorageAvailable: vi.fn(() => true),
-        checkBundledRepoTooling: vi.fn(async () => ({ ok: true })),
+        ...readyDeps(),
         checkRepoAccess: vi.fn(async (access: RepoAccessDescriptor) =>
           access.displayPath === '/missing/repo' ? { ok: false } : { ok: true }
         )
@@ -74,19 +86,17 @@ describe('runtime readiness', () => {
 
     const readiness = await getRuntimeReadiness(
       {
-        checkGitVersion: vi.fn(async () => ({ ok: true, version: 'git version 2.45.0' })),
-        isSafeStorageAvailable: vi.fn(() => true),
-        checkBundledRepoTooling: vi.fn(async () => ({ ok: true })),
+        ...readyDeps(),
         checkRepoAccess
       },
       [
         {
           id: 'repo-1',
           name: 'pilog',
-          localPath: '\\\\wsl.localhost\\Ubuntu\\home\\neely\\dev\\pilog',
+          localPath: WSL_DISPLAY_PATH,
           accessKind: 'wsl',
           wslDistro: 'Ubuntu',
-          wslPath: '/home/neely/dev/pilog'
+          wslPath: WSL_LINUX_PATH
         }
       ]
     )
@@ -95,9 +105,9 @@ describe('runtime readiness', () => {
     expect(checkRepoAccess).toHaveBeenCalledWith(
       {
         kind: 'wsl',
-        displayPath: '\\\\wsl.localhost\\Ubuntu\\home\\neely\\dev\\pilog',
+        displayPath: WSL_DISPLAY_PATH,
         distro: 'Ubuntu',
-        linuxPath: '/home/neely/dev/pilog'
+        linuxPath: WSL_LINUX_PATH
       },
       expect.objectContaining({ id: 'repo-1' })
     )
@@ -106,9 +116,7 @@ describe('runtime readiness', () => {
   it('reports stale WSL repository links before draft generation starts', async () => {
     const readiness = await getRuntimeReadiness(
       {
-        checkGitVersion: vi.fn(async () => ({ ok: true, version: 'git version 2.45.0' })),
-        isSafeStorageAvailable: vi.fn(() => true),
-        checkBundledRepoTooling: vi.fn(async () => ({ ok: true })),
+        ...readyDeps(),
         checkRepoAccess: vi.fn(async () => ({
           ok: false,
           detail: 'WSL distro Ubuntu cannot read /home/neely/dev/pilog because Git is unavailable.',
@@ -119,19 +127,17 @@ describe('runtime readiness', () => {
         {
           id: 'repo-1',
           name: 'pilog',
-          localPath: '\\\\wsl.localhost\\Ubuntu\\home\\neely\\dev\\pilog',
+          localPath: WSL_DISPLAY_PATH,
           accessKind: 'wsl',
           wslDistro: 'Ubuntu',
-          wslPath: '/home/neely/dev/pilog'
+          wslPath: WSL_LINUX_PATH
         }
       ]
     )
 
     expect(readiness.ready).toBe(false)
     expect(readiness.items.localRepositories.status).toBe('degraded')
-    expect(readiness.items.localRepositories.detail).toContain(
-      '\\\\wsl.localhost\\Ubuntu\\home\\neely\\dev\\pilog'
-    )
+    expect(readiness.items.localRepositories.detail).toContain(WSL_DISPLAY_PATH)
     expect(readiness.items.localRepositories.detail).toContain('Git is unavailable')
     expect(readiness.items.localRepositories.recoveryAction).toContain('Install Git inside Ubuntu')
   })
@@ -141,9 +147,7 @@ describe('runtime readiness', () => {
 
     const readiness = await getRuntimeReadiness(
       {
-        checkGitVersion: vi.fn(async () => ({ ok: true, version: 'git version 2.45.0' })),
-        isSafeStorageAvailable: vi.fn(() => true),
-        checkBundledRepoTooling: vi.fn(async () => ({ ok: true })),
+        ...readyDeps(),
         runWslRepoAccessCheck
       },
       [
@@ -178,9 +182,7 @@ describe('runtime readiness', () => {
   it('reports missing WSL project paths with location-specific recovery copy', async () => {
     const readiness = await getRuntimeReadiness(
       {
-        checkGitVersion: vi.fn(async () => ({ ok: true, version: 'git version 2.45.0' })),
-        isSafeStorageAvailable: vi.fn(() => true),
-        checkBundledRepoTooling: vi.fn(async () => ({ ok: true })),
+        ...readyDeps(),
         runWslRepoAccessCheck: vi.fn(async () => {
           throw { stderr: 'chdir /home/neely/dev/missing: no such file or directory' }
         })
@@ -208,9 +210,7 @@ describe('runtime readiness', () => {
 
     const readiness = await getRuntimeReadiness(
       {
-        checkGitVersion: vi.fn(async () => ({ ok: true, version: 'git version 2.45.0' })),
-        isSafeStorageAvailable: vi.fn(() => true),
-        checkBundledRepoTooling: vi.fn(async () => ({ ok: true })),
+        ...readyDeps(),
         checkRepoAccess
       },
       [
@@ -238,9 +238,7 @@ describe('runtime readiness', () => {
 
     const readiness = await getRuntimeReadiness(
       {
-        checkGitVersion: vi.fn(async () => ({ ok: true, version: 'git version 2.45.0' })),
-        isSafeStorageAvailable: vi.fn(() => true),
-        checkBundledRepoTooling: vi.fn(async () => ({ ok: true })),
+        ...readyDeps(),
         checkRepoAccess
       },
       [

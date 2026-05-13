@@ -45,21 +45,28 @@ type BundledRepoToolingCheckResult = {
   detail?: string
 }
 
-type RuntimeReadinessDeps = {
-  checkGitVersion?: () => Promise<GitVersionCheckResult>
-  isSafeStorageAvailable?: () => boolean
-  canUseInsecureCredentialFallback?: () => boolean
-  checkRepoAccess?: (access: RepoAccessDescriptor, repo: ReadinessRepo) => Promise<RepoAccessCheck>
-  runWslRepoAccessCheck?: ExecFile
-  checkBundledRepoTooling?: () => Promise<BundledRepoToolingCheckResult>
-  now?: () => Date
-}
+type WslRepoAccessDescriptor = Extract<RepoAccessDescriptor, { kind: 'wsl' }>
+
+type RepoAccessChecker = (
+  access: RepoAccessDescriptor,
+  repo: ReadinessRepo
+) => Promise<RepoAccessCheck>
 
 type ExecFile = (
   file: string,
   args: string[],
   options?: { windowsHide?: boolean; timeout?: number; maxBuffer?: number }
 ) => Promise<{ stdout: string; stderr: string }>
+
+type RuntimeReadinessDeps = {
+  checkGitVersion?: () => Promise<GitVersionCheckResult>
+  isSafeStorageAvailable?: () => boolean
+  canUseInsecureCredentialFallback?: () => boolean
+  checkRepoAccess?: RepoAccessChecker
+  runWslRepoAccessCheck?: ExecFile
+  checkBundledRepoTooling?: () => Promise<BundledRepoToolingCheckResult>
+  now?: () => Date
+}
 
 export async function getRuntimeReadiness(
   deps: RuntimeReadinessDeps = {},
@@ -164,21 +171,12 @@ function buildLocalRepositoriesReadinessItem(
 ): RuntimeReadiness['items']['localRepositories'] {
   if (repoAccess.failures.length > 0) {
     const inaccessiblePaths = repoAccess.failures.map((failure) => failure.path)
-    const detail = repoAccess.failures
-      .map((failure) => (failure.detail ? `${failure.path} (${failure.detail})` : failure.path))
-      .join(', ')
-    const recoveryActions = Array.from(
-      new Set(repoAccess.failures.flatMap((failure) => failure.recoveryAction ?? []))
-    )
 
     return {
       status: 'degraded',
       label: 'Local repositories',
-      detail: `Pilog cannot read ${detail}.`,
-      recoveryAction:
-        recoveryActions.length > 0
-          ? recoveryActions.join(' ')
-          : 'Relink the repository from its current folder, restore the missing folder, or remove the stale repository link.',
+      detail: `Pilog cannot read ${formatRepoAccessFailureDetail(repoAccess.failures)}.`,
+      recoveryAction: formatRepoAccessRecoveryAction(repoAccess.failures),
       checkedCount: repoAccess.checkedCount,
       inaccessiblePaths
     }
@@ -259,20 +257,16 @@ async function checkRepoAccess(
 
 async function checkLocalRepositories(
   repos: ReadinessRepo[],
-  checkAccess: (access: RepoAccessDescriptor, repo: ReadinessRepo) => Promise<RepoAccessCheck>
+  checkAccess: RepoAccessChecker
 ): Promise<RepoAccessCheckResult> {
   const failures: RepoAccessFailure[] = []
   for (const repo of repos) {
-    if (repo.accessKind === 'wsl' && (!repo.wslDistro || !repo.wslPath)) {
-      failures.push({
-        path: repo.localPath,
-        detail: 'The repository link is missing WSL access metadata.',
-        recoveryAction: 'Relink the repository from its current WSL folder.'
-      })
+    const access = repoToAccessDescriptor(repo)
+    if (!access) {
+      failures.push(missingWslAccessMetadataFailure(repo))
       continue
     }
 
-    const access = repoToAccessDescriptor(repo)
     const result = await checkAccess(access, repo)
     if (!result.ok) {
       failures.push({
@@ -285,20 +279,40 @@ async function checkLocalRepositories(
   return { checkedCount: repos.length, failures }
 }
 
-function repoToAccessDescriptor(repo: ReadinessRepo): RepoAccessDescriptor {
-  if (repo.accessKind === 'wsl') {
-    if (repo.wslDistro && repo.wslPath) {
-      return {
-        kind: 'wsl',
-        displayPath: repo.localPath,
-        distro: repo.wslDistro,
-        linuxPath: repo.wslPath
-      }
-    }
+function formatRepoAccessFailureDetail(failures: RepoAccessFailure[]): string {
+  return failures
+    .map((failure) => (failure.detail ? `${failure.path} (${failure.detail})` : failure.path))
+    .join(', ')
+}
 
+function formatRepoAccessRecoveryAction(failures: RepoAccessFailure[]): string {
+  const recoveryActions = Array.from(
+    new Set(
+      failures
+        .map((failure) => failure.recoveryAction)
+        .filter((action): action is string => typeof action === 'string')
+    )
+  )
+  if (recoveryActions.length > 0) return recoveryActions.join(' ')
+  return 'Relink the repository from its current folder, restore the missing folder, or remove the stale repository link.'
+}
+
+function missingWslAccessMetadataFailure(repo: ReadinessRepo): RepoAccessFailure {
+  return {
+    path: repo.localPath,
+    detail: 'The repository link is missing WSL access metadata.',
+    recoveryAction: 'Relink the repository from its current WSL folder.'
+  }
+}
+
+function repoToAccessDescriptor(repo: ReadinessRepo): RepoAccessDescriptor | null {
+  if (repo.accessKind === 'wsl') {
+    if (!repo.wslDistro || !repo.wslPath) return null
     return {
-      kind: 'host',
-      displayPath: repo.localPath
+      kind: 'wsl',
+      displayPath: repo.localPath,
+      distro: repo.wslDistro,
+      linuxPath: repo.wslPath
     }
   }
 
@@ -309,7 +323,7 @@ function repoToAccessDescriptor(repo: ReadinessRepo): RepoAccessDescriptor {
 }
 
 async function checkWslRepoAccess(
-  access: Extract<RepoAccessDescriptor, { kind: 'wsl' }>,
+  access: WslRepoAccessDescriptor,
   runExecFile: ExecFile
 ): Promise<RepoAccessCheck> {
   try {
@@ -345,7 +359,7 @@ async function checkWslRepoAccess(
 }
 
 function describeWslRepoAccessFailure(
-  access: Extract<RepoAccessDescriptor, { kind: 'wsl' }>,
+  access: WslRepoAccessDescriptor,
   error: unknown
 ): RepoAccessCheck {
   const message = extractErrorText(error)
