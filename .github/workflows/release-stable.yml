@@ -125,10 +125,41 @@ jobs:
           node -e "if (!(process.env.PILOG_BUNDLED_GITHUB_CLIENT_ID || '').trim()) { console.error('PILOG_BUNDLED_GITHUB_CLIENT_ID is required for packaged GitHub Device Flow. Set it as a repository variable or secret before releasing.'); process.exit(1) }"
           pnpm exec electron-vite build
 
+      - name: Package macOS artifacts
+        # Build release files first so size reports run before publishing.
+        run: pnpm exec electron-builder --mac --publish never
+
+      - name: Generate macOS size reports
+        shell: bash
+        run: |
+          mkdir -p dist/reports/stable-mac
+          pnpm inventory:packaged dist/mac/Pilog.app > dist/reports/stable-mac/packaged-artifact-inventory.txt
+          pnpm budget:packaged -- dist/mac/Pilog.app --dist-dir dist --output dist/reports/stable-mac/packaged-size-budget-report.json > dist/reports/stable-mac/packaged-size-budget-report.txt
+
+      - name: Upload macOS size reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: packaged-size-reports-stable-mac
+          path: dist/reports/stable-mac
+          if-no-files-found: error
+
       - name: Publish macOS artifacts
-        # electron-builder creates/finds the GitHub Release for this tag and uploads
-        # the DMG, mac.zip, and latest-mac.yml updater metadata.
-        run: pnpm exec electron-builder --mac --publish always
+        # Creates/finds the GitHub Release and uploads the DMG, mac.zip,
+        # blockmaps, and latest-mac.yml updater metadata after reports exist.
+        shell: bash
+        env:
+          TAG: ${{ needs.validate.outputs.tag }}
+        run: |
+          shopt -s nullglob
+          release_files=(dist/*.dmg dist/*.dmg.blockmap dist/*-mac.zip dist/*-mac.zip.blockmap dist/latest-mac.yml)
+          if ((${#release_files[@]} == 0)); then
+            echo "::error::No macOS release files found in dist."
+            exit 1
+          fi
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" --verify-tag --title "$TAG" --generate-notes || gh release view "$TAG" >/dev/null
+          fi
+          gh release upload "$TAG" "${release_files[@]}" --clobber
 
       - name: Generate checksums
         run: pnpm run build:checksums
@@ -175,9 +206,39 @@ jobs:
           node -e "if (!(process.env.PILOG_BUNDLED_GITHUB_CLIENT_ID || '').trim()) { console.error('PILOG_BUNDLED_GITHUB_CLIENT_ID is required for packaged GitHub Device Flow. Set it as a repository variable or secret before releasing.'); process.exit(1) }"
           pnpm exec electron-vite build
 
+      - name: Package Windows artifacts
+        run: pnpm exec electron-builder --win --publish never
+
+      - name: Generate Windows size reports
+        shell: bash
+        run: |
+          mkdir -p dist/reports/stable-win
+          pnpm inventory:packaged dist/win-unpacked > dist/reports/stable-win/packaged-artifact-inventory.txt
+          pnpm budget:packaged -- dist/win-unpacked --dist-dir dist --output dist/reports/stable-win/packaged-size-budget-report.json > dist/reports/stable-win/packaged-size-budget-report.txt
+
+      - name: Upload Windows size reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: packaged-size-reports-stable-win
+          path: dist/reports/stable-win
+          if-no-files-found: error
+
       - name: Publish Windows artifacts
-        # Uploads the NSIS installer (Setup.exe) and latest.yml updater metadata.
-        run: pnpm exec electron-builder --win --publish always
+        # Uploads the NSIS installer, blockmap, and latest.yml updater metadata.
+        shell: bash
+        env:
+          TAG: ${{ needs.validate.outputs.tag }}
+        run: |
+          shopt -s nullglob
+          release_files=(dist/*Setup.exe dist/*Setup.exe.blockmap dist/latest.yml)
+          if ((${#release_files[@]} == 0)); then
+            echo "::error::No Windows release files found in dist."
+            exit 1
+          fi
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" --verify-tag --title "$TAG" --generate-notes || gh release view "$TAG" >/dev/null
+          fi
+          gh release upload "$TAG" "${release_files[@]}" --clobber
 
       - name: Generate checksums
         run: pnpm run build:checksums
@@ -224,9 +285,39 @@ jobs:
           node -e "if (!(process.env.PILOG_BUNDLED_GITHUB_CLIENT_ID || '').trim()) { console.error('PILOG_BUNDLED_GITHUB_CLIENT_ID is required for packaged GitHub Device Flow. Set it as a repository variable or secret before releasing.'); process.exit(1) }"
           pnpm exec electron-vite build
 
+      - name: Package Linux artifacts
+        run: pnpm exec electron-builder --linux --publish never
+
+      - name: Generate Linux size reports
+        shell: bash
+        run: |
+          mkdir -p dist/reports/stable-linux
+          pnpm inventory:packaged dist/linux-unpacked > dist/reports/stable-linux/packaged-artifact-inventory.txt
+          pnpm budget:packaged -- dist/linux-unpacked --dist-dir dist --output dist/reports/stable-linux/packaged-size-budget-report.json > dist/reports/stable-linux/packaged-size-budget-report.txt
+
+      - name: Upload Linux size reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: packaged-size-reports-stable-linux
+          path: dist/reports/stable-linux
+          if-no-files-found: error
+
       - name: Publish Linux artifacts
-        # Uploads AppImage, deb and latest-linux.yml updater metadata.
-        run: pnpm exec electron-builder --linux --publish always
+        # Uploads AppImage, deb, blockmaps, and latest-linux.yml updater metadata.
+        shell: bash
+        env:
+          TAG: ${{ needs.validate.outputs.tag }}
+        run: |
+          shopt -s nullglob
+          release_files=(dist/*.AppImage dist/*.AppImage.blockmap dist/*.deb dist/latest-linux.yml)
+          if ((${#release_files[@]} == 0)); then
+            echo "::error::No Linux release files found in dist."
+            exit 1
+          fi
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" --verify-tag --title "$TAG" --generate-notes || gh release view "$TAG" >/dev/null
+          fi
+          gh release upload "$TAG" "${release_files[@]}" --clobber
 
       - name: Generate checksums
         run: pnpm run build:checksums

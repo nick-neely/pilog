@@ -73,6 +73,15 @@ The command writes `dist/packaged-size-budget-report.json` and prints a maintain
 
 This first budget pass is intentionally **non-blocking**. Over-budget or missing download artifacts are report findings only; they should not fail local packaged builds, Release Actions, or pull requests until a later enforcement issue makes that policy explicit.
 
+Stable and preview Release Actions publish the same inventory and budget output
+for every platform build. Each build job packages with Electron Builder
+publishing disabled, writes reports under `dist/reports/<channel>-<platform>/`,
+uploads them as a GitHub Actions artifact named
+`packaged-size-reports-<channel>-<platform>`, and then publishes the release
+artifacts, updater metadata, checksums, and Release Manifest inputs. This keeps
+stable metadata (`latest*.yml`) and preview metadata (`preview*.yml`) separated
+while making size growth inspectable at the release boundary.
+
 Initial budgets live in `scripts/packaged-size-budget.ts` as `INITIAL_PACKAGED_SIZE_BUDGETS`. They are rounded above the first artifact inventory baseline so maintainers can see meaningful growth before enforcing failures:
 
 | Budget area                     | Initial budget |

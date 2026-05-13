@@ -127,10 +127,41 @@ jobs:
           node -e "if (!(process.env.PILOG_BUNDLED_GITHUB_CLIENT_ID || '').trim()) { console.error('PILOG_BUNDLED_GITHUB_CLIENT_ID is required for packaged GitHub Device Flow. Set it as a repository variable or secret before releasing.'); process.exit(1) }"
           pnpm exec electron-vite build
 
-      - name: Publish macOS preview artifacts
+      - name: Package macOS preview artifacts
         # Uses electron-builder.preview.yml: channel=preview, releaseType=prerelease.
-        # Uploads Pilog-X.Y.Z-preview.N.dmg, Pilog-X.Y.Z-preview.N-mac.zip, and preview-mac.yml.
-        run: pnpm exec electron-builder --mac --config electron-builder.preview.yml --publish always
+        # Build release files first so size reports run before publishing.
+        run: pnpm exec electron-builder --mac --config electron-builder.preview.yml --publish never
+
+      - name: Generate macOS preview size reports
+        shell: bash
+        run: |
+          mkdir -p dist/reports/preview-mac
+          pnpm inventory:packaged dist/mac/Pilog.app > dist/reports/preview-mac/packaged-artifact-inventory.txt
+          pnpm budget:packaged -- dist/mac/Pilog.app --dist-dir dist --output dist/reports/preview-mac/packaged-size-budget-report.json > dist/reports/preview-mac/packaged-size-budget-report.txt
+
+      - name: Upload macOS preview size reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: packaged-size-reports-preview-mac
+          path: dist/reports/preview-mac
+          if-no-files-found: error
+
+      - name: Publish macOS preview artifacts
+        # Uploads preview DMG, mac.zip, blockmaps, and preview-mac.yml updater metadata.
+        shell: bash
+        env:
+          TAG: ${{ needs.validate.outputs.tag }}
+        run: |
+          shopt -s nullglob
+          release_files=(dist/*.dmg dist/*.dmg.blockmap dist/*-mac.zip dist/*-mac.zip.blockmap dist/preview-mac.yml)
+          if ((${#release_files[@]} == 0)); then
+            echo "::error::No macOS preview release files found in dist."
+            exit 1
+          fi
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" --verify-tag --title "$TAG" --prerelease --generate-notes || gh release view "$TAG" >/dev/null
+          fi
+          gh release upload "$TAG" "${release_files[@]}" --clobber
 
       - name: Generate checksums
         run: pnpm run build:checksums
@@ -177,9 +208,39 @@ jobs:
           node -e "if (!(process.env.PILOG_BUNDLED_GITHUB_CLIENT_ID || '').trim()) { console.error('PILOG_BUNDLED_GITHUB_CLIENT_ID is required for packaged GitHub Device Flow. Set it as a repository variable or secret before releasing.'); process.exit(1) }"
           pnpm exec electron-vite build
 
+      - name: Package Windows preview artifacts
+        run: pnpm exec electron-builder --win --config electron-builder.preview.yml --publish never
+
+      - name: Generate Windows preview size reports
+        shell: bash
+        run: |
+          mkdir -p dist/reports/preview-win
+          pnpm inventory:packaged dist/win-unpacked > dist/reports/preview-win/packaged-artifact-inventory.txt
+          pnpm budget:packaged -- dist/win-unpacked --dist-dir dist --output dist/reports/preview-win/packaged-size-budget-report.json > dist/reports/preview-win/packaged-size-budget-report.txt
+
+      - name: Upload Windows preview size reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: packaged-size-reports-preview-win
+          path: dist/reports/preview-win
+          if-no-files-found: error
+
       - name: Publish Windows preview artifacts
-        # Uploads Pilog-X.Y.Z-preview.N-Setup.exe and preview.yml updater metadata.
-        run: pnpm exec electron-builder --win --config electron-builder.preview.yml --publish always
+        # Uploads preview NSIS installer, blockmap, and preview.yml updater metadata.
+        shell: bash
+        env:
+          TAG: ${{ needs.validate.outputs.tag }}
+        run: |
+          shopt -s nullglob
+          release_files=(dist/*Setup.exe dist/*Setup.exe.blockmap dist/preview.yml)
+          if ((${#release_files[@]} == 0)); then
+            echo "::error::No Windows preview release files found in dist."
+            exit 1
+          fi
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" --verify-tag --title "$TAG" --prerelease --generate-notes || gh release view "$TAG" >/dev/null
+          fi
+          gh release upload "$TAG" "${release_files[@]}" --clobber
 
       - name: Generate checksums
         run: pnpm run build:checksums
@@ -226,9 +287,39 @@ jobs:
           node -e "if (!(process.env.PILOG_BUNDLED_GITHUB_CLIENT_ID || '').trim()) { console.error('PILOG_BUNDLED_GITHUB_CLIENT_ID is required for packaged GitHub Device Flow. Set it as a repository variable or secret before releasing.'); process.exit(1) }"
           pnpm exec electron-vite build
 
+      - name: Package Linux preview artifacts
+        run: pnpm exec electron-builder --linux --config electron-builder.preview.yml --publish never
+
+      - name: Generate Linux preview size reports
+        shell: bash
+        run: |
+          mkdir -p dist/reports/preview-linux
+          pnpm inventory:packaged dist/linux-unpacked > dist/reports/preview-linux/packaged-artifact-inventory.txt
+          pnpm budget:packaged -- dist/linux-unpacked --dist-dir dist --output dist/reports/preview-linux/packaged-size-budget-report.json > dist/reports/preview-linux/packaged-size-budget-report.txt
+
+      - name: Upload Linux preview size reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: packaged-size-reports-preview-linux
+          path: dist/reports/preview-linux
+          if-no-files-found: error
+
       - name: Publish Linux preview artifacts
-        # Uploads Pilog-X.Y.Z-preview.N.AppImage, .deb and preview-linux.yml.
-        run: pnpm exec electron-builder --linux --config electron-builder.preview.yml --publish always
+        # Uploads preview AppImage, deb, blockmaps, and preview-linux.yml updater metadata.
+        shell: bash
+        env:
+          TAG: ${{ needs.validate.outputs.tag }}
+        run: |
+          shopt -s nullglob
+          release_files=(dist/*.AppImage dist/*.AppImage.blockmap dist/*.deb dist/preview-linux.yml)
+          if ((${#release_files[@]} == 0)); then
+            echo "::error::No Linux preview release files found in dist."
+            exit 1
+          fi
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" --verify-tag --title "$TAG" --prerelease --generate-notes || gh release view "$TAG" >/dev/null
+          fi
+          gh release upload "$TAG" "${release_files[@]}" --clobber
 
       - name: Generate checksums
         run: pnpm run build:checksums
