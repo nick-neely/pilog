@@ -4,13 +4,13 @@ import { useEffect, useState } from 'react'
 import { useTheme } from 'next-themes'
 import { cn } from '@pilog/ui/utils'
 
-type ThemeChoice = 'light' | 'dark' | 'system'
-
-const themeChoices: Array<{ id: ThemeChoice; label: string }> = [
+const themeChoices = [
   { id: 'light', label: 'Light' },
   { id: 'dark', label: 'Dark' },
   { id: 'system', label: 'Auto' }
-]
+] as const
+
+type ThemeChoice = (typeof themeChoices)[number]['id']
 
 export function ThemeSelector() {
   const { theme, setTheme } = useTheme()
@@ -20,7 +20,7 @@ export function ThemeSelector() {
     setMounted(true)
   }, [])
 
-  const selectedTheme = mounted ? theme : 'system'
+  const selectedTheme: string | undefined = mounted ? theme : 'system'
 
   return (
     <div

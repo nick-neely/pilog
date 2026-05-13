@@ -25,8 +25,11 @@ describe('site theme integration', () => {
     const header = read('site/src/components/site-header.tsx')
 
     expect(header).toContain('<ThemeSelector />')
-    expect(selector).toContain("type ThemeChoice = 'light' | 'dark' | 'system'")
-    expect(selector).toContain("setTheme(choice.id)")
+    expect(selector).toContain("id: 'light'")
+    expect(selector).toContain("id: 'dark'")
+    expect(selector).toContain("id: 'system'")
+    expect(selector).toContain("type ThemeChoice = (typeof themeChoices)[number]['id']")
+    expect(selector).toContain('setTheme(choice.id)')
     expect(selector).toContain('aria-label="Theme"')
     expect(selector).toContain('Light')
     expect(selector).toContain('Dark')
