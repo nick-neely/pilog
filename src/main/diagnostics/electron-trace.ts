@@ -13,7 +13,6 @@ type ContentTracingApi = {
 
 type TraceLogger = {
   info: (...args: unknown[]) => void
-  warn: (...args: unknown[]) => void
   error: (...args: unknown[]) => void
 }
 
@@ -48,6 +47,9 @@ type CreateElectronTraceDiagnosticInput = ResolveElectronTraceConfigInput & {
 }
 
 const ENABLED_VALUES = new Set(['1', 'true', 'yes', 'on'])
+const TRACE_FLAG = '--pilog-trace'
+const TRACE_FLAG_PREFIX = `${TRACE_FLAG}=`
+const TRACE_INSPECTION_GUIDANCE = 'Open the file in chrome://tracing or https://ui.perfetto.dev'
 const DEFAULT_TRACE_CATEGORIES = [
   'electron',
   'v8',
@@ -62,12 +64,13 @@ const DEFAULT_TRACE_CATEGORIES = [
   'disabled-by-default-devtools.timeline.frame',
   'disabled-by-default-v8.cpu_profiler'
 ]
+const EXCLUDED_TRACE_CATEGORIES = ['disabled-by-default-netlog']
 
 export function resolveElectronTraceConfig(
   input: ResolveElectronTraceConfigInput
 ): ElectronTraceConfig {
   const traceFlag = input.argv.find(
-    (arg) => arg === '--pilog-trace' || arg.startsWith('--pilog-trace=')
+    (arg) => arg === TRACE_FLAG || arg.startsWith(TRACE_FLAG_PREFIX)
   )
   const envEnabled = isEnabled(input.env.PILOG_ELECTRON_TRACE)
   const flagEnabled = Boolean(traceFlag)
@@ -76,9 +79,7 @@ export function resolveElectronTraceConfig(
     return { enabled: false }
   }
 
-  const flagOutputDirectory = traceFlag?.startsWith('--pilog-trace=')
-    ? traceFlag.slice('--pilog-trace='.length).trim()
-    : ''
+  const flagOutputDirectory = getTraceFlagOutputDirectory(traceFlag)
   const outputDirectory =
     input.env.PILOG_ELECTRON_TRACE_DIR?.trim() ||
     flagOutputDirectory ||
@@ -90,8 +91,8 @@ export function resolveElectronTraceConfig(
     outputDirectory: resolve(outputDirectory),
     durationMs,
     traceConfig: {
-      included_categories: DEFAULT_TRACE_CATEGORIES,
-      excluded_categories: ['disabled-by-default-netlog']
+      included_categories: [...DEFAULT_TRACE_CATEGORIES],
+      excluded_categories: [...EXCLUDED_TRACE_CATEGORIES]
     }
   }
 }
@@ -157,7 +158,7 @@ export function createElectronTraceDiagnostic(
       input.log.info('Electron trace diagnostic written', {
         path: writtenPath,
         reason,
-        inspect: 'Open the file in chrome://tracing or https://ui.perfetto.dev'
+        inspect: TRACE_INSPECTION_GUIDANCE
       })
       return writtenPath
     } catch (error) {
@@ -178,6 +179,12 @@ export function createElectronTraceDiagnostic(
 
 function isEnabled(value: string | undefined): boolean {
   return value !== undefined && ENABLED_VALUES.has(value.trim().toLowerCase())
+}
+
+function getTraceFlagOutputDirectory(traceFlag: string | undefined): string {
+  if (!traceFlag?.startsWith(TRACE_FLAG_PREFIX)) return ''
+
+  return traceFlag.slice(TRACE_FLAG_PREFIX.length).trim()
 }
 
 function parseDuration(value: string | undefined): number | null {

@@ -37,7 +37,7 @@ describe('Electron trace diagnostic mode', () => {
       argv: ['pilog'],
       defaultOutputDirectory: join(outputDirectory, 'default'),
       contentTracing: { startRecording, stopRecording },
-      log: { info, warn: vi.fn(), error: vi.fn() }
+      log: { info, error: vi.fn() }
     })
 
     expect(diagnostic.enabled).toBe(true)
@@ -91,7 +91,7 @@ describe('Electron trace diagnostic mode', () => {
         startRecording: vi.fn<() => Promise<void>>().mockRejectedValue(new Error('trace denied')),
         stopRecording: vi.fn<(resultFilePath?: string) => Promise<string>>()
       },
-      log: { info: vi.fn(), warn: vi.fn(), error }
+      log: { info: vi.fn(), error }
     })
 
     await expect(diagnostic.start()).resolves.toBeUndefined()
