@@ -1,8 +1,8 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { useTheme } from 'next-themes'
 import { cn } from '@pilog/ui/utils'
+import { useTheme } from 'next-themes'
+import { useEffect, useState } from 'react'
 
 const themeChoices = [
   { id: 'light', label: 'Light' },
@@ -10,13 +10,14 @@ const themeChoices = [
   { id: 'system', label: 'Auto' }
 ] as const
 
-type ThemeChoice = (typeof themeChoices)[number]['id']
-
 export function ThemeSelector() {
   const { theme, setTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
+    // next-themes `theme` is undefined on the server; keep the first client
+    // paint aligned with SSR, then reveal the persisted theme after mount.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true)
   }, [])
 

@@ -1062,18 +1062,16 @@ function NoteDetail({
           </AlertDialog>
         </div>
       </header>
-      <div className="flex-1">
-        <ScrollArea className="h-full overflow-hidden">
-          <Textarea
-            aria-label="Note content"
-            // Body line length capped at 72ch per DESIGN.md; mono editor body
-            // pairs with the rest of the system (file paths, code blocks).
-            className="mx-auto block h-full w-full max-w-[72ch] resize-none overflow-auto rounded-none border-0 bg-transparent p-6 font-mono text-sm leading-relaxed text-foreground shadow-none focus-visible:ring-0"
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            placeholder="Capture a thought…"
-          />
-        </ScrollArea>
+      <div className="flex-1 min-h-0 overflow-hidden">
+        <Textarea
+          aria-label="Note content"
+          // Body line length capped at 72ch per DESIGN.md; mono editor body
+          // pairs with the rest of the system (file paths, code blocks).
+          className="mx-auto block h-full w-full max-w-[72ch] resize-none overflow-auto rounded-none border-0 bg-transparent p-6 font-mono text-sm leading-relaxed text-foreground shadow-none focus-visible:ring-0"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          placeholder="Capture a thought…"
+        />
       </div>
       {/* Repo and generation provenance, kept secondary to the editor body. */}
       <footer className="flex min-h-14 shrink-0 flex-wrap items-center justify-between gap-x-6 gap-y-2 border-t px-6 py-3">
@@ -2593,7 +2591,7 @@ export function Inbox({
         Detail pane — flex-1, never a fixed width. The Editor-Gravitational
         Rule: when a note is open, the textarea is the visual centre.
       */}
-          <section className="flex-1 min-w-0">
+          <section className="flex-1 min-w-0 h-full overflow-hidden">
             {loadingNotes ? (
               <div
                 className="flex h-full flex-col gap-4 px-6 py-5"
