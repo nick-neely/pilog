@@ -74,6 +74,7 @@ import type {
   Repo
 } from '@shared/ipc'
 import type { LabelMatch } from '@shared/labels'
+import { formatRepoLocation } from '@shared/repo-paths'
 import {
   completeOnboardingState,
   confirmHotkeyOnboardingState,
@@ -197,6 +198,7 @@ type OnboardingPanelProps = {
   generationPhase: string | null
   generationError: string | null
   draftPreview: OnboardingDraftPreview | null
+  repo: Repo | null
   pi: PiConfigState
   onConfirmHotkey: () => void
   onHotkeyChange: (value: string) => void
@@ -375,6 +377,7 @@ function OnboardingPanel({
   generationPhase,
   generationError,
   draftPreview,
+  repo,
   pi,
   onConfirmHotkey,
   onHotkeyChange,
@@ -395,6 +398,7 @@ function OnboardingPanel({
   const currentIndex = ONBOARDING_STEP_ORDER.indexOf(currentStep)
   const displayedIndex = ONBOARDING_STEP_ORDER.indexOf(displayedStep)
   const progressValue = ((displayedIndex + 1) / ONBOARDING_STEP_ORDER.length) * 100
+  const repoLocation = repo ? formatRepoLocation(repo) : null
 
   const handleBack = (): void => {
     if (displayedIndex > 0) {
@@ -780,6 +784,11 @@ function OnboardingPanel({
                 {preview.affectedFiles.length > 0 ? (
                   <div className="mt-4 flex flex-col gap-1.5">
                     <p className="text-xs font-medium text-foreground">Likely area</p>
+                    {repoLocation?.context ? (
+                      <p className="text-xs leading-5 text-muted-foreground">
+                        {repoLocation.context}
+                      </p>
+                    ) : null}
                     <p className="truncate font-mono text-xs text-muted-foreground">
                       {preview.affectedFiles[0].path}
                     </p>
@@ -1117,6 +1126,7 @@ function AutoPublishPreviewDialog({
   open,
   summary,
   drafts,
+  repo,
   sourceNotes,
   report,
   publishing,
@@ -1128,6 +1138,7 @@ function AutoPublishPreviewDialog({
   open: boolean
   summary: AutoPublishPreviewSummary | null
   drafts: GeneratedIssueDraft[]
+  repo: Repo | null
   sourceNotes: Note[]
   report: AutoPublishPublishReport | null
   publishing: boolean
@@ -1142,6 +1153,7 @@ function AutoPublishPreviewDialog({
   )
   const title = getAutoPublishDialogTitle(summary, report)
   const description = getAutoPublishDialogDescription(summary, report)
+  const repoLocation = repo ? formatRepoLocation(repo) : null
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
@@ -1205,6 +1217,11 @@ function AutoPublishPreviewDialog({
                       </div>
                       <div className="flex flex-col gap-1">
                         <p className="text-xs font-medium text-muted-foreground">Affected files</p>
+                        {repoLocation?.context ? (
+                          <p className="text-xs leading-5 text-muted-foreground">
+                            {repoLocation.context}
+                          </p>
+                        ) : null}
                         <ul className="flex flex-col gap-1">
                           {draft.affectedFiles.map((file) => (
                             <li key={file.path} className="min-w-0">
@@ -2075,6 +2092,7 @@ export function Inbox({
           generationPhase={onboardingGenerationPhase}
           generationError={onboardingGenerationError}
           draftPreview={onboardingDraftPreview}
+          repo={repos[0] ?? null}
           pi={onboardingPi}
           onConfirmHotkey={handleConfirmHotkey}
           onHotkeyChange={handleOnboardingHotkeyChange}
@@ -2543,6 +2561,7 @@ export function Inbox({
         open={autoPublishPreview.open}
         summary={autoPublishPreview.summary}
         drafts={autoPublishPreview.drafts}
+        repo={currentInboxRepo}
         sourceNotes={autoPublishPreview.sourceNotes}
         report={autoPublishPreview.report}
         publishing={autoPublishPreview.publishing}

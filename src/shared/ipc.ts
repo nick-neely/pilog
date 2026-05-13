@@ -283,9 +283,12 @@ export type UpdateIssueDraftRequest = {
 export type PathActionRequest = {
   path: string
   repoPath?: string | null
+  repoAccess?: RepoAccessDescriptor | null
 }
 
-export type PathActionResult = { ok: true } | { ok: false; reason: 'missing' | 'unavailable' }
+export type PathActionResult =
+  | { ok: true }
+  | { ok: false; reason: 'missing' | 'unavailable' | 'copied-fallback'; fallbackPath?: string }
 
 export type ListIssueDraftsRequest = {
   status?: IssueDraftStatus | 'all'

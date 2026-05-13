@@ -46,6 +46,7 @@ import type {
   UpdateRepoAutoPublishSettingsRequest
 } from '@shared/ipc'
 import { DEFAULT_REPO_AUTO_PUBLISH_SETTINGS, normalizeRepoAutoPublishSettings } from '@shared/ipc'
+import { formatRepoLocation } from '@shared/repo-paths'
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
 import { getErrorMessage } from '../recovery-state'
 import { RepoLinkFlow } from '../setup/RepoLinkFlow'
@@ -590,6 +591,7 @@ function RepoRow({
     repo.autoPublishDefaultLabel !== DEFAULT_REPO_AUTO_PUBLISH_SETTINGS.autoPublishDefaultLabel ||
     repo.autoPublishDryRun ||
     !repo.autoPublishRequireConfirmation
+  const repoLocation = formatRepoLocation(repo)
 
   return (
     <>
@@ -611,7 +613,16 @@ function RepoRow({
                 </Badge>
               ) : null}
             </div>
-            <p className="truncate font-mono text-xs text-muted-foreground">{repo.localPath}</p>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <p className="truncate font-mono text-xs text-muted-foreground">
+                  {repoLocation.label}
+                </p>
+              </TooltipTrigger>
+              <TooltipContent className="max-w-lg whitespace-pre-wrap font-mono">
+                {repoLocation.title}
+              </TooltipContent>
+            </Tooltip>
             {repo.defaultBranch && (
               <p className="text-xs text-muted-foreground">
                 Branch: <span className="font-mono">{repo.defaultBranch}</span>

@@ -71,4 +71,57 @@ describe('path actions', () => {
     })
     expect(showItemInFolder).toHaveBeenCalledWith('/repo/src/save.ts')
   })
+
+  it('copies a WSL Linux path when Windows cannot reveal the affected file', async () => {
+    const writeText = vi.fn()
+    const showItemInFolder = vi.fn()
+    const actions = createPathActions({
+      writeText,
+      showItemInFolder,
+      exists: () => false
+    })
+
+    await expect(
+      actions.revealPath({
+        path: 'src/save.ts',
+        repoPath: '\\\\wsl.localhost\\Ubuntu\\home\\neely\\dev\\pilog',
+        repoAccess: {
+          kind: 'wsl',
+          displayPath: '\\\\wsl.localhost\\Ubuntu\\home\\neely\\dev\\pilog',
+          distro: 'Ubuntu',
+          linuxPath: '/home/neely/dev/pilog'
+        }
+      })
+    ).resolves.toEqual({
+      ok: false,
+      reason: 'copied-fallback',
+      fallbackPath: '/home/neely/dev/pilog/src/save.ts'
+    })
+    expect(showItemInFolder).not.toHaveBeenCalled()
+    expect(writeText).toHaveBeenCalledWith('/home/neely/dev/pilog/src/save.ts')
+  })
+
+  it('reveals WSL affected files through the Windows UNC path when available', async () => {
+    const showItemInFolder = vi.fn()
+    const actions = createPathActions({
+      writeText: vi.fn(),
+      showItemInFolder,
+      exists: (path) => path === '\\\\wsl.localhost\\Ubuntu\\home\\neely\\dev\\pilog\\src\\save.ts'
+    })
+
+    await expect(
+      actions.revealPath({
+        path: 'src/save.ts',
+        repoAccess: {
+          kind: 'wsl',
+          displayPath: '\\\\wsl.localhost\\Ubuntu\\home\\neely\\dev\\pilog',
+          distro: 'Ubuntu',
+          linuxPath: '/home/neely/dev/pilog'
+        }
+      })
+    ).resolves.toEqual({ ok: true })
+    expect(showItemInFolder).toHaveBeenCalledWith(
+      '\\\\wsl.localhost\\Ubuntu\\home\\neely\\dev\\pilog\\src\\save.ts'
+    )
+  })
 })

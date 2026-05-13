@@ -47,6 +47,7 @@ import {
   usePilogHotkey
 } from '@renderer/shortcuts/pilog-hotkeys'
 import { PUBLISH_EGRESS_DISCLOSURE } from '@shared/data-boundaries'
+import { formatRepoLocation, repoAccessFromRepo } from '@shared/repo-paths'
 import { SHORTCUT_CONTRACT } from '@shared/shortcuts'
 import type {
   AgentRunListItem,
@@ -165,6 +166,10 @@ function pathActionMessage(result: PathActionResult, action: PathAction): string
       return 'File was not found on disk.'
     case 'unavailable':
       return 'Could not use this path.'
+    case 'copied-fallback':
+      return result.fallbackPath
+        ? `Copied WSL path: ${result.fallbackPath}`
+        : 'Copied the WSL path instead.'
   }
 }
 
@@ -1072,6 +1077,8 @@ function DraftEditor({
     error: null
   })
   const [keptUnmatchedLabels, setKeptUnmatchedLabels] = useState<string[]>([])
+  const repoAccess = useMemo(() => (repo ? repoAccessFromRepo(repo) : null), [repo])
+  const repoLocation = useMemo(() => (repo ? formatRepoLocation(repo) : null), [repo])
   const repoOwner = repo?.owner ?? null
   const repoName = repo?.name ?? null
   const repoLabelRequest = useMemo(() => {
@@ -1308,12 +1315,13 @@ function DraftEditor({
     async (file: IssueDraft['affectedFiles'][number], action: PathAction): Promise<void> => {
       const result = await window.pilog.invoke(pathActionChannel(action), {
         path: file.path,
-        repoPath
+        repoPath,
+        repoAccess
       })
 
       setPathMessages((current) => ({ ...current, [file.path]: pathActionMessage(result, action) }))
     },
-    [repoPath]
+    [repoAccess, repoPath]
   )
 
   const handleToggleSplitSourceNote = useCallback((noteId: string, checked: boolean): void => {
@@ -1601,7 +1609,14 @@ function DraftEditor({
           </section>
 
           <section className="flex flex-col gap-2">
-            <h3 className="text-sm font-semibold">Affected Files</h3>
+            <div className="flex flex-col gap-1">
+              <h3 className="text-sm font-semibold">Affected Files</h3>
+              {repoLocation?.context ? (
+                <p className="text-xs leading-relaxed text-muted-foreground">
+                  {repoLocation.context}
+                </p>
+              ) : null}
+            </div>
             {draft.affectedFiles.length > 0 ? (
               <ul className="flex flex-col divide-y divide-border">
                 {draft.affectedFiles.map((file) => (
@@ -1642,7 +1657,11 @@ function DraftEditor({
                               />
                             </Button>
                           </TooltipTrigger>
-                          <TooltipContent>Reveal in explorer</TooltipContent>
+                          <TooltipContent>
+                            {repoAccess?.kind === 'wsl'
+                              ? 'Reveal in Explorer, or copy the WSL path'
+                              : 'Reveal in explorer'}
+                          </TooltipContent>
                         </Tooltip>
                       </div>
                     </div>
