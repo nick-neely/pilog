@@ -2,6 +2,13 @@
 
 Pilog's primary distribution path is a direct download from `https://pilog.dev`. GitHub Releases are the secondary archive and power-user path.
 
+The size and performance workflow in this document belongs to PRD #65. The
+landed slices are the packaged performance baseline runner (#66), packaged
+artifact inventory (#67), non-blocking packaged size budgets (#68), packaged
+file hygiene enforcement (#70), first measured pruning pass (#71), Release
+Action size report publishing (#73), and this maintainer documentation (#74).
+Packaged performance budget enforcement is still tracked by #69.
+
 ## Current MVP Signing Scope
 
 - Windows builds are signing-ready but unsigned until a code-signing certificate is purchased.
@@ -48,6 +55,31 @@ pnpm inventory:packaged dist/linux-unpacked
 ```
 
 Source maps are forbidden by default in the baseline report. Use `-- --allow-source-maps` only when a release intentionally retains them for diagnostics.
+
+## Reading Inventory Reports
+
+Start with the total unpacked size and the `app.asar` /
+`app.asar.unpacked` split. Growth in `app.asar` usually means compiled app
+output, JavaScript runtime dependencies, or bundled assets changed. Growth in
+`app.asar.unpacked` usually means native bindings or executable payloads
+changed, which affects signing, installer size, and cross-platform packaging
+risk.
+
+Then review the attribution sections in this order:
+
+- **Forbidden findings** must be resolved before release unless a documented
+  diagnostic source-map release intentionally opts in. Tests, fixtures, caches,
+  source maps, and build leftovers are not product capability.
+- **Required runtime assets** should stay present. Missing SQLite bindings, Pi
+  packages, repo-search tooling, updater metadata, secure-storage dependencies,
+  icons, or tray resources are release regressions, even if the package is
+  smaller.
+- **Native and executable payloads** need platform-specific scrutiny. New or
+  larger `.node` files, repo-search binaries, or helper executables should have
+  a runtime reason and should be checked on every Supported Download Platform.
+- **Largest files/directories** are the first place to look for dependency or
+  asset growth. Compare before/after reports when a feature adds a runtime
+  dependency, fixture, generated asset, or packaging rule.
 
 ## Packaged File Hygiene
 
@@ -123,6 +155,29 @@ To intentionally update a budget, run `pnpm inventory:packaged` and `pnpm budget
 
 Do not reduce size by deleting required runtime capabilities. Budget work must preserve SQLite, Pi runtime packages, repo-search, updater support, secure-storage behavior, and app/tray identity assets. The report repeats those protected capabilities and includes largest files, largest directories, native/executable payloads, runtime dependencies, forbidden findings, and required runtime assets so growth remains attributable enough for follow-up pruning work.
 
+## Local Reports vs Release Enforcement
+
+Local inventory, size, and performance commands are diagnostic feedback loops:
+
+- `pnpm inventory:packaged` shows what the unpacked packaged app ships.
+- `pnpm budget:packaged` writes a non-blocking size-budget comparison.
+- `pnpm perf:packaged` writes a packaged performance baseline.
+
+These local commands should guide review and before/after comparisons, but they
+do not make ordinary development fail because workstation hardware, display
+servers, and packaging targets vary. CI and Release Actions currently enforce
+typecheck, Vitest, release version validation, Electron Builder packaging, and
+the `afterPack` packaged-file hygiene verifier. Release Actions also upload
+size reports so maintainers can inspect growth before artifacts are published
+to users.
+
+Do not treat a local over-budget size finding as permission to delete product
+capability. Treat it as a request for attribution: identify the changed
+dependency, native payload, source map, fixture, test file, or asset; decide
+whether it belongs in the packaged runtime; and update the budget only when the
+growth is intentional product scope. Performance timings remain baselines until
+issue #69 defines thresholds and any CI or Release Action enforcement policy.
+
 ## First Measured Optimization Pass
 
 Issue #71 used the first Linux unpacked baseline to target build-only native
@@ -151,11 +206,11 @@ metadata, and app assets.
 On the first Linux x64 pass, the after report was written to
 `dist/issue-71-after-size-budget.json` and showed:
 
-| Area                         | Before    | After     | Change     |
-| ---------------------------- | --------- | --------- | ---------- |
-| Unpacked packaged app        | 382.9 MiB | 348.5 MiB | -34.4 MiB  |
-| `app.asar.unpacked` payload  | 46.5 MiB  | 12.1 MiB  | -34.4 MiB  |
-| `app.asar` archive           | 52.2 MiB  | 52.2 MiB  | no change  |
+| Area                        | Before    | After     | Change    |
+| --------------------------- | --------- | --------- | --------- |
+| Unpacked packaged app       | 382.9 MiB | 348.5 MiB | -34.4 MiB |
+| `app.asar.unpacked` payload | 46.5 MiB  | 12.1 MiB  | -34.4 MiB |
+| `app.asar` archive          | 52.2 MiB  | 52.2 MiB  | no change |
 
 Regenerate the comparison with:
 
@@ -230,6 +285,11 @@ should not fail ordinary development. Like the packaged smoke, the runner uses
 `PILOG_DEBUG_IPC=1` with temporary app data so it can seed fixture notes and run
 the agent path without live provider credentials.
 
+When comparing performance reports, keep scenario names stable and compare the
+same packaged target on comparable hardware. The most useful regression note is
+the scenario that changed, the before/after `packaged-performance-baseline.json`
+paths, and whether trace capture was enabled.
+
 ## Electron Trace Diagnostic Mode
 
 Electron trace capture is off by default. Maintainers can opt in for packaged
@@ -261,3 +321,29 @@ uses Electron/Chromium process, startup, V8, Node, GPU/compositor, loading, and
 timeline categories; it deliberately avoids netlog categories and does not add
 Note contents, credentials, linked Repo contents, or provider secrets to normal
 logs.
+
+## Contributor Packaging Review
+
+Before shipping a change that affects runtime dependencies, packaging rules,
+native modules, source maps, tests, fixtures, or assets:
+
+- Build an unpacked package for the affected platform and run
+  `pnpm inventory:packaged` plus `pnpm budget:packaged`.
+- If user-visible responsiveness could change, run `pnpm perf:packaged` against
+  the same unpacked output and keep the JSON report path in the review notes.
+- Confirm new runtime dependencies are needed in the packaged app, not just in
+  development. Prefer keeping build/test tooling outside the runtime package
+  boundary.
+- Justify native and executable payloads by platform. Keep required target
+  binaries, but do not ship build inputs, docs, source trees, or binaries for
+  unrelated platforms unless the runtime truly needs them.
+- Keep source maps out of normal releases. If a diagnostic build intentionally
+  includes them, document why, use the explicit source-map opt-in, and account
+  for the extra size.
+- Keep tests and fixtures out of packaged artifacts. Test data belongs in the
+  repo and CI, not in normal user installs.
+- Check generated or bundled assets for size and runtime necessity. Preserve app
+  icons, tray resources, updater metadata, and any asset required by packaged
+  smoke coverage.
+- Commit budget changes with the product change that requires them, and include
+  the report path and rationale in the commit or release-maintenance note.

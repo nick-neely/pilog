@@ -274,9 +274,57 @@ Each platform job:
 1. Checks out the tagged commit.
 2. Installs dependencies (including native-module rebuild for Electron via postinstall).
 3. Builds the renderer and main bundles with `electron-vite build`.
-4. Packages and publishes artifacts to the GitHub Release with `electron-builder --publish always`.
-5. Generates SHA-256 checksums with `pnpm run build:checksums`.
-6. Uploads per-artifact `.sha256` sidecar files and a platform-scoped `checksums-<platform>.txt` to the GitHub Release.
+4. Packages artifacts with Electron Builder publishing disabled.
+5. Generates packaged artifact inventory and size-budget reports under
+   `dist/reports/<channel>-<platform>/`.
+6. Uploads the report directory as a GitHub Actions artifact.
+7. Publishes the installer artifacts and updater metadata to the GitHub Release.
+8. Generates SHA-256 checksums with `pnpm run build:checksums`.
+9. Uploads per-artifact `.sha256` sidecar files and a platform-scoped `checksums-<platform>.txt` to the GitHub Release.
+
+The release jobs publish size reports before release assets so artifact growth
+is inspectable before users receive the installer. Packaged performance reports
+are not produced by the stable or preview Release Actions yet; the packaged
+performance baseline is a local/manual report until Issue #69 defines
+performance budgets and any release enforcement policy.
+
+### Stage 3 reports
+
+Stable builds upload one report artifact per platform:
+
+- `packaged-size-reports-stable-mac`
+- `packaged-size-reports-stable-win`
+- `packaged-size-reports-stable-linux`
+
+Preview builds upload the matching preview artifacts:
+
+- `packaged-size-reports-preview-mac`
+- `packaged-size-reports-preview-win`
+- `packaged-size-reports-preview-linux`
+
+Use `packaged-size-reports-stable-<platform>` and
+`packaged-size-reports-preview-<platform>` as the naming pattern when comparing
+workflow runs. Each artifact contains:
+
+- `packaged-artifact-inventory.txt`
+- `packaged-size-budget-report.txt`
+- `packaged-size-budget-report.json`
+
+Download the artifact from the workflow run's **Artifacts** section, not from
+the GitHub Release assets list. The reports are Actions evidence for
+maintainers; the Release assets remain installers, updater metadata, checksums,
+and Release Manifest inputs.
+
+For performance investigation, run the packaged performance baseline locally
+against the same platform output when possible:
+
+```bash
+pnpm perf:packaged -- --app-out-dir dist/linux-unpacked --output dist/packaged-performance-baseline.json
+```
+
+If a future release run attaches `packaged-performance-baseline.json`, keep it
+next to the size reports for the same channel/platform and compare scenario
+names rather than internal runner details.
 
 ### Stage 4 — Publish Release Manifest
 

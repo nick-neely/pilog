@@ -12,6 +12,19 @@ References: [ADR-0006](adr/0006-release-distribution-architecture.md) · [releas
 
 - [ ] `Release — Stable` workflow completed with all jobs green (validate, verify, build-mac, build-win, build-linux, publish-manifest, deploy-site).
 - [ ] No unexpected job re-runs were required to reach a clean state.
+- [ ] Each platform build uploaded its Actions report artifact:
+      `packaged-size-reports-stable-mac`,
+      `packaged-size-reports-stable-win`, and
+      `packaged-size-reports-stable-linux`.
+- [ ] Download one size report artifact and review
+      `packaged-artifact-inventory.txt`,
+      `packaged-size-budget-report.txt`, and
+      `packaged-size-budget-report.json` for unexpected tests, fixtures,
+      caches, source maps, native payload growth, or budget findings.
+- [ ] If release performance is under review, run or attach the local
+      `packaged-performance-baseline.json` for the same packaged target and
+      compare scenario timings against the previous release notes. Performance
+      thresholds remain informational until issue #69 defines enforcement.
 
 ### 2. GitHub Release artifacts
 
@@ -143,6 +156,18 @@ Test on a machine or user account with **no existing Pilog data** (or delete `~/
 
 - [ ] `Release — Preview` workflow completed with all stages green.
 - [ ] The GitHub Release is marked as a **Pre-release**.
+- [ ] Each platform build uploaded its Actions report artifact:
+      `packaged-size-reports-preview-mac`,
+      `packaged-size-reports-preview-win`, and
+      `packaged-size-reports-preview-linux`.
+- [ ] Download one preview size report artifact and review
+      `packaged-artifact-inventory.txt`,
+      `packaged-size-budget-report.txt`, and
+      `packaged-size-budget-report.json` for unexpected tests, fixtures,
+      caches, source maps, native payload growth, or budget findings.
+- [ ] If preview performance is under review, run or attach the local
+      `packaged-performance-baseline.json` for the same packaged target and
+      compare scenario timings against the previous preview.
 
 ### 2. GitHub Release artifacts (preview)
 
