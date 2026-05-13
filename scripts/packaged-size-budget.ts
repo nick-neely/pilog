@@ -11,6 +11,30 @@ import {
 } from './packaged-artifact-inventory'
 
 export const DEFAULT_SIZE_BUDGET_REPORT_PATH = 'dist/packaged-size-budget-report.json'
+const DEFAULT_INPUT_PATH = 'dist'
+const DEFAULT_DIST_DIR = 'dist'
+
+export type BudgetCategory =
+  | 'download-artifact'
+  | 'unpacked-app'
+  | 'asar-archive'
+  | 'asar-unpacked-payload'
+  | 'native-or-executable-payload'
+  | 'large-runtime-dependency'
+
+interface SizedFile {
+  path: string
+  sizeBytes: number
+}
+
+export interface ParsedBudgetCliArgs {
+  inputPath: string
+  distDir: string
+  outputPath: string
+  allowSourceMaps: boolean
+  json: boolean
+  help: boolean
+}
 
 export interface ByteBudget {
   id: string
@@ -57,13 +81,7 @@ export interface DownloadArtifactSummary {
 export interface BudgetComparison {
   id: string
   label: string
-  category:
-    | 'download-artifact'
-    | 'unpacked-app'
-    | 'asar-archive'
-    | 'asar-unpacked-payload'
-    | 'native-or-executable-payload'
-    | 'large-runtime-dependency'
+  category: BudgetCategory
   status: 'within-budget' | 'over-budget' | 'missing'
   actualBytes: number | null
   budgetBytes: number
@@ -190,8 +208,9 @@ export async function collectPackagedSizeBudgetReport(
   options: PackagedSizeBudgetOptions = {}
 ): Promise<PackagedSizeBudgetReport> {
   const budgets = options.budgets ?? INITIAL_PACKAGED_SIZE_BUDGETS
-  const appOutDir = resolvePackagedAppOutDir(options.inputPath ?? 'dist')
-  const resolvedDistDir = resolve(options.distDir ?? inferDistDir(options.inputPath ?? 'dist'))
+  const inputPath = options.inputPath ?? DEFAULT_INPUT_PATH
+  const appOutDir = resolvePackagedAppOutDir(inputPath)
+  const resolvedDistDir = resolve(options.distDir ?? inferDistDir(inputPath))
   const inventory = await collectPackagedArtifactInventory(appOutDir, {
     allowSourceMaps: options.allowSourceMaps,
     largestCount: options.largestCount
@@ -349,17 +368,10 @@ export function formatPackagedSizeBudgetReport(report: PackagedSizeBudgetReport)
   return `${lines.join('\n')}\n`
 }
 
-export function parseBudgetCliArgs(args: string[]): {
-  inputPath: string
-  distDir: string
-  outputPath: string
-  allowSourceMaps: boolean
-  json: boolean
-  help: boolean
-} {
-  const parsed = {
-    inputPath: 'dist',
-    distDir: 'dist',
+export function parseBudgetCliArgs(args: string[]): ParsedBudgetCliArgs {
+  const parsed: ParsedBudgetCliArgs = {
+    inputPath: DEFAULT_INPUT_PATH,
+    distDir: DEFAULT_DIST_DIR,
     outputPath: DEFAULT_SIZE_BUDGET_REPORT_PATH,
     allowSourceMaps: false,
     json: false,
@@ -368,22 +380,33 @@ export function parseBudgetCliArgs(args: string[]): {
 
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index]
-    if (arg === '--') {
-      continue
-    } else if (arg === '--dist-dir') {
-      parsed.distDir = requireValue(args, (index += 1), arg)
-    } else if (arg === '--output') {
-      parsed.outputPath = requireValue(args, (index += 1), arg)
-    } else if (arg === '--allow-source-maps') {
-      parsed.allowSourceMaps = true
-    } else if (arg === '--json') {
-      parsed.json = true
-    } else if (arg === '--help' || arg === '-h') {
-      parsed.help = true
-    } else if (!arg.startsWith('-')) {
-      parsed.inputPath = arg
-    } else {
-      throw new Error(`Unknown argument: ${arg}`)
+    switch (arg) {
+      case '--':
+        break
+      case '--dist-dir':
+        index += 1
+        parsed.distDir = requireValue(args, index, arg)
+        break
+      case '--output':
+        index += 1
+        parsed.outputPath = requireValue(args, index, arg)
+        break
+      case '--allow-source-maps':
+        parsed.allowSourceMaps = true
+        break
+      case '--json':
+        parsed.json = true
+        break
+      case '--help':
+      case '-h':
+        parsed.help = true
+        break
+      default:
+        if (!arg.startsWith('-')) {
+          parsed.inputPath = arg
+          break
+        }
+        throw new Error(`Unknown argument: ${arg}`)
     }
   }
 
@@ -398,7 +421,7 @@ async function writeReport(report: PackagedSizeBudgetReport, outputPath: string)
 }
 
 function compareKnownSize(input: {
-  category: BudgetComparison['category']
+  category: BudgetCategory
   budget: ByteBudget
   actualBytes: number
   path: string
@@ -418,10 +441,7 @@ function compareKnownSize(input: {
   }
 }
 
-function compareMissing(input: {
-  category: BudgetComparison['category']
-  budget: ByteBudget
-}): BudgetComparison {
+function compareMissing(input: { category: BudgetCategory; budget: ByteBudget }): BudgetComparison {
   return {
     id: input.budget.id,
     label: input.budget.label,
@@ -444,8 +464,8 @@ function findLargeRuntimeDependencyDirectories(
     .filter((directory) => /(^|\/)node_modules\//.test(directory.path))
 }
 
-async function collectFiles(rootDir: string): Promise<Array<{ path: string; sizeBytes: number }>> {
-  const files: Array<{ path: string; sizeBytes: number }> = []
+async function collectFiles(rootDir: string): Promise<SizedFile[]> {
+  const files: SizedFile[] = []
 
   async function visit(currentDir: string): Promise<void> {
     const entries = await readdir(currentDir, { withFileTypes: true })
@@ -482,17 +502,23 @@ function inferDistDir(inputPath: string): string {
 }
 
 function formatComparison(comparison: BudgetComparison): string {
-  const status =
-    comparison.status === 'over-budget'
-      ? `over by ${formatBytes(comparison.deltaBytes ?? 0)}`
-      : comparison.status === 'missing'
-        ? 'missing from this local dist output'
-        : `under by ${formatBytes(Math.abs(comparison.deltaBytes ?? 0))}`
+  const status = formatComparisonStatus(comparison)
   const actual = comparison.actualBytes === null ? 'not found' : formatBytes(comparison.actualBytes)
   const path = comparison.path ? ` ${comparison.path}` : ''
   return `- ${comparison.label}: ${comparison.status} (${actual} / ${formatBytes(
     comparison.budgetBytes
   )}, ${status})${path}`
+}
+
+function formatComparisonStatus(comparison: BudgetComparison): string {
+  switch (comparison.status) {
+    case 'over-budget':
+      return `over by ${formatBytes(comparison.deltaBytes ?? 0)}`
+    case 'missing':
+      return 'missing from this local dist output'
+    case 'within-budget':
+      return `under by ${formatBytes(Math.abs(comparison.deltaBytes ?? 0))}`
+  }
 }
 
 function formatPathList(paths: Array<{ path: string; sizeBytes: number }>): string[] {
