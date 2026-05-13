@@ -3,7 +3,13 @@ import { HugeiconsIcon } from '@hugeicons/react'
 import { Button } from '@renderer/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@renderer/components/ui/tooltip'
 import { ViewTabs, type ViewTab } from '@renderer/features/shared/ViewTabs'
+import { cn } from '@renderer/lib/utils'
 import { PILOG_APP_SHORTCUTS, shortcutBindingMeta } from '@renderer/shortcuts/pilog-hotkeys'
+import {
+  ELECTRON_DRAG_REGION_CLASS,
+  ELECTRON_NO_DRAG_REGION_CLASS,
+  MAIN_WINDOW_CONTROL_INSET_CLASS
+} from '@shared/window-chrome'
 import type { ReactNode } from 'react'
 
 // AppShell is the global window chrome for Pilog's tab views (Inbox,
@@ -47,14 +53,24 @@ export function AppShell({
 
   return (
     <div className="flex h-screen flex-col bg-background text-foreground">
-      <header className="grid h-12 shrink-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-4 bg-background pl-4 pr-36 [-webkit-app-region:drag]">
-        <div className="min-w-0 [-webkit-app-region:no-drag]">
+      <header
+        className={cn(
+          'flex h-12 shrink-0 items-center gap-4 bg-background pl-4',
+          MAIN_WINDOW_CONTROL_INSET_CLASS,
+          ELECTRON_DRAG_REGION_CLASS
+        )}
+      >
+        <div className={cn('min-w-0 shrink', ELECTRON_NO_DRAG_REGION_CLASS)}>
           {navigationSlot ??
             (tabs && activeTab ? (
               <ViewTabs tabs={tabs} active={activeTab} onChange={onTabChange} />
             ) : null)}
         </div>
-        <div className="flex shrink-0 items-center gap-1 [-webkit-app-region:no-drag]">
+        <div
+          aria-hidden="true"
+          className={cn('min-w-4 flex-1 self-stretch', ELECTRON_DRAG_REGION_CLASS)}
+        />
+        <div className={cn('flex shrink-0 items-center gap-1', ELECTRON_NO_DRAG_REGION_CLASS)}>
           {onOpenCommandPalette ? (
             <Tooltip>
               <TooltipTrigger asChild>

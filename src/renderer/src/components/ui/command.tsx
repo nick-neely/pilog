@@ -5,6 +5,7 @@ import { HugeiconsIcon } from '@hugeicons/react'
 import { Search01Icon } from '@hugeicons/core-free-icons'
 
 import { cn } from '@renderer/lib/utils'
+import { MODAL_CHROME_SCRIM_CLASS } from '@shared/window-chrome'
 
 // Pilog's command palette is the keyboard-first discovery surface: search,
 // filters, capture-from-anywhere. Styled to honour the Active-dialog role
@@ -48,7 +49,10 @@ function CommandDialog({
         */}
         <DialogPrimitive.Overlay
           data-slot="command-dialog-overlay"
-          className="fixed inset-0 z-50 bg-foreground/40 duration-100 dark:bg-background/70 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0"
+          className={cn(
+            'data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0',
+            MODAL_CHROME_SCRIM_CLASS
+          )}
         />
         <DialogPrimitive.Content
           data-slot="command-dialog-content"

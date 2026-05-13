@@ -5,6 +5,7 @@ import { cn } from '@renderer/lib/utils'
 import { Button } from '@renderer/components/ui/button'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { Cancel01Icon } from '@hugeicons/core-free-icons'
+import { MODAL_CHROME_SCRIM_CLASS } from '@shared/window-chrome'
 
 function Dialog({ ...props }: React.ComponentProps<typeof DialogPrimitive.Root>) {
   return <DialogPrimitive.Root data-slot="dialog" {...props} />
@@ -31,7 +32,8 @@ function DialogOverlay({
       data-slot="dialog-overlay"
       className={cn(
         // Tonal scrim only (DESIGN.md): match alert-dialog — no backdrop-blur.
-        'fixed inset-0 isolate z-50 bg-foreground/40 duration-100 dark:bg-background/70 data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0',
+        'isolate data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0',
+        MODAL_CHROME_SCRIM_CLASS,
         className
       )}
       {...props}

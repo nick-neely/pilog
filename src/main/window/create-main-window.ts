@@ -2,6 +2,7 @@ import { BrowserWindow, shell } from 'electron'
 import { join } from 'path'
 import { is } from '@electron-toolkit/utils'
 import type { IpcEvent } from '@shared/ipc'
+import { MAIN_WINDOW_TITLE_BAR_OVERLAY } from '@shared/window-chrome'
 
 let mainWindow: BrowserWindow | null = null
 let windowReady = false
@@ -45,11 +46,7 @@ function getOrCreateWindow(icon: string): BrowserWindow {
           titleBarStyle: 'hidden' as const,
           ...(process.platform !== 'darwin'
             ? {
-                titleBarOverlay: {
-                  color: '#f4f1ed',
-                  symbolColor: '#38322b',
-                  height: 48
-                }
+                titleBarOverlay: MAIN_WINDOW_TITLE_BAR_OVERLAY
               }
             : {})
         }
