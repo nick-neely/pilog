@@ -7,6 +7,9 @@ let mainWindow: BrowserWindow | null = null
 let windowReady = false
 let pendingRoute: IpcEvent | null = null
 
+const isWslDevLaunch = is.dev && Boolean(process.env.WSL_DISTRO_NAME)
+const shouldUseCustomTitleBar = !isWslDevLaunch
+
 function revealMainWindow(): void {
   const win = mainWindow
   if (!win || win.isDestroyed()) return
@@ -37,14 +40,18 @@ function getOrCreateWindow(icon: string): BrowserWindow {
     show: false,
     backgroundColor: '#f4f1ed',
     autoHideMenuBar: process.platform !== 'darwin',
-    titleBarStyle: 'hidden',
-    ...(process.platform !== 'darwin'
+    ...(shouldUseCustomTitleBar
       ? {
-          titleBarOverlay: {
-            color: '#f4f1ed',
-            symbolColor: '#38322b',
-            height: 48
-          }
+          titleBarStyle: 'hidden' as const,
+          ...(process.platform !== 'darwin'
+            ? {
+                titleBarOverlay: {
+                  color: '#f4f1ed',
+                  symbolColor: '#38322b',
+                  height: 48
+                }
+              }
+            : {})
         }
       : {}),
     ...(process.platform === 'linux' ? { icon } : {}),

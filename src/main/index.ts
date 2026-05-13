@@ -39,6 +39,11 @@ loadDotEnvFile()
 
 const BUNDLED_GITHUB_CLIENT_ID = process.env.PILOG_BUNDLED_GITHUB_CLIENT_ID?.trim() ?? ''
 
+const isWslDevLaunch = is.dev && Boolean(process.env.WSL_DISTRO_NAME)
+if (isWslDevLaunch && process.env.PILOG_ENABLE_WSL_GPU !== '1') {
+  app.disableHardwareAcceleration()
+}
+
 if (process.env.PILOG_USER_DATA) {
   app.setPath('userData', process.env.PILOG_USER_DATA)
 }

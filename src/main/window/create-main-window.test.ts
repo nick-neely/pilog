@@ -55,6 +55,7 @@ describe('main window', () => {
     vi.clearAllMocks()
     windows.length = 0
     vi.stubEnv('ELECTRON_RENDERER_URL', 'http://localhost:5173')
+    vi.stubEnv('WSL_DISTRO_NAME', '')
   })
 
   it('keeps the custom titlebar configuration for the main app window', async () => {
@@ -71,6 +72,19 @@ describe('main window', () => {
         height: 48
       }
     })
+  })
+
+  it('uses the native window frame for WSL dev launches', async () => {
+    vi.stubEnv('WSL_DISTRO_NAME', 'Ubuntu')
+    const { showMainWindow } = await import('./create-main-window')
+
+    showMainWindow('/tmp/icon.png')
+
+    expect(windows[0]?.options).toMatchObject({
+      show: false
+    })
+    expect(windows[0]?.options.titleBarStyle).toBeUndefined()
+    expect(windows[0]?.options.titleBarOverlay).toBeUndefined()
   })
 
   it('reveals the hidden window when the renderer finishes loading', async () => {
