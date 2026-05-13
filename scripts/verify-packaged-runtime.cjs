@@ -24,6 +24,11 @@ const REQUIRED_IMPORTS = [
 ]
 
 const HYGIENE_SOURCE_MAP_ENV = 'PILOG_ALLOW_PACKAGED_SOURCE_MAPS'
+const TEST_DIRECTORY_SEGMENTS = new Set(['__tests__', 'tests', 'test'])
+const FIXTURE_DIRECTORY_SEGMENTS = new Set(['fixtures', '__fixtures__'])
+const DEVELOPMENT_CACHE_SEGMENTS = new Set(['.cache', '.vite', '.turbo'])
+const BUILD_LEFTOVER_SEGMENTS = new Set(['coverage', '.nyc_output'])
+const TEST_FILE_PATTERN = /\.(test|spec)\.[cm]?[jt]sx?$/
 
 function resolveResourcesDir(appOutDir) {
   const candidates = [join(appOutDir, 'resources'), join(appOutDir, 'Contents', 'Resources')]
@@ -189,38 +194,47 @@ function classifyForbiddenPackagedPath(comparablePath, reportPath, location, opt
   const segments = path.split('/')
   const fileName = segments.at(-1) || ''
 
+  if (hasPathSegment(segments, TEST_DIRECTORY_SEGMENTS)) {
+    return createHygieneViolation('tests', reportPath, location)
+  }
+
+  if (TEST_FILE_PATTERN.test(fileName)) {
+    return createHygieneViolation('tests', reportPath, location)
+  }
+
+  if (hasPathSegment(segments, FIXTURE_DIRECTORY_SEGMENTS)) {
+    return createHygieneViolation('fixtures', reportPath, location)
+  }
+
   if (
-    segments.some((segment) => segment === '__tests__' || segment === 'tests' || segment === 'test')
-  ) {
-    return { category: 'tests', path: reportPath, location }
-  }
-  if (/\.(test|spec)\.[cm]?[jt]sx?$/.test(fileName)) {
-    return { category: 'tests', path: reportPath, location }
-  }
-  if (segments.some((segment) => segment === 'fixtures' || segment === '__fixtures__')) {
-    return { category: 'fixtures', path: reportPath, location }
-  }
-  if (
-    segments.some(
-      (segment) => segment === '.cache' || segment === '.vite' || segment === '.turbo'
-    ) ||
+    hasPathSegment(segments, DEVELOPMENT_CACHE_SEGMENTS) ||
     path.includes('/node_modules/.cache/')
   ) {
-    return { category: 'development-caches', path: reportPath, location }
+    return createHygieneViolation('development-caches', reportPath, location)
   }
+
   if (!options.allowSourceMaps && fileName.endsWith('.map')) {
-    return { category: 'source-maps', path: reportPath, location }
+    return createHygieneViolation('source-maps', reportPath, location)
   }
+
   if (
     fileName.endsWith('.tsbuildinfo') ||
     fileName === '.DS_Store' ||
     fileName === 'Thumbs.db' ||
-    segments.some((segment) => segment === 'coverage' || segment === '.nyc_output')
+    hasPathSegment(segments, BUILD_LEFTOVER_SEGMENTS)
   ) {
-    return { category: 'build-leftovers', path: reportPath, location }
+    return createHygieneViolation('build-leftovers', reportPath, location)
   }
 
   return null
+}
+
+function hasPathSegment(segments, forbiddenSegments) {
+  return segments.some((segment) => forbiddenSegments.has(segment))
+}
+
+function createHygieneViolation(category, path, location) {
+  return { category, path, location }
 }
 
 function resolveRequiredRipgrepBinary(resourcesDir, { platform, arch }) {
