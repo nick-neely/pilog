@@ -1,9 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import {
   aboutMetadata,
+  aboutStructuredData,
+  docsStructuredData,
   docsMetadata,
   downloadMetadata,
+  downloadStructuredData,
   homeMetadata,
+  homeStructuredData,
   previewMetadata,
   rootMetadata
 } from '../site/src/lib/metadata'
@@ -68,5 +72,80 @@ describe('site metadata', () => {
       }
     })
     expect(previewMetadata.description).toContain('unsigned')
+  })
+
+  it('describes the home page website and Pilog software with stable URLs', () => {
+    expect(homeStructuredData).toEqual({
+      '@context': 'https://schema.org',
+      '@graph': expect.arrayContaining([
+        expect.objectContaining({
+          '@type': 'WebSite',
+          '@id': 'https://pilog.dev/#website',
+          name: 'Pilog',
+          url: 'https://pilog.dev/'
+        }),
+        expect.objectContaining({
+          '@type': 'SoftwareApplication',
+          '@id': 'https://pilog.dev/#software',
+          name: 'Pilog',
+          applicationCategory: 'DeveloperApplication',
+          operatingSystem: 'Desktop',
+          url: 'https://pilog.dev/',
+          downloadUrl: 'https://pilog.dev/download',
+          description:
+            'Pilog is a local-first desktop app for capturing rough development notes and producing repo-aware GitHub issue drafts.'
+        })
+      ])
+    })
+  })
+
+  it('keeps download software data aligned to current release posture', () => {
+    const graph = downloadStructuredData['@graph']
+    const page = graph.find((node) => node['@id'] === 'https://pilog.dev/download#webpage')
+    const software = graph.find((node) => node['@id'] === 'https://pilog.dev/#software')
+
+    expect(page).toMatchObject({
+      '@type': 'WebPage',
+      name: 'Download Pilog',
+      url: 'https://pilog.dev/download'
+    })
+    expect(software).toMatchObject({
+      '@type': 'SoftwareApplication',
+      name: 'Pilog',
+      softwareVersion: '0.1.0-preview.4',
+      releaseNotes: 'https://github.com/nick-neely/pilog/releases/tag/v0.1.0-preview.4'
+    })
+    expect(software).not.toHaveProperty('offers')
+    expect(software).not.toHaveProperty('aggregateRating')
+  })
+
+  it('uses page-appropriate structured data on docs and about', () => {
+    expect(docsStructuredData['@graph']).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          '@type': 'TechArticle',
+          '@id': 'https://pilog.dev/docs#documentation',
+          name: 'Pilog Docs'
+        }),
+        expect.objectContaining({
+          '@type': 'BreadcrumbList',
+          '@id': 'https://pilog.dev/docs#breadcrumb'
+        })
+      ])
+    )
+
+    expect(aboutStructuredData['@graph']).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          '@type': 'AboutPage',
+          '@id': 'https://pilog.dev/about#webpage',
+          name: 'About Pilog'
+        }),
+        expect.objectContaining({
+          '@type': 'BreadcrumbList',
+          '@id': 'https://pilog.dev/about#breadcrumb'
+        })
+      ])
+    )
   })
 })

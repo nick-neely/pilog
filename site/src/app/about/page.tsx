@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import type { Metadata } from 'next'
 import { Button } from '@pilog/ui/button'
-import { aboutMetadata } from '@/lib/metadata'
+import { aboutMetadata, aboutStructuredData, JsonLdScript } from '@/lib/metadata'
 
 export const metadata: Metadata = aboutMetadata
 
@@ -68,6 +68,7 @@ const contributions = [
 export default function AboutPage() {
   return (
     <>
+      <JsonLdScript data={aboutStructuredData} />
       {/* Page header */}
       <div className="mx-auto max-w-6xl px-6 pt-20 pb-16 md:pt-28 md:pb-20">
         <p className="text-muted-foreground mb-6 font-mono text-xs">about this project</p>

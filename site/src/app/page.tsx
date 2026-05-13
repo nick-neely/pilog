@@ -5,7 +5,7 @@ import { KeyboardFirst } from '@/components/landing/keyboard'
 import { Principles } from '@/components/landing/principles'
 import { Closing } from '@/components/landing/closing'
 import type { Metadata } from 'next'
-import { homeMetadata } from '@/lib/metadata'
+import { homeMetadata, homeStructuredData, JsonLdScript } from '@/lib/metadata'
 import { modKeyLabel } from '@/lib/platform'
 import { getServerDetectedPlatform } from '@/lib/server-detected-platform'
 
@@ -25,6 +25,7 @@ export default async function LandingPage() {
 
   return (
     <>
+      <JsonLdScript data={homeStructuredData} />
       <Hero />
       <Transformation />
       <Bento modKey={modKey} />

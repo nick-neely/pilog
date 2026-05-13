@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { PlatformDownload } from '@/components/platform-download'
-import { downloadMetadata } from '@/lib/metadata'
+import { downloadMetadata, downloadStructuredData, JsonLdScript } from '@/lib/metadata'
 import type { ReleaseManifest } from '@/lib/release-manifest'
 import rawManifest from '@/data/release-manifest.json'
 
@@ -13,6 +13,7 @@ const channel = manifest.stable
 export default function DownloadPage() {
   return (
     <div className="mx-auto max-w-3xl px-6 py-16">
+      <JsonLdScript data={downloadStructuredData} />
       <h1 className="font-heading text-foreground text-3xl leading-tight font-normal tracking-tight">
         Download Pilog
       </h1>
