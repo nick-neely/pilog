@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { Kbd, KbdGroup } from '@pilog/ui/kbd'
 import { DocsDownloadCard } from '@/components/docs/docs-download-card'
 import { DocsSidebar, type DocsNavItem } from '@/components/docs/docs-sidebar'
-import { docsMetadata } from '@/lib/metadata'
+import { docsMetadata, docsStructuredData, JsonLdScript } from '@/lib/metadata'
 import { modKeyLabel, type SiteModKeyGlyph } from '@/lib/platform'
 import { getServerDetectedPlatform } from '@/lib/server-detected-platform'
 import type { ReleaseManifest } from '@/lib/release-manifest'
@@ -90,6 +90,7 @@ export default async function DocsPage() {
 
   return (
     <div className="mx-auto w-full max-w-6xl px-6 py-16 md:py-20">
+      <JsonLdScript data={docsStructuredData} />
       <div className="grid grid-cols-1 gap-12 lg:grid-cols-[15rem_minmax(0,1fr)] lg:gap-16">
         <DocsSidebar items={nav} />
 
