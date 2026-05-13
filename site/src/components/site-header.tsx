@@ -1,5 +1,5 @@
-import Link from 'next/link'
 import Image from 'next/image'
+import Link from 'next/link'
 
 const navItems = [
   { href: '/about', label: 'About' },
@@ -22,11 +22,13 @@ export function SiteHeader() {
           aria-label="Pilog home"
         >
           <span aria-hidden className="relative inline-flex size-9 items-center justify-center">
+            {/* Full-size PNG: default next/image caps this mark at ~96px WebP (1x/2x only), which falls apart under zoom / high DPR. */}
             <Image
               src="/pi-mark.png"
               alt=""
               width={36}
               height={36}
+              unoptimized
               className="size-9 select-none transition-transform duration-300 ease-out group-hover:-rotate-3 motion-reduce:transition-none"
               draggable={false}
               priority

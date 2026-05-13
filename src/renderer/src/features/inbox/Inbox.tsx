@@ -3,13 +3,13 @@ import {
   ArrowLeft01Icon,
   ArrowRight01Icon,
   Cancel01Icon,
-  GithubIcon,
   FilePenIcon,
+  GithubIcon,
   InformationCircleIcon
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { Alert, AlertDescription, AlertTitle } from '@renderer/components/ui/alert'
 import { HotkeyInput } from '@renderer/components/HotkeyInput'
+import { Alert, AlertDescription, AlertTitle } from '@renderer/components/ui/alert'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -44,19 +44,19 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@renderer/components/ui
 import type { RunNavigationOrigin } from '@renderer/features/agent-runs/navigation'
 import { cn } from '@renderer/lib/utils'
 import {
-  PILOG_APP_SHORTCUTS,
-  hasOpenTransientUi,
-  shouldClearSelectionForContextualEscape,
-  shouldEnableGenerateDraftsShortcut,
-  usePilogHotkey,
-  usePilogHotkeySequence
-} from '@renderer/shortcuts/pilog-hotkeys'
-import {
   getListNavigationIndex,
   getSelectedListNavigationIndex,
   shouldHandleListNavigationShortcut,
   type ListNavigationDirection
 } from '@renderer/shortcuts/list-navigation'
+import {
+  hasOpenTransientUi,
+  PILOG_APP_SHORTCUTS,
+  shouldClearSelectionForContextualEscape,
+  shouldEnableGenerateDraftsShortcut,
+  usePilogHotkey,
+  usePilogHotkeySequence
+} from '@renderer/shortcuts/pilog-hotkeys'
 import {
   AUTO_PUBLISH_EGRESS_DISCLOSURE,
   GENERATION_EGRESS_DISCLOSURE,
@@ -74,7 +74,6 @@ import type {
   Repo
 } from '@shared/ipc'
 import type { LabelMatch } from '@shared/labels'
-import { formatRepoLocation } from '@shared/repo-paths'
 import {
   completeOnboardingState,
   confirmHotkeyOnboardingState,
@@ -87,11 +86,12 @@ import {
   type OnboardingSignals,
   type OnboardingStepId
 } from '@shared/onboarding'
+import { formatRepoLocation } from '@shared/repo-paths'
 import {
   DEFAULT_GLOBAL_CAPTURE_SHORTCUT,
-  SHORTCUT_CONTRACT,
   formatShortcutForDisplay,
-  getShortcutDisplayPlatform
+  getShortcutDisplayPlatform,
+  SHORTCUT_CONTRACT
 } from '@shared/shortcuts'
 import type {
   AutoPublishPreviewSummary,
@@ -107,8 +107,8 @@ import {
   getPublishRecoveryState,
   type RecoveryState
 } from '../recovery-state'
-import { PiSetupPanel } from '../setup/PiSetupPanel'
 import { GitHubDeviceCode } from '../setup/GitHubDeviceCode'
+import { PiSetupPanel } from '../setup/PiSetupPanel'
 import { RepoLinkFlow } from '../setup/RepoLinkFlow'
 import { mergeGitHubAuthProgress } from '../setup/github-auth-progress'
 import { usePiConfig, type PiConfigState } from '../setup/use-pi-config'
@@ -1055,16 +1055,16 @@ function NoteDetail({
         </div>
       </header>
       <div className="flex-1">
-        <ScrollArea className="h-full">
+        <ScrollArea className="h-full overflow-hidden">
           <Textarea
-            aria-label="Note content"
-            // Body line length capped at 72ch per DESIGN.md; mono editor body
-            // pairs with the rest of the system (file paths, code blocks).
-            className="mx-auto block min-h-full w-full max-w-[72ch] rounded-none border-0 bg-transparent p-6 font-mono text-sm leading-relaxed text-foreground shadow-none field-sizing-content focus-visible:ring-0"
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            placeholder="Capture a thought…"
-          />
+          aria-label="Note content"
+          // Body line length capped at 72ch per DESIGN.md; mono editor body
+          // pairs with the rest of the system (file paths, code blocks).
+          className="mx-auto block h-full w-full max-w-[72ch] resize-none overflow-auto rounded-none border-0 bg-transparent p-6 font-mono text-sm leading-relaxed text-foreground shadow-none focus-visible:ring-0"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          placeholder="Capture a thought…"
+        />
         </ScrollArea>
       </div>
       {/* Repo and generation provenance, kept secondary to the editor body. */}
