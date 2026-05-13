@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs'
-import { chmod, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { chmod, mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { createRequire } from 'node:module'
@@ -151,6 +151,43 @@ describe('packaged runtime file hygiene', () => {
       verifyPackagedImports(appAsar, {
         resourcesDir,
         requiredImports: ['@scope/unpacked-package']
+      })
+    ).not.toThrow()
+  })
+
+  it('checks imports through pnpm-style package links into unpacked asar entries', async () => {
+    const appOutDir = join(tmpDir, 'win-unpacked')
+    const resourcesDir = join(appOutDir, 'resources')
+    const appAsar = join(resourcesDir, 'app.asar')
+    const asarSource = join(tmpDir, 'asar-source')
+    const packageStorePath =
+      'node_modules/.pnpm/@scope+linked-package@1.0.0/node_modules/@scope/linked-package'
+
+    await writeFixtureFile(
+      asarSource,
+      `${packageStorePath}/package.json`,
+      '{"name":"@scope/linked-package","type":"module","main":"./dist/index.js"}'
+    )
+    await writeFixtureFile(
+      asarSource,
+      `${packageStorePath}/dist/index.js`,
+      'export const ok = true'
+    )
+    await mkdir(join(asarSource, 'node_modules/@scope'), { recursive: true })
+    await symlink(
+      '../../.pnpm/@scope+linked-package@1.0.0/node_modules/@scope/linked-package',
+      join(asarSource, 'node_modules/@scope/linked-package'),
+      'dir'
+    )
+    await mkdir(resourcesDir, { recursive: true })
+    await asar.createPackageWithOptions(asarSource, appAsar, {
+      unpackDir: 'node_modules/.pnpm'
+    })
+
+    expect(() =>
+      verifyPackagedImports(appAsar, {
+        resourcesDir,
+        requiredImports: ['@scope/linked-package']
       })
     ).not.toThrow()
   })

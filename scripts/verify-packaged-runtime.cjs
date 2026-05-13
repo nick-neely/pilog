@@ -47,16 +47,6 @@ const PRUNED_UNPACKED_PATHS = [
   ['koffi', 'vendor']
 ]
 
-const PRUNED_UNPACKED_ENTRY_PREFIXES = [
-  'node_modules/better-sqlite3/deps/',
-  'node_modules/better-sqlite3/src/',
-  'node_modules/better-sqlite3/build/Release/obj.target/',
-  'node_modules/koffi/doc/',
-  'node_modules/koffi/src/',
-  'node_modules/koffi/vendor/',
-  'node_modules/koffi/build/koffi/'
-]
-
 function resolveResourcesDir(appOutDir) {
   const candidates = [join(appOutDir, 'resources'), join(appOutDir, 'Contents', 'Resources')]
   const resourcesDir = candidates.find((candidate) => existsSync(join(candidate, 'app.asar')))
@@ -419,6 +409,7 @@ function verifyPackagedImports(appAsar, options = {}) {
   try {
     extractAsarForImportCheck(appAsar, tempDir)
     copyUnpackedAsarForImportCheck(options.resourcesDir ?? dirname(appAsar), tempDir)
+    materializeRequiredImportPackageLinks(tempDir, requiredImports)
     const script = `
       for (const packageName of ${JSON.stringify(requiredImports)}) {
         await import(packageName)
@@ -444,6 +435,34 @@ function verifyPackagedImports(appAsar, options = {}) {
   } finally {
     rmSync(tempDir, { recursive: true, force: true })
   }
+}
+
+function materializeRequiredImportPackageLinks(rootDir, packageNames) {
+  for (const packageName of packageNames) {
+    const packageDir = join(rootDir, 'node_modules', ...packageName.split('/'))
+    if (existsSync(join(packageDir, 'package.json'))) continue
+
+    const virtualStorePackageDir = findPnpmVirtualStorePackageDir(rootDir, packageName)
+    if (!virtualStorePackageDir) continue
+
+    rmSync(packageDir, { recursive: true, force: true })
+    mkdirSync(dirname(packageDir), { recursive: true })
+    copyDirectoryContents(virtualStorePackageDir, packageDir)
+  }
+}
+
+function findPnpmVirtualStorePackageDir(rootDir, packageName) {
+  const virtualStoreDir = join(rootDir, 'node_modules', '.pnpm')
+  if (!existsSync(virtualStoreDir)) return null
+
+  for (const entry of readdirSync(virtualStoreDir)) {
+    const candidate = join(virtualStoreDir, entry, 'node_modules', ...packageName.split('/'))
+    if (existsSync(join(candidate, 'package.json'))) {
+      return candidate
+    }
+  }
+
+  return null
 }
 
 function copyUnpackedAsarForImportCheck(resourcesDir, destinationDir) {
@@ -473,36 +492,7 @@ function copyDirectoryContents(sourceDir, destinationDir) {
 }
 
 function extractAsarForImportCheck(appAsar, destinationDir) {
-  for (const entry of listPackage(appAsar)) {
-    const packagePath = entry.replace(/^\/+/, '')
-    if (!packagePath) continue
-
-    let content
-    try {
-      content = asar.extractFile(appAsar, packagePath)
-    } catch (error) {
-      if (isAsarDirectoryEntry(error)) continue
-      if (isExpectedPrunedUnpackedEntry(packagePath, error)) continue
-      throw error
-    }
-    if (!content) continue
-
-    const destination = join(destinationDir, ...packagePath.split('/'))
-    mkdirSync(dirname(destination), { recursive: true })
-    writeFileSync(destination, content)
-  }
-}
-
-function isAsarDirectoryEntry(error) {
-  return (
-    error instanceof Error &&
-    /found a directory or link|was not found in this archive/.test(error.message)
-  )
-}
-
-function isExpectedPrunedUnpackedEntry(packagePath, error) {
-  if (!error || error.code !== 'ENOENT') return false
-  return PRUNED_UNPACKED_ENTRY_PREFIXES.some((prefix) => packagePath.startsWith(prefix))
+  asar.extractAll(appAsar, destinationDir)
 }
 
 function normalizeAsarEntry(entry) {
