@@ -49,6 +49,49 @@ pnpm inventory:packaged dist/linux-unpacked
 
 Source maps are forbidden by default in the baseline report. Use `-- --allow-source-maps` only when a release intentionally retains them for diagnostics.
 
+## Packaged Size Budgets
+
+After `pnpm build:unpack`, run the non-blocking size comparison:
+
+```bash
+pnpm budget:packaged
+```
+
+Or build the current platform's unpacked app and compare it in one step:
+
+```bash
+pnpm budget:packaged:build
+```
+
+The command writes `dist/packaged-size-budget-report.json` and prints a maintainer-readable report. It reuses the packaged artifact inventory baseline, then compares the current `dist/` output against initial budgets for:
+
+- Supported Download Platform artifacts: macOS DMG and updater ZIP, Windows NSIS setup, Linux AppImage, and Linux deb.
+- The whole unpacked Electron Builder app output.
+- `app.asar` and `app.asar.unpacked` payload sizes.
+- Individual native or executable payloads.
+- Large runtime dependency directories that are big enough to justify follow-up pruning.
+
+This first budget pass is intentionally **non-blocking**. Over-budget or missing download artifacts are report findings only; they should not fail local packaged builds, Release Actions, or pull requests until a later enforcement issue makes that policy explicit.
+
+Initial budgets live in `scripts/packaged-size-budget.ts` as `INITIAL_PACKAGED_SIZE_BUDGETS`. They are rounded above the first artifact inventory baseline so maintainers can see meaningful growth before enforcing failures:
+
+| Budget area                     | Initial budget |
+| ------------------------------- | -------------- |
+| macOS DMG installer             | 350 MiB        |
+| macOS updater ZIP               | 350 MiB        |
+| Windows NSIS setup              | 275 MiB        |
+| Linux AppImage                  | 275 MiB        |
+| Linux deb                       | 240 MiB        |
+| Unpacked packaged app           | 800 MiB        |
+| `app.asar` archive              | 120 MiB        |
+| `app.asar.unpacked` payload     | 280 MiB        |
+| Single native/executable file   | 90 MiB         |
+| Large runtime dependency folder | 120 MiB        |
+
+To intentionally update a budget, run `pnpm inventory:packaged` and `pnpm budget:packaged` against the packaged output, confirm the growth is caused by product scope rather than shipped tests, fixtures, caches, source maps, or build leftovers, then update the matching `INITIAL_PACKAGED_SIZE_BUDGETS` entry with a short rationale. Commit the budget update together with the product change or with a release-maintenance note that names the report path and reason for growth.
+
+Do not reduce size by deleting required runtime capabilities. Budget work must preserve SQLite, Pi runtime packages, repo-search, updater support, secure-storage behavior, and app/tray identity assets. The report repeats those protected capabilities and includes largest files, largest directories, native/executable payloads, runtime dependencies, forbidden findings, and required runtime assets so growth remains attributable enough for follow-up pruning work.
+
 The canonical icon source is `design/icon-variants/pilog-app-icon.png`. The committed app icon assets consumed by Electron Builder are:
 
 - `build/icon.png`

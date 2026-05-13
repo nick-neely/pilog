@@ -42,6 +42,8 @@
     "perf:packaged": "node scripts/packaged-performance.cjs",
     "perf:packaged:build": "pnpm run build:unpack && pnpm run perf:packaged",
     "inventory:packaged": "tsx scripts/packaged-artifact-inventory.ts",
+    "budget:packaged": "tsx scripts/packaged-size-budget.ts",
+    "budget:packaged:build": "pnpm run build:unpack && pnpm run budget:packaged",
     "build:checksums": "tsx scripts/generate-checksums.ts",
     "release:bump": "node scripts/bump-release.mjs",
     "generate:manifest": "tsx scripts/generate-release-manifest.ts"
