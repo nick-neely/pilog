@@ -30,6 +30,7 @@
     "build:preview": "pnpm run build && electron-builder --config electron-builder.preview.yml",
     "site:dev": "pnpm --dir site dev",
     "site:build": "pnpm --dir site build",
+    "site:seo": "tsx scripts/verify-site-seo.ts",
     "site:install": "pnpm --dir site install",
     "site:typecheck": "pnpm --dir site typecheck",
     "test": "vitest run",

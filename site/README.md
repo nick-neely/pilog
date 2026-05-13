@@ -10,6 +10,7 @@ From the repository root:
 pnpm site:install   # install site dependencies
 pnpm site:dev       # start the Next.js dev server (http://localhost:3000)
 pnpm site:build     # production build
+pnpm site:seo       # build, serve locally, and verify SEO regression outputs
 pnpm site:typecheck # type-check site code
 ```
 
@@ -19,6 +20,14 @@ Or from inside `site/`:
 pnpm install
 pnpm dev
 ```
+
+## SEO regression checks
+
+Run `pnpm site:seo` from the repository root before shipping site metadata,
+crawl-discovery, social-preview, or structured-data changes. The command builds
+the production site, starts the built Next server on a local ephemeral port, and
+checks the emitted public routes, `robots.txt`, `sitemap.xml`, JSON-LD, and the
+Preview Download noindex contract without requiring a live deployment.
 
 ## Vercel deployment
 
