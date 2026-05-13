@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { createElement } from 'react'
+import type { ReactElement } from 'react'
 import type { ReleaseManifest } from './release-manifest'
 import rawManifest from '../data/release-manifest.json'
 
@@ -19,13 +20,20 @@ type JsonLdNode = Record<string, unknown>
 
 export type JsonLdGraph = {
   readonly '@context': 'https://schema.org'
-  readonly '@graph': JsonLdNode[]
+  readonly '@graph': readonly JsonLdNode[]
 }
 
 const manifest = rawManifest as ReleaseManifest
 
 function absoluteUrl(path: string): string {
   return new URL(path, SITE_URL).toString()
+}
+
+function jsonLdGraph(nodes: readonly JsonLdNode[]): JsonLdGraph {
+  return {
+    '@context': 'https://schema.org',
+    '@graph': nodes
+  }
 }
 
 function breadcrumb(pageName: string, pagePath: string): JsonLdNode {
@@ -223,85 +231,73 @@ export const previewMetadata: Metadata = createPageMetadata({
     'Download unsigned Pilog preview builds for testing only. Preview builds are not the stable Public Download Path.'
 })
 
-export const homeStructuredData: JsonLdGraph = {
-  '@context': 'https://schema.org',
-  '@graph': [
-    {
-      '@type': 'WebSite',
-      '@id': `${SITE_URL}/#website`,
-      name: SITE_NAME,
-      url: absoluteUrl('/'),
-      description: DEFAULT_DESCRIPTION,
-      publisher: {
-        '@id': `${SITE_URL}/#organization`
-      }
+export const homeStructuredData: JsonLdGraph = jsonLdGraph([
+  {
+    '@type': 'WebSite',
+    '@id': `${SITE_URL}/#website`,
+    name: SITE_NAME,
+    url: absoluteUrl('/'),
+    description: DEFAULT_DESCRIPTION,
+    publisher: {
+      '@id': `${SITE_URL}/#organization`
+    }
+  },
+  {
+    '@type': 'Organization',
+    '@id': `${SITE_URL}/#organization`,
+    name: SITE_NAME,
+    url: absoluteUrl('/'),
+    sameAs: ['https://github.com/nick-neely/pilog']
+  },
+  pageNode(
+    'WebPage',
+    '/',
+    'Pilog',
+    'Capture rough development notes and triage them into repo-aware GitHub issue drafts.'
+  ),
+  pilogSoftwareIdentity()
+])
+
+export const downloadStructuredData: JsonLdGraph = jsonLdGraph([
+  pageNode(
+    'WebPage',
+    '/download',
+    'Download Pilog',
+    'Download Pilog desktop releases from the public download path.'
+  ),
+  breadcrumb('Download', '/download'),
+  currentReleaseSoftwareIdentity()
+])
+
+export const docsStructuredData: JsonLdGraph = jsonLdGraph([
+  {
+    '@type': 'TechArticle',
+    '@id': `${SITE_URL}/docs#documentation`,
+    name: 'Pilog Docs',
+    url: absoluteUrl('/docs'),
+    description:
+      'Install Pilog, connect GitHub, configure the Pi draft agent, and turn rough notes into clean GitHub issues.',
+    isPartOf: {
+      '@id': `${SITE_URL}/#website`
     },
-    {
-      '@type': 'Organization',
-      '@id': `${SITE_URL}/#organization`,
-      name: SITE_NAME,
-      url: absoluteUrl('/'),
-      sameAs: ['https://github.com/nick-neely/pilog']
-    },
-    pageNode(
-      'WebPage',
-      '/',
-      'Pilog',
-      'Capture rough development notes and triage them into repo-aware GitHub issue drafts.'
-    ),
-    pilogSoftwareIdentity()
-  ]
-}
+    about: {
+      '@id': `${SITE_URL}/#software`
+    }
+  },
+  breadcrumb('Docs', '/docs')
+])
 
-export const downloadStructuredData: JsonLdGraph = {
-  '@context': 'https://schema.org',
-  '@graph': [
-    pageNode(
-      'WebPage',
-      '/download',
-      'Download Pilog',
-      'Download Pilog desktop releases from the public download path.'
-    ),
-    breadcrumb('Download', '/download'),
-    currentReleaseSoftwareIdentity()
-  ]
-}
+export const aboutStructuredData: JsonLdGraph = jsonLdGraph([
+  pageNode(
+    'AboutPage',
+    '/about',
+    'About Pilog',
+    'Learn why Pilog is local-first by default and how the open source project is maintained.'
+  ),
+  breadcrumb('About', '/about')
+])
 
-export const docsStructuredData: JsonLdGraph = {
-  '@context': 'https://schema.org',
-  '@graph': [
-    {
-      '@type': 'TechArticle',
-      '@id': `${SITE_URL}/docs#documentation`,
-      name: 'Pilog Docs',
-      url: absoluteUrl('/docs'),
-      description:
-        'Install Pilog, connect GitHub, configure the Pi draft agent, and turn rough notes into clean GitHub issues.',
-      isPartOf: {
-        '@id': `${SITE_URL}/#website`
-      },
-      about: {
-        '@id': `${SITE_URL}/#software`
-      }
-    },
-    breadcrumb('Docs', '/docs')
-  ]
-}
-
-export const aboutStructuredData: JsonLdGraph = {
-  '@context': 'https://schema.org',
-  '@graph': [
-    pageNode(
-      'AboutPage',
-      '/about',
-      'About Pilog',
-      'Learn why Pilog is local-first by default and how the open source project is maintained.'
-    ),
-    breadcrumb('About', '/about')
-  ]
-}
-
-export function JsonLdScript({ data }: { readonly data: JsonLdGraph }) {
+export function JsonLdScript({ data }: { readonly data: JsonLdGraph }): ReactElement {
   return createElement('script', {
     type: 'application/ld+json',
     dangerouslySetInnerHTML: { __html: JSON.stringify(data) }
