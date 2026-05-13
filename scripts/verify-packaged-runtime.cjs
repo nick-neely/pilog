@@ -8,7 +8,7 @@ const {
   writeFileSync
 } = require('node:fs')
 const { tmpdir } = require('node:os')
-const { basename, dirname, join } = require('node:path')
+const { basename, dirname, join, relative } = require('node:path')
 const { spawnSync } = require('node:child_process')
 const { listPackage } = require('@electron/asar')
 const asar = require('@electron/asar')
@@ -274,21 +274,24 @@ function findPackagedFileHygieneViolations(appOutDir, options = {}) {
 
   for (const entry of listPackage(appAsar)) {
     const comparablePath = normalizeAsarEntry(entry).replace(/^\/+/, '')
-    const violation = classifyForbiddenPackagedPath(
+    appendForbiddenPathViolation(violations, {
       comparablePath,
-      `app.asar/${comparablePath}`,
-      'asar',
+      reportPath: `app.asar/${comparablePath}`,
+      location: 'asar',
       options
-    )
-    if (violation) violations.push(violation)
+    })
   }
 
-  for (const file of collectPhysicalPackagedFiles(appOutDir)) {
+  for (const file of collectPhysicalPackagedFilePaths(appOutDir)) {
     const normalized = normalizePath(file)
     if (normalized.endsWith('/app.asar') || normalized === 'app.asar') continue
 
-    const violation = classifyForbiddenPackagedPath(normalized, normalized, 'file-system', options)
-    if (violation) violations.push(violation)
+    appendForbiddenPathViolation(violations, {
+      comparablePath: normalized,
+      reportPath: normalized,
+      location: 'file-system',
+      options
+    })
   }
 
   return violations.sort(
@@ -296,7 +299,17 @@ function findPackagedFileHygieneViolations(appOutDir, options = {}) {
   )
 }
 
-function collectPhysicalPackagedFiles(rootDir) {
+function appendForbiddenPathViolation(
+  violations,
+  { comparablePath, reportPath, location, options }
+) {
+  const violation = classifyForbiddenPackagedPath(comparablePath, reportPath, location, options)
+  if (violation) {
+    violations.push(violation)
+  }
+}
+
+function collectPhysicalPackagedFilePaths(rootDir) {
   const files = []
 
   function visit(currentDir) {
@@ -308,7 +321,7 @@ function collectPhysicalPackagedFiles(rootDir) {
         continue
       }
       if (info.isFile()) {
-        files.push(normalizePath(fullPath.slice(rootDir.length + 1)))
+        files.push(normalizePath(relative(rootDir, fullPath)))
       }
     }
   }
@@ -318,9 +331,9 @@ function collectPhysicalPackagedFiles(rootDir) {
 }
 
 function classifyForbiddenPackagedPath(comparablePath, reportPath, location, options) {
-  const path = normalizePath(comparablePath)
-  const segments = path.split('/')
-  const fileName = segments.at(-1) || ''
+  const normalizedPath = normalizePath(comparablePath)
+  const segments = normalizedPath.split('/')
+  const fileName = segments.at(-1) ?? ''
 
   if (hasPathSegment(segments, TEST_DIRECTORY_SEGMENTS)) {
     return createHygieneViolation('tests', reportPath, location)
@@ -334,10 +347,7 @@ function classifyForbiddenPackagedPath(comparablePath, reportPath, location, opt
     return createHygieneViolation('fixtures', reportPath, location)
   }
 
-  if (
-    hasPathSegment(segments, DEVELOPMENT_CACHE_SEGMENTS) ||
-    path.includes('/node_modules/.cache/')
-  ) {
+  if (hasPathSegment(segments, DEVELOPMENT_CACHE_SEGMENTS)) {
     return createHygieneViolation('development-caches', reportPath, location)
   }
 
