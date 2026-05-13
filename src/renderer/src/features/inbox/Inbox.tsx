@@ -2275,10 +2275,14 @@ export function Inbox({
                     <ul className="flex flex-col gap-1">
                       {notes.map((note, index) => {
                         const isSelected = selectedIds.has(note.id)
-                        const preview = note.content.trim() || 'Untitled note'
+                        const trimmedContent = note.content.trim()
+                        const preview = trimmedContent || 'Untitled note'
                         const repo = note.repoId ? reposById.get(note.repoId) : undefined
+                        const repoLabel = repo ? `${repo.owner}/${repo.name}` : 'Unassigned'
                         const draftLinks = draftLinksByNote.get(note.id) ?? []
                         const primaryDraftLink = draftLinks[0] ?? null
+                        const runId = note.runId
+                        const hasGenerationLinks = primaryDraftLink !== null || runId !== null
                         return (
                           <li key={note.id}>
                             <ContextMenu>
@@ -2309,12 +2313,10 @@ export function Inbox({
                                     <Tooltip>
                                       <TooltipTrigger asChild>
                                         <span className="block truncate font-mono text-xs text-muted-foreground/80">
-                                          {repo ? `${repo.owner}/${repo.name}` : 'Unassigned'}
+                                          {repoLabel}
                                         </span>
                                       </TooltipTrigger>
-                                      <TooltipContent>
-                                        {repo ? `${repo.owner}/${repo.name}` : 'Unassigned'}
-                                      </TooltipContent>
+                                      <TooltipContent>{repoLabel}</TooltipContent>
                                     </Tooltip>
                                     <span className="flex min-w-0 items-center justify-between gap-2 text-xs">
                                       <Badge
@@ -2336,13 +2338,13 @@ export function Inbox({
                                     Open note
                                   </ContextMenuItem>
                                   <ContextMenuItem
-                                    disabled={!note.content.trim()}
+                                    disabled={!trimmedContent}
                                     onSelect={() => void handleCopyNoteContent(note)}
                                   >
                                     Copy note text
                                   </ContextMenuItem>
                                 </ContextMenuGroup>
-                                {(primaryDraftLink || note.runId) && <ContextMenuSeparator />}
+                                {hasGenerationLinks ? <ContextMenuSeparator /> : null}
                                 {primaryDraftLink ? (
                                   <ContextMenuItem
                                     onSelect={() => onNavigateToDraftReview(primaryDraftLink.id)}
@@ -2350,10 +2352,10 @@ export function Inbox({
                                     {draftLinks.length > 1 ? 'View drafts' : 'View draft'}
                                   </ContextMenuItem>
                                 ) : null}
-                                {note.runId ? (
+                                {runId ? (
                                   <ContextMenuItem
                                     onSelect={() =>
-                                      onNavigateToAgentRuns(note.runId!, {
+                                      onNavigateToAgentRuns(runId, {
                                         kind: 'note',
                                         noteId: note.id
                                       })

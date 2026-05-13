@@ -1,9 +1,11 @@
+'use client'
+
+import { ArrowRight01Icon, Tick02Icon } from '@hugeicons/core-free-icons'
+import { HugeiconsIcon } from '@hugeicons/react'
 import * as React from 'react'
 import { ContextMenu as ContextMenuPrimitive } from 'radix-ui'
 
 import { cn } from '@renderer/lib/utils'
-import { HugeiconsIcon } from '@hugeicons/react'
-import { ArrowRight01Icon, Tick02Icon } from '@hugeicons/core-free-icons'
 
 function ContextMenu({ ...props }: React.ComponentProps<typeof ContextMenuPrimitive.Root>) {
   return <ContextMenuPrimitive.Root data-slot="context-menu" {...props} />
@@ -43,11 +45,9 @@ function ContextMenuRadioGroup({
 function ContextMenuContent({
   className,
   ...props
-}: React.ComponentProps<typeof ContextMenuPrimitive.Content> & {
-  side?: 'top' | 'right' | 'bottom' | 'left'
-}) {
+}: React.ComponentProps<typeof ContextMenuPrimitive.Content>) {
   return (
-    <ContextMenuPrimitive.Portal>
+    <ContextMenuPortal>
       <ContextMenuPrimitive.Content
         data-slot="context-menu-content"
         className={cn(
@@ -56,7 +56,7 @@ function ContextMenuContent({
         )}
         {...props}
       />
-    </ContextMenuPrimitive.Portal>
+    </ContextMenuPortal>
   )
 }
 
