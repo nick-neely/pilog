@@ -1,4 +1,10 @@
-import { test, expect, _electron as electron, type ElectronApplication } from '@playwright/test'
+import {
+  test,
+  expect,
+  _electron as electron,
+  type ElectronApplication,
+  type Page
+} from '@playwright/test'
 import { mkdtempSync, rmSync } from 'fs'
 import { join } from 'path'
 import { tmpdir } from 'os'
@@ -23,6 +29,31 @@ async function launchApp(): Promise<ElectronApplication> {
   return app
 }
 
+async function openScratchpadFromMenu(app: ElectronApplication): Promise<void> {
+  await app.evaluate(({ Menu }) => {
+    const menu = Menu.getApplicationMenu()
+    const fileMenu = menu?.items.find((item) => item.label === 'File')
+    const newNote = fileMenu?.submenu?.items.find((item) => item.label === 'New Note')
+    newNote?.click()
+  })
+}
+
+async function waitForScratchpad(app: ElectronApplication): Promise<Page> {
+  const page = await app.waitForEvent('window', { timeout: 5000 })
+  await page.waitForLoadState('domcontentloaded')
+  await page.locator('.cm-content').waitFor({ state: 'visible', timeout: 5000 })
+  return page
+}
+
+async function isScratchpadVisible(app: ElectronApplication): Promise<boolean> {
+  return app.evaluate(({ BrowserWindow }) => {
+    const scratchpadWindow = BrowserWindow.getAllWindows().find((window) =>
+      window.webContents.getURL().includes('scratchpad')
+    )
+    return scratchpadWindow?.isVisible() ?? false
+  })
+}
+
 test('scratchpad: menu → type → Esc → note visible in inbox', async () => {
   const app = await launchApp()
   const inboxPage = await app.firstWindow()
@@ -30,17 +61,8 @@ test('scratchpad: menu → type → Esc → note visible in inbox', async () => 
   await expect(inboxPage.locator('h1')).toHaveText('Inbox')
   await expect(inboxPage.locator('main li')).toHaveCount(0)
 
-  await app.evaluate(({ Menu }) => {
-    const menu = Menu.getApplicationMenu()
-    const fileMenu = menu?.items.find((item) => item.label === 'File')
-    const newNote = fileMenu?.submenu?.items.find((item) => item.label === 'New Note')
-    newNote?.click()
-  })
-
-  const scratchpadPage = await app.waitForEvent('window', { timeout: 5000 })
-
-  await scratchpadPage.waitForLoadState('domcontentloaded')
-  await scratchpadPage.locator('.cm-content').waitFor({ state: 'visible', timeout: 5000 })
+  await openScratchpadFromMenu(app)
+  const scratchpadPage = await waitForScratchpad(app)
 
   await scratchpadPage.locator('.cm-content').click()
   await scratchpadPage.keyboard.type('fix the navbar z-index bug')
@@ -57,16 +79,8 @@ test('scratchpad: Cmd+S saves and hides the window', async () => {
   const app = await launchApp()
   const inboxPage = await app.firstWindow()
 
-  await app.evaluate(({ Menu }) => {
-    const menu = Menu.getApplicationMenu()
-    const fileMenu = menu?.items.find((item) => item.label === 'File')
-    const newNote = fileMenu?.submenu?.items.find((item) => item.label === 'New Note')
-    newNote?.click()
-  })
-
-  const scratchpadPage = await app.waitForEvent('window', { timeout: 5000 })
-  await scratchpadPage.waitForLoadState('domcontentloaded')
-  await scratchpadPage.locator('.cm-content').waitFor({ state: 'visible', timeout: 5000 })
+  await openScratchpadFromMenu(app)
+  const scratchpadPage = await waitForScratchpad(app)
 
   await scratchpadPage.locator('.cm-content').click()
   await scratchpadPage.keyboard.type('remember to update docs')
@@ -75,18 +89,7 @@ test('scratchpad: Cmd+S saves and hides the window', async () => {
   await scratchpadPage.keyboard.press(`${mod}+s`)
 
   await expect(inboxPage.locator('main li')).toHaveCount(1, { timeout: 5000 })
-  await expect
-    .poll(
-      async () =>
-        app.evaluate(({ BrowserWindow }) => {
-          const scratchpadWindow = BrowserWindow.getAllWindows().find((w) =>
-            w.webContents.getURL().includes('scratchpad')
-          )
-          return scratchpadWindow?.isVisible() ?? false
-        }),
-      { timeout: 5000 }
-    )
-    .toBe(false)
+  await expect.poll(() => isScratchpadVisible(app), { timeout: 5000 }).toBe(false)
 
   await app.close()
 })
@@ -95,16 +98,8 @@ test('scratchpad: empty buffer on Esc does not create a note', async () => {
   const app = await launchApp()
   const inboxPage = await app.firstWindow()
 
-  await app.evaluate(({ Menu }) => {
-    const menu = Menu.getApplicationMenu()
-    const fileMenu = menu?.items.find((item) => item.label === 'File')
-    const newNote = fileMenu?.submenu?.items.find((item) => item.label === 'New Note')
-    newNote?.click()
-  })
-
-  const scratchpadPage = await app.waitForEvent('window', { timeout: 5000 })
-  await scratchpadPage.waitForLoadState('domcontentloaded')
-  await scratchpadPage.locator('.cm-content').waitFor({ state: 'visible', timeout: 5000 })
+  await openScratchpadFromMenu(app)
+  const scratchpadPage = await waitForScratchpad(app)
 
   await scratchpadPage.keyboard.press('Escape')
 

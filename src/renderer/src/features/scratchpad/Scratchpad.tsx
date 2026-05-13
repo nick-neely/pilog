@@ -129,7 +129,7 @@ export function Scratchpad(): React.JSX.Element {
     view.focus()
 
     return () => view.destroy()
-  }, [save, saveAndHide])
+  }, [saveAndHide])
 
   const handleResetEditor = useEffectEvent(resetEditor)
 
