@@ -2,14 +2,17 @@ import {
   Activity01Icon,
   ArrowDown01Icon,
   CheckmarkCircle01Icon,
+  ComputerIcon,
   Delete02Icon,
   Download01Icon,
   EyeIcon,
   GithubIcon,
   InformationCircleIcon,
   ListRestartIcon,
+  Moon02Icon,
   Refresh01Icon,
-  Search01Icon
+  Search01Icon,
+  Sun02Icon
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { HotkeyInput } from '@renderer/components/HotkeyInput'
@@ -56,6 +59,9 @@ import {
 import { Separator } from '@renderer/components/ui/separator'
 import { Switch } from '@renderer/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@renderer/components/ui/tabs'
+import { ToggleGroup, ToggleGroupItem } from '@renderer/components/ui/toggle-group'
+import { useTheme } from '@renderer/theme/ThemeProvider'
+import { isThemeMode, type ThemeMode } from '@renderer/theme/theme-mode'
 import { LOCAL_FIRST_DISCLOSURE } from '@shared/data-boundaries'
 import type {
   AdvancedSettings,
@@ -87,6 +93,11 @@ const SEARCH_PROVIDER_LABELS: Record<SearchProvider, string> = {
 }
 const TURN_BUDGET_ERROR = `Enter a whole number from ${MIN_TURN_BUDGET} to ${MAX_TURN_BUDGET}.`
 const TURN_BUDGET_HELP = `Generation stops if a run passes this many turns. Default is ${DEFAULT_TURN_BUDGET}.`
+const THEME_OPTIONS = [
+  { value: 'light', label: 'Light', icon: Sun02Icon },
+  { value: 'dark', label: 'Dark', icon: Moon02Icon },
+  { value: 'system', label: 'Auto', icon: ComputerIcon }
+] as const satisfies readonly { value: ThemeMode; label: string; icon: typeof Sun02Icon }[]
 
 function githubAuthMessage(auth: GitHubAuthProgress | undefined): string | null {
   if (!auth) return null
@@ -350,6 +361,7 @@ export function Settings({
   const advanced = useAdvancedSettings()
   const updates = useAppUpdates()
   const runtime = useRuntimeReadiness()
+  const theme = useTheme()
 
   const displayValue = userEdited ? (hotkeyDraft ?? '') : (hotkey ?? '')
   const dirty = userEdited && hotkeyDraft !== (hotkey ?? '')
@@ -458,6 +470,43 @@ export function Settings({
                     </div>
                     <p className="text-xs text-muted-foreground">
                       When disabled, Pilog starts in the system tray only.
+                    </p>
+                  </section>
+
+                  <section className="flex flex-col gap-3">
+                    <div className="flex flex-col gap-1">
+                      <h2 className="text-sm font-medium text-foreground">Appearance</h2>
+                      <p className="text-xs text-muted-foreground">
+                        Match your system, or keep Pilog pinned to one theme.
+                      </p>
+                    </div>
+                    <ToggleGroup
+                      type="single"
+                      variant="outline"
+                      size="sm"
+                      value={theme.mode}
+                      onValueChange={(value) => {
+                        if (isThemeMode(value)) theme.setMode(value)
+                      }}
+                      aria-label="Theme"
+                      className="w-full max-w-md"
+                    >
+                      {THEME_OPTIONS.map((option) => (
+                        <ToggleGroupItem
+                          key={option.value}
+                          value={option.value}
+                          aria-label={`${option.label} theme`}
+                          className="min-w-0 flex-1"
+                        >
+                          <HugeiconsIcon icon={option.icon} data-icon="inline-start" aria-hidden />
+                          {option.label}
+                        </ToggleGroupItem>
+                      ))}
+                    </ToggleGroup>
+                    <p className="text-xs text-muted-foreground" aria-live="polite">
+                      {theme.mode === 'system'
+                        ? `Auto is currently using ${theme.appliedTheme} mode.`
+                        : `${theme.mode === 'dark' ? 'Dark' : 'Light'} mode is active.`}
                     </p>
                   </section>
 
