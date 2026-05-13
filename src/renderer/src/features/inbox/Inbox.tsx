@@ -114,6 +114,9 @@ import { mergeGitHubAuthProgress } from '../setup/github-auth-progress'
 import { usePiConfig, type PiConfigState } from '../setup/use-pi-config'
 import { StatusFilter } from './StatusFilter'
 
+export const INBOX_NOTE_PREVIEW_TOOLTIP_CLASS =
+  'max-h-64 max-w-[min(34rem,calc(100vw-2rem))] items-start overflow-y-auto whitespace-pre-wrap break-words text-left leading-relaxed'
+
 // Status filter rows. Order matches the inbox lifecycle (capture →
 // triage → publish → archive) so the list reads top-to-bottom as a
 // pipeline and the user's eye lands on Unprocessed first by default.
@@ -1057,14 +1060,14 @@ function NoteDetail({
       <div className="flex-1">
         <ScrollArea className="h-full overflow-hidden">
           <Textarea
-          aria-label="Note content"
-          // Body line length capped at 72ch per DESIGN.md; mono editor body
-          // pairs with the rest of the system (file paths, code blocks).
-          className="mx-auto block h-full w-full max-w-[72ch] resize-none overflow-auto rounded-none border-0 bg-transparent p-6 font-mono text-sm leading-relaxed text-foreground shadow-none focus-visible:ring-0"
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          placeholder="Capture a thought…"
-        />
+            aria-label="Note content"
+            // Body line length capped at 72ch per DESIGN.md; mono editor body
+            // pairs with the rest of the system (file paths, code blocks).
+            className="mx-auto block h-full w-full max-w-[72ch] resize-none overflow-auto rounded-none border-0 bg-transparent p-6 font-mono text-sm leading-relaxed text-foreground shadow-none focus-visible:ring-0"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            placeholder="Capture a thought…"
+          />
         </ScrollArea>
       </div>
       {/* Repo and generation provenance, kept secondary to the editor body. */}
@@ -1404,7 +1407,9 @@ function SourceNoteList({
               <TooltipTrigger asChild>
                 <span className={cn('block min-w-0', itemClassName)}>{preview}</span>
               </TooltipTrigger>
-              <TooltipContent>{preview}</TooltipContent>
+              <TooltipContent className={INBOX_NOTE_PREVIEW_TOOLTIP_CLASS}>
+                {preview}
+              </TooltipContent>
             </Tooltip>
           </li>
         )
@@ -2270,7 +2275,9 @@ export function Inbox({
                                       {preview}
                                     </span>
                                   </TooltipTrigger>
-                                  <TooltipContent>{preview}</TooltipContent>
+                                  <TooltipContent className={INBOX_NOTE_PREVIEW_TOOLTIP_CLASS}>
+                                    {preview}
+                                  </TooltipContent>
                                 </Tooltip>
                                 <Tooltip>
                                   <TooltipTrigger asChild>
