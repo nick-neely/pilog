@@ -112,10 +112,8 @@ import { PiSetupPanel } from '../setup/PiSetupPanel'
 import { RepoLinkFlow } from '../setup/RepoLinkFlow'
 import { mergeGitHubAuthProgress } from '../setup/github-auth-progress'
 import { usePiConfig, type PiConfigState } from '../setup/use-pi-config'
+import { INBOX_NOTE_PREVIEW_TOOLTIP_CLASS } from './inbox-note-preview-tooltip'
 import { StatusFilter } from './StatusFilter'
-
-export const INBOX_NOTE_PREVIEW_TOOLTIP_CLASS =
-  'max-h-64 max-w-[min(34rem,calc(100vw-2rem))] items-start overflow-y-auto whitespace-pre-wrap break-words text-left leading-relaxed'
 
 // Status filter rows. Order matches the inbox lifecycle (capture →
 // triage → publish → archive) so the list reads top-to-bottom as a

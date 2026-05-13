@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { INBOX_NOTE_PREVIEW_TOOLTIP_CLASS } from './Inbox'
+import { INBOX_NOTE_PREVIEW_TOOLTIP_CLASS } from './inbox-note-preview-tooltip'
 
 describe('inbox note preview tooltip', () => {
   it('constrains long multi-line note previews without native title fallback', () => {
