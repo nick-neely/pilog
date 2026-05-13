@@ -1,13 +1,14 @@
-import { describe, expect, it } from 'vitest'
-import { readFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
+import { readFileSync } from 'node:fs'
+import { describe, expect, it } from 'vitest'
+import rawReleaseManifest from '../site/src/data/release-manifest.json'
 import {
   aboutMetadata,
   aboutStructuredData,
   createRobots,
   createSitemap,
-  docsStructuredData,
   docsMetadata,
+  docsStructuredData,
   downloadMetadata,
   downloadStructuredData,
   homeMetadata,
@@ -15,6 +16,10 @@ import {
   previewMetadata,
   rootMetadata
 } from '../site/src/lib/metadata'
+import type { ReleaseManifest } from '../site/src/lib/release-manifest'
+
+const releaseManifest = rawReleaseManifest as ReleaseManifest
+const currentReleaseChannel = releaseManifest.stable ?? releaseManifest.preview
 
 const previewImageDetails = {
   width: 1200,
@@ -214,12 +219,21 @@ describe('site metadata', () => {
       name: 'Download Pilog',
       url: 'https://pilog.dev/download'
     })
-    expect(software).toMatchObject({
-      '@type': 'SoftwareApplication',
-      name: 'Pilog',
-      softwareVersion: '0.1.0-preview.4',
-      releaseNotes: 'https://github.com/nick-neely/pilog/releases/tag/v0.1.0-preview.4'
-    })
+    if (currentReleaseChannel) {
+      expect(software).toMatchObject({
+        '@type': 'SoftwareApplication',
+        name: 'Pilog',
+        softwareVersion: currentReleaseChannel.version,
+        releaseNotes: currentReleaseChannel.releaseUrl
+      })
+    } else {
+      expect(software).toMatchObject({
+        '@type': 'SoftwareApplication',
+        name: 'Pilog'
+      })
+      expect(software).not.toHaveProperty('softwareVersion')
+      expect(software).not.toHaveProperty('releaseNotes')
+    }
     expect(software).not.toHaveProperty('offers')
     expect(software).not.toHaveProperty('aggregateRating')
   })
