@@ -10,26 +10,31 @@ const asar = require('@electron/asar') as {
 }
 const {
   findPackagedFileHygieneViolations,
-  enforcePackagedFileHygiene
+  enforcePackagedFileHygiene,
+  prunePackagedRuntimeBloat
 }: {
   findPackagedFileHygieneViolations: (
     appOutDir: string,
     options?: { allowSourceMaps?: boolean }
   ) => Array<{ category: string; location: string; path: string }>
   enforcePackagedFileHygiene: (appOutDir: string, options?: { allowSourceMaps?: boolean }) => void
+  prunePackagedRuntimeBloat: (
+    appOutDir: string,
+    options?: { platform?: string; arch?: string }
+  ) => { removedPaths: string[]; removedBytes: number }
 } = require('./verify-packaged-runtime.cjs')
 
+let tmpDir: string
+
+beforeEach(async () => {
+  tmpDir = await mkdtemp(join(tmpdir(), 'pilog-packaged-runtime-test-'))
+})
+
+afterEach(async () => {
+  await rm(tmpDir, { recursive: true, force: true })
+})
+
 describe('packaged runtime file hygiene', () => {
-  let tmpDir: string
-
-  beforeEach(async () => {
-    tmpDir = await mkdtemp(join(tmpdir(), 'pilog-packaged-hygiene-test-'))
-  })
-
-  afterEach(async () => {
-    await rm(tmpDir, { recursive: true, force: true })
-  })
-
   it('rejects forbidden shipped files from asar and unpacked package output', async () => {
     const appOutDir = join(tmpDir, 'linux-unpacked')
     const resourcesDir = join(appOutDir, 'resources')
@@ -108,6 +113,78 @@ describe('packaged runtime file hygiene', () => {
     await chmod(join(resourcesDir, 'app.asar.unpacked/node_modules/@vscode/ripgrep/bin/rg'), 0o755)
 
     expect(() => enforcePackagedFileHygiene(appOutDir, { allowSourceMaps: true })).not.toThrow()
+  })
+})
+
+describe('packaged runtime pruning', () => {
+  it('removes native build inputs and non-target koffi binaries while keeping the target binary', async () => {
+    const appOutDir = join(tmpDir, 'linux-unpacked')
+    const resourcesDir = join(appOutDir, 'resources')
+
+    await writeFixtureFile(resourcesDir, 'app.asar', 'asar placeholder')
+    await writeFixtureFile(
+      resourcesDir,
+      'app.asar.unpacked/node_modules/better-sqlite3/build/Release/better_sqlite3.node',
+      'sqlite native'
+    )
+    await writeFixtureFile(
+      resourcesDir,
+      'app.asar.unpacked/node_modules/better-sqlite3/deps/sqlite3/sqlite3.c',
+      'sqlite amalgamation source'
+    )
+    await writeFixtureFile(
+      resourcesDir,
+      'app.asar.unpacked/node_modules/better-sqlite3/src/objects/database.hpp',
+      'sqlite build header'
+    )
+    await writeFixtureFile(
+      resourcesDir,
+      'app.asar.unpacked/node_modules/koffi/build/koffi/linux_x64/koffi.node',
+      'target koffi native'
+    )
+    await writeFixtureFile(
+      resourcesDir,
+      'app.asar.unpacked/node_modules/koffi/build/koffi/darwin_arm64/koffi.node',
+      'non-target koffi native'
+    )
+    await writeFixtureFile(
+      resourcesDir,
+      'app.asar.unpacked/node_modules/koffi/doc/start.md',
+      'koffi docs'
+    )
+    await writeFixtureFile(
+      resourcesDir,
+      'app.asar.unpacked/node_modules/koffi/vendor/node-api-headers/include/node_api.h',
+      'koffi build header'
+    )
+
+    const result = prunePackagedRuntimeBloat(appOutDir, { platform: 'linux', arch: 'x64' })
+
+    expect(result.removedBytes).toBeGreaterThan(0)
+    expect(result.removedPaths).toEqual(
+      expect.arrayContaining([
+        'resources/app.asar.unpacked/node_modules/better-sqlite3/deps',
+        'resources/app.asar.unpacked/node_modules/better-sqlite3/src',
+        'resources/app.asar.unpacked/node_modules/koffi/build/koffi/darwin_arm64',
+        'resources/app.asar.unpacked/node_modules/koffi/doc',
+        'resources/app.asar.unpacked/node_modules/koffi/vendor'
+      ])
+    )
+    await expect(
+      writeFile(
+        join(
+          resourcesDir,
+          'app.asar.unpacked',
+          'node_modules',
+          'koffi',
+          'build',
+          'koffi',
+          'linux_x64',
+          'runtime-check'
+        ),
+        'still present'
+      )
+    ).resolves.toBeUndefined()
   })
 })
 

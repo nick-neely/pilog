@@ -1,4 +1,12 @@
-const { existsSync, mkdtempSync, readdirSync, rmSync, statSync } = require('node:fs')
+const {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  rmSync,
+  statSync,
+  writeFileSync
+} = require('node:fs')
 const { tmpdir } = require('node:os')
 const { basename, dirname, join } = require('node:path')
 const { spawnSync } = require('node:child_process')
@@ -79,6 +87,16 @@ function verifyPackagedRuntime(appOutDir, options = {}) {
 
   const resourcesDir = resolveResourcesDir(appOutDir)
   const appAsar = join(resourcesDir, 'app.asar')
+  verifyPackagedRuntimeFiles(appOutDir, options)
+
+  verifyPackagedImports(appAsar)
+
+  console.log('[verify-packaged-runtime] required runtime files and imports are packaged')
+}
+
+function verifyPackagedRuntimeFiles(appOutDir, options = {}) {
+  const resourcesDir = resolveResourcesDir(appOutDir)
+  const appAsar = join(resourcesDir, 'app.asar')
   const entries = new Set(listPackage(appAsar).map(normalizeAsarEntry))
   const missingEntries = REQUIRED_ASAR_ENTRIES.filter((entry) => !entries.has(entry))
   const sqliteNative = join(
@@ -94,6 +112,10 @@ function verifyPackagedRuntime(appOutDir, options = {}) {
     arch: options.arch,
     platform: options.platform ?? inferPackagedPlatform(appOutDir)
   })
+  const koffiNative = resolveKoffiNativeBinary(resourcesDir, {
+    arch: options.arch,
+    platform: options.platform ?? inferPackagedPlatform(appOutDir)
+  })
 
   if (!existsSync(sqliteNative)) {
     missingEntries.push(sqliteNative)
@@ -103,6 +125,10 @@ function verifyPackagedRuntime(appOutDir, options = {}) {
     missingEntries.push(ripgrepBinary)
   }
 
+  if (koffiNative && !existsSync(koffiNative)) {
+    missingEntries.push(koffiNative)
+  }
+
   if (missingEntries.length > 0) {
     throw new Error(
       `Packaged runtime is missing required files:\n${missingEntries
@@ -110,10 +136,110 @@ function verifyPackagedRuntime(appOutDir, options = {}) {
         .join('\n')}`
     )
   }
+}
 
-  verifyPackagedImports(appAsar)
+function prunePackagedRuntimeBloat(appOutDir, options = {}) {
+  const resourcesDir = resolveResourcesDir(appOutDir)
+  const unpackedNodeModules = join(resourcesDir, 'app.asar.unpacked', 'node_modules')
+  const platform = options.platform ?? inferPackagedPlatform(appOutDir)
+  const arch = options.arch ?? process.arch
+  const removed = []
 
-  console.log('[verify-packaged-runtime] required runtime files and imports are packaged')
+  removePackagedPath(appOutDir, join(unpackedNodeModules, 'better-sqlite3', 'deps'), removed)
+  removePackagedPath(appOutDir, join(unpackedNodeModules, 'better-sqlite3', 'src'), removed)
+  removePackagedPath(
+    appOutDir,
+    join(unpackedNodeModules, 'better-sqlite3', 'build', 'Release', 'obj.target'),
+    removed
+  )
+
+  removePackagedPath(appOutDir, join(unpackedNodeModules, 'koffi', 'doc'), removed)
+  removePackagedPath(appOutDir, join(unpackedNodeModules, 'koffi', 'src'), removed)
+  removePackagedPath(appOutDir, join(unpackedNodeModules, 'koffi', 'vendor'), removed)
+  pruneKoffiPlatformBinaries(
+    appOutDir,
+    join(unpackedNodeModules, 'koffi', 'build', 'koffi'),
+    { platform, arch },
+    removed
+  )
+
+  const removedBytes = removed.reduce((total, item) => total + item.sizeBytes, 0)
+  return {
+    removedBytes,
+    removedPaths: removed.map((item) => item.path)
+  }
+}
+
+function pruneKoffiPlatformBinaries(appOutDir, koffiBuildDir, options, removed) {
+  if (!existsSync(koffiBuildDir)) return
+
+  const targetDirectory = resolveKoffiPlatformDirectory(options)
+  for (const entry of readdirSync(koffiBuildDir)) {
+    const absolutePath = join(koffiBuildDir, entry)
+    if (!statSync(absolutePath).isDirectory()) continue
+    if (entry === targetDirectory) continue
+    removePackagedPath(appOutDir, absolutePath, removed)
+  }
+}
+
+function resolveKoffiPlatformDirectory({ platform, arch }) {
+  const normalizedPlatform = platform === 'win32' ? 'win32' : platform
+  const normalizedArch = normalizeElectronBuilderArch(arch)
+
+  if (normalizedPlatform === 'darwin') return `darwin_${normalizedArch}`
+  if (normalizedPlatform === 'win32') return `win32_${normalizedArch}`
+  if (normalizedPlatform === 'linux') return `linux_${normalizedArch}`
+  if (normalizedPlatform === 'freebsd') return `freebsd_${normalizedArch}`
+  if (normalizedPlatform === 'openbsd') return `openbsd_${normalizedArch}`
+  return `${normalizedPlatform}_${normalizedArch}`
+}
+
+function resolveKoffiNativeBinary(resourcesDir, options) {
+  const directory = resolveKoffiPlatformDirectory(options)
+  const path = join(
+    resourcesDir,
+    'app.asar.unpacked',
+    'node_modules',
+    'koffi',
+    'build',
+    'koffi',
+    directory,
+    'koffi.node'
+  )
+  const koffiBuildRoot = join(resourcesDir, 'app.asar.unpacked', 'node_modules', 'koffi')
+  return existsSync(koffiBuildRoot) || existsSync(path) ? path : null
+}
+
+function normalizeElectronBuilderArch(arch) {
+  const numericArchMap = {
+    0: 'ia32',
+    1: 'x64',
+    2: 'armv7l',
+    3: 'arm64',
+    4: process.arch
+  }
+  if (typeof arch === 'number') return numericArchMap[arch] ?? process.arch
+  if (arch === 'x64' || arch === 'arm64' || arch === 'ia32' || arch === 'armhf') return arch
+  return process.arch
+}
+
+function removePackagedPath(appOutDir, absolutePath, removed) {
+  if (!existsSync(absolutePath)) return
+
+  const sizeBytes = directorySize(absolutePath)
+  rmSync(absolutePath, { recursive: true, force: true })
+  removed.push({
+    path: normalizeReportPath(appOutDir, absolutePath),
+    sizeBytes
+  })
+}
+
+function directorySize(path) {
+  const info = statSync(path)
+  if (info.isFile()) return info.size
+  if (!info.isDirectory()) return 0
+
+  return readdirSync(path).reduce((total, entry) => total + directorySize(join(path, entry)), 0)
 }
 
 function enforcePackagedFileHygiene(appOutDir, options = {}) {
@@ -238,7 +364,7 @@ function createHygieneViolation(category, path, location) {
 }
 
 function resolveRequiredRipgrepBinary(resourcesDir, { platform, arch }) {
-  const targetArch = arch ?? process.arch
+  const targetArch = normalizeElectronBuilderArch(arch)
   const packageByPlatform = {
     darwin: {
       arm64: ['@vscode', 'ripgrep-darwin-arm64', 'bin', 'rg'],
@@ -277,7 +403,7 @@ function verifyPackagedImports(appAsar) {
   const tempDir = mkdtempSync(join(tmpdir(), 'pilog-packaged-runtime-'))
 
   try {
-    asar.extractAll(appAsar, tempDir)
+    extractAsarForImportCheck(appAsar, tempDir)
     const script = `
       for (const packageName of ${JSON.stringify(REQUIRED_IMPORTS)}) {
         await import(packageName)
@@ -305,6 +431,47 @@ function verifyPackagedImports(appAsar) {
   }
 }
 
+function extractAsarForImportCheck(appAsar, destinationDir) {
+  for (const entry of listPackage(appAsar)) {
+    const packagePath = entry.replace(/^\/+/, '')
+    if (!packagePath) continue
+
+    let content
+    try {
+      content = asar.extractFile(appAsar, packagePath)
+    } catch (error) {
+      if (isAsarDirectoryEntry(error)) continue
+      if (isExpectedPrunedUnpackedEntry(packagePath, error)) continue
+      throw error
+    }
+    if (!content) continue
+
+    const destination = join(destinationDir, ...packagePath.split('/'))
+    mkdirSync(dirname(destination), { recursive: true })
+    writeFileSync(destination, content)
+  }
+}
+
+function isAsarDirectoryEntry(error) {
+  return (
+    error instanceof Error &&
+    /found a directory or link|was not found in this archive/.test(error.message)
+  )
+}
+
+function isExpectedPrunedUnpackedEntry(packagePath, error) {
+  if (!error || error.code !== 'ENOENT') return false
+  return (
+    packagePath.startsWith('node_modules/better-sqlite3/deps/') ||
+    packagePath.startsWith('node_modules/better-sqlite3/src/') ||
+    packagePath.startsWith('node_modules/better-sqlite3/build/Release/obj.target/') ||
+    packagePath.startsWith('node_modules/koffi/doc/') ||
+    packagePath.startsWith('node_modules/koffi/src/') ||
+    packagePath.startsWith('node_modules/koffi/vendor/') ||
+    packagePath.startsWith('node_modules/koffi/build/koffi/')
+  )
+}
+
 function normalizeAsarEntry(entry) {
   const normalized = normalizePath(entry)
   return normalized.startsWith('/') ? normalized : `/${normalized}`
@@ -319,12 +486,42 @@ async function afterPack(context) {
     arch: context.arch,
     platform: context.electronPlatformName
   })
+  const pruning = prunePackagedRuntimeBloat(context.appOutDir, {
+    arch: context.arch,
+    platform: context.electronPlatformName
+  })
+  if (pruning.removedPaths.length > 0) {
+    console.log(
+      `[verify-packaged-runtime] pruned ${formatBytes(pruning.removedBytes)} of build-only native package payload`
+    )
+  }
+  verifyPackagedRuntimeFiles(context.appOutDir, {
+    arch: context.arch,
+    platform: context.electronPlatformName
+  })
+}
+
+function normalizeReportPath(appOutDir, absolutePath) {
+  return absolutePath.slice(appOutDir.length + 1).replaceAll('\\', '/')
+}
+
+function formatBytes(bytes) {
+  if (bytes < 1024) return `${bytes} B`
+  const units = ['KiB', 'MiB', 'GiB']
+  let value = bytes / 1024
+  for (const unit of units) {
+    if (value < 1024) return `${value.toFixed(1)} ${unit}`
+    value /= 1024
+  }
+  return `${value.toFixed(1)} TiB`
 }
 
 module.exports = afterPack
 module.exports.verifyPackagedRuntime = verifyPackagedRuntime
 module.exports.enforcePackagedFileHygiene = enforcePackagedFileHygiene
 module.exports.findPackagedFileHygieneViolations = findPackagedFileHygieneViolations
+module.exports.verifyPackagedRuntimeFiles = verifyPackagedRuntimeFiles
+module.exports.prunePackagedRuntimeBloat = prunePackagedRuntimeBloat
 
 if (require.main === module) {
   const appOutDir = process.argv[2]

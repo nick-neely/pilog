@@ -123,6 +123,58 @@ To intentionally update a budget, run `pnpm inventory:packaged` and `pnpm budget
 
 Do not reduce size by deleting required runtime capabilities. Budget work must preserve SQLite, Pi runtime packages, repo-search, updater support, secure-storage behavior, and app/tray identity assets. The report repeats those protected capabilities and includes largest files, largest directories, native/executable payloads, runtime dependencies, forbidden findings, and required runtime assets so growth remains attributable enough for follow-up pruning work.
 
+## First Measured Optimization Pass
+
+Issue #71 used the first Linux unpacked baseline to target build-only native
+package payload in `app.asar.unpacked`. The before report was written to
+`dist/issue-71-before-size-budget.json` from a `dist/linux-unpacked` output of
+about 384 MiB. The baseline finding was concentrated in required native
+dependencies that Electron Builder must unpack because they contain `.node`
+files:
+
+- `resources/app.asar.unpacked/node_modules/better-sqlite3/deps` contained the
+  SQLite amalgamation and headers used to compile the native binding, while the
+  packaged runtime only needs `build/Release/better_sqlite3.node` plus the
+  JavaScript package files.
+- `resources/app.asar.unpacked/node_modules/koffi/build/koffi` contained native
+  binaries for many platforms even though a packaged artifact can only run on
+  its target platform and architecture.
+- `koffi/doc`, `koffi/src`, and `koffi/vendor` were build/documentation payload,
+  not runtime product capability.
+
+The `afterPack` verifier now verifies the full packaged runtime, prunes those
+build-only directories, and then rechecks the required unpacked runtime files.
+It keeps the current target's Koffi binary, keeps the SQLite native binding, and
+preserves required runtime imports, SQLite, Pi packages, repo-search, updater
+metadata, and app assets.
+
+On the first Linux x64 pass, the after report was written to
+`dist/issue-71-after-size-budget.json` and showed:
+
+| Area                         | Before    | After     | Change     |
+| ---------------------------- | --------- | --------- | ---------- |
+| Unpacked packaged app        | 382.9 MiB | 348.5 MiB | -34.4 MiB  |
+| `app.asar.unpacked` payload  | 46.5 MiB  | 12.1 MiB  | -34.4 MiB  |
+| `app.asar` archive           | 52.2 MiB  | 52.2 MiB  | no change  |
+
+Regenerate the comparison with:
+
+```bash
+pnpm build:unpack
+pnpm budget:packaged dist/linux-unpacked -- --output dist/issue-71-after-size-budget.json
+```
+
+The before/after report pair should show the impact in the unpacked app,
+`app.asar.unpacked` payload, native/executable attribution, and largest
+directory attribution. This is intentionally a native-package payload cleanup,
+not a rewrite of the main/preload/renderer boundary and not a change to the
+embedded Pi strategy.
+
+Residual risk: the Koffi pruning is target-platform specific. Cross-platform
+release builds must continue to run `afterPack` and packaged smoke on each
+Supported Download Platform so a package-level native-loading change is caught
+before release.
+
 The canonical icon source is `design/icon-variants/pilog-app-icon.png`. The committed app icon assets consumed by Electron Builder are:
 
 - `build/icon.png`
