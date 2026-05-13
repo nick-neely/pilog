@@ -49,6 +49,14 @@ export function applyStoredTheme(
   return appliedTheme
 }
 
+function resolveAppliedThemeFromMediaQuery(
+  mode: ThemeMode,
+  mediaQuery: MediaQueryList
+): AppliedTheme {
+  if (mode !== 'system') return mode
+  return mediaQuery.matches ? 'dark' : 'light'
+}
+
 export function createThemeController(
   onChange?: (mode: ThemeMode, appliedTheme: AppliedTheme) => void,
   target: ThemeTarget = document,
@@ -58,7 +66,7 @@ export function createThemeController(
   let mode = getStoredThemeMode(themeWindow.localStorage)
 
   const apply = (): AppliedTheme => {
-    const appliedTheme = mode === 'system' ? (mediaQuery.matches ? 'dark' : 'light') : mode
+    const appliedTheme = resolveAppliedThemeFromMediaQuery(mode, mediaQuery)
     applyThemeClass(target, appliedTheme)
     onChange?.(mode, appliedTheme)
     return appliedTheme

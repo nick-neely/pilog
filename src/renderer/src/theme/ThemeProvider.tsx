@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
   createThemeController,
   getStoredThemeMode,
@@ -6,60 +6,47 @@ import {
   type AppliedTheme,
   type ThemeMode
 } from './theme-mode'
+import { ThemeContext } from './useTheme'
 
-type ThemeContextValue = {
+type ThemeState = {
   mode: ThemeMode
   appliedTheme: AppliedTheme
-  setMode: (mode: ThemeMode) => void
 }
 
-const ThemeContext = createContext<ThemeContextValue | null>(null)
-
-function getInitialMode(): ThemeMode {
-  return getStoredThemeMode(window.localStorage)
-}
-
-function getInitialAppliedTheme(): AppliedTheme {
-  return resolveAppliedTheme(getInitialMode(), window.matchMedia)
+function getInitialThemeState(): ThemeState {
+  const mode = getStoredThemeMode(window.localStorage)
+  return {
+    mode,
+    appliedTheme: resolveAppliedTheme(mode, window.matchMedia)
+  }
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }): React.JSX.Element {
-  const [mode, setModeState] = useState<ThemeMode>(getInitialMode)
-  const [appliedTheme, setAppliedTheme] = useState<AppliedTheme>(getInitialAppliedTheme)
-  const [setControllerMode, setSetControllerMode] = useState<((mode: ThemeMode) => void) | null>(
-    null
-  )
+  const [themeState, setThemeState] = useState<ThemeState>(getInitialThemeState)
+  const controllerRef = useRef<ReturnType<typeof createThemeController> | null>(null)
 
   useEffect(() => {
     const controller = createThemeController((nextMode, nextAppliedTheme) => {
-      setModeState(nextMode)
-      setAppliedTheme(nextAppliedTheme)
+      setThemeState({ mode: nextMode, appliedTheme: nextAppliedTheme })
     })
-    setSetControllerMode(() => (nextMode: ThemeMode) => {
-      controller.setMode(nextMode)
-    })
+    controllerRef.current = controller
 
     return () => {
+      controllerRef.current = null
       controller.dispose()
     }
   }, [])
 
   const value = useMemo(
     () => ({
-      mode,
-      appliedTheme,
+      mode: themeState.mode,
+      appliedTheme: themeState.appliedTheme,
       setMode: (nextMode: ThemeMode) => {
-        setControllerMode?.(nextMode)
+        controllerRef.current?.setMode(nextMode)
       }
     }),
-    [appliedTheme, mode, setControllerMode]
+    [themeState]
   )
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
-}
-
-export function useTheme(): ThemeContextValue {
-  const value = useContext(ThemeContext)
-  if (!value) throw new Error('useTheme must be used within ThemeProvider')
-  return value
 }

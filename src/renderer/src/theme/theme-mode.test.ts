@@ -35,11 +35,10 @@ describe('theme mode', () => {
     const media = createMatchMedia(false)
     const onChange = vi.fn()
 
-    const controller = createThemeController(
-      onChange,
-      target,
-      { localStorage: storage, matchMedia: media.matchMedia }
-    )
+    const controller = createThemeController(onChange, target, {
+      localStorage: storage,
+      matchMedia: media.matchMedia
+    })
 
     expect(controller.getMode()).toBe('system')
     expect(target.documentElement.classList.contains('dark')).toBe(false)

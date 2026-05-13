@@ -60,8 +60,8 @@ import { Separator } from '@renderer/components/ui/separator'
 import { Switch } from '@renderer/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@renderer/components/ui/tabs'
 import { ToggleGroup, ToggleGroupItem } from '@renderer/components/ui/toggle-group'
-import { useTheme } from '@renderer/theme/ThemeProvider'
-import { isThemeMode, type ThemeMode } from '@renderer/theme/theme-mode'
+import { isThemeMode, type AppliedTheme, type ThemeMode } from '@renderer/theme/theme-mode'
+import { useTheme } from '@renderer/theme/useTheme'
 import { LOCAL_FIRST_DISCLOSURE } from '@shared/data-boundaries'
 import type {
   AdvancedSettings,
@@ -98,6 +98,17 @@ const THEME_OPTIONS = [
   { value: 'dark', label: 'Dark', icon: Moon02Icon },
   { value: 'system', label: 'Auto', icon: ComputerIcon }
 ] as const satisfies readonly { value: ThemeMode; label: string; icon: typeof Sun02Icon }[]
+
+function getThemeStatusMessage(mode: ThemeMode, appliedTheme: AppliedTheme): string {
+  switch (mode) {
+    case 'system':
+      return `Auto is currently using ${appliedTheme} mode.`
+    case 'dark':
+      return 'Dark mode is active.'
+    case 'light':
+      return 'Light mode is active.'
+  }
+}
 
 function githubAuthMessage(auth: GitHubAuthProgress | undefined): string | null {
   if (!auth) return null
@@ -504,9 +515,7 @@ export function Settings({
                       ))}
                     </ToggleGroup>
                     <p className="text-xs text-muted-foreground" aria-live="polite">
-                      {theme.mode === 'system'
-                        ? `Auto is currently using ${theme.appliedTheme} mode.`
-                        : `${theme.mode === 'dark' ? 'Dark' : 'Light'} mode is active.`}
+                      {getThemeStatusMessage(theme.mode, theme.appliedTheme)}
                     </p>
                   </section>
 
