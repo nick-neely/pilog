@@ -291,24 +291,36 @@ function parseArgs(argv) {
 
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index]
-    if (arg === '--') {
-      continue
-    } else if (arg === '--app-out-dir') {
-      options.appOutDir = requireValue(argv, (index += 1), arg)
-    } else if (arg === '--executable') {
-      options.executablePath = requireValue(argv, (index += 1), arg)
-    } else if (arg === '--output') {
-      options.outputPath = requireValue(argv, (index += 1), arg)
-    } else if (arg === '--json') {
-      options.json = true
-    } else if (arg === '--keep-user-data') {
-      options.keepUserData = true
-    } else if (arg === '--keep-repo-dir') {
-      options.keepRepoDir = true
-    } else if (arg === '--help' || arg === '-h') {
-      options.help = true
-    } else {
-      throw new Error(`Unknown argument: ${arg}`)
+    switch (arg) {
+      case '--':
+        break
+      case '--app-out-dir':
+        index += 1
+        options.appOutDir = requireValue(argv, index, arg)
+        break
+      case '--executable':
+        index += 1
+        options.executablePath = requireValue(argv, index, arg)
+        break
+      case '--output':
+        index += 1
+        options.outputPath = requireValue(argv, index, arg)
+        break
+      case '--json':
+        options.json = true
+        break
+      case '--keep-user-data':
+        options.keepUserData = true
+        break
+      case '--keep-repo-dir':
+        options.keepRepoDir = true
+        break
+      case '--help':
+      case '-h':
+        options.help = true
+        break
+      default:
+        throw new Error(`Unknown argument: ${arg}`)
     }
   }
 

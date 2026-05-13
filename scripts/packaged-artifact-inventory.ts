@@ -91,6 +91,12 @@ interface LocatedPackagedPath {
   path: string | null
 }
 
+const TEST_DIRECTORY_SEGMENTS = new Set(['__tests__', 'tests', 'test'])
+const FIXTURE_DIRECTORY_SEGMENTS = new Set(['fixtures', '__fixtures__'])
+const DEVELOPMENT_CACHE_SEGMENTS = new Set(['.cache', '.vite', '.turbo'])
+const BUILD_LEFTOVER_SEGMENTS = new Set(['coverage', '.nyc_output'])
+const TEST_FILE_PATTERN = /\.(test|spec)\.[cm]?[jt]sx?$/
+
 const RUNTIME_DEPENDENCIES: Array<{
   name: string
   purpose: string
@@ -238,23 +244,13 @@ export function formatPackagedArtifactInventory(inventory: PackagedArtifactInven
     ...formatPayloads(inventory.nativeAndExecutablePayloads),
     '',
     'Runtime dependencies',
-    ...inventory.runtimeDependencies.map((dependency) => {
-      const status = dependency.present ? 'present' : 'missing'
-      return `- ${dependency.name}: ${status} (${dependency.location})${dependency.path ? ` ${dependency.path}` : ''}`
-    }),
+    ...inventory.runtimeDependencies.map(formatRuntimeDependency),
     '',
     'Required runtime assets',
-    ...inventory.requiredRuntimeAssets.map((asset) => {
-      const status = asset.present ? 'present' : 'missing'
-      return `- ${asset.label}: ${status}${asset.path ? ` ${asset.path}` : ''}`
-    }),
+    ...inventory.requiredRuntimeAssets.map(formatRequiredRuntimeAsset),
     '',
     'Forbidden findings',
-    ...(inventory.forbiddenFindings.length === 0
-      ? ['- none']
-      : inventory.forbiddenFindings.map(
-          (finding) => `- ${finding.category}: ${finding.location} ${finding.path}`
-        ))
+    ...formatForbiddenFindings(inventory.forbiddenFindings)
   ]
 
   return `${lines.join('\n')}\n`
@@ -391,21 +387,17 @@ function classifyForbiddenPath(
   const segments = path.split('/')
   const fileName = segments.at(-1) ?? ''
 
-  if (
-    segments.some((segment) => segment === '__tests__' || segment === 'tests' || segment === 'test')
-  ) {
+  if (hasPathSegment(segments, TEST_DIRECTORY_SEGMENTS)) {
     return { category: 'tests', path: reportPath, location }
   }
-  if (/\.(test|spec)\.[cm]?[jt]sx?$/.test(fileName)) {
+  if (TEST_FILE_PATTERN.test(fileName)) {
     return { category: 'tests', path: reportPath, location }
   }
-  if (segments.some((segment) => segment === 'fixtures' || segment === '__fixtures__')) {
+  if (hasPathSegment(segments, FIXTURE_DIRECTORY_SEGMENTS)) {
     return { category: 'fixtures', path: reportPath, location }
   }
   if (
-    segments.some(
-      (segment) => segment === '.cache' || segment === '.vite' || segment === '.turbo'
-    ) ||
+    hasPathSegment(segments, DEVELOPMENT_CACHE_SEGMENTS) ||
     path.includes('/node_modules/.cache/')
   ) {
     return { category: 'development-caches', path: reportPath, location }
@@ -417,12 +409,16 @@ function classifyForbiddenPath(
     fileName.endsWith('.tsbuildinfo') ||
     fileName === '.DS_Store' ||
     fileName === 'Thumbs.db' ||
-    segments.some((segment) => segment === 'coverage' || segment === '.nyc_output')
+    hasPathSegment(segments, BUILD_LEFTOVER_SEGMENTS)
   ) {
     return { category: 'build-leftovers', path: reportPath, location }
   }
 
   return null
+}
+
+function hasPathSegment(segments: string[], forbiddenSegments: Set<string>): boolean {
+  return segments.some((segment) => forbiddenSegments.has(segment))
 }
 
 function summarizeRuntimeDependencies(
@@ -550,6 +546,26 @@ function formatPayloads(payloads: NativeOrExecutablePayload[]): string[] {
     : payloads.map(
         (payload) => `- ${formatBytes(payload.sizeBytes)} ${payload.reason} ${payload.path}`
       )
+}
+
+function formatRuntimeDependency(dependency: RuntimeDependencySummary): string {
+  const status = dependency.present ? 'present' : 'missing'
+  return `- ${dependency.name}: ${status} (${dependency.location})${formatOptionalPath(dependency.path)}`
+}
+
+function formatRequiredRuntimeAsset(asset: RequiredRuntimeAssetSummary): string {
+  const status = asset.present ? 'present' : 'missing'
+  return `- ${asset.label}: ${status}${formatOptionalPath(asset.path)}`
+}
+
+function formatForbiddenFindings(findings: ForbiddenFinding[]): string[] {
+  if (findings.length === 0) return ['- none']
+
+  return findings.map((finding) => `- ${finding.category}: ${finding.location} ${finding.path}`)
+}
+
+function formatOptionalPath(path: string | null): string {
+  return path ? ` ${path}` : ''
 }
 
 function formatBytes(bytes: number): string {
