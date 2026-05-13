@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { getDetectResultRecoveryContent } from './repo-link-copy'
-import type { DetectLocalRepoResult } from '@shared/ipc'
+import type {
+  DetectLocalRepoResult,
+  RepoAccessDescriptor,
+  WslRepoDetectionFailureReason
+} from '@shared/ipc'
+
+type WslFailureResult = Extract<DetectLocalRepoResult, { state: 'wsl-failure' }>
 
 describe('repository link recovery copy', () => {
   it('names missing Git inside WSL instead of calling the path a non-repo', () => {
@@ -25,29 +31,31 @@ describe('repository link recovery copy', () => {
   })
 
   it('gives each WSL linking failure a direct recovery action', () => {
-    const access = {
-      kind: 'wsl' as const,
+    const access: Extract<RepoAccessDescriptor, { kind: 'wsl' }> = {
+      kind: 'wsl',
       displayPath: '\\\\wsl.localhost\\Ubuntu\\home\\neely\\dev\\pilog',
       distro: 'Ubuntu',
       linuxPath: '/home/neely/dev/pilog'
     }
+    const reasons: WslRepoDetectionFailureReason[] = [
+      'wsl-unavailable',
+      'distro-unavailable',
+      'path-missing',
+      'not-git',
+      'no-origin',
+      'unmatched'
+    ]
 
     expect(
-      [
-        'wsl-unavailable',
-        'distro-unavailable',
-        'path-missing',
-        'not-git',
-        'no-origin',
-        'unmatched'
-      ].map((reason) =>
-        getDetectResultRecoveryContent(access.displayPath, {
+      reasons.map((reason) => {
+        const result: WslFailureResult = {
           state: 'wsl-failure',
           reason,
           access,
           remoteUrl: reason === 'unmatched' ? 'https://github.com/other/project.git' : undefined
-        } as DetectLocalRepoResult)
-      )
+        }
+        return getDetectResultRecoveryContent(access.displayPath, result)
+      })
     ).toEqual([
       {
         path: access.displayPath,

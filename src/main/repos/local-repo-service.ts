@@ -9,7 +9,13 @@ import {
 import { getOctokitClient, listLabels, listRepos } from '../github/client'
 import { createRepo } from '../db/repositories/repos'
 import type { PilogDatabase } from '../db/client'
-import type { DetectLocalRepoResult, LinkRepoRequest, Repo, RepoAccessKind } from '@shared/ipc'
+import type {
+  DetectLocalRepoResult,
+  LinkRepoRequest,
+  Repo,
+  RepoAccessDescriptor,
+  RepoAccessKind
+} from '@shared/ipc'
 import type { GitHubLabel } from '@shared/ipc'
 import {
   REPO_LINK_RUNTIME_REQUIREMENTS,
@@ -47,9 +53,7 @@ export async function detectLocalRepo(localPath: string): Promise<DetectLocalRep
 
   const parsed = parseGitHubOwnerRepo(metadata.remoteUrl)
   if (!parsed) {
-    return access.kind === 'wsl'
-      ? { state: 'wsl-failure', reason: 'unmatched', access, remoteUrl: metadata.remoteUrl }
-      : { state: 'unmatched', remoteUrl: metadata.remoteUrl }
+    return unmatchedRepoResult(access, metadata.remoteUrl)
   }
 
   const githubRepos = await listRepos()
@@ -60,9 +64,7 @@ export async function detectLocalRepo(localPath: string): Promise<DetectLocalRep
   )
 
   if (!matched) {
-    return access.kind === 'wsl'
-      ? { state: 'wsl-failure', reason: 'unmatched', access, remoteUrl: metadata.remoteUrl }
-      : { state: 'unmatched', remoteUrl: metadata.remoteUrl }
+    return unmatchedRepoResult(access, metadata.remoteUrl)
   }
 
   return {
@@ -73,6 +75,16 @@ export async function detectLocalRepo(localPath: string): Promise<DetectLocalRep
     githubRepo: matched,
     access
   }
+}
+
+function unmatchedRepoResult(
+  access: RepoAccessDescriptor,
+  remoteUrl: string
+): Extract<DetectLocalRepoResult, { state: 'unmatched' | 'wsl-failure' }> {
+  if (access.kind === 'wsl') {
+    return { state: 'wsl-failure', reason: 'unmatched', access, remoteUrl }
+  }
+  return { state: 'unmatched', remoteUrl }
 }
 
 export async function linkRepo(db: PilogDatabase, request: LinkRepoRequest): Promise<Repo> {

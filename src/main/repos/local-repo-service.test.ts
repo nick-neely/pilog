@@ -11,7 +11,6 @@ vi.mock('./git', () => ({
     kind: 'host',
     displayPath: localPath
   })),
-  readGitMetadata: vi.fn(),
   readGitMetadataResult: vi.fn(),
   parseGitHubOwnerRepo: vi.fn()
 }))
@@ -43,7 +42,6 @@ describe('local-repo-service', () => {
     isGitRepo: ReturnType<typeof vi.fn>
     readLocalGitMetadata: ReturnType<typeof vi.fn>
     parseRepoAccessDescriptor: ReturnType<typeof vi.fn>
-    readGitMetadata: ReturnType<typeof vi.fn>
     readGitMetadataResult: ReturnType<typeof vi.fn>
     parseGitHubOwnerRepo: ReturnType<typeof vi.fn>
   }

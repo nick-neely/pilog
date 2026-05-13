@@ -1,8 +1,7 @@
 import simpleGit from 'simple-git'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
-import type { RepoAccessDescriptor } from '@shared/ipc'
-import type { WslRepoDetectionFailureReason } from '@shared/ipc'
+import type { RepoAccessDescriptor, WslRepoDetectionFailureReason } from '@shared/ipc'
 
 export type LocalGitMetadata = {
   remoteUrl: string
@@ -12,13 +11,17 @@ export type LocalGitMetadata = {
 
 type ExecFile = (file: string, args: string[]) => Promise<{ stdout: string; stderr: string }>
 type WslRepoAccessDescriptor = Extract<RepoAccessDescriptor, { kind: 'wsl' }>
+type WslGitFailureReason = Exclude<WslRepoDetectionFailureReason, 'unmatched'>
+type WslGitCommandResult =
+  | { state: 'stdout'; stdout: string }
+  | { state: 'wsl-failure'; reason: WslGitFailureReason }
 
 export type GitMetadataReadResult =
   | { state: 'metadata'; metadata: LocalGitMetadata }
   | { state: 'missing' }
   | {
       state: 'wsl-failure'
-      reason: Exclude<WslRepoDetectionFailureReason, 'unmatched'>
+      reason: WslGitFailureReason
       access: WslRepoAccessDescriptor
     }
 
@@ -171,10 +174,7 @@ async function runWslGitResult(
   access: WslRepoAccessDescriptor,
   gitArgs: string[],
   runExecFile: ExecFile
-): Promise<
-  | { state: 'stdout'; stdout: string }
-  | { state: 'wsl-failure'; reason: Exclude<WslRepoDetectionFailureReason, 'unmatched'> }
-> {
+): Promise<WslGitCommandResult> {
   try {
     return { state: 'stdout', stdout: await runWslGit(access, gitArgs, runExecFile) }
   } catch (error) {
@@ -182,10 +182,7 @@ async function runWslGitResult(
   }
 }
 
-function classifyWslGitFailure(
-  error: unknown,
-  gitArgs: string[]
-): Exclude<WslRepoDetectionFailureReason, 'unmatched'> {
+function classifyWslGitFailure(error: unknown, gitArgs: string[]): WslGitFailureReason {
   const text = getProcessFailureText(error)
   if (isMissingWslExecutable(error, text)) return 'wsl-unavailable'
   if (matchesAny(text, ['wsl_e_distro_not_found', 'no distribution with the supplied name'])) {
@@ -212,8 +209,12 @@ function classifyWslGitFailure(
   ) {
     return 'path-missing'
   }
-  if (gitArgs.join(' ') === 'remote get-url origin') return 'no-origin'
+  if (isOriginRemoteLookup(gitArgs)) return 'no-origin'
   return 'not-git'
+}
+
+function isOriginRemoteLookup(gitArgs: string[]): boolean {
+  return gitArgs.join(' ') === 'remote get-url origin'
 }
 
 function getProcessFailureText(error: unknown): string {
