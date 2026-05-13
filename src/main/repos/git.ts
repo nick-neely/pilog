@@ -10,11 +10,13 @@ export type LocalGitMetadata = {
 }
 
 type ExecFile = (file: string, args: string[]) => Promise<{ stdout: string; stderr: string }>
+type WslRepoAccessDescriptor = Extract<RepoAccessDescriptor, { kind: 'wsl' }>
 
 const execFileAsync = promisify(execFile)
+const WSL_UNC_PATH_PATTERN = /^\\\\(wsl\.localhost|wsl\$)\\([^\\]+)\\(.+)$/i
 
 export function parseRepoAccessDescriptor(localPath: string): RepoAccessDescriptor {
-  const match = localPath.match(/^\\\\(wsl\.localhost|wsl\$)\\([^\\]+)\\(.+)$/i)
+  const match = localPath.match(WSL_UNC_PATH_PATTERN)
   if (!match) return { kind: 'host', displayPath: localPath }
 
   const [, , distro, pathInsideDistro] = match
@@ -77,7 +79,7 @@ export function parseGitHubOwnerRepo(remoteUrl: string): { owner: string; name: 
 }
 
 async function readWslGitMetadata(
-  access: Extract<RepoAccessDescriptor, { kind: 'wsl' }>,
+  access: WslRepoAccessDescriptor,
   runExecFile: ExecFile
 ): Promise<LocalGitMetadata | null> {
   const isRepo = await runWslGit(access, ['rev-parse', '--is-inside-work-tree'], runExecFile)
@@ -106,7 +108,7 @@ async function readWslGitMetadata(
 }
 
 async function runWslGit(
-  access: Extract<RepoAccessDescriptor, { kind: 'wsl' }>,
+  access: WslRepoAccessDescriptor,
   gitArgs: string[],
   runExecFile: ExecFile
 ): Promise<string> {

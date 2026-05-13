@@ -3,12 +3,13 @@ import {
   readLocalGitMetadata,
   parseGitHubOwnerRepo,
   parseRepoAccessDescriptor,
-  readGitMetadata
+  readGitMetadata,
+  type LocalGitMetadata
 } from './git'
 import { getOctokitClient, listLabels, listRepos } from '../github/client'
 import { createRepo } from '../db/repositories/repos'
 import type { PilogDatabase } from '../db/client'
-import type { DetectLocalRepoResult, LinkRepoRequest, Repo } from '@shared/ipc'
+import type { DetectLocalRepoResult, LinkRepoRequest, Repo, RepoAccessKind } from '@shared/ipc'
 import type { GitHubLabel } from '@shared/ipc'
 import {
   REPO_LINK_RUNTIME_REQUIREMENTS,
@@ -32,7 +33,7 @@ export async function detectLocalRepo(localPath: string): Promise<DetectLocalRep
     return { state: 'unauthenticated' }
   }
 
-  let metadata
+  let metadata: LocalGitMetadata | null
   if (access.kind === 'wsl') {
     metadata = await readGitMetadata(access)
   } else {
@@ -70,14 +71,13 @@ export async function linkRepo(db: PilogDatabase, request: LinkRepoRequest): Pro
   if (message) throw new Error(message)
 
   const labelCache = await fetchInitialLabelCache(request.githubRepo.owner, request.githubRepo.name)
+  const accessFields = getRepoAccessFields(request.access)
 
   return createRepo(db, {
     name: request.githubRepo.name,
     owner: request.githubRepo.owner,
     localPath: request.localPath,
-    accessKind: request.access?.kind ?? 'host',
-    wslDistro: request.access?.kind === 'wsl' ? request.access.distro : null,
-    wslPath: request.access?.kind === 'wsl' ? request.access.linuxPath : null,
+    ...accessFields,
     githubUrl: request.githubRepo.url,
     defaultBranch: request.defaultBranch,
     githubLabels: labelCache.labels,
@@ -98,5 +98,25 @@ async function fetchInitialLabelCache(
     }
   } catch {
     return { labels: [], syncedAt: null }
+  }
+}
+
+function getRepoAccessFields(access: LinkRepoRequest['access']): {
+  accessKind: RepoAccessKind
+  wslDistro: string | null
+  wslPath: string | null
+} {
+  if (access?.kind !== 'wsl') {
+    return {
+      accessKind: 'host',
+      wslDistro: null,
+      wslPath: null
+    }
+  }
+
+  return {
+    accessKind: access.kind,
+    wslDistro: access.distro,
+    wslPath: access.linuxPath
   }
 }
