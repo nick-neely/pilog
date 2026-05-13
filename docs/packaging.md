@@ -33,6 +33,22 @@ pnpm build:mac
 pnpm build:linux
 ```
 
+## Packaged Artifact Inventory
+
+After `pnpm build:unpack`, run:
+
+```bash
+pnpm inventory:packaged
+```
+
+The command inspects the current platform's unpacked Electron Builder output under `dist/` and reports total unpacked size, largest files/directories, `app.asar` versus `app.asar.unpacked` size, native/executable payloads, required runtime dependencies, required runtime assets, and forbidden categories such as tests, fixtures, development caches, source maps, and build leftovers. Pass an explicit unpacked app directory when inspecting a non-default output, for example:
+
+```bash
+pnpm inventory:packaged dist/linux-unpacked
+```
+
+Source maps are forbidden by default in the baseline report. Use `-- --allow-source-maps` only when a release intentionally retains them for diagnostics.
+
 The canonical icon source is `design/icon-variants/pilog-app-icon.png`. The committed app icon assets consumed by Electron Builder are:
 
 - `build/icon.png`

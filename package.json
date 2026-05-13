@@ -41,6 +41,7 @@
     "test:e2e:packaged": "pnpm run build:unpack && playwright test e2e/packaged-runtime.spec.ts",
     "perf:packaged": "node scripts/packaged-performance.cjs",
     "perf:packaged:build": "pnpm run build:unpack && pnpm run perf:packaged",
+    "inventory:packaged": "tsx scripts/packaged-artifact-inventory.ts",
     "build:checksums": "tsx scripts/generate-checksums.ts",
     "release:bump": "node scripts/bump-release.mjs",
     "generate:manifest": "tsx scripts/generate-release-manifest.ts"
