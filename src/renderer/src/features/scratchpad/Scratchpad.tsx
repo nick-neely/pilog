@@ -87,11 +87,6 @@ export function Scratchpad(): React.JSX.Element {
       return true
     }
 
-    const saveCommand = (): boolean => {
-      void save()
-      return true
-    }
-
     const state = EditorState.create({
       extensions: [
         history(),
@@ -101,7 +96,7 @@ export function Scratchpad(): React.JSX.Element {
         keymap.of([
           { key: 'Escape', run: saveAndHideCommand },
           { key: 'Mod-Enter', run: saveAndHideCommand },
-          { key: 'Mod-s', run: saveCommand, preventDefault: true }
+          { key: 'Mod-s', run: saveAndHideCommand, preventDefault: true }
         ]),
         keymap.of([...defaultKeymap, ...historyKeymap]),
         EditorView.updateListener.of((update) => {
@@ -134,7 +129,7 @@ export function Scratchpad(): React.JSX.Element {
     view.focus()
 
     return () => view.destroy()
-  }, [save, saveAndHide])
+  }, [saveAndHide])
 
   const handleResetEditor = useEffectEvent(resetEditor)
 
