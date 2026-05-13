@@ -146,3 +146,35 @@ These timings are informational baselines, not budgets. Local machine noise
 should not fail ordinary development. Like the packaged smoke, the runner uses
 `PILOG_DEBUG_IPC=1` with temporary app data so it can seed fixture notes and run
 the agent path without live provider credentials.
+
+## Electron Trace Diagnostic Mode
+
+Electron trace capture is off by default. Maintainers can opt in for packaged
+startup/runtime investigation with either `PILOG_ELECTRON_TRACE=1` or the
+explicit `--pilog-trace` launch flag. Normal user operation does not start trace
+capture, write trace files, or expose a performance UI.
+
+For packaged performance runs, write traces outside the temporary app data
+directory so the runner cleanup does not remove them:
+
+```bash
+PILOG_ELECTRON_TRACE=1 \
+PILOG_ELECTRON_TRACE_DIR=dist/electron-traces \
+pnpm perf:packaged -- --app-out-dir dist/linux-unpacked
+```
+
+To bound capture time, set `PILOG_ELECTRON_TRACE_DURATION_MS`:
+
+```bash
+PILOG_ELECTRON_TRACE=1 \
+PILOG_ELECTRON_TRACE_DURATION_MS=10000 \
+PILOG_ELECTRON_TRACE_DIR=dist/electron-traces \
+pnpm perf:packaged -- --app-out-dir dist/linux-unpacked
+```
+
+The app logs the written `electron-trace-*.json` path and inspection guidance.
+Open the trace in `chrome://tracing` or `https://ui.perfetto.dev`. The trace
+uses Electron/Chromium process, startup, V8, Node, GPU/compositor, loading, and
+timeline categories; it deliberately avoids netlog categories and does not add
+Note contents, credentials, linked Repo contents, or provider secrets to normal
+logs.

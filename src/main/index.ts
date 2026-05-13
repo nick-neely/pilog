@@ -1,11 +1,15 @@
 import { electronApp, is, optimizer } from '@electron-toolkit/utils'
-import { app, BrowserWindow, ipcMain, Menu } from 'electron'
+import { app, BrowserWindow, contentTracing, ipcMain, Menu } from 'electron'
 import { join } from 'path'
 import icon from '../../resources/icon.png?asset'
 import trayIcon from '../../resources/tray-icon.png?asset'
 import { loadDotEnvFile } from './config/env'
 import { createDatabase } from './db/client'
 import { runMigrations } from './db/migrations'
+import {
+  createElectronTraceDiagnostic,
+  type ElectronTraceDiagnostic
+} from './diagnostics/electron-trace'
 import { cancelRunningAgentRuns } from './db/repositories/agent-runs'
 import { getOnboardingState, getSetting, setSetting } from './db/repositories/settings'
 import { registerGlobalHotkeys, unregisterGlobalHotkeys } from './hotkeys/register-global-hotkeys'
@@ -14,6 +18,7 @@ import { registerIpcHandlers } from './ipc/handlers'
 import { registerGitHubIpcHandlers } from './ipc/github-handlers'
 import { registerRepoIpcHandlers } from './ipc/repo-handlers'
 import { registerPiIpcHandlers } from './ipc/pi-handlers'
+import { log } from './lib/log'
 import { buildAppMenu } from './menu/app-menu'
 import { PILOG_APP_ID, PILOG_PRODUCT_NAME } from '../shared/app-identity'
 import { shouldOpenMainWindowForOnboarding } from '../shared/onboarding'
@@ -40,7 +45,19 @@ if (process.env.PILOG_USER_DATA) {
 
 app.setName(PILOG_PRODUCT_NAME)
 
-app.whenReady().then(() => {
+let electronTraceDiagnostic: ElectronTraceDiagnostic | null = null
+let quittingAfterTraceStop = false
+
+app.whenReady().then(async () => {
+  electronTraceDiagnostic = createElectronTraceDiagnostic({
+    env: process.env,
+    argv: process.argv,
+    defaultOutputDirectory: join(app.getPath('userData'), 'diagnostics', 'electron-traces'),
+    contentTracing,
+    log
+  })
+  await electronTraceDiagnostic.start()
+
   electronApp.setAppUserModelId(PILOG_APP_ID)
 
   app.on('browser-window-created', (_, window) => {
@@ -140,9 +157,17 @@ app.whenReady().then(() => {
   })
 })
 
-app.on('before-quit', () => {
+app.on('before-quit', (event) => {
   destroyMainWindow()
   destroyTray()
+
+  if (electronTraceDiagnostic?.enabled && !quittingAfterTraceStop) {
+    event.preventDefault()
+    quittingAfterTraceStop = true
+    void electronTraceDiagnostic.stop('before-quit').finally(() => {
+      app.quit()
+    })
+  }
 })
 
 app.on('will-quit', () => {
