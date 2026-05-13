@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createIssueGenerationTools } from './runtime'
+import { createIssueGenerationTools, repoToToolAccessDescriptor } from './runtime'
 import type { IssueGenerationInput } from './issue-generation'
 
 describe('Pi runtime tool registration', () => {
@@ -14,6 +14,27 @@ describe('Pi runtime tool registration', () => {
     expect(disabledTools).not.toContain('web_fetch')
     expect(enabledTools).toContain('web_search')
     expect(enabledTools).not.toContain('web_fetch')
+  })
+
+  it('builds draft-generation repo tools from persisted WSL access metadata', () => {
+    expect(
+      repoToToolAccessDescriptor(
+        baseInput({
+          repo: {
+            ...baseInput().repo,
+            localPath: '\\\\wsl.localhost\\Ubuntu\\home\\neely\\dev\\pi log',
+            accessKind: 'wsl',
+            wslDistro: 'Ubuntu',
+            wslPath: '/home/neely/dev/pi log'
+          }
+        }).repo
+      )
+    ).toEqual({
+      kind: 'wsl',
+      displayPath: '\\\\wsl.localhost\\Ubuntu\\home\\neely\\dev\\pi log',
+      distro: 'Ubuntu',
+      linuxPath: '/home/neely/dev/pi log'
+    })
   })
 })
 

@@ -1,5 +1,6 @@
 import type { AgentEvent as PiAgentEvent, AgentTool } from '@earendil-works/pi-agent-core'
 import type { getModel as getModelType } from '@earendil-works/pi-ai'
+import type { RepoAccessDescriptor } from '@shared/ipc'
 import { setTimeout as delay } from 'node:timers/promises'
 import { createModelRegistry, createSafeStorageAuthStorage } from './auth-storage'
 import {
@@ -169,10 +170,25 @@ export function createIssueGenerationTools(
   onSubmit: (drafts: GeneratedIssueDraft[]) => void
 ): AgentTool[] {
   return [
-    ...createReadOnlyRepoTools(input.repo.localPath),
+    ...createReadOnlyRepoTools(repoToToolAccessDescriptor(input.repo)),
     ...(input.webSearch ? [createWebSearchTool(input.webSearch)] : []),
     createSubmitIssueDraftsTool(onSubmit)
   ]
+}
+
+export function repoToToolAccessDescriptor(
+  input: IssueGenerationInput['repo']
+): RepoAccessDescriptor {
+  if (input.accessKind === 'wsl' && input.wslDistro && input.wslPath) {
+    return {
+      kind: 'wsl' as const,
+      displayPath: input.localPath,
+      distro: input.wslDistro,
+      linuxPath: input.wslPath
+    }
+  }
+
+  return { kind: 'host' as const, displayPath: input.localPath }
 }
 
 async function* runFixtureAgent(input: IssueGenerationInput): AsyncIterable<AgentEvent> {

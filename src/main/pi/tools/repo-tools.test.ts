@@ -1,9 +1,10 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { execFileSync } from 'node:child_process'
 import { mkdtempSync, symlinkSync, writeFileSync, mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import {
+  createReadOnlyRepoTools,
   createGitBlameTool,
   createGitDiffTool,
   createGitLogTool,
@@ -103,6 +104,120 @@ describe('read-only repo tools', () => {
     expect(result.details).toMatchObject({ current: 'main' })
   })
 
+  it('reads WSL repository files through wsl.exe argument arrays', async () => {
+    const mockExecFileSync = vi.fn((file: string, args: string[]) => {
+      expect(file).toBe('wsl.exe')
+      expect(args.slice(0, 5)).toEqual([
+        '-d',
+        'Ubuntu',
+        '--cd',
+        '/home/neely/dev/pi log;rm -rf nope',
+        '--'
+      ])
+
+      const command = args[5]
+      if (command === 'realpath') return Buffer.from('src/app.ts\n')
+      if (command === 'stat') return Buffer.from('17\n')
+      if (command === 'head') return Buffer.from('export const app\n')
+      throw new Error(`Unexpected command: ${command}`)
+    })
+    const tools = createReadOnlyRepoTools(wslAccess(), {
+      execFileSync: mockExecFileSync as unknown as typeof execFileSync
+    })
+    const readFile = tools.find((tool) => tool.name === 'read_file')
+
+    const result = await readFile!.execute('tool', { path: 'src/app.ts' })
+
+    expect(result.details).toEqual({
+      path: 'src/app.ts',
+      truncated: false,
+      content: 'export const app\n'
+    })
+    expect(mockExecFileSync).toHaveBeenCalledWith(
+      'wsl.exe',
+      [
+        '-d',
+        'Ubuntu',
+        '--cd',
+        '/home/neely/dev/pi log;rm -rf nope',
+        '--',
+        'realpath',
+        '--relative-to=.',
+        '--',
+        'src/app.ts'
+      ],
+      expect.objectContaining({ windowsHide: true })
+    )
+  })
+
+  it('runs WSL read-only tools without shell-concatenating repository paths', async () => {
+    const mockExecFileSync = vi.fn((_file: string, args: string[]) => {
+      const command = args[5]
+      if (command === 'realpath') return Buffer.from(`${args.at(-1)}\n`)
+      if (command === 'find') return Buffer.from('src/app.ts\tf\nsrc\td\n')
+      if (command === 'git' && args[6] === 'ls-files') return Buffer.from('src/app.ts\0')
+      if (command === 'grep') return Buffer.from('src/app.ts:1:export const app = true\n')
+      if (command === 'git' && args[6] === 'status') return Buffer.from('## main\n M src/app.ts\n')
+      if (command === 'git' && args[6] === 'diff')
+        return Buffer.from('diff --git a/src/app.ts b/src/app.ts\n')
+      if (command === 'git' && args[6] === 'log') {
+        return Buffer.from('abc\tPilog\t2026-05-13\tInitial commit\n')
+      }
+      if (command === 'git' && args[6] === 'blame')
+        return Buffer.from('abc (Pilog 2026-05-13 1) line\n')
+      throw new Error(`Unexpected command: ${args.join(' ')}`)
+    })
+    const access = wslAccess()
+
+    const options = { execFileSync: mockExecFileSync as unknown as typeof execFileSync }
+
+    await createListDirTool(access, options).execute('tool', { path: 'src', depth: 1 })
+    await createGlobTool(access, options).execute('tool', { pattern: 'src/*.ts' })
+    await createGrepTool(access, options).execute('tool', { pattern: 'app', path: 'src' })
+    await createGitStatusTool(access, options).execute('tool', {})
+    await createGitDiffTool(access, options).execute('tool', { path: 'src/app.ts' })
+    await createGitLogTool(access, options).execute('tool', { path: 'src/app.ts' })
+    await createGitBlameTool(access, options).execute('tool', { path: 'src/app.ts' })
+
+    for (const call of mockExecFileSync.mock.calls) {
+      expect(call[0]).toBe('wsl.exe')
+      expect(call[1]).toContain('/home/neely/dev/pi log;rm -rf nope')
+    }
+  })
+
+  it('keeps WSL sandbox protections for traversal, denied paths, and symlink escapes', async () => {
+    const mockExecFileSync = vi.fn((_file: string, args: string[]) => {
+      if (args[5] === 'git' && args[6] === 'ls-files') {
+        return Buffer.from('.env.local\0escape-link.txt\0')
+      }
+      if (args[5] === 'realpath' && args.at(-1) === 'escape-link.txt') {
+        return Buffer.from('../outside.txt\n')
+      }
+      return Buffer.from(`${args.at(-1)}\n`)
+    })
+    const access = wslAccess()
+    const options = { execFileSync: mockExecFileSync as unknown as typeof execFileSync }
+
+    await expect(
+      createReadFileTool(access, options).execute('tool', { path: '../x' })
+    ).rejects.toThrow(/escapes/)
+    await expect(
+      createReadFileTool(access, options).execute('tool', { path: '.env.local' })
+    ).rejects.toThrow(/denied/)
+    await expect(
+      createReadFileTool(access, options).execute('tool', { path: 'escape-link.txt' })
+    ).rejects.toThrow(/escapes/)
+    await expect(
+      createGlobTool(access, options).execute('tool', { pattern: '../*' })
+    ).rejects.toThrow(/escapes/)
+    await expect(
+      createGlobTool(access, options).execute('tool', { pattern: '.env*' })
+    ).rejects.toThrow(/denied/)
+    await expect(
+      createGlobTool(access, options).execute('tool', { pattern: 'escape-link.txt' })
+    ).rejects.toThrow(/escapes/)
+  })
+
   it('resolves the ripgrep binary from app.asar.unpacked in packaged builds', () => {
     const originalResourcesPath = process.resourcesPath
     const originalDefaultApp = process.defaultApp
@@ -129,6 +244,20 @@ describe('read-only repo tools', () => {
     }
   })
 })
+
+function wslAccess(): {
+  kind: 'wsl'
+  displayPath: string
+  distro: string
+  linuxPath: string
+} {
+  return {
+    kind: 'wsl' as const,
+    displayPath: '\\\\wsl.localhost\\Ubuntu\\home\\neely\\dev\\pi log;rm -rf nope',
+    distro: 'Ubuntu',
+    linuxPath: '/home/neely/dev/pi log;rm -rf nope'
+  }
+}
 
 function createFixtureRepo(): { repoPath: string } {
   const root = mkdtempSync(path.join(tmpdir(), 'pilog-tools-'))
