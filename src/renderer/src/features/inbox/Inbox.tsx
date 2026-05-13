@@ -111,6 +111,7 @@ import { PiSetupPanel } from '../setup/PiSetupPanel'
 import { RepoLinkFlow } from '../setup/RepoLinkFlow'
 import { mergeGitHubAuthProgress } from '../setup/github-auth-progress'
 import { usePiConfig, type PiConfigState } from '../setup/use-pi-config'
+import { INBOX_NOTE_PREVIEW_TOOLTIP_CLASS } from './inbox-note-preview-tooltip'
 import { StatusFilter } from './StatusFilter'
 
 // Status filter rows. Order matches the inbox lifecycle (capture →
@@ -1403,7 +1404,9 @@ function SourceNoteList({
               <TooltipTrigger asChild>
                 <span className={cn('block min-w-0', itemClassName)}>{preview}</span>
               </TooltipTrigger>
-              <TooltipContent>{preview}</TooltipContent>
+              <TooltipContent className={INBOX_NOTE_PREVIEW_TOOLTIP_CLASS}>
+                {preview}
+              </TooltipContent>
             </Tooltip>
           </li>
         )
@@ -2274,7 +2277,9 @@ export function Inbox({
                                       {preview}
                                     </span>
                                   </TooltipTrigger>
-                                  <TooltipContent>{preview}</TooltipContent>
+                                  <TooltipContent className={INBOX_NOTE_PREVIEW_TOOLTIP_CLASS}>
+                                    {preview}
+                                  </TooltipContent>
                                 </Tooltip>
                                 <Tooltip>
                                   <TooltipTrigger asChild>
