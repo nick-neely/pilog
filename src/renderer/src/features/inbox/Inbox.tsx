@@ -1056,14 +1056,14 @@ function NoteDetail({
       <div className="flex-1">
         <ScrollArea className="h-full overflow-hidden">
           <Textarea
-          aria-label="Note content"
-          // Body line length capped at 72ch per DESIGN.md; mono editor body
-          // pairs with the rest of the system (file paths, code blocks).
-          className="mx-auto block h-full w-full max-w-[72ch] resize-none overflow-auto rounded-none border-0 bg-transparent p-6 font-mono text-sm leading-relaxed text-foreground shadow-none focus-visible:ring-0"
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          placeholder="Capture a thought…"
-        />
+            aria-label="Note content"
+            // Body line length capped at 72ch per DESIGN.md; mono editor body
+            // pairs with the rest of the system (file paths, code blocks).
+            className="mx-auto block h-full w-full max-w-[72ch] resize-none overflow-auto rounded-none border-0 bg-transparent p-6 font-mono text-sm leading-relaxed text-foreground shadow-none focus-visible:ring-0"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            placeholder="Capture a thought…"
+          />
         </ScrollArea>
       </div>
       {/* Repo and generation provenance, kept secondary to the editor body. */}
@@ -1482,6 +1482,7 @@ export function Inbox({
     [githubStatus, onboardingDrafts, onboardingNotes, piStatus, repos]
   )
   const onboardingStep = getVisibleOnboardingStep(onboardingState, onboardingSignals)
+  const shouldShowOnboarding = onboardingState !== null && onboardingStep !== null
 
   useEffect(() => {
     mountedRef.current = true
@@ -1618,6 +1619,11 @@ export function Inbox({
     const saved = await window.pilog.invoke('onboarding:set', next)
     setOnboardingState(saved)
   }, [])
+
+  const completeOnboardingIfNeeded = useCallback(async (): Promise<void> => {
+    if (!onboardingState || onboardingState.completed) return
+    await persistOnboardingState(completeOnboardingState(onboardingState))
+  }, [onboardingState, persistOnboardingState])
 
   const handleConfirmHotkey = useCallback(async (): Promise<void> => {
     if (!onboardingState) return
@@ -1902,9 +1908,7 @@ export function Inbox({
               publishError: null
             })
           } else {
-            if (onboardingState && !onboardingState.completed) {
-              await persistOnboardingState(completeOnboardingState(onboardingState))
-            }
+            await completeOnboardingIfNeeded()
             clearSelection()
             onNavigateToDraftReview()
           }
@@ -1992,12 +1996,10 @@ export function Inbox({
   }
 
   const handleOpenOnboardingDrafts = useCallback(async (): Promise<void> => {
-    if (onboardingState && !onboardingState.completed) {
-      await persistOnboardingState(completeOnboardingState(onboardingState))
-    }
+    await completeOnboardingIfNeeded()
     clearSelection()
     onNavigateToDraftReview()
-  }, [clearSelection, onboardingState, onNavigateToDraftReview, persistOnboardingState])
+  }, [clearSelection, completeOnboardingIfNeeded, onNavigateToDraftReview])
 
   const handleProcessCurrentInbox = async (): Promise<void> => {
     if (!currentInboxRepo || !canProcessCurrentInbox) return
@@ -2080,7 +2082,7 @@ export function Inbox({
 
   return (
     <div className="flex h-full bg-background text-foreground">
-      {onboardingStep && onboardingState ? (
+      {shouldShowOnboarding ? (
         <OnboardingPanel
           key={onboardingStep}
           state={onboardingState}
