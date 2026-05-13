@@ -5,9 +5,9 @@ Pilog's primary distribution path is a direct download from `https://pilog.dev`.
 The size and performance workflow in this document belongs to PRD #65. The
 landed slices are the packaged performance baseline runner (#66), packaged
 artifact inventory (#67), non-blocking packaged size budgets (#68), packaged
-file hygiene enforcement (#70), first measured pruning pass (#71), Release
-Action size report publishing (#73), and this maintainer documentation (#74).
-Packaged performance budget enforcement is still tracked by #69.
+performance budgets and regression reporting (#69), packaged file hygiene
+enforcement (#70), first measured pruning pass (#71), Release Action size
+report publishing (#73), and this maintainer documentation (#74).
 
 ## Current MVP Signing Scope
 
@@ -161,7 +161,8 @@ Local inventory, size, and performance commands are diagnostic feedback loops:
 
 - `pnpm inventory:packaged` shows what the unpacked packaged app ships.
 - `pnpm budget:packaged` writes a non-blocking size-budget comparison.
-- `pnpm perf:packaged` writes a packaged performance baseline.
+- `pnpm perf:packaged` writes a packaged performance baseline and non-blocking
+  performance-budget comparison.
 
 These local commands should guide review and before/after comparisons, but they
 do not make ordinary development fail because workstation hardware, display
@@ -175,8 +176,10 @@ Do not treat a local over-budget size finding as permission to delete product
 capability. Treat it as a request for attribution: identify the changed
 dependency, native payload, source map, fixture, test file, or asset; decide
 whether it belongs in the packaged runtime; and update the budget only when the
-growth is intentional product scope. Performance timings remain baselines until
-issue #69 defines thresholds and any CI or Release Action enforcement policy.
+growth is intentional product scope. Treat a local over-budget performance
+finding the same way: identify the scenario, compare reports on comparable
+hardware, and enforce only through an intentional release or CI command such as
+`--enforce-budgets`.
 
 ## First Measured Optimization Pass
 
@@ -271,8 +274,11 @@ pnpm perf:packaged:build
 ```
 
 The runner launches the packaged app outside the dev server and writes
-`dist/packaged-performance-baseline.json` by default. The JSON report includes
-app/build metadata, diagnostic context, and timings for:
+`dist/packaged-performance-baseline.json` by default. It also writes
+`dist/packaged-performance-budget-report.json`, comparing those timings against
+the initial release-tolerance budgets. The JSON reports include app/build
+metadata, diagnostic context, scenario names, timings, budget status, and enough
+context to identify which scenario regressed.
 
 - cold launch to usable Inbox window
 - Scratchpad open from the packaged application menu path
@@ -280,15 +286,51 @@ app/build metadata, diagnostic context, and timings for:
 - fixture-backed Agent Run to generated draft
 - Draft Review navigation
 
-These timings are informational baselines, not budgets. Local machine noise
-should not fail ordinary development. Like the packaged smoke, the runner uses
+Local packaged performance runs are informational by default. Local machine
+noise should not fail ordinary development, so an over-budget scenario prints
+and writes a report finding without exiting non-zero. CI or Release Actions can
+opt into enforcement with:
+
+```bash
+pnpm perf:packaged -- --app-out-dir dist/linux-unpacked --enforce-budgets
+```
+
+When enforcement is enabled, any missing or over-budget scenario exits non-zero.
+This keeps threshold decisions explicit at the release boundary while preserving
+the local feedback loop. Like the packaged smoke, the runner uses
 `PILOG_DEBUG_IPC=1` with temporary app data so it can seed fixture notes and run
 the agent path without live provider credentials.
+
+Initial packaged performance budgets live in
+`scripts/packaged-performance.cjs` as
+`INITIAL_PACKAGED_PERFORMANCE_BUDGETS`. They are deliberately coarse first-pass
+release tolerances for the packaged baseline runner's user-visible scenarios.
+The first reference run was a Linux x64 unpacked packaged build measured on
+2026-05-13:
+
+| Scenario                         | Reference run | Initial budget |
+| -------------------------------- | ------------- | -------------- |
+| Cold launch to usable Inbox      | 1200 ms       | 6000 ms        |
+| Scratchpad open                  | 186.1 ms      | 1000 ms        |
+| Note create and list             | 23.8 ms       | 750 ms         |
+| Draft Review navigation          | 217.7 ms      | 1000 ms        |
+| Fixture Agent Run to draft       | 76 ms         | 15000 ms       |
+
+To intentionally update a performance budget, run `pnpm perf:packaged` against
+the packaged target under review, compare the new
+`packaged-performance-baseline.json` and
+`packaged-performance-budget-report.json` with the previous release's reports,
+then update the matching budget with a short rationale. Budget increases should
+name the product behavior that got more expensive. Budget decreases should be
+based on repeated clean packaged runs on comparable hardware.
 
 When comparing performance reports, keep scenario names stable and compare the
 same packaged target on comparable hardware. The most useful regression note is
 the scenario that changed, the before/after `packaged-performance-baseline.json`
-paths, and whether trace capture was enabled.
+and `packaged-performance-budget-report.json` paths, and whether trace capture
+was enabled. If a fixture Agent Run budget fails, inspect whether the UI stayed
+responsive and whether progress/cancel affordances remained usable; do not hide
+Agent Run UI freezes behind the longer runner timeout.
 
 ## Electron Trace Diagnostic Mode
 
