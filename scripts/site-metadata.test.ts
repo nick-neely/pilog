@@ -73,6 +73,8 @@ describe('site metadata', () => {
   })
 
   it('publishes crawler discovery for public site routes', () => {
+    const sitemap = createSitemap()
+
     expect(createRobots()).toEqual({
       rules: {
         userAgent: '*',
@@ -82,7 +84,7 @@ describe('site metadata', () => {
       host: 'https://pilog.dev'
     })
 
-    expect(createSitemap()).toEqual([
+    expect(sitemap).toEqual([
       {
         url: 'https://pilog.dev/',
         changeFrequency: 'weekly',
@@ -104,6 +106,6 @@ describe('site metadata', () => {
         priority: 0.5
       }
     ])
-    expect(createSitemap().map((entry) => entry.url)).not.toContain('https://pilog.dev/preview')
+    expect(sitemap.map((entry) => entry.url)).not.toContain('https://pilog.dev/preview')
   })
 })
