@@ -53,7 +53,7 @@ test('scratchpad: menu → type → Esc → note visible in inbox', async () => 
   await app.close()
 })
 
-test('scratchpad: Cmd+S saves but window stays open', async () => {
+test('scratchpad: Cmd+S saves and hides the window', async () => {
   const app = await launchApp()
   const inboxPage = await app.firstWindow()
 
@@ -75,10 +75,18 @@ test('scratchpad: Cmd+S saves but window stays open', async () => {
   await scratchpadPage.keyboard.press(`${mod}+s`)
 
   await expect(inboxPage.locator('main li')).toHaveCount(1, { timeout: 5000 })
-
-  const windows = await app.windows()
-  const scratchpadStillOpen = windows.some((w) => w !== inboxPage && w.url().includes('scratchpad'))
-  expect(scratchpadStillOpen).toBe(true)
+  await expect
+    .poll(
+      async () =>
+        app.evaluate(({ BrowserWindow }) => {
+          const scratchpadWindow = BrowserWindow.getAllWindows().find((w) =>
+            w.webContents.getURL().includes('scratchpad')
+          )
+          return scratchpadWindow?.isVisible() ?? false
+        }),
+      { timeout: 5000 }
+    )
+    .toBe(false)
 
   await app.close()
 })
