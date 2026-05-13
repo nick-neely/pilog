@@ -26,15 +26,14 @@ describe('packaged performance runner plumbing', () => {
   it('resolves the unpacked packaged executable for the current platform', () => {
     const appOutDir = mkdtempSync(join(tmpdir(), 'pilog-packaged-perf-test-'))
     tempDirs.push(appOutDir)
-    const executableName =
-      process.platform === 'win32' ? 'Pilog.exe' : process.platform === 'darwin' ? null : 'pilog'
 
     if (process.platform === 'darwin') {
       const executable = join(appOutDir, 'Pilog.app', 'Contents', 'MacOS', 'Pilog')
       mkdirSync(join(appOutDir, 'Pilog.app', 'Contents', 'MacOS'), { recursive: true })
       writeFileSync(executable, '', { flag: 'w' })
     } else {
-      writeFileSync(join(appOutDir, executableName!), '', { flag: 'w' })
+      const executableName = process.platform === 'win32' ? 'Pilog.exe' : 'pilog'
+      writeFileSync(join(appOutDir, executableName), '', { flag: 'w' })
     }
 
     expect(findPackagedExecutable({ appOutDir })).toContain(appOutDir)

@@ -14,31 +14,43 @@ const { execFileSync } = require('node:child_process')
 
 const REPORT_SCHEMA_VERSION = 1
 const DEFAULT_REPORT_PATH = 'dist/packaged-performance-baseline.json'
+const FIXTURE_NOTE_CONTENTS = [
+  'packaged performance can generate fixture drafts',
+  'packaged performance can navigate draft review'
+]
 
 function findPackagedExecutable(options = {}) {
   const appOutDir = options.appOutDir ? resolve(options.appOutDir) : null
-  const candidates =
-    process.platform === 'win32'
-      ? [appOutDir ? join(appOutDir, 'Pilog.exe') : null, resolve('dist/win-unpacked/Pilog.exe')]
-      : process.platform === 'darwin'
-        ? [
-            appOutDir?.endsWith('.app') ? join(appOutDir, 'Contents/MacOS/Pilog') : null,
-            appOutDir ? join(appOutDir, 'Pilog.app/Contents/MacOS/Pilog') : null,
-            resolve('dist/mac/Pilog.app/Contents/MacOS/Pilog')
-          ]
-        : [
-            appOutDir ? join(appOutDir, 'pilog') : null,
-            appOutDir ? join(appOutDir, 'Pilog') : null,
-            resolve('dist/linux-unpacked/pilog'),
-            resolve('dist/linux-unpacked/Pilog')
-          ]
-
+  const candidates = packagedExecutableCandidates(appOutDir)
   const checked = candidates.filter(Boolean)
   const executable = checked.find((candidate) => existsSync(candidate))
   if (!executable) {
     throw new Error(`Packaged executable not found. Checked: ${checked.join(', ')}`)
   }
   return executable
+}
+
+function packagedExecutableCandidates(appOutDir) {
+  switch (process.platform) {
+    case 'win32':
+      return [
+        appOutDir ? join(appOutDir, 'Pilog.exe') : null,
+        resolve('dist/win-unpacked/Pilog.exe')
+      ]
+    case 'darwin':
+      return [
+        appOutDir?.endsWith('.app') ? join(appOutDir, 'Contents/MacOS/Pilog') : null,
+        appOutDir ? join(appOutDir, 'Pilog.app/Contents/MacOS/Pilog') : null,
+        resolve('dist/mac/Pilog.app/Contents/MacOS/Pilog')
+      ]
+    default:
+      return [
+        appOutDir ? join(appOutDir, 'pilog') : null,
+        appOutDir ? join(appOutDir, 'Pilog') : null,
+        resolve('dist/linux-unpacked/pilog'),
+        resolve('dist/linux-unpacked/Pilog')
+      ]
+  }
 }
 
 function createEmptyReport(input) {
@@ -201,10 +213,7 @@ async function seedIssueGenerationFixture(page, repoDir) {
     async ({ repoPath }) =>
       window.pilog.invoke('debug:seedIssueGenerationFixture', {
         repoPath,
-        notes: [
-          'packaged performance can generate fixture drafts',
-          'packaged performance can navigate draft review'
-        ]
+        notes: FIXTURE_NOTE_CONTENTS
       }),
     { repoPath: repoDir }
   )
@@ -212,11 +221,9 @@ async function seedIssueGenerationFixture(page, repoDir) {
 
 async function selectFixtureNotes(page) {
   const noteRows = page.locator('[data-testid="note-row"]')
-  await noteRows.filter({ hasText: 'packaged performance can generate fixture drafts' }).click()
+  await noteRows.filter({ hasText: FIXTURE_NOTE_CONTENTS[0] }).click()
   const modifier = process.platform === 'darwin' ? 'Meta' : 'Control'
-  await noteRows
-    .filter({ hasText: 'packaged performance can navigate draft review' })
-    .click({ modifiers: [modifier] })
+  await noteRows.filter({ hasText: FIXTURE_NOTE_CONTENTS[1] }).click({ modifiers: [modifier] })
   await page.getByRole('button', { name: 'Generate Drafts', exact: true }).waitFor({
     state: 'visible'
   })
@@ -322,12 +329,12 @@ function writeReport(report, outputPath) {
 }
 
 function formatSummary(report, outputPath) {
+  const appName = report.metadata.productName ?? report.metadata.packageName
+  const appVersion = report.metadata.appVersion ?? report.metadata.packageVersion
   const lines = [
     '[packaged-performance] baseline complete',
     `[packaged-performance] report: ${outputPath}`,
-    `[packaged-performance] app: ${report.metadata.productName ?? report.metadata.packageName} ${
-      report.metadata.appVersion ?? report.metadata.packageVersion
-    } (${report.metadata.platform}/${report.metadata.arch})`
+    `[packaged-performance] app: ${appName} ${appVersion} (${report.metadata.platform}/${report.metadata.arch})`
   ]
 
   for (const scenario of report.scenarios) {
