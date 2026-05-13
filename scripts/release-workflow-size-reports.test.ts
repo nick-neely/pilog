@@ -5,19 +5,37 @@ interface WorkflowExpectation {
   path: string
   channel: 'stable' | 'preview'
   publishLabel: string
-  publishFlag: string
-  uploadArtifactName: string
+  packageArgs: string
   updaterMetadata: string[]
   releaseCreateFlag: string
 }
 
-const workflows: WorkflowExpectation[] = [
+interface PlatformExpectation {
+  packageTarget: '--mac' | '--win' | '--linux'
+  platform: 'mac' | 'win' | 'linux'
+}
+
+const platforms: readonly PlatformExpectation[] = [
+  {
+    packageTarget: '--mac',
+    platform: 'mac'
+  },
+  {
+    packageTarget: '--win',
+    platform: 'win'
+  },
+  {
+    packageTarget: '--linux',
+    platform: 'linux'
+  }
+]
+
+const workflows: readonly WorkflowExpectation[] = [
   {
     path: '.github/workflows/release-stable.yml',
     channel: 'stable',
     publishLabel: 'Publish macOS artifacts',
-    publishFlag: '--publish never',
-    uploadArtifactName: 'packaged-size-reports-stable-mac',
+    packageArgs: '--publish never',
     updaterMetadata: ['dist/latest-mac.yml', 'dist/latest.yml', 'dist/latest-linux.yml'],
     releaseCreateFlag: '--generate-notes'
   },
@@ -25,8 +43,7 @@ const workflows: WorkflowExpectation[] = [
     path: '.github/workflows/release-preview.yml',
     channel: 'preview',
     publishLabel: 'Publish macOS preview artifacts',
-    publishFlag: '--config electron-builder.preview.yml --publish never',
-    uploadArtifactName: 'packaged-size-reports-preview-mac',
+    packageArgs: '--config electron-builder.preview.yml --publish never',
     updaterMetadata: ['dist/preview-mac.yml', 'dist/preview.yml', 'dist/preview-linux.yml'],
     releaseCreateFlag: '--prerelease --generate-notes'
   }
@@ -35,38 +52,29 @@ const workflows: WorkflowExpectation[] = [
 describe('release workflow size reports', () => {
   it.each(workflows)(
     '$channel workflow generates inspectable reports after packaging and before publishing',
-    async ({
-      path,
-      channel,
-      publishLabel,
-      publishFlag,
-      uploadArtifactName,
-      updaterMetadata,
-      releaseCreateFlag
-    }) => {
+    async ({ path, channel, publishLabel, packageArgs, updaterMetadata, releaseCreateFlag }) => {
       const workflow = await readFile(path, 'utf8')
+      const macReportDirectory = `dist/reports/${channel}-mac`
+      const macReportArtifactName = `packaged-size-reports-${channel}-mac`
 
-      expect(workflow).toContain(`pnpm exec electron-builder --mac ${publishFlag}`)
-      expect(workflow).toContain(`pnpm exec electron-builder --win ${publishFlag}`)
-      expect(workflow).toContain(`pnpm exec electron-builder --linux ${publishFlag}`)
+      for (const { packageTarget, platform } of platforms) {
+        expect(workflow).toContain(`pnpm exec electron-builder ${packageTarget} ${packageArgs}`)
+        expect(workflow).toContain(`REPORT_DIR=dist/reports/${channel}-${platform}`)
+        expect(workflow).toContain(`name: packaged-size-reports-${channel}-${platform}`)
+      }
       expect(workflow).toContain('pnpm inventory:packaged')
       expect(workflow).toContain('pnpm budget:packaged')
       expect(workflow).toContain('actions/upload-artifact@v4')
-      expect(workflow).toContain(uploadArtifactName)
       expect(workflow).toContain(
         `gh release create "$TAG" --verify-tag --title "$TAG" ${releaseCreateFlag}`
       )
       for (const metadataFile of updaterMetadata) {
         expect(workflow).toContain(metadataFile)
       }
-      for (const platform of ['mac', 'win', 'linux']) {
-        expect(workflow).toContain(`dist/reports/${channel}-${platform}`)
-        expect(workflow).toContain(`packaged-size-reports-${channel}-${platform}`)
-      }
 
-      const packageIndex = workflow.indexOf(`--mac ${publishFlag}`)
-      const reportIndex = workflow.indexOf(`dist/reports/${channel}-mac`)
-      const uploadIndex = workflow.indexOf(`name: ${uploadArtifactName}`)
+      const packageIndex = workflow.indexOf(`--mac ${packageArgs}`)
+      const reportIndex = workflow.indexOf(`REPORT_DIR=${macReportDirectory}`)
+      const uploadIndex = workflow.indexOf(`name: ${macReportArtifactName}`)
       const publishIndex = workflow.indexOf(`name: ${publishLabel}`)
 
       expect(packageIndex).toBeGreaterThan(-1)

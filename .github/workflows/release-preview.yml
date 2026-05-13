@@ -135,9 +135,10 @@ jobs:
       - name: Generate macOS preview size reports
         shell: bash
         run: |
-          mkdir -p dist/reports/preview-mac
-          pnpm inventory:packaged dist/mac/Pilog.app > dist/reports/preview-mac/packaged-artifact-inventory.txt
-          pnpm budget:packaged -- dist/mac/Pilog.app --dist-dir dist --output dist/reports/preview-mac/packaged-size-budget-report.json > dist/reports/preview-mac/packaged-size-budget-report.txt
+          REPORT_DIR=dist/reports/preview-mac
+          mkdir -p "$REPORT_DIR"
+          pnpm inventory:packaged dist/mac/Pilog.app > "$REPORT_DIR/packaged-artifact-inventory.txt"
+          pnpm budget:packaged -- dist/mac/Pilog.app --dist-dir dist --output "$REPORT_DIR/packaged-size-budget-report.json" > "$REPORT_DIR/packaged-size-budget-report.txt"
 
       - name: Upload macOS preview size reports
         uses: actions/upload-artifact@v4
@@ -153,7 +154,13 @@ jobs:
           TAG: ${{ needs.validate.outputs.tag }}
         run: |
           shopt -s nullglob
-          release_files=(dist/*.dmg dist/*.dmg.blockmap dist/*-mac.zip dist/*-mac.zip.blockmap dist/preview-mac.yml)
+          release_files=(
+            dist/*.dmg
+            dist/*.dmg.blockmap
+            dist/*-mac.zip
+            dist/*-mac.zip.blockmap
+            dist/preview-mac.yml
+          )
           if ((${#release_files[@]} == 0)); then
             echo "::error::No macOS preview release files found in dist."
             exit 1
@@ -214,9 +221,10 @@ jobs:
       - name: Generate Windows preview size reports
         shell: bash
         run: |
-          mkdir -p dist/reports/preview-win
-          pnpm inventory:packaged dist/win-unpacked > dist/reports/preview-win/packaged-artifact-inventory.txt
-          pnpm budget:packaged -- dist/win-unpacked --dist-dir dist --output dist/reports/preview-win/packaged-size-budget-report.json > dist/reports/preview-win/packaged-size-budget-report.txt
+          REPORT_DIR=dist/reports/preview-win
+          mkdir -p "$REPORT_DIR"
+          pnpm inventory:packaged dist/win-unpacked > "$REPORT_DIR/packaged-artifact-inventory.txt"
+          pnpm budget:packaged -- dist/win-unpacked --dist-dir dist --output "$REPORT_DIR/packaged-size-budget-report.json" > "$REPORT_DIR/packaged-size-budget-report.txt"
 
       - name: Upload Windows preview size reports
         uses: actions/upload-artifact@v4
@@ -232,7 +240,11 @@ jobs:
           TAG: ${{ needs.validate.outputs.tag }}
         run: |
           shopt -s nullglob
-          release_files=(dist/*Setup.exe dist/*Setup.exe.blockmap dist/preview.yml)
+          release_files=(
+            dist/*Setup.exe
+            dist/*Setup.exe.blockmap
+            dist/preview.yml
+          )
           if ((${#release_files[@]} == 0)); then
             echo "::error::No Windows preview release files found in dist."
             exit 1
@@ -293,9 +305,10 @@ jobs:
       - name: Generate Linux preview size reports
         shell: bash
         run: |
-          mkdir -p dist/reports/preview-linux
-          pnpm inventory:packaged dist/linux-unpacked > dist/reports/preview-linux/packaged-artifact-inventory.txt
-          pnpm budget:packaged -- dist/linux-unpacked --dist-dir dist --output dist/reports/preview-linux/packaged-size-budget-report.json > dist/reports/preview-linux/packaged-size-budget-report.txt
+          REPORT_DIR=dist/reports/preview-linux
+          mkdir -p "$REPORT_DIR"
+          pnpm inventory:packaged dist/linux-unpacked > "$REPORT_DIR/packaged-artifact-inventory.txt"
+          pnpm budget:packaged -- dist/linux-unpacked --dist-dir dist --output "$REPORT_DIR/packaged-size-budget-report.json" > "$REPORT_DIR/packaged-size-budget-report.txt"
 
       - name: Upload Linux preview size reports
         uses: actions/upload-artifact@v4
@@ -311,7 +324,12 @@ jobs:
           TAG: ${{ needs.validate.outputs.tag }}
         run: |
           shopt -s nullglob
-          release_files=(dist/*.AppImage dist/*.AppImage.blockmap dist/*.deb dist/preview-linux.yml)
+          release_files=(
+            dist/*.AppImage
+            dist/*.AppImage.blockmap
+            dist/*.deb
+            dist/preview-linux.yml
+          )
           if ((${#release_files[@]} == 0)); then
             echo "::error::No Linux preview release files found in dist."
             exit 1

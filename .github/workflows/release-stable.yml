@@ -132,9 +132,10 @@ jobs:
       - name: Generate macOS size reports
         shell: bash
         run: |
-          mkdir -p dist/reports/stable-mac
-          pnpm inventory:packaged dist/mac/Pilog.app > dist/reports/stable-mac/packaged-artifact-inventory.txt
-          pnpm budget:packaged -- dist/mac/Pilog.app --dist-dir dist --output dist/reports/stable-mac/packaged-size-budget-report.json > dist/reports/stable-mac/packaged-size-budget-report.txt
+          REPORT_DIR=dist/reports/stable-mac
+          mkdir -p "$REPORT_DIR"
+          pnpm inventory:packaged dist/mac/Pilog.app > "$REPORT_DIR/packaged-artifact-inventory.txt"
+          pnpm budget:packaged -- dist/mac/Pilog.app --dist-dir dist --output "$REPORT_DIR/packaged-size-budget-report.json" > "$REPORT_DIR/packaged-size-budget-report.txt"
 
       - name: Upload macOS size reports
         uses: actions/upload-artifact@v4
@@ -151,7 +152,13 @@ jobs:
           TAG: ${{ needs.validate.outputs.tag }}
         run: |
           shopt -s nullglob
-          release_files=(dist/*.dmg dist/*.dmg.blockmap dist/*-mac.zip dist/*-mac.zip.blockmap dist/latest-mac.yml)
+          release_files=(
+            dist/*.dmg
+            dist/*.dmg.blockmap
+            dist/*-mac.zip
+            dist/*-mac.zip.blockmap
+            dist/latest-mac.yml
+          )
           if ((${#release_files[@]} == 0)); then
             echo "::error::No macOS release files found in dist."
             exit 1
@@ -212,9 +219,10 @@ jobs:
       - name: Generate Windows size reports
         shell: bash
         run: |
-          mkdir -p dist/reports/stable-win
-          pnpm inventory:packaged dist/win-unpacked > dist/reports/stable-win/packaged-artifact-inventory.txt
-          pnpm budget:packaged -- dist/win-unpacked --dist-dir dist --output dist/reports/stable-win/packaged-size-budget-report.json > dist/reports/stable-win/packaged-size-budget-report.txt
+          REPORT_DIR=dist/reports/stable-win
+          mkdir -p "$REPORT_DIR"
+          pnpm inventory:packaged dist/win-unpacked > "$REPORT_DIR/packaged-artifact-inventory.txt"
+          pnpm budget:packaged -- dist/win-unpacked --dist-dir dist --output "$REPORT_DIR/packaged-size-budget-report.json" > "$REPORT_DIR/packaged-size-budget-report.txt"
 
       - name: Upload Windows size reports
         uses: actions/upload-artifact@v4
@@ -230,7 +238,11 @@ jobs:
           TAG: ${{ needs.validate.outputs.tag }}
         run: |
           shopt -s nullglob
-          release_files=(dist/*Setup.exe dist/*Setup.exe.blockmap dist/latest.yml)
+          release_files=(
+            dist/*Setup.exe
+            dist/*Setup.exe.blockmap
+            dist/latest.yml
+          )
           if ((${#release_files[@]} == 0)); then
             echo "::error::No Windows release files found in dist."
             exit 1
@@ -291,9 +303,10 @@ jobs:
       - name: Generate Linux size reports
         shell: bash
         run: |
-          mkdir -p dist/reports/stable-linux
-          pnpm inventory:packaged dist/linux-unpacked > dist/reports/stable-linux/packaged-artifact-inventory.txt
-          pnpm budget:packaged -- dist/linux-unpacked --dist-dir dist --output dist/reports/stable-linux/packaged-size-budget-report.json > dist/reports/stable-linux/packaged-size-budget-report.txt
+          REPORT_DIR=dist/reports/stable-linux
+          mkdir -p "$REPORT_DIR"
+          pnpm inventory:packaged dist/linux-unpacked > "$REPORT_DIR/packaged-artifact-inventory.txt"
+          pnpm budget:packaged -- dist/linux-unpacked --dist-dir dist --output "$REPORT_DIR/packaged-size-budget-report.json" > "$REPORT_DIR/packaged-size-budget-report.txt"
 
       - name: Upload Linux size reports
         uses: actions/upload-artifact@v4
@@ -309,7 +322,12 @@ jobs:
           TAG: ${{ needs.validate.outputs.tag }}
         run: |
           shopt -s nullglob
-          release_files=(dist/*.AppImage dist/*.AppImage.blockmap dist/*.deb dist/latest-linux.yml)
+          release_files=(
+            dist/*.AppImage
+            dist/*.AppImage.blockmap
+            dist/*.deb
+            dist/latest-linux.yml
+          )
           if ((${#release_files[@]} == 0)); then
             echo "::error::No Linux release files found in dist."
             exit 1
