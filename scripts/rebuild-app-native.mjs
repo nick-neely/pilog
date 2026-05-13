@@ -1,4 +1,4 @@
-import electronPackage from 'electron/package.json'
+import electronPackage from 'electron/package.json' with { type: 'json' }
 import { spawnSync } from 'node:child_process'
 import { resolve } from 'node:path'
 

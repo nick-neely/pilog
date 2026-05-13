@@ -43,6 +43,7 @@ Use skills to keep implementation aligned with PiLog’s design system and shadc
 
 - Prefer incremental polish over a full UI redesign when feedback is localized to one surface (for example the Repositories New Issue dialog).
 - For sidebar and status-filter polish across Inbox, Runs, and Drafts, treat Inbox as the default visual standard unless the user specifies otherwise.
+- Status filters across Inbox, Runs, and Drafts should be clearable; the cleared state shows all statuses instead of forcing a default selection.
 
 ## Learned Workspace Facts
 
@@ -52,3 +53,8 @@ Use skills to keep implementation aligned with PiLog’s design system and shadc
 - The `.sandcastle/Dockerfile` image is a long-lived sandbox (`sleep infinity`); typical workflow is build, run with the repo mounted at `/home/agent/workspace`, then use `docker exec` for a shell (unless Sandcastle CLI drives mounts for you).
 - Sandcastle’s ready hook runs `CI=true PILOG_SANDBOX=1 pnpm install`, which skips `app:rebuild` (avoids flaky `electronjs.org` fetches during `electron-rebuild`). Normal install on the host or for e2e should not rely on `PILOG_SANDBOX` alone: run a full install/rebuild (`pnpm install` without that flag or `pnpm run app:install` / `app:rebuild`) so `better-sqlite3` matches Electron’s ABI.
 - In `src/shared/ipc.ts`, optional invoke payloads should be modeled as `T | undefined`, not `T | void`, so handlers line up with optional repository arguments and IDE TypeScript agrees with CLI checks.
+- `PILOG_BUNDLED_GITHUB_CLIENT_ID` is the GitHub OAuth app Client ID for packaged device-flow builds; local dev can use `GITHUB_CLIENT_ID`, and client secrets only belong to the optional loopback flow.
+- `SANDCASTLE_MAX_PARALLEL_ISSUES` caps the number of issues emitted by one planner result; if the planner returns one issue, Sandcastle runs one issue even when the cap is higher.
+- Sandcastle dependency ordering is inferred from issue body text returned by `gh issue list`; use explicit sections like `Blocked by` / `Blocks` because GitHub native parent relationships are not validated by the runner.
+- In renderer UI, prefer shadcn/Radix `Tooltip` over native `title` attributes for controls so the app avoids double tooltips and keeps styled accessible hints.
+- Renderer TypeScript can flag `for...of` over `Set`/`Map` iterators; prefer `Array.from(...)` or `.forEach(...)` when touching iterator-heavy code.

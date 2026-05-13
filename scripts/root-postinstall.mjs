@@ -1,12 +1,9 @@
 import { spawnSync } from 'node:child_process'
 
-// Root postinstall: link app deps, then optionally rebuild better-sqlite3 for Electron.
+// Root postinstall: optionally rebuild better-sqlite3 for Electron.
 // Sandcastle and other Docker sandboxes set PILOG_SANDBOX=1 to skip app:rebuild so
 // install does not require network access to Electron download hosts (electron-rebuild).
-// --ignore-workspace: `app/` lives under the monorepo root but is not listed in
-// pnpm-workspace.yaml. Without this flag, `pnpm install` in app climbs to the
-// workspace root and re-runs the root postinstall (infinite recursion).
-const pnpmCommands = [['--dir', 'app', 'install', '--ignore-workspace']]
+const pnpmCommands = []
 
 if (!process.env.PILOG_SANDBOX) {
   pnpmCommands.push(['run', 'app:rebuild'])
@@ -23,7 +20,14 @@ const spawnEnv = (() => {
 })()
 
 for (const args of pnpmCommands) {
-  const result = spawnSync('pnpm', args, { stdio: 'inherit', env: spawnEnv })
+  const result = spawnSync('pnpm', args, {
+    stdio: 'inherit',
+    env: spawnEnv,
+    shell: process.platform === 'win32'
+  })
+  if (result.error) {
+    throw result.error
+  }
   if (result.status) {
     process.exit(result.status ?? 1)
   }

@@ -15,6 +15,7 @@ asarUnpack:
   - '**/*.node'
   - '**/node_modules/@vscode/ripgrep/bin/**'
   - resources/**
+afterPack: ./scripts/verify-packaged-runtime.cjs
 publish:
   provider: github
   owner: nick-neely
