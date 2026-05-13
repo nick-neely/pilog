@@ -4,7 +4,7 @@ import {
   ELECTRON_DRAG_REGION_CLASS,
   ELECTRON_NO_DRAG_REGION_CLASS,
   MAIN_WINDOW_CHROME_HEIGHT_PX,
-  MAIN_WINDOW_CONTROL_INSET_CLASS,
+  MAIN_WINDOW_CONTROL_REGION_INSET,
   MAIN_WINDOW_CONTROL_REGION_WIDTH_PX,
   MAIN_WINDOW_TITLE_BAR_OVERLAY,
   MODAL_CHROME_SCRIM_CLASS
@@ -14,8 +14,8 @@ describe('window chrome contract', () => {
   it('keeps Windows-style custom titlebar dimensions aligned with renderer chrome', () => {
     expect(MAIN_WINDOW_CHROME_HEIGHT_PX).toBe(48)
     expect(MAIN_WINDOW_CONTROL_REGION_WIDTH_PX).toBe(144)
-    expect(MAIN_WINDOW_CONTROL_INSET_CLASS).toBe('pr-36')
-    expect(MAIN_WINDOW_TITLE_BAR_OVERLAY).toMatchObject({
+    expect(MAIN_WINDOW_CONTROL_REGION_INSET).toBe(`${MAIN_WINDOW_CONTROL_REGION_WIDTH_PX}px`)
+    expect(MAIN_WINDOW_TITLE_BAR_OVERLAY).toEqual({
       color: '#00000000',
       symbolColor: '#38322b',
       height: MAIN_WINDOW_CHROME_HEIGHT_PX

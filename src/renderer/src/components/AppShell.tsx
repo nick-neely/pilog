@@ -8,7 +8,7 @@ import { PILOG_APP_SHORTCUTS, shortcutBindingMeta } from '@renderer/shortcuts/pi
 import {
   ELECTRON_DRAG_REGION_CLASS,
   ELECTRON_NO_DRAG_REGION_CLASS,
-  MAIN_WINDOW_CONTROL_INSET_CLASS
+  MAIN_WINDOW_CONTROL_REGION_INSET
 } from '@shared/window-chrome'
 import type { ReactNode } from 'react'
 
@@ -54,9 +54,9 @@ export function AppShell({
   return (
     <div className="flex h-screen flex-col bg-background text-foreground">
       <header
+        style={{ paddingRight: MAIN_WINDOW_CONTROL_REGION_INSET }}
         className={cn(
           'flex h-12 shrink-0 items-center gap-4 bg-background pl-4',
-          MAIN_WINDOW_CONTROL_INSET_CLASS,
           ELECTRON_DRAG_REGION_CLASS
         )}
       >
