@@ -139,6 +139,8 @@ This is enforced **inside each tool's `execute` body**, not in the prompt. Promp
 
 **Tool execution mode:** `parallel` for read tools (stateless reads, no shared mutable state, parallel I/O speeds the run); the exit tool is a singleton terminator.
 
+**Repository access descriptor:** every repo operation starts from the descriptor produced by repository linking. Host-local repos use the displayed filesystem path directly. WSL repos carry the displayed UNC path plus the selected distro and Linux path, and tools execute through `wsl.exe` argument arrays. Do not hand-roll UNC parsing in future repo features; route reads, Git metadata, issue-template lookup, runtime readiness, and file/path affordances through the repository access descriptor so Windows-installed Pilog keeps working with WSL-hosted projects.
+
 Rationale:
 
 - This trades model output quality (models bench higher with `bash` available) for a real read-only-by-construction security property. We accept this trade for MVP and revisit if Phase 4–6 integration testing shows the agent hitting tool-shape limitations.

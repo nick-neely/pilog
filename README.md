@@ -30,11 +30,22 @@ pnpm --version
 
 Pilog checks these in Settings before repository linking and draft generation:
 
-- **Windows:** Git for Windows must be installed and `git` must be on `PATH`. Secure storage uses Windows DPAPI through Electron `safeStorage`; sign into Windows normally and avoid running Pilog in a locked-down service session.
+- **Windows:** Git for Windows must be installed and `git` must be on `PATH` for Windows-local repositories. Secure storage uses Windows DPAPI through Electron `safeStorage`; sign into Windows normally and avoid running Pilog in a locked-down service session. Windows-installed Pilog can link GitHub repositories hosted in WSL when WSL is installed and the selected distro is reachable.
 - **macOS:** Xcode Command Line Tools or Git must provide `git` on `PATH`. Secure storage uses Keychain through Electron `safeStorage`; allow Pilog to use Keychain when prompted.
 - **Linux:** `git` must be installed through your distribution package manager. Secure storage needs a desktop keyring available to Electron, typically GNOME Keyring or KWallet with `libsecret`. Headless sessions, minimal containers, and some WSL2 setups may not expose a keyring.
 - **Linked repositories:** linked local repository folders must still exist and be readable by your user account.
 - **Bundled repo tooling:** Pilog ships its own repo-search tooling and Pi runtime packages. If Settings reports these missing, reinstall Pilog.
+
+### Windows App With WSL Repositories
+
+Windows-installed Pilog can link GitHub repositories hosted in WSL. Enter or choose either supported UNC path form:
+
+- `\\wsl.localhost\<distro>\...`
+- `\\wsl$\<distro>\...`
+
+Git must be installed inside the selected WSL distro because Pilog reads Git metadata through that distro, not through Git for Windows. For draft generation, Pilog reads the live local WSL working tree through the persisted repository access descriptor. It does not upload, sync, copy, or mutate the repository.
+
+Common WSL recovery states are reported directly: WSL unavailable, distro unavailable, Git missing in the distro, missing path, not a Git repo, no origin, and unmatched GitHub repo. Fix the named prerequisite, then choose the repository again or reload runtime readiness from Settings.
 
 ## Setup
 
