@@ -3,7 +3,13 @@ import { mkdtempSync, rmSync, writeFileSync } from 'fs'
 import { execSync } from 'child_process'
 import { join } from 'path'
 import { tmpdir } from 'os'
-import { readLocalGitMetadata, isGitRepo, parseRepoAccessDescriptor, readGitMetadata } from './git'
+import {
+  readLocalGitMetadata,
+  isGitRepo,
+  parseRepoAccessDescriptor,
+  readGitMetadata,
+  readGitMetadataResult
+} from './git'
 
 describe('readLocalGitMetadata', () => {
   let repoDir: string
@@ -143,5 +149,81 @@ describe('readGitMetadata', () => {
       'rev-parse',
       '--is-inside-work-tree'
     ])
+  })
+
+  it('classifies WSL prerequisite and repository failures precisely', async () => {
+    const access = {
+      kind: 'wsl' as const,
+      displayPath: '\\\\wsl.localhost\\Ubuntu\\home\\n\\missing',
+      distro: 'Ubuntu',
+      linuxPath: '/home/n/missing'
+    }
+
+    const cases = [
+      {
+        stderr: 'The system cannot find the file specified',
+        code: 'ENOENT',
+        reason: 'wsl-unavailable'
+      },
+      {
+        stderr: 'There is no distribution with the supplied name.',
+        code: undefined,
+        reason: 'distro-unavailable'
+      },
+      {
+        stderr: 'execvpe(/usr/bin/git) failed: No such file or directory',
+        code: undefined,
+        reason: 'git-missing'
+      },
+      {
+        stderr: 'The directory name is invalid.',
+        code: undefined,
+        reason: 'path-missing'
+      },
+      {
+        stderr: 'fatal: not a git repository (or any of the parent directories): .git',
+        code: undefined,
+        reason: 'not-git'
+      }
+    ] as const
+
+    for (const item of cases) {
+      const execFile = vi.fn(async () => {
+        const error = new Error(item.stderr) as Error & { stderr: string; code?: string }
+        error.stderr = item.stderr
+        error.code = item.code
+        throw error
+      })
+
+      await expect(readGitMetadataResult(access, { execFile })).resolves.toEqual({
+        state: 'wsl-failure',
+        reason: item.reason,
+        access
+      })
+    }
+  })
+
+  it('classifies a WSL repo with no origin remote separately from a non-repo', async () => {
+    const access = {
+      kind: 'wsl' as const,
+      displayPath: '\\\\wsl.localhost\\Ubuntu\\home\\n\\dev\\pilog',
+      distro: 'Ubuntu',
+      linuxPath: '/home/n/dev/pilog'
+    }
+    const execFile = vi.fn(async (_file: string, args: string[]) => {
+      const gitArgs = args.slice(args.indexOf('git') + 1)
+      if (gitArgs.join(' ') === 'rev-parse --is-inside-work-tree') {
+        return { stdout: 'true\n', stderr: '' }
+      }
+      const error = new Error("fatal: No such remote 'origin'") as Error & { stderr: string }
+      error.stderr = "fatal: No such remote 'origin'"
+      throw error
+    })
+
+    await expect(readGitMetadataResult(access, { execFile })).resolves.toEqual({
+      state: 'wsl-failure',
+      reason: 'no-origin',
+      access
+    })
   })
 })

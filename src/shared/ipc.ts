@@ -121,6 +121,15 @@ export type RepoAccessDescriptor =
   | { kind: 'host'; displayPath: string }
   | { kind: 'wsl'; displayPath: string; distro: string; linuxPath: string }
 
+export type WslRepoDetectionFailureReason =
+  | 'wsl-unavailable'
+  | 'distro-unavailable'
+  | 'git-missing'
+  | 'path-missing'
+  | 'not-git'
+  | 'no-origin'
+  | 'unmatched'
+
 export type RepoAutoPublishSettings = Pick<
   Repo,
   | 'autoPublishEnabled'
@@ -166,6 +175,12 @@ export type DetectLocalRepoResult =
   | { state: 'not-git' }
   | { state: 'no-remote' }
   | { state: 'unmatched'; remoteUrl: string }
+  | {
+      state: 'wsl-failure'
+      reason: WslRepoDetectionFailureReason
+      access: Extract<RepoAccessDescriptor, { kind: 'wsl' }>
+      remoteUrl?: string
+    }
   | {
       state: 'matched'
       remoteUrl: string

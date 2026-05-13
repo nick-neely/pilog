@@ -12,6 +12,7 @@ vi.mock('./git', () => ({
     displayPath: localPath
   })),
   readGitMetadata: vi.fn(),
+  readGitMetadataResult: vi.fn(),
   parseGitHubOwnerRepo: vi.fn()
 }))
 
@@ -43,6 +44,7 @@ describe('local-repo-service', () => {
     readLocalGitMetadata: ReturnType<typeof vi.fn>
     parseRepoAccessDescriptor: ReturnType<typeof vi.fn>
     readGitMetadata: ReturnType<typeof vi.fn>
+    readGitMetadataResult: ReturnType<typeof vi.fn>
     parseGitHubOwnerRepo: ReturnType<typeof vi.fn>
   }
   let clientMock: {
@@ -65,6 +67,10 @@ describe('local-repo-service', () => {
     gitMock = (await import('./git')) as unknown as typeof gitMock
     clientMock = (await import('../github/client')) as unknown as typeof clientMock
     readinessMock = (await import('../runtime-readiness')) as unknown as typeof readinessMock
+    gitMock.parseRepoAccessDescriptor.mockImplementation((localPath: string) => ({
+      kind: 'host',
+      displayPath: localPath
+    }))
     readinessMock.getRuntimeReadiness.mockResolvedValue({ ready: true, items: {} })
     readinessMock.getBlockingRuntimeReadinessMessage.mockReturnValue(null)
     service = await import('./local-repo-service')
@@ -177,10 +183,13 @@ describe('local-repo-service', () => {
       }
       clientMock.getOctokitClient.mockReturnValue({})
       gitMock.parseRepoAccessDescriptor.mockReturnValue(access)
-      gitMock.readGitMetadata.mockResolvedValue({
-        remoteUrl: 'https://github.com/nick-neely/pilog.git',
-        defaultBranch: 'main',
-        headSha: 'wslhead'
+      gitMock.readGitMetadataResult.mockResolvedValue({
+        state: 'metadata',
+        metadata: {
+          remoteUrl: 'https://github.com/nick-neely/pilog.git',
+          defaultBranch: 'main',
+          headSha: 'wslhead'
+        }
       })
       gitMock.parseGitHubOwnerRepo.mockReturnValue({ owner: 'nick-neely', name: 'pilog' })
       clientMock.listRepos.mockResolvedValue([mockGitHubRepo])
@@ -189,7 +198,7 @@ describe('local-repo-service', () => {
 
       expect(gitMock.isGitRepo).not.toHaveBeenCalled()
       expect(gitMock.readLocalGitMetadata).not.toHaveBeenCalled()
-      expect(gitMock.readGitMetadata).toHaveBeenCalledWith(access)
+      expect(gitMock.readGitMetadataResult).toHaveBeenCalledWith(access)
       expect(result).toEqual({
         state: 'matched',
         remoteUrl: 'https://github.com/nick-neely/pilog.git',
@@ -197,6 +206,83 @@ describe('local-repo-service', () => {
         headSha: 'wslhead',
         githubRepo: mockGitHubRepo,
         access
+      })
+    })
+
+    it('returns a precise WSL failure when Git is missing inside the selected distro', async () => {
+      const access = {
+        kind: 'wsl' as const,
+        displayPath: '\\\\wsl.localhost\\Ubuntu\\home\\neely\\dev\\pilog',
+        distro: 'Ubuntu',
+        linuxPath: '/home/neely/dev/pilog'
+      }
+      clientMock.getOctokitClient.mockReturnValue({})
+      gitMock.parseRepoAccessDescriptor.mockReturnValue(access)
+      gitMock.readGitMetadataResult.mockResolvedValue({
+        state: 'wsl-failure',
+        reason: 'git-missing',
+        access
+      })
+
+      const result = await service.detectLocalRepo(access.displayPath)
+
+      expect(result).toEqual({
+        state: 'wsl-failure',
+        reason: 'git-missing',
+        access
+      })
+      expect(gitMock.isGitRepo).not.toHaveBeenCalled()
+      expect(clientMock.listRepos).not.toHaveBeenCalled()
+    })
+
+    it('returns a precise WSL failure when the WSL repo has no origin', async () => {
+      const access = {
+        kind: 'wsl' as const,
+        displayPath: '\\\\wsl.localhost\\Ubuntu\\home\\neely\\dev\\pilog',
+        distro: 'Ubuntu',
+        linuxPath: '/home/neely/dev/pilog'
+      }
+      clientMock.getOctokitClient.mockReturnValue({})
+      gitMock.parseRepoAccessDescriptor.mockReturnValue(access)
+      gitMock.readGitMetadataResult.mockResolvedValue({
+        state: 'wsl-failure',
+        reason: 'no-origin',
+        access
+      })
+
+      await expect(service.detectLocalRepo(access.displayPath)).resolves.toEqual({
+        state: 'wsl-failure',
+        reason: 'no-origin',
+        access
+      })
+      expect(clientMock.listRepos).not.toHaveBeenCalled()
+    })
+
+    it('returns a WSL unmatched failure when the WSL origin is not visible to GitHub', async () => {
+      const access = {
+        kind: 'wsl' as const,
+        displayPath: '\\\\wsl.localhost\\Ubuntu\\home\\neely\\dev\\pilog',
+        distro: 'Ubuntu',
+        linuxPath: '/home/neely/dev/pilog'
+      }
+      clientMock.getOctokitClient.mockReturnValue({})
+      gitMock.parseRepoAccessDescriptor.mockReturnValue(access)
+      gitMock.readGitMetadataResult.mockResolvedValue({
+        state: 'metadata',
+        metadata: {
+          remoteUrl: 'https://github.com/other/project.git',
+          defaultBranch: 'main',
+          headSha: 'wslhead'
+        }
+      })
+      gitMock.parseGitHubOwnerRepo.mockReturnValue({ owner: 'other', name: 'project' })
+      clientMock.listRepos.mockResolvedValue([mockGitHubRepo])
+
+      await expect(service.detectLocalRepo(access.displayPath)).resolves.toEqual({
+        state: 'wsl-failure',
+        reason: 'unmatched',
+        access,
+        remoteUrl: 'https://github.com/other/project.git'
       })
     })
 

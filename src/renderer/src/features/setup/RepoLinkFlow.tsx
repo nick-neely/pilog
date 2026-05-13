@@ -3,6 +3,7 @@ import { Button } from '@renderer/components/ui/button'
 import type { DetectLocalRepoResult, GitHubRepo, RepoAccessDescriptor } from '@shared/ipc'
 import { useState } from 'react'
 import { getErrorMessage } from '../recovery-state'
+import { getDetectResultRecoveryContent } from './repo-link-copy'
 
 type AddRepoState =
   | { step: 'idle' }
@@ -26,12 +27,25 @@ function DetectResultInline({
   onGitHubRequired?: () => void
   githubRequiredLabel?: string
 }): React.JSX.Element {
-  if (result.state === 'runtime-blocked') {
+  const recovery = getDetectResultRecoveryContent(localPath, result)
+
+  if (recovery) {
+    const showGitHubAction = result.state === 'unauthenticated' && onGitHubRequired
+
     return (
       <Alert variant="destructive">
         <AlertDescription>
-          <span className="block">{result.message}</span>
-          {onGitHubRequired ? (
+          {recovery.path ? <span className="block font-mono text-xs">{recovery.path}</span> : null}
+          {recovery.remoteUrl ? (
+            <span className="block font-mono text-xs">Remote: {recovery.remoteUrl}</span>
+          ) : null}
+          <span className={recovery.path || recovery.remoteUrl ? 'mt-1 block' : 'block'}>
+            {recovery.message}
+          </span>
+          {recovery.recoveryAction ? (
+            <span className="mt-1 block text-muted-foreground">{recovery.recoveryAction}</span>
+          ) : null}
+          {showGitHubAction ? (
             <Button
               type="button"
               variant="outline"
@@ -47,57 +61,7 @@ function DetectResultInline({
     )
   }
 
-  if (result.state === 'unauthenticated') {
-    return (
-      <Alert variant="destructive">
-        <AlertDescription>
-          <span className="block">Connect your GitHub account before adding a repository.</span>
-          {onGitHubRequired ? (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="mt-2"
-              onClick={onGitHubRequired}
-            >
-              {githubRequiredLabel}
-            </Button>
-          ) : null}
-        </AlertDescription>
-      </Alert>
-    )
-  }
-
-  if (result.state === 'not-git') {
-    return (
-      <Alert variant="destructive">
-        <AlertDescription>
-          <span className="font-mono text-xs">{localPath}</span> is not a Git repository.
-        </AlertDescription>
-      </Alert>
-    )
-  }
-
-  if (result.state === 'no-remote') {
-    return (
-      <Alert variant="destructive">
-        <AlertDescription>
-          <span className="font-mono text-xs">{localPath}</span> has no origin remote configured.
-        </AlertDescription>
-      </Alert>
-    )
-  }
-
-  if (result.state === 'unmatched') {
-    return (
-      <Alert variant="destructive">
-        <AlertDescription>
-          Remote <span className="font-mono text-xs">{result.remoteUrl}</span> does not match any
-          GitHub repository visible to your account.
-        </AlertDescription>
-      </Alert>
-    )
-  }
+  if (result.state !== 'matched') return <></>
 
   const { githubRepo, defaultBranch } = result
   return (

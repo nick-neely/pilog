@@ -3,7 +3,7 @@ import {
   readLocalGitMetadata,
   parseGitHubOwnerRepo,
   parseRepoAccessDescriptor,
-  readGitMetadata,
+  readGitMetadataResult,
   type LocalGitMetadata
 } from './git'
 import { getOctokitClient, listLabels, listRepos } from '../github/client'
@@ -35,7 +35,9 @@ export async function detectLocalRepo(localPath: string): Promise<DetectLocalRep
 
   let metadata: LocalGitMetadata | null
   if (access.kind === 'wsl') {
-    metadata = await readGitMetadata(access)
+    const result = await readGitMetadataResult(access)
+    if (result.state === 'wsl-failure') return result
+    metadata = result.state === 'metadata' ? result.metadata : null
   } else {
     const gitRepo = await isGitRepo(access.displayPath)
     if (!gitRepo) return { state: 'not-git' }
@@ -44,7 +46,11 @@ export async function detectLocalRepo(localPath: string): Promise<DetectLocalRep
   if (!metadata) return { state: 'no-remote' }
 
   const parsed = parseGitHubOwnerRepo(metadata.remoteUrl)
-  if (!parsed) return { state: 'unmatched', remoteUrl: metadata.remoteUrl }
+  if (!parsed) {
+    return access.kind === 'wsl'
+      ? { state: 'wsl-failure', reason: 'unmatched', access, remoteUrl: metadata.remoteUrl }
+      : { state: 'unmatched', remoteUrl: metadata.remoteUrl }
+  }
 
   const githubRepos = await listRepos()
   const matched = githubRepos.find(
@@ -53,7 +59,11 @@ export async function detectLocalRepo(localPath: string): Promise<DetectLocalRep
       r.name.toLowerCase() === parsed.name.toLowerCase()
   )
 
-  if (!matched) return { state: 'unmatched', remoteUrl: metadata.remoteUrl }
+  if (!matched) {
+    return access.kind === 'wsl'
+      ? { state: 'wsl-failure', reason: 'unmatched', access, remoteUrl: metadata.remoteUrl }
+      : { state: 'unmatched', remoteUrl: metadata.remoteUrl }
+  }
 
   return {
     state: 'matched',
