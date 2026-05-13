@@ -1,6 +1,6 @@
 import { chmod, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { createRequire } from 'node:module'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import {
@@ -167,14 +167,40 @@ describe('packaged artifact inventory', () => {
     expect(report).toContain('Required runtime assets')
   })
 
+  it('locates unpacked runtime assets under macOS Contents/Resources', async () => {
+    const appOutDir = join(tmpDir, 'mac', 'Pilog.app')
+    const resourcesDir = join(appOutDir, 'Contents', 'Resources')
+    const asarSource = join(tmpDir, 'asar-macos')
+
+    await writeFixtureFile(asarSource, 'out/main/index.js', 'main')
+    await mkdir(resourcesDir, { recursive: true })
+    await asar.createPackage(asarSource, join(resourcesDir, 'app.asar'))
+    await writeFixtureFile(
+      resourcesDir,
+      'app.asar.unpacked/node_modules/better-sqlite3/build/Release/better_sqlite3.node',
+      'native'
+    )
+
+    const inventory = await collectPackagedArtifactInventory(appOutDir)
+
+    expect(
+      inventory.requiredRuntimeAssets.find((asset) => asset.id === 'sqlite-native')
+    ).toMatchObject({
+      present: true,
+      location: 'asar-unpacked',
+      path: 'Contents/Resources/app.asar.unpacked/node_modules/better-sqlite3/build/Release/better_sqlite3.node'
+    })
+  })
+
   it('resolves the current platform unpacked build under dist by default', () => {
     const distDir = join(tmpDir, 'dist')
-    const expected =
-      process.platform === 'win32'
-        ? join(distDir, 'win-unpacked')
-        : process.platform === 'darwin'
-          ? join(distDir, 'mac', 'Pilog.app')
-          : join(distDir, 'linux-unpacked')
+    let expected = join(distDir, 'linux-unpacked')
+    if (process.platform === 'win32') {
+      expected = join(distDir, 'win-unpacked')
+    }
+    if (process.platform === 'darwin') {
+      expected = join(distDir, 'mac', 'Pilog.app')
+    }
 
     expect(resolvePackagedAppOutDir(distDir)).toBe(expected)
   })
@@ -197,6 +223,6 @@ async function writeFixtureFile(
   content: string
 ): Promise<void> {
   const destination = join(root, ...relativePath.split('/'))
-  await mkdir(join(destination, '..'), { recursive: true })
+  await mkdir(dirname(destination), { recursive: true })
   await writeFile(destination, content)
 }

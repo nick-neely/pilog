@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs'
 import { readdir, stat } from 'node:fs/promises'
 import { createRequire } from 'node:module'
-import { basename, join, relative, resolve, sep } from 'node:path'
+import { basename, dirname, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const require = createRequire(import.meta.url)
@@ -86,6 +86,11 @@ interface DirectorySize {
   sizeBytes: number
 }
 
+interface LocatedPackagedPath {
+  location: InventoryLocation
+  path: string | null
+}
+
 const RUNTIME_DEPENDENCIES: Array<{
   name: string
   purpose: string
@@ -158,13 +163,6 @@ export function resolvePackagedAppOutDir(inputPath = 'dist'): string {
     return absoluteInput
   }
 
-  const platformDefault =
-    process.platform === 'win32'
-      ? join(absoluteInput, 'win-unpacked')
-      : process.platform === 'darwin'
-        ? join(absoluteInput, 'mac', 'Pilog.app')
-        : join(absoluteInput, 'linux-unpacked')
-
   if (existsSync(join(absoluteInput, 'resources', 'app.asar'))) {
     return absoluteInput
   }
@@ -172,7 +170,7 @@ export function resolvePackagedAppOutDir(inputPath = 'dist'): string {
     return absoluteInput
   }
 
-  return platformDefault
+  return resolveDefaultPlatformAppOutDir(absoluteInput)
 }
 
 export async function collectPackagedArtifactInventory(
@@ -215,16 +213,8 @@ export async function collectPackagedArtifactInventory(
     },
     nativeAndExecutablePayloads: findNativeAndExecutablePayloads(physicalFiles),
     forbiddenFindings: findForbiddenFindings(physicalFiles, asarEntries, options),
-    runtimeDependencies: summarizeRuntimeDependencies(
-      asarEntries,
-      physicalFiles,
-      resolvedAppOutDir
-    ),
-    requiredRuntimeAssets: summarizeRequiredRuntimeAssets(
-      asarEntries,
-      physicalFiles,
-      resolvedAppOutDir
-    )
+    runtimeDependencies: summarizeRuntimeDependencies(asarEntries, physicalFiles, resourcesDir),
+    requiredRuntimeAssets: summarizeRequiredRuntimeAssets(asarEntries, physicalFiles, resourcesDir)
   }
 }
 
@@ -290,6 +280,18 @@ function resolveResourcesDir(appOutDir: string): string {
       .map((candidate) => join(candidate, 'app.asar'))
       .join(', ')}`
   )
+}
+
+function resolveDefaultPlatformAppOutDir(distDir: string): string {
+  if (process.platform === 'win32') {
+    return join(distDir, 'win-unpacked')
+  }
+
+  if (process.platform === 'darwin') {
+    return join(distDir, 'mac', 'Pilog.app')
+  }
+
+  return join(distDir, 'linux-unpacked')
 }
 
 async function collectPhysicalFiles(rootDir: string): Promise<PhysicalFile[]> {
@@ -426,7 +428,7 @@ function classifyForbiddenPath(
 function summarizeRuntimeDependencies(
   asarEntries: Set<string>,
   physicalFiles: PhysicalFile[],
-  appOutDir: string
+  resourcesDir: string
 ): RuntimeDependencySummary[] {
   return RUNTIME_DEPENDENCIES.map((dependency) => {
     if (dependency.name === 'electron.safeStorage') {
@@ -440,7 +442,7 @@ function summarizeRuntimeDependencies(
     }
 
     const packagePath = `node_modules/${dependency.name}/package.json`
-    const located = locatePackagedPath(packagePath, asarEntries, physicalFiles, appOutDir)
+    const located = locatePackagedPath(packagePath, asarEntries, physicalFiles, resourcesDir)
     return {
       name: dependency.name,
       present: located.location !== 'missing',
@@ -454,11 +456,11 @@ function summarizeRuntimeDependencies(
 function summarizeRequiredRuntimeAssets(
   asarEntries: Set<string>,
   physicalFiles: PhysicalFile[],
-  appOutDir: string
+  resourcesDir: string
 ): RequiredRuntimeAssetSummary[] {
   return REQUIRED_RUNTIME_ASSETS.map((asset) => {
     const locatedCandidates = asset.candidates.map((candidate) =>
-      locatePackagedPath(candidate, asarEntries, physicalFiles, appOutDir)
+      locatePackagedPath(candidate, asarEntries, physicalFiles, resourcesDir)
     )
     const found = locatedCandidates.find((candidate) => candidate.location !== 'missing')
     return {
@@ -475,8 +477,8 @@ function locatePackagedPath(
   requestedPath: string,
   asarEntries: Set<string>,
   physicalFiles: PhysicalFile[],
-  appOutDir: string
-): { location: InventoryLocation; path: string | null } {
+  resourcesDir: string
+): LocatedPackagedPath {
   const normalized = normalizePath(requestedPath)
   if (normalized.startsWith('app.asar/')) {
     const asarPath = normalized.replace(/^app\.asar\//, '')
@@ -498,7 +500,8 @@ function locatePackagedPath(
     }
   }
 
-  const resourcesPath = normalizePath(relative(appOutDir, join(appOutDir, 'resources', normalized)))
+  const appOutDir = resolveAppOutDirFromResourcesDir(resourcesDir)
+  const resourcesPath = normalizePath(relative(appOutDir, join(resourcesDir, normalized)))
   const physicalResourcePath = physicalFiles.find((file) => file.relativePath === resourcesPath)
   if (physicalResourcePath) {
     return {
@@ -508,6 +511,14 @@ function locatePackagedPath(
   }
 
   return { location: 'missing', path: null }
+}
+
+function resolveAppOutDirFromResourcesDir(resourcesDir: string): string {
+  if (basename(resourcesDir) === 'Resources' && basename(dirname(resourcesDir)) === 'Contents') {
+    return resolve(resourcesDir, '..', '..')
+  }
+
+  return dirname(resourcesDir)
 }
 
 function normalizeAsarEntry(entry: string): string {
