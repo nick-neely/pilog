@@ -36,18 +36,18 @@ export function GitHubDeviceCode({
     window.setTimeout(() => setCopied(false), 1500)
   }
 
+  const isCentered = align === 'center'
+
   return (
     <div
       className={cn(
         'flex flex-col gap-3 rounded-md border bg-muted/30 p-4',
-        align === 'center' ? 'items-center text-center' : 'items-start text-left',
+        isCentered ? 'items-center text-center' : 'items-start text-left',
         className
       )}
       aria-live="polite"
     >
-      <div
-        className={cn('flex flex-col gap-1', align === 'center' ? 'items-center' : 'items-start')}
-      >
+      <div className={cn('flex flex-col gap-1', isCentered ? 'items-center' : 'items-start')}>
         <p className="text-sm font-medium text-foreground">Enter this GitHub code</p>
         <p className="max-w-[42ch] text-xs leading-5 text-muted-foreground">{message}</p>
       </div>
@@ -58,7 +58,7 @@ export function GitHubDeviceCode({
         pattern={REGEXP_ONLY_DIGITS_AND_CHARS}
         readOnly
         aria-label={`GitHub device code ${auth.userCode}`}
-        containerClassName="justify-center"
+        containerClassName={isCentered ? 'justify-center' : 'justify-start'}
       >
         <InputOTPGroup>
           {firstGroup.split('').map((_, index) => (
@@ -83,15 +83,15 @@ export function GitHubDeviceCode({
 
       <div
         className={cn(
-          'flex flex-wrap items-center gap-2',
-          align === 'center' ? 'justify-center' : 'justify-start'
+          'flex flex-wrap items-center gap-3',
+          isCentered ? 'justify-center' : 'justify-start'
         )}
       >
         <Button type="button" variant="outline" size="sm" onClick={() => void handleCopy()}>
           <HugeiconsIcon icon={Copy01Icon} data-icon="inline-start" aria-hidden />
           {copied ? 'Copied' : 'Copy code'}
         </Button>
-        <span className="text-xs text-muted-foreground">{auth.verificationUri}</span>
+        <span className="font-mono text-xs text-muted-foreground">{auth.verificationUri}</span>
       </div>
     </div>
   )

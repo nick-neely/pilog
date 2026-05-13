@@ -12,8 +12,8 @@ import {
   Search01Icon
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { Alert, AlertDescription, AlertTitle } from '@renderer/components/ui/alert'
 import { HotkeyInput } from '@renderer/components/HotkeyInput'
+import { Alert, AlertDescription, AlertTitle } from '@renderer/components/ui/alert'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -75,8 +75,8 @@ import {
   isSearchProvider
 } from '@shared/types'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { PiSetupPanel } from '../setup/PiSetupPanel'
 import { GitHubDeviceCode } from '../setup/GitHubDeviceCode'
+import { PiSetupPanel } from '../setup/PiSetupPanel'
 import { useGitHubStatus } from '../setup/use-github-status'
 import { usePiConfig } from '../setup/use-pi-config'
 import { getUpdateStatusView } from './update-status-view'
@@ -641,6 +641,7 @@ export function Settings({
                             <GitHubDeviceCode
                               auth={github.status.auth}
                               align="start"
+                              className="max-w-md"
                               message={githubAuthMessage(github.status.auth) ?? undefined}
                             />
                           ) : (
@@ -687,7 +688,7 @@ export function Settings({
                       variant="ghost"
                       disabled={!onNavigateRepositories}
                       onClick={() => onNavigateRepositories?.()}
-                      className="px-0"
+                      className="justify-start self-start px-0"
                     >
                       Manage repositories &rarr;
                     </Button>
