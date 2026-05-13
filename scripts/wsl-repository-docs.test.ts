@@ -1,31 +1,44 @@
 import { readFile } from 'node:fs/promises'
 import { describe, expect, it } from 'vitest'
 
+const README_WSL_DETAILS = [
+  'Windows-installed Pilog can link GitHub repositories hosted in WSL',
+  '\\\\wsl.localhost\\<distro>\\...',
+  '\\\\wsl$\\<distro>\\...',
+  'Git must be installed inside the selected WSL distro',
+  'reads the live local WSL working tree',
+  'does not upload, sync, copy, or mutate the repository'
+] as const
+
+const README_RECOVERY_STATES = [
+  'WSL unavailable',
+  'distro unavailable',
+  'Git missing in the distro',
+  'missing path',
+  'not a Git repo',
+  'no origin',
+  'unmatched GitHub repo'
+] as const
+
+const ADR_WSL_DETAILS = ['repository access descriptor', 'Do not hand-roll UNC parsing'] as const
+
 describe('WSL repository documentation', () => {
   it('documents Windows-installed Pilog with WSL-hosted repositories', async () => {
-    const readme = await readFile('README.md', 'utf8')
-    const piEmbeddingAdr = await readFile('docs/adr/0005-pi-embedding-strategy.md', 'utf8')
+    const [readme, piEmbeddingAdr] = await Promise.all([
+      readFile('README.md', 'utf8'),
+      readFile('docs/adr/0005-pi-embedding-strategy.md', 'utf8')
+    ])
 
-    expect(readme).toContain('Windows-installed Pilog can link GitHub repositories hosted in WSL')
-    expect(readme).toContain('\\\\wsl.localhost\\<distro>\\...')
-    expect(readme).toContain('\\\\wsl$\\<distro>\\...')
-    expect(readme).toContain('Git must be installed inside the selected WSL distro')
-    expect(readme).toContain('reads the live local WSL working tree')
-    expect(readme).toContain('does not upload, sync, copy, or mutate the repository')
+    for (const requiredText of README_WSL_DETAILS) {
+      expect(readme).toContain(requiredText)
+    }
 
-    for (const recoveryState of [
-      'WSL unavailable',
-      'distro unavailable',
-      'Git missing in the distro',
-      'missing path',
-      'not a Git repo',
-      'no origin',
-      'unmatched GitHub repo'
-    ]) {
+    for (const recoveryState of README_RECOVERY_STATES) {
       expect(readme).toContain(recoveryState)
     }
 
-    expect(piEmbeddingAdr).toContain('repository access descriptor')
-    expect(piEmbeddingAdr).toContain('Do not hand-roll UNC parsing')
+    for (const requiredText of ADR_WSL_DETAILS) {
+      expect(piEmbeddingAdr).toContain(requiredText)
+    }
   })
 })
