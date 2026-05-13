@@ -2,7 +2,7 @@ import type { Repo, RepoAccessDescriptor } from './ipc'
 
 type RepoLocationDisplay = {
   label: string
-  title: string
+  tooltipText: string
   context: string | null
 }
 
@@ -25,14 +25,14 @@ export function formatRepoLocation(repo: Repo): RepoLocationDisplay {
     const label = `WSL ${access.distro}: ${access.linuxPath}`
     return {
       label,
-      title: `${label}\n${access.displayPath}`,
+      tooltipText: `${label}\n${access.displayPath}`,
       context: `Paths are relative to WSL ${access.distro}: ${access.linuxPath}.`
     }
   }
 
   return {
     label: access.displayPath,
-    title: access.displayPath,
+    tooltipText: access.displayPath,
     context: null
   }
 }

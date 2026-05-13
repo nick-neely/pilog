@@ -19,7 +19,7 @@ describe('repo path helpers', () => {
     })
     expect(formatRepoLocation(repo)).toEqual({
       label: 'WSL Ubuntu: /home/neely/dev/pilog',
-      title:
+      tooltipText:
         'WSL Ubuntu: /home/neely/dev/pilog\n\\\\wsl.localhost\\Ubuntu\\home\\neely\\dev\\pilog',
       context: 'Paths are relative to WSL Ubuntu: /home/neely/dev/pilog.'
     })
@@ -31,7 +31,7 @@ describe('repo path helpers', () => {
     expect(repoAccessFromRepo(repo)).toEqual({ kind: 'host', displayPath: '/repo' })
     expect(formatRepoLocation(repo)).toEqual({
       label: '/repo',
-      title: '/repo',
+      tooltipText: '/repo',
       context: null
     })
   })

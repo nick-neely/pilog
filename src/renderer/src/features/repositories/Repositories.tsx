@@ -620,7 +620,7 @@ function RepoRow({
                 </p>
               </TooltipTrigger>
               <TooltipContent className="max-w-lg whitespace-pre-wrap font-mono">
-                {repoLocation.title}
+                {repoLocation.tooltipText}
               </TooltipContent>
             </Tooltip>
             {repo.defaultBranch && (
