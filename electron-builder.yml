@@ -6,6 +6,12 @@ directories:
 files:
   - out/**
   - package.json
+  - '!**/*.map'
+  - '!**/*.tsbuildinfo'
+  - '!**/.DS_Store'
+  - '!**/Thumbs.db'
+  - '!**/{test,tests,__tests__,fixtures,__fixtures__,coverage,.nyc_output,.cache,.vite,.turbo}/**'
+  - '!**/*.{test,spec}.{js,jsx,cjs,mjs,ts,tsx,cts,mts}'
 extraResources:
   - from: resources/icon.png
     to: resources/icon.png

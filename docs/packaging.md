@@ -49,6 +49,28 @@ pnpm inventory:packaged dist/linux-unpacked
 
 Source maps are forbidden by default in the baseline report. Use `-- --allow-source-maps` only when a release intentionally retains them for diagnostics.
 
+## Packaged File Hygiene
+
+Electron Builder excludes release-forbidden file categories before writing the
+packaged app, and the `afterPack` verifier fails the build if any still ship in
+`app.asar` or `app.asar.unpacked`.
+
+Forbidden categories are:
+
+- tests and specs (`test`, `tests`, `__tests__`, `*.test.*`, `*.spec.*`)
+- fixtures (`fixtures`, `__fixtures__`)
+- development caches (`.cache`, `.vite`, `.turbo`)
+- build leftovers (`*.tsbuildinfo`, `.DS_Store`, `Thumbs.db`, `coverage`, `.nyc_output`)
+- source maps, unless an intentional diagnostic release changes the package
+  file rules and sets `PILOG_ALLOW_PACKAGED_SOURCE_MAPS=1`
+
+Allowed exceptions remain limited to files needed at runtime: compiled app
+output, runtime package metadata/dependencies, SQLite native bindings, Pi
+packages, repo-search executables, updater support, app icons, and tray
+resources. The verifier still reports native and executable payloads through
+the inventory and size-budget output so changes to unpacked runtime payloads are
+visible during release review.
+
 ## Packaged Size Budgets
 
 After `pnpm build:unpack`, run the non-blocking size comparison:

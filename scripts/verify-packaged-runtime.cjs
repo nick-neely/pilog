@@ -23,6 +23,8 @@ const REQUIRED_IMPORTS = [
   '@earendil-works/pi-coding-agent'
 ]
 
+const HYGIENE_SOURCE_MAP_ENV = 'PILOG_ALLOW_PACKAGED_SOURCE_MAPS'
+
 function resolveResourcesDir(appOutDir) {
   const candidates = [join(appOutDir, 'resources'), join(appOutDir, 'Contents', 'Resources')]
   const resourcesDir = candidates.find((candidate) => existsSync(join(candidate, 'app.asar')))
@@ -66,6 +68,10 @@ function findNestedAppAsar(rootDir, depth = 0) {
 }
 
 function verifyPackagedRuntime(appOutDir, options = {}) {
+  enforcePackagedFileHygiene(appOutDir, {
+    allowSourceMaps: options.allowSourceMaps ?? process.env[HYGIENE_SOURCE_MAP_ENV] === '1'
+  })
+
   const resourcesDir = resolveResourcesDir(appOutDir)
   const appAsar = join(resourcesDir, 'app.asar')
   const entries = new Set(listPackage(appAsar).map(normalizeAsarEntry))
@@ -103,6 +109,118 @@ function verifyPackagedRuntime(appOutDir, options = {}) {
   verifyPackagedImports(appAsar)
 
   console.log('[verify-packaged-runtime] required runtime files and imports are packaged')
+}
+
+function enforcePackagedFileHygiene(appOutDir, options = {}) {
+  const violations = findPackagedFileHygieneViolations(appOutDir, options)
+
+  if (violations.length === 0) {
+    console.log('[verify-packaged-runtime] packaged file hygiene rules passed')
+    return
+  }
+
+  const formattedViolations = violations
+    .map((violation) => `- ${violation.category}: ${violation.location} ${violation.path}`)
+    .join('\n')
+
+  throw new Error(
+    [
+      'Packaged file hygiene check failed. The packaged app includes files that are not allowed in release artifacts:',
+      formattedViolations,
+      '',
+      'Allowed exceptions remain limited to required runtime dependencies, native bindings, repo-search executables, updater support, and app/tray resources.',
+      `Source maps are excluded by packaging config and blocked here unless an intentional diagnostic release also sets ${HYGIENE_SOURCE_MAP_ENV}=1.`
+    ].join('\n')
+  )
+}
+
+function findPackagedFileHygieneViolations(appOutDir, options = {}) {
+  const resourcesDir = resolveResourcesDir(appOutDir)
+  const appAsar = join(resourcesDir, 'app.asar')
+  const violations = []
+
+  for (const entry of listPackage(appAsar)) {
+    const comparablePath = normalizeAsarEntry(entry).replace(/^\/+/, '')
+    const violation = classifyForbiddenPackagedPath(
+      comparablePath,
+      `app.asar/${comparablePath}`,
+      'asar',
+      options
+    )
+    if (violation) violations.push(violation)
+  }
+
+  for (const file of collectPhysicalPackagedFiles(appOutDir)) {
+    const normalized = normalizePath(file)
+    if (normalized.endsWith('/app.asar') || normalized === 'app.asar') continue
+
+    const violation = classifyForbiddenPackagedPath(normalized, normalized, 'file-system', options)
+    if (violation) violations.push(violation)
+  }
+
+  return violations.sort(
+    (a, b) => a.category.localeCompare(b.category) || a.path.localeCompare(b.path)
+  )
+}
+
+function collectPhysicalPackagedFiles(rootDir) {
+  const files = []
+
+  function visit(currentDir) {
+    for (const entry of readdirSync(currentDir)) {
+      const fullPath = join(currentDir, entry)
+      const info = statSync(fullPath)
+      if (info.isDirectory()) {
+        visit(fullPath)
+        continue
+      }
+      if (info.isFile()) {
+        files.push(normalizePath(fullPath.slice(rootDir.length + 1)))
+      }
+    }
+  }
+
+  visit(rootDir)
+  return files
+}
+
+function classifyForbiddenPackagedPath(comparablePath, reportPath, location, options) {
+  const path = normalizePath(comparablePath)
+  const segments = path.split('/')
+  const fileName = segments.at(-1) || ''
+
+  if (
+    segments.some((segment) => segment === '__tests__' || segment === 'tests' || segment === 'test')
+  ) {
+    return { category: 'tests', path: reportPath, location }
+  }
+  if (/\.(test|spec)\.[cm]?[jt]sx?$/.test(fileName)) {
+    return { category: 'tests', path: reportPath, location }
+  }
+  if (segments.some((segment) => segment === 'fixtures' || segment === '__fixtures__')) {
+    return { category: 'fixtures', path: reportPath, location }
+  }
+  if (
+    segments.some(
+      (segment) => segment === '.cache' || segment === '.vite' || segment === '.turbo'
+    ) ||
+    path.includes('/node_modules/.cache/')
+  ) {
+    return { category: 'development-caches', path: reportPath, location }
+  }
+  if (!options.allowSourceMaps && fileName.endsWith('.map')) {
+    return { category: 'source-maps', path: reportPath, location }
+  }
+  if (
+    fileName.endsWith('.tsbuildinfo') ||
+    fileName === '.DS_Store' ||
+    fileName === 'Thumbs.db' ||
+    segments.some((segment) => segment === 'coverage' || segment === '.nyc_output')
+  ) {
+    return { category: 'build-leftovers', path: reportPath, location }
+  }
+
+  return null
 }
 
 function resolveRequiredRipgrepBinary(resourcesDir, { platform, arch }) {
@@ -174,8 +292,12 @@ function verifyPackagedImports(appAsar) {
 }
 
 function normalizeAsarEntry(entry) {
-  const normalized = entry.replaceAll('\\', '/')
+  const normalized = normalizePath(entry)
   return normalized.startsWith('/') ? normalized : `/${normalized}`
+}
+
+function normalizePath(path) {
+  return path.replaceAll('\\', '/')
 }
 
 async function afterPack(context) {
@@ -187,6 +309,8 @@ async function afterPack(context) {
 
 module.exports = afterPack
 module.exports.verifyPackagedRuntime = verifyPackagedRuntime
+module.exports.enforcePackagedFileHygiene = enforcePackagedFileHygiene
+module.exports.findPackagedFileHygieneViolations = findPackagedFileHygieneViolations
 
 if (require.main === module) {
   const appOutDir = process.argv[2]
