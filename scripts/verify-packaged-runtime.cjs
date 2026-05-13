@@ -1,5 +1,5 @@
-const { existsSync } = require('node:fs')
-const { join } = require('node:path')
+const { existsSync, readdirSync, statSync } = require('node:fs')
+const { dirname, join } = require('node:path')
 const { listPackage } = require('@electron/asar')
 
 const REQUIRED_ASAR_ENTRIES = [
@@ -15,21 +15,48 @@ function resolveResourcesDir(appOutDir) {
   const candidates = [join(appOutDir, 'resources'), join(appOutDir, 'Contents', 'Resources')]
   const resourcesDir = candidates.find((candidate) => existsSync(join(candidate, 'app.asar')))
 
-  if (!resourcesDir) {
-    throw new Error(
-      `Could not find packaged app.asar. Checked: ${candidates
-        .map((candidate) => join(candidate, 'app.asar'))
-        .join(', ')}`
-    )
+  if (resourcesDir) {
+    return resourcesDir
   }
 
-  return resourcesDir
+  const nestedAppAsar = findNestedAppAsar(appOutDir)
+
+  if (nestedAppAsar) {
+    return dirname(nestedAppAsar)
+  }
+
+  throw new Error(
+    `Could not find packaged app.asar. Checked: ${candidates
+      .map((candidate) => join(candidate, 'app.asar'))
+      .join(', ')}`
+  )
+}
+
+function findNestedAppAsar(rootDir, depth = 0) {
+  if (depth > 4 || !existsSync(rootDir)) {
+    return null
+  }
+
+  for (const entry of readdirSync(rootDir)) {
+    const fullPath = join(rootDir, entry)
+    if (entry === 'app.asar') {
+      return fullPath
+    }
+    if (statSync(fullPath).isDirectory()) {
+      const nested = findNestedAppAsar(fullPath, depth + 1)
+      if (nested) {
+        return nested
+      }
+    }
+  }
+
+  return null
 }
 
 function verifyPackagedRuntime(appOutDir) {
   const resourcesDir = resolveResourcesDir(appOutDir)
   const appAsar = join(resourcesDir, 'app.asar')
-  const entries = new Set(listPackage(appAsar))
+  const entries = new Set(listPackage(appAsar).map(normalizeAsarEntry))
   const missingEntries = REQUIRED_ASAR_ENTRIES.filter((entry) => !entries.has(entry))
   const sqliteNative = join(
     resourcesDir,
@@ -54,6 +81,11 @@ function verifyPackagedRuntime(appOutDir) {
   }
 
   console.log('[verify-packaged-runtime] required runtime files are packaged')
+}
+
+function normalizeAsarEntry(entry) {
+  const normalized = entry.replaceAll('\\', '/')
+  return normalized.startsWith('/') ? normalized : `/${normalized}`
 }
 
 async function afterPack(context) {
