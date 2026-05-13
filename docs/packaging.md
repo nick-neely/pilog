@@ -58,3 +58,32 @@ This creates an unpacked Electron Builder output and verifies that the packaged 
 - `@vscode/ripgrep` from `app.asar.unpacked`
 
 The packaged smoke uses `PILOG_DEBUG_IPC=1` and a temporary `PILOG_USER_DATA` directory. Debug IPC must remain unavailable unless `PILOG_DEBUG_IPC=1` is set.
+
+## Packaged Performance Baseline
+
+Run against an existing unpacked Electron Builder output:
+
+```bash
+pnpm perf:packaged -- --app-out-dir dist/linux-unpacked
+```
+
+Or build the unpacked app first and then measure it:
+
+```bash
+pnpm perf:packaged:build
+```
+
+The runner launches the packaged app outside the dev server and writes
+`dist/packaged-performance-baseline.json` by default. The JSON report includes
+app/build metadata, diagnostic context, and timings for:
+
+- cold launch to usable Inbox window
+- Scratchpad open from the packaged application menu path
+- note creation and listing
+- fixture-backed Agent Run to generated draft
+- Draft Review navigation
+
+These timings are informational baselines, not budgets. Local machine noise
+should not fail ordinary development. Like the packaged smoke, the runner uses
+`PILOG_DEBUG_IPC=1` with temporary app data so it can seed fixture notes and run
+the agent path without live provider credentials.

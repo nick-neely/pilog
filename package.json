@@ -39,6 +39,8 @@
     "quality:prompt": "tsx src/main/pi/prompt-quality-loop.cli.ts",
     "test:e2e": "playwright test",
     "test:e2e:packaged": "pnpm run build:unpack && playwright test e2e/packaged-runtime.spec.ts",
+    "perf:packaged": "node scripts/packaged-performance.cjs",
+    "perf:packaged:build": "pnpm run build:unpack && pnpm run perf:packaged",
     "build:checksums": "tsx scripts/generate-checksums.ts",
     "release:bump": "node scripts/bump-release.mjs",
     "generate:manifest": "tsx scripts/generate-release-manifest.ts"
