@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { cn } from '@renderer/lib/utils'
+import { ELECTRON_NO_DRAG_REGION_CLASS } from '@shared/window-chrome'
 
 // Pilog's app-level view nav. Lives in the global top bar (see AppShell);
 // the sidebar deliberately doesn't render this so view chrome and view
@@ -105,6 +106,7 @@ function ViewTabItem({
           data-testid={testId}
           className={cn(
             sharedTextClasses,
+            ELECTRON_NO_DRAG_REGION_CLASS,
             'cursor-pointer rounded-sm text-muted-foreground hover:text-foreground',
             'focus-visible:text-foreground focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/30'
           )}

@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest'
+import { readFileSync } from 'fs'
+import { join } from 'path'
 
 import {
   ELECTRON_DRAG_REGION_CLASS,
@@ -23,8 +25,16 @@ describe('window chrome contract', () => {
   })
 
   it('names drag and no-drag regions explicitly for Electron hit testing', () => {
-    expect(ELECTRON_DRAG_REGION_CLASS).toContain('app-region:drag')
-    expect(ELECTRON_NO_DRAG_REGION_CLASS).toContain('app-region:no-drag')
+    expect(ELECTRON_DRAG_REGION_CLASS).toBe('electron-window-drag-region')
+    expect(ELECTRON_NO_DRAG_REGION_CLASS).toBe('electron-window-no-drag-region')
+  })
+
+  it('defines emitted renderer CSS for Electron hit testing', () => {
+    const css = readFileSync(join(process.cwd(), 'src/renderer/src/assets/main.css'), 'utf8')
+    expect(css).toContain(`.${ELECTRON_DRAG_REGION_CLASS}`)
+    expect(css).toContain('-webkit-app-region: drag')
+    expect(css).toContain(`.${ELECTRON_NO_DRAG_REGION_CLASS}`)
+    expect(css).toContain('-webkit-app-region: no-drag')
   })
 
   it('uses a full-surface tonal scrim for modal overlays', () => {

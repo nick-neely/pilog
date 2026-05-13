@@ -60,7 +60,12 @@ export function AppShell({
           ELECTRON_DRAG_REGION_CLASS
         )}
       >
-        <div className={cn('min-w-0 shrink', ELECTRON_NO_DRAG_REGION_CLASS)}>
+        <div
+          className={cn(
+            'min-w-0 shrink',
+            navigationSlot ? ELECTRON_NO_DRAG_REGION_CLASS : ELECTRON_DRAG_REGION_CLASS
+          )}
+        >
           {navigationSlot ??
             (tabs && activeTab ? (
               <ViewTabs tabs={tabs} active={activeTab} onChange={onTabChange} />

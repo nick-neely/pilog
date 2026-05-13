@@ -10,8 +10,8 @@ export const MAIN_WINDOW_TITLE_BAR_OVERLAY = {
   height: MAIN_WINDOW_CHROME_HEIGHT_PX
 } as const
 
-export const ELECTRON_DRAG_REGION_CLASS = '[-webkit-app-region:drag]'
-export const ELECTRON_NO_DRAG_REGION_CLASS = '[-webkit-app-region:no-drag]'
+export const ELECTRON_DRAG_REGION_CLASS = 'electron-window-drag-region'
+export const ELECTRON_NO_DRAG_REGION_CLASS = 'electron-window-no-drag-region'
 
 export const MODAL_CHROME_SCRIM_CLASS =
   'fixed inset-0 z-50 bg-foreground/40 duration-100 dark:bg-background/70'
