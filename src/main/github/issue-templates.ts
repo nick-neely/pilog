@@ -42,6 +42,8 @@ type IssueTemplateLookupDeps = {
 const ISSUE_TEMPLATE_DIR = path.join('.github', 'ISSUE_TEMPLATE')
 const SINGLE_ISSUE_TEMPLATE = path.join('.github', 'ISSUE_TEMPLATE.md')
 const CONFIG_TEMPLATE_NAMES = new Set(['config.yml', 'config.yaml'])
+const WSL_TEMPLATE_COMMAND_TIMEOUT_MS = 10000
+const WSL_TEMPLATE_COMMAND_MAX_BUFFER = 1024 * 1024
 
 export function listLocalIssueTemplates(repoPath: string): GitHubIssueTemplate[] {
   return listIssueTemplates(repoPath)
@@ -52,7 +54,7 @@ export function listIssueTemplates(
   deps: IssueTemplateLookupDeps = {}
 ): GitHubIssueTemplate[] {
   const access = resolveIssueTemplateAccess(input)
-  const fileSystem = deps.fileSystem ?? createIssueTemplateFileSystem(access, deps)
+  const fileSystem = deps.fileSystem ?? createIssueTemplateFileSystem(access, deps.execFileSync)
   const templates: GitHubIssueTemplate[] = []
 
   try {
@@ -67,14 +69,7 @@ export function listIssueTemplates(
         .sort((a, b) => a.localeCompare(b))
 
       for (const file of templateFiles) {
-        const relativePath = path.join(ISSUE_TEMPLATE_DIR, file)
-        const content = fileSystem.readFile(relativePath)
-
-        if (isYamlTemplate(file)) {
-          templates.push(parseYamlIssueTemplate(relativePath, content))
-        } else {
-          templates.push(parseMarkdownIssueTemplate(relativePath, content))
-        }
+        templates.push(readIssueTemplateFile(fileSystem, file))
       }
     }
 
@@ -173,6 +168,20 @@ function parseYamlIssueTemplate(relativePath: string, content: string): GitHubIs
     title: readTopLevelValue(lines, 'title'),
     body: renderYamlIssueFormBody(lines).trim()
   }
+}
+
+function readIssueTemplateFile(
+  fileSystem: IssueTemplateFileSystem,
+  fileName: string
+): GitHubIssueTemplate {
+  const relativePath = path.join(ISSUE_TEMPLATE_DIR, fileName)
+  const content = fileSystem.readFile(relativePath)
+
+  if (isYamlTemplate(fileName)) {
+    return parseYamlIssueTemplate(relativePath, content)
+  }
+
+  return parseMarkdownIssueTemplate(relativePath, content)
 }
 
 function parseFrontMatter(content: string): FrontMatter {
@@ -365,10 +374,10 @@ function resolveIssueTemplateAccess(input: IssueTemplateLookupInput): RepoAccess
 
 function createIssueTemplateFileSystem(
   access: RepoAccessDescriptor,
-  deps: IssueTemplateLookupDeps
+  runExecFileSync?: ExecFileSync
 ): IssueTemplateFileSystem {
   if (access.kind === 'host') return createHostIssueTemplateFileSystem(access.displayPath)
-  return createWslIssueTemplateFileSystem(access, deps.execFileSync ?? execFileSync)
+  return createWslIssueTemplateFileSystem(access, runExecFileSync ?? execFileSync)
 }
 
 function createHostIssueTemplateFileSystem(repoPath: string): IssueTemplateFileSystem {
@@ -399,8 +408,8 @@ function createWslIssueTemplateFileSystem(
       runExecFileSync('wsl.exe', ['-d', access.distro, '--cd', access.linuxPath, '--', ...args], {
         encoding: 'utf8',
         windowsHide: true,
-        timeout: 10000,
-        maxBuffer: 1024 * 1024
+        timeout: WSL_TEMPLATE_COMMAND_TIMEOUT_MS,
+        maxBuffer: WSL_TEMPLATE_COMMAND_MAX_BUFFER
       })
     )
 
@@ -443,16 +452,15 @@ function createWslIssueTemplateFileSystem(
 }
 
 function normalizeRelativeTemplatePath(relativePath: string): string {
-  return relativePath.split(path.sep).join('/')
+  return normalizeTemplatePath(relativePath)
 }
 
 function isExpectedMissingPathError(error: unknown): boolean {
-  return (
-    typeof error === 'object' &&
-    error !== null &&
-    'status' in error &&
-    (error as { status?: unknown }).status === 1
-  )
+  return hasExitStatus(error) && error.status === 1
+}
+
+function hasExitStatus(error: unknown): error is { status: unknown } {
+  return typeof error === 'object' && error !== null && 'status' in error
 }
 
 function formatErrorMessage(error: unknown): string {

@@ -227,9 +227,11 @@ describe('local GitHub issue templates', () => {
       distro: 'Ubuntu',
       linuxPath: '/home/neely/missing'
     }
-    const fileSystem = createMockTemplateFileSystem({})
-    fileSystem.isDirectory = () => {
-      throw new Error('WSL path is unavailable')
+    const fileSystem: IssueTemplateFileSystem = {
+      ...createMockTemplateFileSystem({}),
+      isDirectory() {
+        throw new Error('WSL path is unavailable')
+      }
     }
 
     expect(() => resolveDefaultIssueTemplate(access, { fileSystem })).toThrow(
