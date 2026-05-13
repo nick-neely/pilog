@@ -77,9 +77,8 @@ import type { LabelMatch } from '@shared/labels'
 import {
   completeOnboardingState,
   confirmHotkeyOnboardingState,
-  DEFAULT_ONBOARDING_STATE,
   getCompletedOnboardingSteps,
-  getCurrentOnboardingStep,
+  getVisibleOnboardingStep,
   ONBOARDING_STEP_ORDER,
   resumeOnboardingState,
   skipOnboardingState,
@@ -1429,7 +1428,7 @@ export function Inbox({
   onNavigateToAgentRuns: (runId?: string, origin?: RunNavigationOrigin) => void
 }): React.JSX.Element {
   const [notes, setNotes] = useState<Note[]>([])
-  const [onboardingState, setOnboardingState] = useState<OnboardingState>(DEFAULT_ONBOARDING_STATE)
+  const [onboardingState, setOnboardingState] = useState<OnboardingState | null>(null)
   const [onboardingNotes, setOnboardingNotes] = useState<Note[]>([])
   const [onboardingDrafts, setOnboardingDrafts] = useState<IssueDraftForReview[]>([])
   const [onboardingHotkey, setOnboardingHotkey] = useState<string | null>(null)
@@ -1482,7 +1481,7 @@ export function Inbox({
     }),
     [githubStatus, onboardingDrafts, onboardingNotes, piStatus, repos]
   )
-  const onboardingStep = getCurrentOnboardingStep(onboardingState, onboardingSignals)
+  const onboardingStep = getVisibleOnboardingStep(onboardingState, onboardingSignals)
 
   useEffect(() => {
     mountedRef.current = true
@@ -1621,6 +1620,7 @@ export function Inbox({
   }, [])
 
   const handleConfirmHotkey = useCallback(async (): Promise<void> => {
+    if (!onboardingState) return
     if (onboardingHotkeyEdited && onboardingHotkeyDraft !== (onboardingHotkey ?? '')) {
       await window.pilog.invoke('setting:set', {
         key: 'hotkey.scratchpad',
@@ -1653,10 +1653,12 @@ export function Inbox({
   }, [onboardingHotkeyDraft])
 
   const handleSkipOnboarding = useCallback((): void => {
+    if (!onboardingState) return
     void persistOnboardingState(skipOnboardingState(onboardingState))
   }, [onboardingState, persistOnboardingState])
 
   const handleResumeOnboarding = useCallback((): void => {
+    if (!onboardingState) return
     void persistOnboardingState(resumeOnboardingState(onboardingState))
   }, [onboardingState, persistOnboardingState])
 
@@ -1900,7 +1902,7 @@ export function Inbox({
               publishError: null
             })
           } else {
-            if (!onboardingState.completed) {
+            if (onboardingState && !onboardingState.completed) {
               await persistOnboardingState(completeOnboardingState(onboardingState))
             }
             clearSelection()
@@ -1990,7 +1992,7 @@ export function Inbox({
   }
 
   const handleOpenOnboardingDrafts = useCallback(async (): Promise<void> => {
-    if (!onboardingState.completed) {
+    if (onboardingState && !onboardingState.completed) {
       await persistOnboardingState(completeOnboardingState(onboardingState))
     }
     clearSelection()
@@ -2078,7 +2080,7 @@ export function Inbox({
 
   return (
     <div className="flex h-full bg-background text-foreground">
-      {onboardingStep && !onboardingState.skipped ? (
+      {onboardingStep && onboardingState ? (
         <OnboardingPanel
           key={onboardingStep}
           state={onboardingState}
@@ -2542,7 +2544,7 @@ export function Inbox({
                 <EmptyDescription className="max-w-[36ch]">
                   {detailEmptyDescription}
                 </EmptyDescription>
-                {!onboardingState.completed && onboardingState.skipped ? (
+                {onboardingState && !onboardingState.completed && onboardingState.skipped ? (
                   <Button
                     variant="link"
                     size="sm"

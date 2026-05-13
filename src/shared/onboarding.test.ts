@@ -6,6 +6,7 @@ import {
   completeOnboardingState,
   confirmHotkeyOnboardingState,
   getCurrentOnboardingStep,
+  getVisibleOnboardingStep,
   getCompletedOnboardingSteps,
   parseOnboardingState,
   resumeOnboardingState,
@@ -136,6 +137,16 @@ describe('onboarding state', () => {
         })
       )
     ).toBeNull()
+  })
+
+  it('only exposes onboarding UI after persisted state says it is needed', () => {
+    const completed = completeOnboardingState(DEFAULT_ONBOARDING_STATE)
+    const skipped = skipOnboardingState(DEFAULT_ONBOARDING_STATE)
+
+    expect(getVisibleOnboardingStep(null, signals())).toBeNull()
+    expect(getVisibleOnboardingStep(completed, signals())).toBeNull()
+    expect(getVisibleOnboardingStep(skipped, signals())).toBeNull()
+    expect(getVisibleOnboardingStep(DEFAULT_ONBOARDING_STATE, signals())).toBe('hotkey')
   })
 
   it('reports completed setup steps from persisted and local app state', () => {

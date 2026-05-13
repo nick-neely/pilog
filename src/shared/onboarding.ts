@@ -152,3 +152,11 @@ export function getCurrentOnboardingStep(
   if (signals.drafts.length === 0) return 'draft'
   return 'review'
 }
+
+export function getVisibleOnboardingStep(
+  state: OnboardingState | null,
+  signals: OnboardingSignals
+): OnboardingStepId | null {
+  if (!state || state.skipped) return null
+  return getCurrentOnboardingStep(state, signals)
+}
