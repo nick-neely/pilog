@@ -1,4 +1,4 @@
-import { safeStorage } from 'electron'
+import { app, safeStorage } from 'electron'
 import { accessSync, constants, existsSync } from 'node:fs'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
@@ -37,6 +37,7 @@ type BundledRepoToolingCheckResult = {
 type RuntimeReadinessDeps = {
   checkGitVersion?: () => Promise<GitVersionCheckResult>
   isSafeStorageAvailable?: () => boolean
+  canUseInsecureCredentialFallback?: () => boolean
   checkRepoAccess?: (path: string) => Promise<{ ok: boolean }>
   checkBundledRepoTooling?: () => Promise<BundledRepoToolingCheckResult>
   now?: () => Date
@@ -51,11 +52,16 @@ export async function getRuntimeReadiness(
     (deps.checkBundledRepoTooling ?? checkBundledRepoTooling)()
   ])
   const isSafeStorageAvailable = deps.isSafeStorageAvailable ?? defaultSafeStorageAvailable
+  const canUseInsecureCredentialFallback =
+    deps.canUseInsecureCredentialFallback ?? defaultCanUseInsecureCredentialFallback
   const repoAccess = await checkLocalRepositories(repos, deps.checkRepoAccess ?? checkRepoAccess)
 
   const items: RuntimeReadiness['items'] = {
     git: buildGitReadinessItem(git),
-    keychain: buildKeychainReadinessItem(isSafeStorageAvailable()),
+    keychain: buildKeychainReadinessItem({
+      safeStorageAvailable: isSafeStorageAvailable(),
+      insecureFallbackAvailable: canUseInsecureCredentialFallback()
+    }),
     localRepositories: buildLocalRepositoriesReadinessItem(repoAccess),
     bundledRepoTooling: buildBundledRepoToolingReadinessItem(bundledRepoTooling)
   }
@@ -100,14 +106,26 @@ function buildGitReadinessItem(git: GitVersionCheckResult): RuntimeReadiness['it
   }
 }
 
-function buildKeychainReadinessItem(isAvailable: boolean): RuntimeReadinessItem {
-  if (!isAvailable) {
+function buildKeychainReadinessItem(input: {
+  safeStorageAvailable: boolean
+  insecureFallbackAvailable: boolean
+}): RuntimeReadinessItem {
+  if (!input.safeStorageAvailable && !input.insecureFallbackAvailable) {
     return {
       status: 'missing',
       label: 'Keychain',
       detail: 'Secure credential storage is unavailable.',
       recoveryAction:
         'Enable your OS keychain or credential manager, then restart Pilog before connecting GitHub or saving Pi credentials.'
+    }
+  }
+
+  if (!input.safeStorageAvailable && input.insecureFallbackAvailable) {
+    return {
+      status: 'ready',
+      label: 'Keychain',
+      detail: 'Development plaintext credential fallback is active.',
+      recoveryAction: NO_ACTION_NEEDED
     }
   }
 
@@ -187,6 +205,10 @@ async function checkGitVersion(): Promise<GitVersionCheckResult> {
 
 function defaultSafeStorageAvailable(): boolean {
   return safeStorage.isEncryptionAvailable()
+}
+
+function defaultCanUseInsecureCredentialFallback(): boolean {
+  return app?.isPackaged !== true || process.env.PILOG_DEBUG_IPC === '1'
 }
 
 async function checkRepoAccess(path: string): Promise<{ ok: boolean }> {

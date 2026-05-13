@@ -47,7 +47,7 @@ export function AppShell({
 
   return (
     <div className="flex h-screen flex-col bg-background text-foreground">
-      <header className="grid h-12 shrink-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-4 border-b bg-background pl-4 pr-36 [-webkit-app-region:drag]">
+      <header className="grid h-12 shrink-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-4 bg-background pl-4 pr-36 [-webkit-app-region:drag]">
         <div className="min-w-0 [-webkit-app-region:no-drag]">
           {navigationSlot ??
             (tabs && activeTab ? (
@@ -91,7 +91,7 @@ export function AppShell({
           </Tooltip>
         </div>
       </header>
-      <div className="min-h-0 flex-1">{children}</div>
+      <div className="min-h-0 flex-1 border-t">{children}</div>
     </div>
   )
 }

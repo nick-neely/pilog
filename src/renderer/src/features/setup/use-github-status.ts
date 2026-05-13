@@ -1,6 +1,7 @@
 import type { GitHubStatus } from '@shared/ipc'
 import { useCallback, useEffect, useState } from 'react'
 import { getErrorMessage } from '../recovery-state'
+import { mergeGitHubAuthProgress } from './github-auth-progress'
 
 export function useGitHubStatus(): {
   status: GitHubStatus | null
@@ -31,20 +32,7 @@ export function useGitHubStatus(): {
 
   useEffect(() => {
     return window.pilog.onGitHubAuthProgress((auth) => {
-      setStatus((current) => {
-        if (
-          current?.auth?.state === 'device_code' &&
-          (auth.state === 'polling' || auth.state === 'slow_down')
-        ) {
-          return current
-        }
-
-        return {
-          connected: current?.connected ?? false,
-          login: current?.login,
-          auth
-        }
-      })
+      setStatus((current) => mergeGitHubAuthProgress(current, auth))
       if (
         auth.state === 'denied' ||
         auth.state === 'expired' ||

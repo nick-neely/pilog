@@ -21,10 +21,25 @@ describe('runtime readiness', () => {
     expect(readiness.items.git.detail).not.toContain('ENOENT')
   })
 
-  it('surfaces unavailable safeStorage as a keychain prerequisite', async () => {
+  it('allows unavailable safeStorage when the development credential fallback is active', async () => {
     const readiness = await getRuntimeReadiness({
       checkGitVersion: vi.fn(async () => ({ ok: true, version: 'git version 2.45.0' })),
       isSafeStorageAvailable: vi.fn(() => false),
+      canUseInsecureCredentialFallback: vi.fn(() => true),
+      checkBundledRepoTooling: vi.fn(async () => ({ ok: true })),
+      checkRepoAccess: vi.fn()
+    })
+
+    expect(readiness.ready).toBe(true)
+    expect(readiness.items.keychain.status).toBe('ready')
+    expect(readiness.items.keychain.detail).toContain('Development plaintext')
+  })
+
+  it('surfaces unavailable safeStorage as a keychain prerequisite in packaged mode', async () => {
+    const readiness = await getRuntimeReadiness({
+      checkGitVersion: vi.fn(async () => ({ ok: true, version: 'git version 2.45.0' })),
+      isSafeStorageAvailable: vi.fn(() => false),
+      canUseInsecureCredentialFallback: vi.fn(() => false),
       checkBundledRepoTooling: vi.fn(async () => ({ ok: true })),
       checkRepoAccess: vi.fn()
     })

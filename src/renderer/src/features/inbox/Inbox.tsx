@@ -109,6 +109,7 @@ import {
 import { PiSetupPanel } from '../setup/PiSetupPanel'
 import { GitHubDeviceCode } from '../setup/GitHubDeviceCode'
 import { RepoLinkFlow } from '../setup/RepoLinkFlow'
+import { mergeGitHubAuthProgress } from '../setup/github-auth-progress'
 import { usePiConfig, type PiConfigState } from '../setup/use-pi-config'
 import { StatusFilter } from './StatusFilter'
 
@@ -1486,11 +1487,7 @@ export function Inbox({
 
   useEffect(() => {
     return window.pilog.onGitHubAuthProgress((auth) => {
-      setGitHubStatus((current) => ({
-        connected: current.connected,
-        login: current.login,
-        auth
-      }))
+      setGitHubStatus((current) => mergeGitHubAuthProgress(current, auth))
     })
   }, [])
 
