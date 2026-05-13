@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+import type { Metadata, MetadataRoute } from 'next'
 
 const SITE_URL = 'https://pilog.dev'
 const SITE_NAME = 'Pilog'
@@ -11,6 +11,33 @@ const OPEN_GRAPH_IMAGE = {
   height: 1000,
   alt: 'Pilog, a local-first developer journal'
 }
+
+const PUBLIC_SITEMAP_ROUTES = [
+  {
+    path: '/',
+    changeFrequency: 'weekly',
+    priority: 1
+  },
+  {
+    path: '/download',
+    changeFrequency: 'weekly',
+    priority: 0.9
+  },
+  {
+    path: '/docs',
+    changeFrequency: 'monthly',
+    priority: 0.7
+  },
+  {
+    path: '/about',
+    changeFrequency: 'yearly',
+    priority: 0.5
+  }
+] satisfies ReadonlyArray<{
+  readonly path: string
+  readonly changeFrequency: MetadataRoute.Sitemap[number]['changeFrequency']
+  readonly priority: number
+}>
 
 type PageMetadataOptions = {
   readonly title: string
@@ -141,3 +168,22 @@ export const previewMetadata: Metadata = createPageMetadata({
   openGraphDescription:
     'Download unsigned Pilog preview builds for testing only. Preview builds are not the stable Public Download Path.'
 })
+
+export function createRobots(): MetadataRoute.Robots {
+  return {
+    rules: {
+      userAgent: '*',
+      allow: '/'
+    },
+    sitemap: `${SITE_URL}/sitemap.xml`,
+    host: SITE_URL
+  }
+}
+
+export function createSitemap(): MetadataRoute.Sitemap {
+  return PUBLIC_SITEMAP_ROUTES.map(({ path, changeFrequency, priority }) => ({
+    url: new URL(path, SITE_URL).toString(),
+    changeFrequency,
+    priority
+  }))
+}

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   aboutMetadata,
+  createRobots,
+  createSitemap,
   docsMetadata,
   downloadMetadata,
   homeMetadata,
@@ -68,5 +70,40 @@ describe('site metadata', () => {
       }
     })
     expect(previewMetadata.description).toContain('unsigned')
+  })
+
+  it('publishes crawler discovery for public site routes', () => {
+    expect(createRobots()).toEqual({
+      rules: {
+        userAgent: '*',
+        allow: '/'
+      },
+      sitemap: 'https://pilog.dev/sitemap.xml',
+      host: 'https://pilog.dev'
+    })
+
+    expect(createSitemap()).toEqual([
+      {
+        url: 'https://pilog.dev/',
+        changeFrequency: 'weekly',
+        priority: 1
+      },
+      {
+        url: 'https://pilog.dev/download',
+        changeFrequency: 'weekly',
+        priority: 0.9
+      },
+      {
+        url: 'https://pilog.dev/docs',
+        changeFrequency: 'monthly',
+        priority: 0.7
+      },
+      {
+        url: 'https://pilog.dev/about',
+        changeFrequency: 'yearly',
+        priority: 0.5
+      }
+    ])
+    expect(createSitemap().map((entry) => entry.url)).not.toContain('https://pilog.dev/preview')
   })
 })
