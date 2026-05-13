@@ -119,7 +119,11 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build app
-        run: pnpm exec electron-vite build
+        env:
+          PILOG_BUNDLED_GITHUB_CLIENT_ID: ${{ vars.PILOG_BUNDLED_GITHUB_CLIENT_ID || secrets.PILOG_BUNDLED_GITHUB_CLIENT_ID }}
+        run: |
+          node -e "if (!(process.env.PILOG_BUNDLED_GITHUB_CLIENT_ID || '').trim()) { console.error('PILOG_BUNDLED_GITHUB_CLIENT_ID is required for packaged GitHub Device Flow. Set it as a repository variable or secret before releasing.'); process.exit(1) }"
+          pnpm exec electron-vite build
 
       - name: Publish macOS artifacts
         # electron-builder creates/finds the GitHub Release for this tag and uploads
@@ -165,7 +169,11 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build app
-        run: pnpm exec electron-vite build
+        env:
+          PILOG_BUNDLED_GITHUB_CLIENT_ID: ${{ vars.PILOG_BUNDLED_GITHUB_CLIENT_ID || secrets.PILOG_BUNDLED_GITHUB_CLIENT_ID }}
+        run: |
+          node -e "if (!(process.env.PILOG_BUNDLED_GITHUB_CLIENT_ID || '').trim()) { console.error('PILOG_BUNDLED_GITHUB_CLIENT_ID is required for packaged GitHub Device Flow. Set it as a repository variable or secret before releasing.'); process.exit(1) }"
+          pnpm exec electron-vite build
 
       - name: Publish Windows artifacts
         # Uploads the NSIS installer (Setup.exe) and latest.yml updater metadata.
@@ -210,7 +218,11 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build app
-        run: pnpm exec electron-vite build
+        env:
+          PILOG_BUNDLED_GITHUB_CLIENT_ID: ${{ vars.PILOG_BUNDLED_GITHUB_CLIENT_ID || secrets.PILOG_BUNDLED_GITHUB_CLIENT_ID }}
+        run: |
+          node -e "if (!(process.env.PILOG_BUNDLED_GITHUB_CLIENT_ID || '').trim()) { console.error('PILOG_BUNDLED_GITHUB_CLIENT_ID is required for packaged GitHub Device Flow. Set it as a repository variable or secret before releasing.'); process.exit(1) }"
+          pnpm exec electron-vite build
 
       - name: Publish Linux artifacts
         # Uploads AppImage, deb and latest-linux.yml updater metadata.

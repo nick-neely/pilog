@@ -10,7 +10,10 @@ export const metadata: Metadata = {
   },
   description:
     'A local-first developer journal for turning rough notes into GitHub-ready issues. Capture in flow, triage at your pace.',
-  metadataBase: new URL('https://pilog.dev')
+  metadataBase: new URL('https://pilog.dev'),
+  appleWebApp: {
+    title: 'Pilog'
+  }
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

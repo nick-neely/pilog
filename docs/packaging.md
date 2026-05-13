@@ -11,6 +11,21 @@ Pilog's primary distribution path is a direct download from `https://pilog.dev`.
 
 ## Build Commands
 
+Packaged builds must receive the public GitHub OAuth client ID at build time so
+Device Flow works without a user-provided secret:
+
+```bash
+PILOG_BUNDLED_GITHUB_CLIENT_ID=... pnpm build:unpack
+PILOG_BUNDLED_GITHUB_CLIENT_ID=... pnpm build:win
+PILOG_BUNDLED_GITHUB_CLIENT_ID=... pnpm build:mac
+PILOG_BUNDLED_GITHUB_CLIENT_ID=... pnpm build:linux
+```
+
+GitHub Actions release workflows read this value from the repository variable
+`PILOG_BUNDLED_GITHUB_CLIENT_ID`, falling back to a repository secret with the
+same name. The value is a public OAuth client ID; no client secret should be
+bundled into distributable builds.
+
 ```bash
 pnpm build:unpack
 pnpm build:win

@@ -1,9 +1,9 @@
-import { defineConfig } from 'eslint/config'
-import tseslint from '@electron-toolkit/eslint-config-ts'
 import eslintConfigPrettier from '@electron-toolkit/eslint-config-prettier'
+import tseslint from '@electron-toolkit/eslint-config-ts'
 import eslintPluginReact from 'eslint-plugin-react'
 import eslintPluginReactHooks from 'eslint-plugin-react-hooks'
 import eslintPluginReactRefresh from 'eslint-plugin-react-refresh'
+import { defineConfig } from 'eslint/config'
 
 export default defineConfig(
   {
@@ -64,6 +64,15 @@ export default defineConfig(
     rules: {
       'react-refresh/only-export-components': 'off',
       '@typescript-eslint/explicit-function-return-type': 'off'
+    }
+  },
+  {
+    // Node CLI/build hooks (.mjs) and electron-builder CJS hooks (.cjs): no TS
+    // signatures; CJS must use require().
+    files: ['scripts/**/*.{mjs,cjs}'],
+    rules: {
+      '@typescript-eslint/explicit-function-return-type': 'off',
+      '@typescript-eslint/no-require-imports': 'off'
     }
   },
   {

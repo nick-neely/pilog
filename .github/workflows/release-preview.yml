@@ -121,7 +121,11 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build app
-        run: pnpm exec electron-vite build
+        env:
+          PILOG_BUNDLED_GITHUB_CLIENT_ID: ${{ vars.PILOG_BUNDLED_GITHUB_CLIENT_ID || secrets.PILOG_BUNDLED_GITHUB_CLIENT_ID }}
+        run: |
+          node -e "if (!(process.env.PILOG_BUNDLED_GITHUB_CLIENT_ID || '').trim()) { console.error('PILOG_BUNDLED_GITHUB_CLIENT_ID is required for packaged GitHub Device Flow. Set it as a repository variable or secret before releasing.'); process.exit(1) }"
+          pnpm exec electron-vite build
 
       - name: Publish macOS preview artifacts
         # Uses electron-builder.preview.yml: channel=preview, releaseType=prerelease.
@@ -167,7 +171,11 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build app
-        run: pnpm exec electron-vite build
+        env:
+          PILOG_BUNDLED_GITHUB_CLIENT_ID: ${{ vars.PILOG_BUNDLED_GITHUB_CLIENT_ID || secrets.PILOG_BUNDLED_GITHUB_CLIENT_ID }}
+        run: |
+          node -e "if (!(process.env.PILOG_BUNDLED_GITHUB_CLIENT_ID || '').trim()) { console.error('PILOG_BUNDLED_GITHUB_CLIENT_ID is required for packaged GitHub Device Flow. Set it as a repository variable or secret before releasing.'); process.exit(1) }"
+          pnpm exec electron-vite build
 
       - name: Publish Windows preview artifacts
         # Uploads Pilog-X.Y.Z-preview.N-Setup.exe and preview.yml updater metadata.
@@ -212,7 +220,11 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build app
-        run: pnpm exec electron-vite build
+        env:
+          PILOG_BUNDLED_GITHUB_CLIENT_ID: ${{ vars.PILOG_BUNDLED_GITHUB_CLIENT_ID || secrets.PILOG_BUNDLED_GITHUB_CLIENT_ID }}
+        run: |
+          node -e "if (!(process.env.PILOG_BUNDLED_GITHUB_CLIENT_ID || '').trim()) { console.error('PILOG_BUNDLED_GITHUB_CLIENT_ID is required for packaged GitHub Device Flow. Set it as a repository variable or secret before releasing.'); process.exit(1) }"
+          pnpm exec electron-vite build
 
       - name: Publish Linux preview artifacts
         # Uploads Pilog-X.Y.Z-preview.N.AppImage, .deb and preview-linux.yml.
