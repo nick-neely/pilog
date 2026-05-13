@@ -6,14 +6,24 @@ import rawManifest from '../data/release-manifest.json'
 
 const SITE_URL = 'https://pilog.dev'
 const SITE_NAME = 'Pilog'
+const ROOT_TITLE = 'Pilog: Local-first developer journal'
 const DEFAULT_DESCRIPTION =
   'Pilog is the Public Download Path for a local-first developer journal that captures rough notes and turns them into GitHub-ready issues.'
 
-const OPEN_GRAPH_IMAGE = {
-  url: '/pi-icon.png',
-  width: 1000,
-  height: 1000,
-  alt: 'Pilog, a local-first developer journal'
+const PREVIEW_IMAGE_DETAILS = {
+  width: 1200,
+  height: 630,
+  alt: 'Pilog preview: a warm parchment note stack with a Reading-Room Moss pi mark'
+}
+
+const OPEN_GRAPH_PREVIEW_IMAGE = {
+  url: '/opengraph-image.jpg',
+  ...PREVIEW_IMAGE_DETAILS
+}
+
+const TWITTER_PREVIEW_IMAGE = {
+  url: '/twitter-image.jpg',
+  ...PREVIEW_IMAGE_DETAILS
 }
 
 const PUBLIC_SITEMAP_ROUTES = [
@@ -137,6 +147,36 @@ type PageMetadataOptions = {
   readonly robots?: Metadata['robots']
 }
 
+type SocialPreviewMetadataOptions = {
+  readonly url: string
+  readonly title: string
+  readonly description: string
+}
+
+function createSocialPreviewMetadata({
+  url,
+  title,
+  description
+}: SocialPreviewMetadataOptions): Pick<Metadata, 'openGraph' | 'twitter'> {
+  return {
+    openGraph: {
+      type: 'website',
+      locale: 'en_US',
+      url,
+      siteName: SITE_NAME,
+      title,
+      description,
+      images: [OPEN_GRAPH_PREVIEW_IMAGE]
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
+      images: [TWITTER_PREVIEW_IMAGE]
+    }
+  }
+}
+
 function createPageMetadata({
   title,
   description,
@@ -152,11 +192,11 @@ function createPageMetadata({
       canonical
     },
     ...(robots ? { robots } : {}),
-    openGraph: {
+    ...createSocialPreviewMetadata({
       url: canonical,
       title: openGraphTitle,
       description: openGraphDescription
-    }
+    })
   }
 }
 
@@ -168,7 +208,7 @@ export const rootMetadata: Metadata = {
     title: SITE_NAME
   },
   title: {
-    default: 'Pilog: Local-first developer journal',
+    default: ROOT_TITLE,
     template: `%s | ${SITE_NAME}`
   },
   description: DEFAULT_DESCRIPTION,
@@ -191,21 +231,11 @@ export const rootMetadata: Metadata = {
     apple: [{ url: '/apple-icon.png', type: 'image/png' }]
   },
   manifest: '/manifest.json',
-  openGraph: {
-    type: 'website',
-    locale: 'en_US',
+  ...createSocialPreviewMetadata({
     url: '/',
-    siteName: SITE_NAME,
-    title: 'Pilog: Local-first developer journal',
-    description: DEFAULT_DESCRIPTION,
-    images: [OPEN_GRAPH_IMAGE]
-  },
-  twitter: {
-    card: 'summary_large_image',
-    title: 'Pilog: Local-first developer journal',
-    description: DEFAULT_DESCRIPTION,
-    images: [OPEN_GRAPH_IMAGE.url]
-  }
+    title: ROOT_TITLE,
+    description: DEFAULT_DESCRIPTION
+  })
 }
 
 export const homeMetadata: Metadata = createPageMetadata({

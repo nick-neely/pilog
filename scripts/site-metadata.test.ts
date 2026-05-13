@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
 import {
   aboutMetadata,
   aboutStructuredData,
@@ -13,6 +15,26 @@ import {
   previewMetadata,
   rootMetadata
 } from '../site/src/lib/metadata'
+
+const previewImageDetails = {
+  width: 1200,
+  height: 630,
+  alt: 'Pilog preview: a warm parchment note stack with a Reading-Room Moss pi mark'
+}
+
+const openGraphPreviewImage = {
+  url: '/opengraph-image.jpg',
+  ...previewImageDetails
+}
+
+const twitterPreviewImage = {
+  url: '/twitter-image.jpg',
+  ...previewImageDetails
+}
+
+function sha256(path: string): string {
+  return createHash('sha256').update(readFileSync(path)).digest('hex')
+}
 
 describe('site metadata', () => {
   it('defines branded root defaults for public Pilog pages', () => {
@@ -35,6 +57,21 @@ describe('site metadata', () => {
         { url: '/icon1.png', type: 'image/png' }
       ],
       apple: [{ url: '/apple-icon.png', type: 'image/png' }]
+    })
+    expect(rootMetadata.openGraph).toMatchObject({
+      type: 'website',
+      locale: 'en_US',
+      url: '/',
+      siteName: 'Pilog',
+      title: 'Pilog: Local-first developer journal',
+      description: rootMetadata.description,
+      images: [openGraphPreviewImage]
+    })
+    expect(rootMetadata.twitter).toMatchObject({
+      card: 'summary_large_image',
+      title: 'Pilog: Local-first developer journal',
+      description: rootMetadata.description,
+      images: [twitterPreviewImage]
     })
   })
 
@@ -62,6 +99,35 @@ describe('site metadata', () => {
       alternates: { canonical: '/about' }
     })
     expect(aboutMetadata.description).toContain('local-first')
+  })
+
+  it('gives indexable public routes complete Open Graph and Twitter preview metadata', () => {
+    const indexableRoutes = [homeMetadata, downloadMetadata, docsMetadata, aboutMetadata]
+
+    for (const metadata of indexableRoutes) {
+      expect(metadata.openGraph).toMatchObject({
+        type: 'website',
+        locale: 'en_US',
+        url: metadata.alternates?.canonical,
+        siteName: 'Pilog',
+        title: expect.any(String),
+        description: expect.any(String),
+        images: [openGraphPreviewImage]
+      })
+      expect(metadata.twitter).toMatchObject({
+        card: 'summary_large_image',
+        title: expect.any(String),
+        description: expect.any(String),
+        images: [twitterPreviewImage]
+      })
+    }
+  })
+
+  it('serves the selected branded preview image through Next metadata image conventions', () => {
+    const selectedImage = 'design/og-image/pilog-og-option-01-optimized.jpg'
+
+    expect(sha256('site/src/app/opengraph-image.jpg')).toBe(sha256(selectedImage))
+    expect(sha256('site/src/app/twitter-image.jpg')).toBe(sha256(selectedImage))
   })
 
   it('keeps preview downloads out of the index', () => {
