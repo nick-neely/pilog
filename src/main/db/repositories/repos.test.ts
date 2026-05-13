@@ -40,6 +40,9 @@ describe('repos repository', () => {
     expect(repo.name).toBe('pilog')
     expect(repo.owner).toBe('nick-neely')
     expect(repo.localPath).toBe('/home/user/projects/pilog')
+    expect(repo.accessKind).toBe('host')
+    expect(repo.wslDistro).toBeNull()
+    expect(repo.wslPath).toBeNull()
     expect(repo.githubUrl).toBe('https://github.com/nick-neely/pilog')
     expect(repo.defaultBranch).toBe('main')
     expect(repo.autoPublishEnabled).toBe(false)
@@ -101,8 +104,28 @@ describe('repos repository', () => {
     runMigrations(legacyDb)
 
     expect(getRepoById(legacyDb, 'repo-legacy')).toMatchObject({
+      accessKind: 'host',
+      wslDistro: null,
+      wslPath: null,
       githubLabels: [],
       githubLabelsSyncedAt: null
+    })
+  })
+
+  it('persists WSL access metadata for linked repositories', () => {
+    const repo = createRepo(db, {
+      ...sampleInput,
+      localPath: '\\\\wsl.localhost\\Ubuntu\\home\\user\\projects\\pilog',
+      accessKind: 'wsl',
+      wslDistro: 'Ubuntu',
+      wslPath: '/home/user/projects/pilog'
+    })
+
+    expect(getRepoById(db, repo.id)).toMatchObject({
+      localPath: '\\\\wsl.localhost\\Ubuntu\\home\\user\\projects\\pilog',
+      accessKind: 'wsl',
+      wslDistro: 'Ubuntu',
+      wslPath: '/home/user/projects/pilog'
     })
   })
 

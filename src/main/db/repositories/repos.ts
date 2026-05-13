@@ -7,6 +7,7 @@ import {
   normalizeRepoAutoPublishSettings,
   type GitHubLabel,
   type Repo,
+  type RepoAccessKind,
   type UpdateRepoAutoPublishSettingsRequest
 } from '@shared/ipc'
 
@@ -15,6 +16,9 @@ export const repoColumns = {
   name: repos.name,
   owner: repos.owner,
   localPath: repos.localPath,
+  accessKind: repos.accessKind,
+  wslDistro: repos.wslDistro,
+  wslPath: repos.wslPath,
   githubUrl: repos.githubUrl,
   defaultBranch: repos.defaultBranch,
   githubLabels: repos.githubLabels,
@@ -34,6 +38,9 @@ export function createRepo(
     name: string
     owner: string
     localPath: string
+    accessKind?: RepoAccessKind
+    wslDistro?: string | null
+    wslPath?: string | null
     githubUrl: string | null
     defaultBranch: string | null
     githubLabels?: GitHubLabel[]
@@ -44,6 +51,9 @@ export function createRepo(
   const id = uuidv4()
   const githubLabels = input.githubLabels ?? []
   const githubLabelsSyncedAt = input.githubLabelsSyncedAt ?? null
+  const accessKind = input.accessKind ?? 'host'
+  const wslDistro = accessKind === 'wsl' ? (input.wslDistro ?? null) : null
+  const wslPath = accessKind === 'wsl' ? (input.wslPath ?? null) : null
 
   db.insert(repos)
     .values({
@@ -51,6 +61,9 @@ export function createRepo(
       name: input.name,
       owner: input.owner,
       localPath: input.localPath,
+      accessKind,
+      wslDistro: wslDistro ?? undefined,
+      wslPath: wslPath ?? undefined,
       githubUrl: input.githubUrl ?? undefined,
       defaultBranch: input.defaultBranch ?? undefined,
       githubLabels: JSON.stringify(githubLabels),
@@ -66,6 +79,9 @@ export function createRepo(
     name: input.name,
     owner: input.owner,
     localPath: input.localPath,
+    accessKind,
+    wslDistro,
+    wslPath,
     githubUrl: input.githubUrl,
     defaultBranch: input.defaultBranch,
     githubLabels,
@@ -132,6 +148,9 @@ export type RepoRow = {
   name: string
   owner: string
   localPath: string
+  accessKind: RepoAccessKind
+  wslDistro: string | null
+  wslPath: string | null
   githubUrl: string | null
   defaultBranch: string | null
   githubLabels: string

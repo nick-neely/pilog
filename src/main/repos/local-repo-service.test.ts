@@ -7,6 +7,11 @@ import type { GitHubRepo } from '@shared/ipc'
 vi.mock('./git', () => ({
   isGitRepo: vi.fn(),
   readLocalGitMetadata: vi.fn(),
+  parseRepoAccessDescriptor: vi.fn((localPath: string) => ({
+    kind: 'host',
+    displayPath: localPath
+  })),
+  readGitMetadata: vi.fn(),
   parseGitHubOwnerRepo: vi.fn()
 }))
 
@@ -36,6 +41,8 @@ describe('local-repo-service', () => {
   let gitMock: {
     isGitRepo: ReturnType<typeof vi.fn>
     readLocalGitMetadata: ReturnType<typeof vi.fn>
+    parseRepoAccessDescriptor: ReturnType<typeof vi.fn>
+    readGitMetadata: ReturnType<typeof vi.fn>
     parseGitHubOwnerRepo: ReturnType<typeof vi.fn>
   }
   let clientMock: {
@@ -51,6 +58,7 @@ describe('local-repo-service', () => {
 
   beforeEach(async () => {
     vi.resetModules()
+    vi.clearAllMocks()
     db = createInMemoryDatabase()
     runMigrations(db)
 
@@ -155,7 +163,40 @@ describe('local-repo-service', () => {
         remoteUrl: 'https://github.com/nick-neely/pilog.git',
         defaultBranch: 'main',
         headSha: 'deadbeef1234',
-        githubRepo: mockGitHubRepo
+        githubRepo: mockGitHubRepo,
+        access: { kind: 'host', displayPath: '/projects/pilog' }
+      })
+    })
+
+    it('routes WSL paths through WSL-aware metadata reads before GitHub matching', async () => {
+      const access = {
+        kind: 'wsl' as const,
+        displayPath: '\\\\wsl.localhost\\Ubuntu\\home\\neely\\dev\\pilog',
+        distro: 'Ubuntu',
+        linuxPath: '/home/neely/dev/pilog'
+      }
+      clientMock.getOctokitClient.mockReturnValue({})
+      gitMock.parseRepoAccessDescriptor.mockReturnValue(access)
+      gitMock.readGitMetadata.mockResolvedValue({
+        remoteUrl: 'https://github.com/nick-neely/pilog.git',
+        defaultBranch: 'main',
+        headSha: 'wslhead'
+      })
+      gitMock.parseGitHubOwnerRepo.mockReturnValue({ owner: 'nick-neely', name: 'pilog' })
+      clientMock.listRepos.mockResolvedValue([mockGitHubRepo])
+
+      const result = await service.detectLocalRepo(access.displayPath)
+
+      expect(gitMock.isGitRepo).not.toHaveBeenCalled()
+      expect(gitMock.readLocalGitMetadata).not.toHaveBeenCalled()
+      expect(gitMock.readGitMetadata).toHaveBeenCalledWith(access)
+      expect(result).toEqual({
+        state: 'matched',
+        remoteUrl: 'https://github.com/nick-neely/pilog.git',
+        defaultBranch: 'main',
+        headSha: 'wslhead',
+        githubRepo: mockGitHubRepo,
+        access
       })
     })
 
@@ -208,6 +249,7 @@ describe('local-repo-service', () => {
       expect(repo.name).toBe('pilog')
       expect(repo.owner).toBe('nick-neely')
       expect(repo.localPath).toBe('/projects/pilog')
+      expect(repo.accessKind).toBe('host')
       expect(repo.githubUrl).toBe('https://github.com/nick-neely/pilog')
       expect(repo.defaultBranch).toBe('main')
       expect(repo.githubLabels).toEqual([
@@ -230,6 +272,28 @@ describe('local-repo-service', () => {
 
       const rows = listDbRepos(db)
       expect(rows).toHaveLength(1)
+    })
+
+    it('persists WSL access metadata from the link request', async () => {
+      clientMock.getOctokitClient.mockReturnValue({})
+      clientMock.listLabels.mockResolvedValue([])
+
+      const repo = await service.linkRepo(db, {
+        localPath: '\\\\wsl.localhost\\Ubuntu\\home\\neely\\dev\\pilog',
+        access: {
+          kind: 'wsl',
+          displayPath: '\\\\wsl.localhost\\Ubuntu\\home\\neely\\dev\\pilog',
+          distro: 'Ubuntu',
+          linuxPath: '/home/neely/dev/pilog'
+        },
+        githubRepo: mockGitHubRepo,
+        defaultBranch: 'main'
+      })
+
+      expect(repo.localPath).toBe('\\\\wsl.localhost\\Ubuntu\\home\\neely\\dev\\pilog')
+      expect(repo.accessKind).toBe('wsl')
+      expect(repo.wslDistro).toBe('Ubuntu')
+      expect(repo.wslPath).toBe('/home/neely/dev/pilog')
     })
   })
 })

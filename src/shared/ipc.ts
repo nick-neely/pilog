@@ -99,6 +99,9 @@ export type Repo = {
   name: string
   owner: string
   localPath: string
+  accessKind: RepoAccessKind
+  wslDistro: string | null
+  wslPath: string | null
   githubUrl: string | null
   defaultBranch: string | null
   githubLabels: GitHubLabel[]
@@ -111,6 +114,12 @@ export type Repo = {
   createdAt: string
   updatedAt: string
 }
+
+export type RepoAccessKind = 'host' | 'wsl'
+
+export type RepoAccessDescriptor =
+  | { kind: 'host'; displayPath: string }
+  | { kind: 'wsl'; displayPath: string; distro: string; linuxPath: string }
 
 export type RepoAutoPublishSettings = Pick<
   Repo,
@@ -163,10 +172,12 @@ export type DetectLocalRepoResult =
       defaultBranch: string
       headSha: string
       githubRepo: GitHubRepo
+      access: RepoAccessDescriptor
     }
 
 export type LinkRepoRequest = {
   localPath: string
+  access?: RepoAccessDescriptor
   githubRepo: GitHubRepo
   defaultBranch: string
 }

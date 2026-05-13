@@ -1,6 +1,6 @@
 import { Alert, AlertDescription } from '@renderer/components/ui/alert'
 import { Button } from '@renderer/components/ui/button'
-import type { DetectLocalRepoResult, GitHubRepo } from '@shared/ipc'
+import type { DetectLocalRepoResult, GitHubRepo, RepoAccessDescriptor } from '@shared/ipc'
 import { useState } from 'react'
 import { getErrorMessage } from '../recovery-state'
 
@@ -21,7 +21,7 @@ function DetectResultInline({
 }: {
   localPath: string
   result: DetectLocalRepoResult
-  onConfirm: (githubRepo: GitHubRepo, defaultBranch: string) => void
+  onConfirm: (githubRepo: GitHubRepo, defaultBranch: string, access: RepoAccessDescriptor) => void
   onReset: () => void
   onGitHubRequired?: () => void
   githubRequiredLabel?: string
@@ -111,7 +111,7 @@ function DetectResultInline({
           <p className="mt-0.5 font-mono text-xs text-muted-foreground">{localPath}</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button size="sm" onClick={() => onConfirm(githubRepo, defaultBranch)}>
+          <Button size="sm" onClick={() => onConfirm(githubRepo, defaultBranch, result.access)}>
             Link repository
           </Button>
           <Button size="sm" variant="ghost" onClick={onReset}>
@@ -153,12 +153,17 @@ export function RepoLinkFlow({
     }
   }
 
-  const handleConfirm = async (githubRepo: GitHubRepo, defaultBranch: string): Promise<void> => {
+  const handleConfirm = async (
+    githubRepo: GitHubRepo,
+    defaultBranch: string,
+    access: RepoAccessDescriptor
+  ): Promise<void> => {
     if (state.step !== 'result') return
     setState({ step: 'linking' })
     try {
       await window.pilog.invoke('repos:link', {
         localPath: state.localPath,
+        access,
         githubRepo,
         defaultBranch
       })

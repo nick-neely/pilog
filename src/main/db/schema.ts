@@ -17,6 +17,11 @@ export const repos = sqliteTable('repos', {
   name: text('name').notNull(),
   owner: text('owner').notNull(),
   localPath: text('local_path').notNull(),
+  accessKind: text('access_kind', { enum: ['host', 'wsl'] })
+    .notNull()
+    .default('host'),
+  wslDistro: text('wsl_distro'),
+  wslPath: text('wsl_path'),
   githubUrl: text('github_url'),
   defaultBranch: text('default_branch'),
   githubLabels: text('github_labels').notNull().default('[]'),

@@ -1,9 +1,9 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest'
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest'
 import { mkdtempSync, rmSync, writeFileSync } from 'fs'
 import { execSync } from 'child_process'
 import { join } from 'path'
 import { tmpdir } from 'os'
-import { readLocalGitMetadata, isGitRepo } from './git'
+import { readLocalGitMetadata, isGitRepo, parseRepoAccessDescriptor, readGitMetadata } from './git'
 
 describe('readLocalGitMetadata', () => {
   let repoDir: string
@@ -63,5 +63,85 @@ describe('readLocalGitMetadata', () => {
     } finally {
       rmSync(noRemoteDir, { recursive: true, force: true })
     }
+  })
+})
+
+describe('parseRepoAccessDescriptor', () => {
+  it('parses wsl.localhost UNC paths into a WSL descriptor', () => {
+    expect(
+      parseRepoAccessDescriptor('\\\\wsl.localhost\\Ubuntu\\home\\neely\\dev\\pi log')
+    ).toEqual({
+      kind: 'wsl',
+      displayPath: '\\\\wsl.localhost\\Ubuntu\\home\\neely\\dev\\pi log',
+      distro: 'Ubuntu',
+      linuxPath: '/home/neely/dev/pi log'
+    })
+  })
+
+  it('parses legacy wsl$ UNC paths and preserves shell-sensitive characters', () => {
+    expect(parseRepoAccessDescriptor('\\\\wsl$\\Ubuntu-22.04\\home\\n\\dev\\semi;colon')).toEqual({
+      kind: 'wsl',
+      displayPath: '\\\\wsl$\\Ubuntu-22.04\\home\\n\\dev\\semi;colon',
+      distro: 'Ubuntu-22.04',
+      linuxPath: '/home/n/dev/semi;colon'
+    })
+  })
+
+  it('leaves host-local paths as host descriptors', () => {
+    expect(parseRepoAccessDescriptor('/home/neely/dev/pilog')).toEqual({
+      kind: 'host',
+      displayPath: '/home/neely/dev/pilog'
+    })
+    expect(parseRepoAccessDescriptor('C:\\Users\\neely\\dev\\pilog')).toEqual({
+      kind: 'host',
+      displayPath: 'C:\\Users\\neely\\dev\\pilog'
+    })
+  })
+})
+
+describe('readGitMetadata', () => {
+  it('uses wsl.exe with argument arrays for WSL Git metadata reads', async () => {
+    const execFile = vi.fn(async (_file: string, args: string[]) => {
+      const gitArgs = args.slice(args.indexOf('git') + 1)
+      if (gitArgs.join(' ') === 'rev-parse --is-inside-work-tree') {
+        return { stdout: 'true\n', stderr: '' }
+      }
+      if (gitArgs.join(' ') === 'remote get-url origin') {
+        return { stdout: 'https://github.com/nick-neely/pilog.git\n', stderr: '' }
+      }
+      if (gitArgs.join(' ') === 'rev-parse HEAD') {
+        return { stdout: 'deadbeef\n', stderr: '' }
+      }
+      if (gitArgs.join(' ') === 'rev-parse --abbrev-ref HEAD') {
+        return { stdout: 'main\n', stderr: '' }
+      }
+      throw new Error(`unexpected git args: ${gitArgs.join(' ')}`)
+    })
+
+    const metadata = await readGitMetadata(
+      {
+        kind: 'wsl',
+        displayPath: '\\\\wsl.localhost\\Ubuntu\\home\\n\\dev\\pi log;rm -rf nope',
+        distro: 'Ubuntu',
+        linuxPath: '/home/n/dev/pi log;rm -rf nope'
+      },
+      { execFile }
+    )
+
+    expect(metadata).toEqual({
+      remoteUrl: 'https://github.com/nick-neely/pilog.git',
+      defaultBranch: 'main',
+      headSha: 'deadbeef'
+    })
+    expect(execFile).toHaveBeenCalledWith('wsl.exe', [
+      '-d',
+      'Ubuntu',
+      '--cd',
+      '/home/n/dev/pi log;rm -rf nope',
+      '--',
+      'git',
+      'rev-parse',
+      '--is-inside-work-tree'
+    ])
   })
 })

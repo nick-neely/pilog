@@ -19,6 +19,9 @@ export function runMigrations(db: PilogDatabase): void {
       name TEXT NOT NULL,
       owner TEXT NOT NULL,
       local_path TEXT NOT NULL,
+      access_kind TEXT NOT NULL DEFAULT 'host',
+      wsl_distro TEXT,
+      wsl_path TEXT,
       github_url TEXT,
       default_branch TEXT,
       github_labels TEXT NOT NULL DEFAULT '[]',
@@ -69,6 +72,9 @@ export function runMigrations(db: PilogDatabase): void {
   `)
 
   addColumnIfMissing(db, 'notes', 'run_id', 'TEXT')
+  addColumnIfMissing(db, 'repos', 'access_kind', "TEXT NOT NULL DEFAULT 'host'")
+  addColumnIfMissing(db, 'repos', 'wsl_distro', 'TEXT')
+  addColumnIfMissing(db, 'repos', 'wsl_path', 'TEXT')
   addColumnIfMissing(db, 'repos', 'auto_publish_enabled', 'INTEGER NOT NULL DEFAULT 0')
   addColumnIfMissing(db, 'repos', 'github_labels', "TEXT NOT NULL DEFAULT '[]'")
   addColumnIfMissing(db, 'repos', 'github_labels_synced_at', 'TEXT')

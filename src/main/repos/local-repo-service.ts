@@ -1,4 +1,10 @@
-import { isGitRepo, readLocalGitMetadata, parseGitHubOwnerRepo } from './git'
+import {
+  isGitRepo,
+  readLocalGitMetadata,
+  parseGitHubOwnerRepo,
+  parseRepoAccessDescriptor,
+  readGitMetadata
+} from './git'
 import { getOctokitClient, listLabels, listRepos } from '../github/client'
 import { createRepo } from '../db/repositories/repos'
 import type { PilogDatabase } from '../db/client'
@@ -11,6 +17,7 @@ import {
 } from '../runtime-readiness'
 
 export async function detectLocalRepo(localPath: string): Promise<DetectLocalRepoResult> {
+  const access = parseRepoAccessDescriptor(localPath)
   const readiness = await getRuntimeReadiness()
   const message = getBlockingRuntimeReadinessMessage(readiness, REPO_LINK_RUNTIME_REQUIREMENTS)
   if (message) {
@@ -25,10 +32,14 @@ export async function detectLocalRepo(localPath: string): Promise<DetectLocalRep
     return { state: 'unauthenticated' }
   }
 
-  const gitRepo = await isGitRepo(localPath)
-  if (!gitRepo) return { state: 'not-git' }
-
-  const metadata = await readLocalGitMetadata(localPath)
+  let metadata
+  if (access.kind === 'wsl') {
+    metadata = await readGitMetadata(access)
+  } else {
+    const gitRepo = await isGitRepo(access.displayPath)
+    if (!gitRepo) return { state: 'not-git' }
+    metadata = await readLocalGitMetadata(access.displayPath)
+  }
   if (!metadata) return { state: 'no-remote' }
 
   const parsed = parseGitHubOwnerRepo(metadata.remoteUrl)
@@ -48,7 +59,8 @@ export async function detectLocalRepo(localPath: string): Promise<DetectLocalRep
     remoteUrl: metadata.remoteUrl,
     defaultBranch: metadata.defaultBranch,
     headSha: metadata.headSha,
-    githubRepo: matched
+    githubRepo: matched,
+    access
   }
 }
 
@@ -63,6 +75,9 @@ export async function linkRepo(db: PilogDatabase, request: LinkRepoRequest): Pro
     name: request.githubRepo.name,
     owner: request.githubRepo.owner,
     localPath: request.localPath,
+    accessKind: request.access?.kind ?? 'host',
+    wslDistro: request.access?.kind === 'wsl' ? request.access.distro : null,
+    wslPath: request.access?.kind === 'wsl' ? request.access.linuxPath : null,
     githubUrl: request.githubRepo.url,
     defaultBranch: request.defaultBranch,
     githubLabels: labelCache.labels,
