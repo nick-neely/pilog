@@ -1,6 +1,6 @@
 {
   "name": "pilog-app",
-  "version": "0.1.0-preview.4",
+  "version": "0.1.0-preview.5",
   "description": "Pilog Electron runtime package",
   "author": "Nick Neely",
   "homepage": "https://pilog.dev",
