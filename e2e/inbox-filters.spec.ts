@@ -119,3 +119,31 @@ test('inbox filters, search, and multi-select', async () => {
 
   await exitApp(app)
 })
+
+test('inbox note context menu deletes through confirmation', async () => {
+  const app = await launchApp()
+  const page = await app.firstWindow()
+
+  try {
+    await expect(page.locator('h1')).toHaveText('Inbox')
+
+    await page.evaluate(async () => {
+      await window.pilog.invoke('note:create', { content: 'context menu delete note' })
+    })
+    await page.reload()
+
+    const noteRows = page.locator('[data-testid="note-row"]')
+    await expect(noteRows).toHaveCount(1)
+
+    await noteRows.first().click({ button: 'right' })
+    await page.getByRole('menuitem', { name: 'Delete note...' }).click()
+    await page.getByRole('button', { name: 'Delete' }).click()
+
+    await expect(noteRows).toHaveCount(0)
+    await expect
+      .poll(async () => page.evaluate(async () => window.pilog.invoke('note:list')))
+      .toHaveLength(0)
+  } finally {
+    await exitApp(app)
+  }
+})

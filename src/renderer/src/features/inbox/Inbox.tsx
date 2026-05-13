@@ -23,6 +23,14 @@ import {
 } from '@renderer/components/ui/alert-dialog'
 import { Badge } from '@renderer/components/ui/badge'
 import { Button } from '@renderer/components/ui/button'
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuGroup,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger
+} from '@renderer/components/ui/context-menu'
 import { Empty, EmptyDescription } from '@renderer/components/ui/empty'
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@renderer/components/ui/hover-card'
 import { Kbd, KbdGroup } from '@renderer/components/ui/kbd'
@@ -1467,6 +1475,7 @@ export function Inbox({
   const [loadingNotes, setLoadingNotes] = useState(true)
   const [notesError, setNotesError] = useState<string | null>(null)
   const [generationError, setGenerationError] = useState<GenerationErrorState | null>(null)
+  const [pendingDeleteNote, setPendingDeleteNote] = useState<Note | null>(null)
   const lastClickedIndex = useRef<number | null>(null)
   const fetchIdRef = useRef(0)
   const countsFetchIdRef = useRef(0)
@@ -1769,6 +1778,17 @@ export function Inbox({
     }
     lastClickedIndex.current = index
   }
+
+  const focusNote = useCallback((noteId: string, index: number): void => {
+    setSelectedIds(new Set([noteId]))
+    lastClickedIndex.current = index
+  }, [])
+
+  const handleCopyNoteContent = useCallback(async (note: Note): Promise<void> => {
+    const content = note.content.trim()
+    if (!content) return
+    await navigator.clipboard.writeText(content)
+  }, [])
 
   const selectedNote =
     selectedIds.size === 1 ? (notes.find((n) => selectedIds.has(n.id)) ?? null) : null
@@ -2257,53 +2277,100 @@ export function Inbox({
                         const isSelected = selectedIds.has(note.id)
                         const preview = note.content.trim() || 'Untitled note'
                         const repo = note.repoId ? reposById.get(note.repoId) : undefined
+                        const draftLinks = draftLinksByNote.get(note.id) ?? []
+                        const primaryDraftLink = draftLinks[0] ?? null
                         return (
                           <li key={note.id}>
-                            <button
-                              type="button"
-                              data-testid="note-row"
-                              onClick={(e) => handleNoteClick(note.id, index, e)}
-                              className={
-                                'flex min-w-0 max-w-full w-full cursor-pointer items-start gap-3 overflow-hidden rounded-md border px-3 py-2.5 text-left transition-colors select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30 ' +
-                                (isSelected
-                                  ? 'border-border bg-muted'
-                                  : 'border-transparent hover:bg-muted/60')
-                              }
-                            >
-                              <span className="min-w-0 flex flex-1 flex-col gap-1">
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <span className="block truncate text-sm leading-snug">
-                                      {preview}
+                            <ContextMenu>
+                              <ContextMenuTrigger asChild>
+                                <button
+                                  type="button"
+                                  data-testid="note-row"
+                                  onClick={(e) => handleNoteClick(note.id, index, e)}
+                                  onContextMenu={() => focusNote(note.id, index)}
+                                  className={
+                                    'flex min-w-0 max-w-full w-full cursor-pointer items-start gap-3 overflow-hidden rounded-md border px-3 py-2.5 text-left transition-colors select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30 ' +
+                                    (isSelected
+                                      ? 'border-border bg-muted'
+                                      : 'border-transparent hover:bg-muted/60')
+                                  }
+                                >
+                                  <span className="min-w-0 flex flex-1 flex-col gap-1">
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <span className="block truncate text-sm leading-snug">
+                                          {preview}
+                                        </span>
+                                      </TooltipTrigger>
+                                      <TooltipContent className={INBOX_NOTE_PREVIEW_TOOLTIP_CLASS}>
+                                        {preview}
+                                      </TooltipContent>
+                                    </Tooltip>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <span className="block truncate font-mono text-xs text-muted-foreground/80">
+                                          {repo ? `${repo.owner}/${repo.name}` : 'Unassigned'}
+                                        </span>
+                                      </TooltipTrigger>
+                                      <TooltipContent>
+                                        {repo ? `${repo.owner}/${repo.name}` : 'Unassigned'}
+                                      </TooltipContent>
+                                    </Tooltip>
+                                    <span className="flex min-w-0 items-center justify-between gap-2 text-xs">
+                                      <Badge
+                                        variant="secondary"
+                                        className="shrink-0 font-medium text-foreground/80"
+                                      >
+                                        {STATUS_LABEL[note.status]}
+                                      </Badge>
+                                      <span className="tabular shrink-0 whitespace-nowrap text-muted-foreground">
+                                        {formatNoteTimestamp(note.createdAt)}
+                                      </span>
                                     </span>
-                                  </TooltipTrigger>
-                                  <TooltipContent className={INBOX_NOTE_PREVIEW_TOOLTIP_CLASS}>
-                                    {preview}
-                                  </TooltipContent>
-                                </Tooltip>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <span className="block truncate font-mono text-xs text-muted-foreground/80">
-                                      {repo ? `${repo.owner}/${repo.name}` : 'Unassigned'}
-                                    </span>
-                                  </TooltipTrigger>
-                                  <TooltipContent>
-                                    {repo ? `${repo.owner}/${repo.name}` : 'Unassigned'}
-                                  </TooltipContent>
-                                </Tooltip>
-                                <span className="flex min-w-0 items-center justify-between gap-2 text-xs">
-                                  <Badge
-                                    variant="secondary"
-                                    className="shrink-0 font-medium text-foreground/80"
-                                  >
-                                    {STATUS_LABEL[note.status]}
-                                  </Badge>
-                                  <span className="tabular shrink-0 whitespace-nowrap text-muted-foreground">
-                                    {formatNoteTimestamp(note.createdAt)}
                                   </span>
-                                </span>
-                              </span>
-                            </button>
+                                </button>
+                              </ContextMenuTrigger>
+                              <ContextMenuContent alignOffset={-4}>
+                                <ContextMenuGroup>
+                                  <ContextMenuItem onSelect={() => focusNote(note.id, index)}>
+                                    Open note
+                                  </ContextMenuItem>
+                                  <ContextMenuItem
+                                    disabled={!note.content.trim()}
+                                    onSelect={() => void handleCopyNoteContent(note)}
+                                  >
+                                    Copy note text
+                                  </ContextMenuItem>
+                                </ContextMenuGroup>
+                                {(primaryDraftLink || note.runId) && <ContextMenuSeparator />}
+                                {primaryDraftLink ? (
+                                  <ContextMenuItem
+                                    onSelect={() => onNavigateToDraftReview(primaryDraftLink.id)}
+                                  >
+                                    {draftLinks.length > 1 ? 'View drafts' : 'View draft'}
+                                  </ContextMenuItem>
+                                ) : null}
+                                {note.runId ? (
+                                  <ContextMenuItem
+                                    onSelect={() =>
+                                      onNavigateToAgentRuns(note.runId!, {
+                                        kind: 'note',
+                                        noteId: note.id
+                                      })
+                                    }
+                                  >
+                                    View run
+                                  </ContextMenuItem>
+                                ) : null}
+                                <ContextMenuSeparator />
+                                <ContextMenuItem
+                                  variant="destructive"
+                                  onSelect={() => setPendingDeleteNote(note)}
+                                >
+                                  Delete note...
+                                </ContextMenuItem>
+                              </ContextMenuContent>
+                            </ContextMenu>
                           </li>
                         )
                       })}
@@ -2583,6 +2650,33 @@ export function Inbox({
         }}
         onPublish={() => void handleConfirmAutoPublish()}
       />
+      <AlertDialog
+        open={pendingDeleteNote !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingDeleteNote(null)
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this note?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This cannot be undone. The note and any draft history derived from it will be removed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={() => {
+                if (pendingDeleteNote) void handleDelete(pendingDeleteNote.id)
+                setPendingDeleteNote(null)
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
