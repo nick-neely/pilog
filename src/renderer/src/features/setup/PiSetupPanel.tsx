@@ -174,11 +174,11 @@ export function PiSetupPanel({
             {piSaveLabel}
           </Button>
         </div>
-        <p className="text-[11px] text-muted-foreground">
-          Current: {pi.active?.providerName ?? 'No provider'} · {pi.active?.modelName ?? 'No model'}{' '}
-          · key {piCredentialStatus}
-        </p>
         <div className="flex items-center gap-1.5">
+          <span className="text-[11px] text-muted-foreground">
+            Current: {pi.active?.providerName ?? 'No provider'} ·{' '}
+            {pi.active?.modelName ?? 'No model'} · key {piCredentialStatus}
+          </span>
           <HoverCard>
             <HoverCardTrigger asChild>
               <button
@@ -199,7 +199,6 @@ export function PiSetupPanel({
               </div>
             </HoverCardContent>
           </HoverCard>
-          <span className="text-[11px] text-muted-foreground">Data sharing</span>
         </div>
       </div>
 

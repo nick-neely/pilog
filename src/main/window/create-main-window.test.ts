@@ -66,7 +66,7 @@ describe('main window', () => {
       show: false,
       titleBarStyle: 'hidden',
       titleBarOverlay: {
-        color: '#f2eee5',
+        color: '#f4f1ed',
         symbolColor: '#38322b',
         height: 48
       }

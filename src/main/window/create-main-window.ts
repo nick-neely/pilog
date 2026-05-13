@@ -35,13 +35,13 @@ function getOrCreateWindow(icon: string): BrowserWindow {
     width: 900,
     height: 670,
     show: false,
-    backgroundColor: '#f2eee5',
+    backgroundColor: '#f4f1ed',
     autoHideMenuBar: process.platform !== 'darwin',
     titleBarStyle: 'hidden',
     ...(process.platform !== 'darwin'
       ? {
           titleBarOverlay: {
-            color: '#f2eee5',
+            color: '#f4f1ed',
             symbolColor: '#38322b',
             height: 48
           }
