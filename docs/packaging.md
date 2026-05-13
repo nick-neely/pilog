@@ -308,13 +308,13 @@ release tolerances for the packaged baseline runner's user-visible scenarios.
 The first reference run was a Linux x64 unpacked packaged build measured on
 2026-05-13:
 
-| Scenario                         | Reference run | Initial budget |
-| -------------------------------- | ------------- | -------------- |
-| Cold launch to usable Inbox      | 1200 ms       | 6000 ms        |
-| Scratchpad open                  | 186.1 ms      | 1000 ms        |
-| Note create and list             | 23.8 ms       | 750 ms         |
-| Draft Review navigation          | 217.7 ms      | 1000 ms        |
-| Fixture Agent Run to draft       | 76 ms         | 15000 ms       |
+| Scenario                    | Reference run | Initial budget |
+| --------------------------- | ------------- | -------------- |
+| Cold launch to usable Inbox | 1200 ms       | 6000 ms        |
+| Scratchpad open             | 186.1 ms      | 1000 ms        |
+| Note create and list        | 23.8 ms       | 750 ms         |
+| Draft Review navigation     | 217.7 ms      | 1000 ms        |
+| Fixture Agent Run to draft  | 76 ms         | 15000 ms       |
 
 To intentionally update a performance budget, run `pnpm perf:packaged` against
 the packaged target under review, compare the new
