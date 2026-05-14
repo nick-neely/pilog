@@ -6,6 +6,7 @@ import type {
   ErrorCause,
   IssueDraft
 } from '@shared/types'
+import { parseClarificationHistory } from '@shared/clarification-history'
 import { desc, eq, inArray, sql } from 'drizzle-orm'
 import { v4 as uuidv4 } from 'uuid'
 import type { PilogDatabase } from '../client'
@@ -295,23 +296,6 @@ function parseAffectedFiles(value: string): IssueDraft['affectedFiles'] {
       typeof item.reason === 'string'
     )
   })
-}
-
-function parseClarificationHistory(value: string): IssueDraft['clarificationHistory'] {
-  return parseJsonArray(value).filter(
-    (entry): entry is IssueDraft['clarificationHistory'][number] => {
-      return (
-        entry !== null &&
-        typeof entry === 'object' &&
-        'question' in entry &&
-        'answer' in entry &&
-        'answeredAt' in entry &&
-        typeof entry.question === 'string' &&
-        typeof entry.answer === 'string' &&
-        typeof entry.answeredAt === 'string'
-      )
-    }
-  )
 }
 
 function parseErrorCause(value: string | null): ErrorCause | null {

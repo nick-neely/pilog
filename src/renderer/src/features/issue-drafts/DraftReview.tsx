@@ -91,6 +91,16 @@ type RepoLabelLoadState = {
   error: string | null
 }
 
+type ClarificationQuestionsSectionProps = {
+  draft: Pick<IssueDraft, 'workflowState' | 'clarificationQuestions' | 'clarificationHistory'>
+  answers?: Record<string, string>
+  savingQuestion?: string | null
+  message?: string | null
+  error?: string | null
+  onAnswerChange?: (question: string, answer: string) => void
+  onSubmitAnswer?: (question: string) => Promise<void>
+}
+
 const DRAFT_TIMESTAMP_FORMATTER = new Intl.DateTimeFormat(undefined, {
   month: 'short',
   day: 'numeric',
@@ -1816,18 +1826,11 @@ export function ClarificationQuestionsSection({
   error = null,
   onAnswerChange,
   onSubmitAnswer
-}: {
-  draft: Pick<IssueDraft, 'workflowState' | 'clarificationQuestions' | 'clarificationHistory'>
-  answers?: Record<string, string>
-  savingQuestion?: string | null
-  message?: string | null
-  error?: string | null
-  onAnswerChange?: (question: string, answer: string) => void
-  onSubmitAnswer?: (question: string) => Promise<void>
-}): React.JSX.Element | null {
+}: ClarificationQuestionsSectionProps): React.JSX.Element | null {
   const hasQuestions =
     draft.workflowState === 'needs_clarification' && draft.clarificationQuestions.length > 0
   const hasHistory = draft.clarificationHistory.length > 0
+  const canAnswerQuestions = Boolean(onAnswerChange && onSubmitAnswer)
   if (!hasQuestions && !hasHistory) {
     return null
   }
@@ -1848,12 +1851,12 @@ export function ClarificationQuestionsSection({
                   <label htmlFor={answerId} className="text-sm leading-relaxed text-foreground/90">
                     {question}
                   </label>
-                  {onAnswerChange && onSubmitAnswer ? (
+                  {canAnswerQuestions ? (
                     <div className="flex flex-col gap-2">
                       <Textarea
                         id={answerId}
                         value={answer}
-                        onChange={(event) => onAnswerChange(question, event.target.value)}
+                        onChange={(event) => onAnswerChange?.(question, event.target.value)}
                         className="min-h-20 text-sm leading-relaxed"
                         placeholder="Write an answer"
                       />
@@ -1863,7 +1866,7 @@ export function ClarificationQuestionsSection({
                           variant="outline"
                           size="sm"
                           disabled={!answer.trim() || Boolean(savingQuestion)}
-                          onClick={() => void onSubmitAnswer(question)}
+                          onClick={() => void onSubmitAnswer?.(question)}
                         >
                           <HugeiconsIcon icon={Tick02Icon} data-icon="inline-start" aria-hidden />
                           {savingQuestion === question ? 'Saving' : 'Save answer'}

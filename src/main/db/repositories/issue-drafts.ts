@@ -5,12 +5,12 @@ import { issueDrafts, notes } from '../schema'
 import type {
   GeneratedIssueDraft,
   GitHubIssueTemplate,
-  ClarificationHistoryEntry,
   IssueDraft,
   IssueDraftForReview,
   IssueDraftWorkflowState,
   IssueDraftStatus
 } from '@shared/types'
+import { parseClarificationHistory } from '@shared/clarification-history'
 import {
   applyIssueTemplateToDraftBody,
   formatFallbackIssueDraftBody
@@ -217,7 +217,7 @@ export function addClarificationAnswer(
   }
 
   const now = nextUpdatedAt(draft.updatedAt)
-  const clarificationHistory: ClarificationHistoryEntry[] = [
+  const clarificationHistory = [
     ...draft.clarificationHistory,
     { question, answer, answeredAt: now }
   ]
@@ -449,24 +449,6 @@ function mapIssueDraft(row: typeof issueDrafts.$inferSelect): IssueDraft {
     createdAt: row.createdAt,
     updatedAt: row.updatedAt
   }
-}
-
-function parseClarificationHistory(value: string): ClarificationHistoryEntry[] {
-  const parsed = JSON.parse(value) as unknown
-  if (!Array.isArray(parsed)) return []
-
-  return parsed.filter((entry): entry is ClarificationHistoryEntry => {
-    return (
-      entry !== null &&
-      typeof entry === 'object' &&
-      'question' in entry &&
-      'answer' in entry &&
-      'answeredAt' in entry &&
-      typeof entry.question === 'string' &&
-      typeof entry.answer === 'string' &&
-      typeof entry.answeredAt === 'string'
-    )
-  })
 }
 
 function getGeneratedDraftWorkflow(draft: GeneratedIssueDraft): {
