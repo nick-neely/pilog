@@ -124,7 +124,7 @@ export async function linkRepo(db: PilogDatabase, request: LinkRepoRequest): Pro
 
 export async function refreshRepoIndex(db: PilogDatabase, repoId: string): Promise<Repo | null> {
   const repo = getRepoById(db, repoId)
-  if (!repo || !repo.repoIndex) return repo
+  if (!repo) return null
 
   try {
     const snapshot = await createRepoIndexSnapshot(repo.localPath)
@@ -133,7 +133,7 @@ export async function refreshRepoIndex(db: PilogDatabase, repoId: string): Promi
   } catch (err) {
     const repoIndex = upsertRepoIndex(db, repo.id, {
       status: 'failed',
-      indexVersion: repo.repoIndex.indexVersion,
+      indexVersion: repo.repoIndex?.indexVersion ?? REPO_INDEX_VERSION,
       errorMessage: err instanceof Error ? err.message : 'Repo Index refresh failed.'
     })
     return { ...repo, repoIndex }

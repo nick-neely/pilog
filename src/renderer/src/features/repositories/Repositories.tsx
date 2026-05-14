@@ -614,8 +614,8 @@ function RepoRow({
     <>
       <div className="rounded-md border border-border">
         {/* Compact repo header — scannable at a glance */}
-        <div className="flex items-center gap-3 px-4 py-3">
-          <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <div className="flex items-start gap-3 px-4 py-3">
+          <div className="flex min-w-0 flex-1 flex-col gap-1">
             <div className="flex items-center gap-2">
               <span className="text-sm font-medium">
                 {repo.owner}/{repo.name}
@@ -630,45 +630,39 @@ function RepoRow({
                 </Badge>
               ) : null}
             </div>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <p className="truncate font-mono text-xs text-muted-foreground">
-                  {repoLocation.label}
-                </p>
-              </TooltipTrigger>
-              <TooltipContent className="max-w-lg whitespace-pre-wrap font-mono">
-                {repoLocation.tooltipText}
-              </TooltipContent>
-            </Tooltip>
-            {repo.defaultBranch && (
-              <p className="text-xs text-muted-foreground">
-                Branch: <span className="font-mono">{repo.defaultBranch}</span>
-              </p>
-            )}
+            <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="min-w-0 truncate font-mono">{repoLocation.label}</span>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-lg whitespace-pre-wrap font-mono">
+                  {repoLocation.tooltipText}
+                </TooltipContent>
+              </Tooltip>
+              {repo.defaultBranch && (
+                <span className="font-mono text-muted-foreground/80">{repo.defaultBranch}</span>
+              )}
+            </div>
             <p
               className="text-xs text-muted-foreground"
               aria-label={repoIndexStatus.ariaLabel}
               aria-live="polite"
             >
-              Repo Index: <span className="text-foreground">{repoIndexStatus.label}</span>
-            </p>
-            <p className="max-w-2xl text-xs leading-5 text-muted-foreground">
-              {REPO_INDEX_PRIVACY_COPY}
+              Repo Index <span className="text-foreground">{repoIndexStatus.label}</span>
             </p>
           </div>
 
           <div className="flex shrink-0 items-center gap-1">
-            {repo.repoIndex ? (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={handleRefreshIndex}
-                disabled={!repoIndexStatus.canRefresh}
-              >
-                <HugeiconsIcon icon={Refresh01Icon} strokeWidth={2} data-icon="inline-start" />
-                {refreshingIndex ? 'Re-indexing...' : 'Re-index repo'}
-              </Button>
-            ) : null}
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleRefreshIndex}
+              disabled={!repoIndexStatus.canRefresh}
+              aria-label={repoIndexStatus.ariaLabel}
+            >
+              <HugeiconsIcon icon={Refresh01Icon} strokeWidth={2} data-icon="inline-start" />
+              {repoIndexStatus.actionLabel}
+            </Button>
             <Button size="sm" variant="outline" onClick={() => setShowNewIssue(true)}>
               New Issue
             </Button>
@@ -750,8 +744,11 @@ export function Repositories({
         <div className="mx-auto flex max-w-3xl flex-col gap-8 p-6">
           {repos.length > 0 && (
             <section className="flex flex-col gap-3">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col gap-1">
                 <h2 className="text-sm font-medium text-muted-foreground">Linked repositories</h2>
+                <p className="max-w-2xl text-xs leading-5 text-muted-foreground">
+                  {REPO_INDEX_PRIVACY_COPY}
+                </p>
               </div>
               <div className="flex flex-col gap-3">
                 {repos.map((repo) => (

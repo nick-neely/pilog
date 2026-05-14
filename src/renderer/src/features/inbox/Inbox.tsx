@@ -239,21 +239,33 @@ type GenerationErrorState = RecoveryState & {
   message: string
 }
 
-function GenerationRepoIndexSummary({
+function NoteRepoIndexIndicator({
   status
 }: {
   status: GenerationRepoIndexStatusView
 }): React.JSX.Element {
-  return (
-    <div
-      className="flex flex-col gap-1 rounded-md border bg-muted/25 px-3 py-2"
+  const dotClass =
+    status.state === 'fresh'
+      ? 'bg-primary'
+      : status.state === 'stale'
+        ? 'bg-foreground/40'
+        : 'bg-foreground/25'
+  const indicator = (
+    <span
+      className="inline-flex items-center gap-1.5 text-xs text-muted-foreground"
+      role="status"
       aria-label={status.ariaLabel}
     >
-      <p className="text-xs font-medium text-foreground">{status.label}</p>
-      {status.notice ? (
-        <p className="text-xs leading-5 text-muted-foreground">{status.notice}</p>
-      ) : null}
-    </div>
+      <span aria-hidden className={cn('size-1.5 rounded-full', dotClass)} />
+      <span className="tabular">{status.shortLabel}</span>
+    </span>
+  )
+  if (!status.notice) return indicator
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>{indicator}</TooltipTrigger>
+      <TooltipContent className="max-w-xs">{status.notice}</TooltipContent>
+    </Tooltip>
   )
 }
 
@@ -1027,6 +1039,8 @@ function NoteDetail({
   const [draft, setDraft] = useState(note.content)
   const dirty = draft !== note.content
   const primaryDraftLink = draftLinks[0] ?? null
+  const assignedRepo = note.repoId ? (repos.find((r) => r.id === note.repoId) ?? null) : null
+  const repoIndexStatus = assignedRepo ? getGenerationRepoIndexStatus(assignedRepo) : null
 
   const handleSave = useCallback(async (): Promise<void> => {
     await onSave(note.id, draft)
@@ -1099,7 +1113,7 @@ function NoteDetail({
       </div>
       {/* Repo and generation provenance, kept secondary to the editor body. */}
       <footer className="flex min-h-14 shrink-0 flex-wrap items-center justify-between gap-x-6 gap-y-2 border-t px-6 py-3">
-        <div className="flex min-w-0 items-center gap-3">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
           <span className="text-xs font-medium text-muted-foreground">Repo</span>
           {repos.length === 0 ? (
             <span className="text-xs text-muted-foreground">
@@ -1137,6 +1151,7 @@ function NoteDetail({
               </SelectContent>
             </Select>
           )}
+          {repoIndexStatus ? <NoteRepoIndexIndicator status={repoIndexStatus} /> : null}
         </div>
         {note.runId && (
           <button
@@ -1832,12 +1847,6 @@ export function Inbox({
   const selectedRepo = selectedRepoId ? (reposById.get(selectedRepoId) ?? null) : null
   const currentInboxRepo =
     typeof repoFilter === 'string' ? (reposById.get(repoFilter) ?? null) : null
-  const selectedGenerationRepoIndex = selectedRepoId
-    ? getGenerationRepoIndexStatus(selectedRepo)
-    : null
-  const currentInboxRepoIndex = currentInboxRepo
-    ? getGenerationRepoIndexStatus(currentInboxRepo)
-    : null
   const canGenerateDrafts =
     hasSelection &&
     selectedNotesAllUnprocessed &&
@@ -2535,9 +2544,6 @@ export function Inbox({
                       ) : null}
                     </div>
                   ) : null}
-                  {selectedGenerationRepoIndex ? (
-                    <GenerationRepoIndexSummary status={selectedGenerationRepoIndex} />
-                  ) : null}
                   {!piStatus.configured && selectedNotesShareRepo && (
                     <Button
                       type="button"
@@ -2605,9 +2611,6 @@ export function Inbox({
                         </HoverCard>
                       ) : null}
                     </div>
-                  ) : null}
-                  {currentInboxRepoIndex ? (
-                    <GenerationRepoIndexSummary status={currentInboxRepoIndex} />
                   ) : null}
                   <Button
                     onClick={handleNewNote}

@@ -17,20 +17,25 @@ const READY_INDEX = {
 }
 
 describe('getRepoIndexStatusLabel', () => {
-  it('maps a ready Repo Index to a last-indexed label', () => {
+  it('maps a ready Repo Index to a last-indexed label with a re-index action', () => {
     const view = getRepoIndexStatusLabel(READY_INDEX)
 
     expect(view.label).toContain('Indexed')
     expect(view.ariaLabel).toContain('Repo Index last indexed')
+    expect(view.canRefresh).toBe(true)
+    expect(view.actionLabel).toBe('Re-index repo')
   })
 
-  it('maps missing and failed Repo Index states without hiding failures', () => {
+  it('lets a missing Repo Index be created from the repositories surface', () => {
     expect(getRepoIndexStatusLabel(null)).toEqual({
       label: 'Not created',
       ariaLabel: 'Repo Index not created',
-      canRefresh: false
+      canRefresh: true,
+      actionLabel: 'Create index'
     })
+  })
 
+  it('exposes a recoverable retry action when a Repo Index has failed', () => {
     expect(
       getRepoIndexStatusLabel({
         status: 'failed',
@@ -51,7 +56,8 @@ describe('getRepoIndexStatusLabel', () => {
     ).toEqual({
       label: 'Failed: EACCES: permission denied',
       ariaLabel: 'Repo Index failed: EACCES: permission denied',
-      canRefresh: true
+      canRefresh: true,
+      actionLabel: 'Create index'
     })
   })
 
@@ -76,11 +82,10 @@ describe('getRepoIndexStatusLabel', () => {
       { refreshing: true }
     )
 
-    expect(view).toEqual({
-      label: expect.stringContaining('Refreshing'),
-      ariaLabel: expect.stringContaining('Repo Index refresh in progress'),
-      canRefresh: false
-    })
+    expect(view.label).toContain('Refreshing')
+    expect(view.ariaLabel).toContain('Repo Index refresh in progress')
+    expect(view.canRefresh).toBe(false)
+    expect(view.actionLabel).toBe('Indexing…')
   })
 
   it('explains the Repo Index privacy boundary in product-facing copy', () => {

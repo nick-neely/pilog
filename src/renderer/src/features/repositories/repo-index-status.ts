@@ -5,13 +5,14 @@ export const REPO_INDEX_PRIVACY_COPY =
 
 const STALE_REPO_INDEX_AGE_MS = 7 * 24 * 60 * 60 * 1000
 const LIVE_REPO_EVIDENCE_NOTICE =
-  'Live file checks through Live Repo Evidence ground specific file claims before drafts are saved.'
+  'Live Repo Evidence will verify specific file claims during generation.'
 
 export type GenerationRepoIndexState = 'fresh' | 'stale' | 'missing' | 'unavailable'
 
 export type GenerationRepoIndexStatusView = {
   state: GenerationRepoIndexState
   label: string
+  shortLabel: string
   ariaLabel: string
   notice: string | null
   blocksGeneration: boolean
@@ -19,19 +20,23 @@ export type GenerationRepoIndexStatusView = {
 
 type GenerationRepoIndexRepo = Pick<Repo, 'name' | 'repoIndex'> | null
 
-export function getRepoIndexStatusLabel(
-  repoIndex: RepoIndexStatus | null,
-  options: { refreshing?: boolean } = {}
-): {
+export type RepoIndexStatusView = {
   label: string
   ariaLabel: string
   canRefresh: boolean
-} {
+  actionLabel: string
+}
+
+export function getRepoIndexStatusLabel(
+  repoIndex: RepoIndexStatus | null,
+  options: { refreshing?: boolean } = {}
+): RepoIndexStatusView {
   if (!repoIndex) {
     return {
       label: 'Not created',
       ariaLabel: 'Repo Index not created',
-      canRefresh: false
+      canRefresh: true,
+      actionLabel: 'Create index'
     }
   }
 
@@ -44,7 +49,8 @@ export function getRepoIndexStatusLabel(
         ? `Refreshing (indexed ${formatIndexDate(repoIndex.lastIndexedAt)})`
         : 'Refreshing',
       ariaLabel: `Repo Index refresh in progress.${indexedAt}`,
-      canRefresh: false
+      canRefresh: false,
+      actionLabel: 'Indexing…'
     }
   }
 
@@ -53,7 +59,8 @@ export function getRepoIndexStatusLabel(
     return {
       label: `Failed${failureDetail}`,
       ariaLabel: `Repo Index failed${failureDetail}`,
-      canRefresh: true
+      canRefresh: true,
+      actionLabel: repoIndex.lastIndexedAt ? 'Retry index' : 'Create index'
     }
   }
 
@@ -61,7 +68,8 @@ export function getRepoIndexStatusLabel(
   return {
     label: `Indexed ${indexedAt}`,
     ariaLabel: `Repo Index last indexed ${indexedAt}`,
-    canRefresh: true
+    canRefresh: true,
+    actionLabel: 'Re-index repo'
   }
 }
 
@@ -73,6 +81,7 @@ export function getGenerationRepoIndexStatus(
     return generationRepoIndexStatus({
       state: 'unavailable',
       label: 'Repo Index unavailable',
+      shortLabel: 'Unavailable',
       ariaLabel: 'Repository unavailable before draft generation',
       notice:
         'Relink the repository before generating drafts. Existing readiness checks stop generation before a run starts.',
@@ -86,6 +95,7 @@ export function getGenerationRepoIndexStatus(
     return generationRepoIndexStatus({
       state: 'missing',
       label: 'Repo Index missing',
+      shortLabel: 'Not indexed',
       ariaLabel: `Repo Index missing for ${repoName}`,
       notice: LIVE_REPO_EVIDENCE_NOTICE
     })
@@ -99,6 +109,7 @@ export function getGenerationRepoIndexStatus(
     return generationRepoIndexStatus({
       state: 'stale',
       label: `Repo Index stale, indexed ${indexedAt}`,
+      shortLabel: `Stale, indexed ${indexedAt}`,
       ariaLabel: `Repo Index stale for ${repoName}. Last indexed ${indexedAt}`,
       notice: LIVE_REPO_EVIDENCE_NOTICE
     })
@@ -107,6 +118,7 @@ export function getGenerationRepoIndexStatus(
   return generationRepoIndexStatus({
     state: 'fresh',
     label: `Repo Index fresh, indexed ${indexedAt}`,
+    shortLabel: `Indexed ${indexedAt}`,
     ariaLabel: `Repo Index fresh for ${repoName}. Last indexed ${indexedAt}`,
     notice: null
   })
