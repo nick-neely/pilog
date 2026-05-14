@@ -136,6 +136,10 @@ import { PiSetupPanel } from '../setup/PiSetupPanel'
 import { RepoLinkFlow } from '../setup/RepoLinkFlow'
 import { mergeGitHubAuthProgress } from '../setup/github-auth-progress'
 import { usePiConfig, type PiConfigState } from '../setup/use-pi-config'
+import {
+  getGenerationContextRowView,
+  type GenerationContextRowView
+} from './generation-context-row'
 import { INBOX_NOTE_PREVIEW_TOOLTIP_CLASS } from './inbox-note-preview-tooltip'
 import { StatusFilter } from './StatusFilter'
 
@@ -305,6 +309,31 @@ function NoteRepoIndexIndicator({
       <TooltipTrigger asChild>{indicator}</TooltipTrigger>
       <TooltipContent className="max-w-xs">{status.notice}</TooltipContent>
     </Tooltip>
+  )
+}
+
+function GenerationContextRow({ view }: { view: GenerationContextRowView }): React.JSX.Element {
+  return (
+    <div
+      role="status"
+      aria-label={view.ariaLabel}
+      data-testid="generation-context-row"
+      className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 rounded-md bg-muted/30 px-2.5 py-1.5 text-xs text-muted-foreground"
+    >
+      {view.items.map((item, index) => (
+        <Fragment key={`${item.label}-${index}`}>
+          {index > 0 ? (
+            <span aria-hidden className="text-muted-foreground/60">
+              ·
+            </span>
+          ) : null}
+          <span className="min-w-0">
+            <span>{item.label}: </span>
+            <span className="font-medium text-foreground/85">{item.value}</span>
+          </span>
+        </Fragment>
+      ))}
+    </div>
   )
 }
 
@@ -1942,6 +1971,11 @@ export function Inbox({
       : null
   const activeDraftSettings = getActiveDraftSettings(draftSettingsRepo, draftSettingsOverride)
   const hasDraftSettingsOverride = hasDraftSettingsChanges(draftSettingsRepo, activeDraftSettings)
+  const selectedGenerationContextRow = getGenerationContextRowView({
+    repoIndexStatus: selectedRepo ? getGenerationRepoIndexStatus(selectedRepo) : null,
+    notes: selectedNotes,
+    draftSettings: activeDraftSettings
+  })
   const draftSettingsStatusMessage = draftSettingsRepo
     ? getDraftSettingsStatusMessage({
         repo: draftSettingsRepo,
@@ -2606,6 +2640,9 @@ export function Inbox({
                 // Triage-mode: draft generation (+ optional publish). Clearing the
                 // selection lives on the title strip (the count chip) and on Esc.
                 <div className="flex w-full flex-col gap-1.5">
+                  {selectedGenerationContextRow ? (
+                    <GenerationContextRow view={selectedGenerationContextRow} />
+                  ) : null}
                   <div className="flex w-full items-center gap-2">
                     <Tooltip>
                       <TooltipTrigger asChild>
