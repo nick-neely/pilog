@@ -71,6 +71,37 @@ describe('AppUpdateService', () => {
     expect(updater.checkForUpdates).not.toHaveBeenCalled()
   })
 
+  it('does not schedule a startup check in development or unpackaged builds', () => {
+    const schedule = vi.fn()
+    const devUpdater = new FakeUpdater()
+    const devService = new AppUpdateService(
+      { isDev: true, isPackaged: false, version: '1.0.0' },
+      devUpdater
+    )
+    const unpackagedUpdater = new FakeUpdater()
+    const unpackagedService = new AppUpdateService(
+      { isDev: false, isPackaged: false, version: '1.0.0' },
+      unpackagedUpdater
+    )
+
+    devService.initialize()
+    unpackagedService.initialize()
+    devService.scheduleStartupCheck(schedule)
+    unpackagedService.scheduleStartupCheck(schedule)
+
+    expect(schedule).not.toHaveBeenCalled()
+    expect(devUpdater.checkForUpdates).not.toHaveBeenCalled()
+    expect(unpackagedUpdater.checkForUpdates).not.toHaveBeenCalled()
+    expect(devService.getStatus()).toMatchObject({
+      state: 'disabled',
+      disabledReason: 'development'
+    })
+    expect(unpackagedService.getStatus()).toMatchObject({
+      state: 'disabled',
+      disabledReason: 'unpackaged'
+    })
+  })
+
   it('configures stable builds to use stable GitHub metadata only', () => {
     const updater = new FakeUpdater()
     const service = new AppUpdateService(
@@ -147,6 +178,45 @@ describe('AppUpdateService', () => {
     expect(status).toMatchObject({ state: 'not-available', updateVersion: '1.0.0' })
   })
 
+  it('runs one quiet packaged startup check and broadcasts the existing status lifecycle', async () => {
+    const updater = new FakeUpdater()
+    updater.checkForUpdates.mockResolvedValueOnce({
+      isUpdateAvailable: true,
+      updateInfo: updateInfo('1.1.0'),
+      versionInfo: updateInfo('1.1.0')
+    })
+    const broadcast = vi.fn()
+    const service = new AppUpdateService(
+      { isDev: false, isPackaged: true, version: '1.0.0' },
+      updater,
+      broadcast
+    )
+    const startupChecks: Array<() => void> = []
+    const schedule = vi.fn((callback: () => void, delayMs: number) => {
+      startupChecks.push(callback)
+      return delayMs
+    })
+    service.initialize()
+
+    service.scheduleStartupCheck(schedule)
+    service.scheduleStartupCheck(schedule)
+    startupChecks[0]()
+    await vi.waitFor(() => expect(updater.checkForUpdates).toHaveBeenCalledTimes(1))
+
+    expect(schedule).toHaveBeenCalledTimes(1)
+    expect(schedule).toHaveBeenCalledWith(expect.any(Function), 5000)
+    expect(updater.autoDownload).toBe(false)
+    expect(updater.autoInstallOnAppQuit).toBe(false)
+    expect(service.getStatus()).toMatchObject({
+      state: 'available',
+      updateVersion: '1.1.0'
+    })
+    expect(broadcast).toHaveBeenCalledWith(expect.objectContaining({ state: 'checking' }))
+    expect(broadcast).toHaveBeenCalledWith(
+      expect.objectContaining({ state: 'available', updateVersion: '1.1.0' })
+    )
+  })
+
   it('turns provider failures into a retryable error status', async () => {
     const updater = new FakeUpdater()
     updater.checkForUpdates.mockRejectedValueOnce(new Error('GitHub returned 503'))
@@ -160,6 +230,37 @@ describe('AppUpdateService', () => {
     const status = await service.checkForUpdates()
 
     expect(status).toMatchObject({ state: 'error', errorMessage: 'GitHub returned 503' })
+  })
+
+  it('leaves the manual check action available after a failed startup check', async () => {
+    const updater = new FakeUpdater()
+    updater.checkForUpdates
+      .mockRejectedValueOnce(new Error('GitHub returned 503'))
+      .mockResolvedValueOnce({
+        isUpdateAvailable: false,
+        updateInfo: updateInfo('1.0.0'),
+        versionInfo: updateInfo('1.0.0')
+      })
+    const service = new AppUpdateService(
+      { isDev: false, isPackaged: true, version: '1.0.0' },
+      updater,
+      vi.fn()
+    )
+    service.initialize()
+
+    service.scheduleStartupCheck((callback) => {
+      callback()
+      return null
+    })
+    await vi.waitFor(() => expect(service.getStatus().state).toBe('error'))
+    const status = await service.checkForUpdates()
+
+    expect(updater.checkForUpdates).toHaveBeenCalledTimes(2)
+    expect(status).toMatchObject({
+      state: 'not-available',
+      errorMessage: null,
+      updateVersion: '1.0.0'
+    })
   })
 })
 

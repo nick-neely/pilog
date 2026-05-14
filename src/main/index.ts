@@ -100,6 +100,7 @@ app.whenReady().then(async () => {
   })
   appUpdateService.initialize()
   registerAppUpdateIpcHandlers(appUpdateService)
+  appUpdateService.scheduleStartupCheck()
 
   registerIpcHandlers(db, {
     onNoteCreated: broadcastNoteCreated,

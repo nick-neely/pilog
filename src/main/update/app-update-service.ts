@@ -13,6 +13,10 @@ type UpdaterEvent =
   | 'update-downloaded'
   | 'error'
 
+type ScheduleStartupCheck = (callback: () => void, delayMs: number) => unknown
+
+const STARTUP_UPDATE_CHECK_DELAY_MS = 5_000
+
 export type AppUpdateUpdater = {
   autoDownload: boolean
   autoInstallOnAppQuit: boolean
@@ -75,6 +79,7 @@ function disabledReason(
 export class AppUpdateService {
   private status: AppUpdateStatus
   private initialized = false
+  private startupCheckScheduled = false
   private readonly updater: AppUpdateUpdater | null
 
   constructor(
@@ -135,9 +140,23 @@ export class AppUpdateService {
     return this.status
   }
 
+  scheduleStartupCheck(
+    schedule: ScheduleStartupCheck = setTimeout,
+    delayMs = STARTUP_UPDATE_CHECK_DELAY_MS
+  ): void {
+    if (this.startupCheckScheduled || this.status.state === 'disabled') return
+    if (!this.updater) return
+    this.startupCheckScheduled = true
+
+    schedule(() => {
+      void this.checkForUpdates()
+    }, delayMs)
+  }
+
   async checkForUpdates(): Promise<AppUpdateStatus> {
     if (this.status.state === 'disabled') return this.status
     if (!this.updater) return this.status
+    this.setStatus({ state: 'checking', errorMessage: null })
     try {
       const result = await this.updater.checkForUpdates()
       this.setStatusFromCheckResult(result)
