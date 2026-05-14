@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { createInMemoryDatabase, type PilogDatabase } from '../db/client'
@@ -439,6 +439,75 @@ describe('local-repo-service', () => {
       expect(repo.accessKind).toBe('wsl')
       expect(repo.wslDistro).toBe('Ubuntu')
       expect(repo.wslPath).toBe('/home/neely/dev/pilog')
+    })
+  })
+
+  describe('refreshRepoIndex', () => {
+    it('refreshes an existing Repo Index and updates its freshness metadata', async () => {
+      const repoPath = await mkdtemp(path.join(os.tmpdir(), 'pilog-refresh-index-'))
+      await mkdir(path.join(repoPath, 'src'))
+      await writeFile(path.join(repoPath, 'package-lock.json'), '')
+      clientMock.getOctokitClient.mockReturnValue({})
+      clientMock.listLabels.mockResolvedValue([])
+
+      const repo = await service.linkRepo(db, {
+        localPath: repoPath,
+        githubRepo: mockGitHubRepo,
+        defaultBranch: 'main'
+      })
+      const originalIndexedAt = repo.repoIndex?.lastIndexedAt
+
+      await mkdir(path.join(repoPath, 'tests'))
+      await writeFile(path.join(repoPath, 'pnpm-lock.yaml'), '')
+
+      const refreshed = await service.refreshRepoIndex(db, repo.id)
+
+      if (!refreshed) throw new Error('Expected Repo Index refresh to return the repo.')
+      expect(refreshed.repoIndex).toMatchObject({
+        status: 'ready',
+        packageManager: 'pnpm',
+        importantDirectories: [
+          { path: 'src', role: 'Source' },
+          { path: 'tests', role: 'Tests' }
+        ],
+        errorMessage: null
+      })
+      expect(Date.parse(refreshed.repoIndex?.lastIndexedAt ?? '')).toBeGreaterThanOrEqual(
+        Date.parse(originalIndexedAt ?? '')
+      )
+      expect(listDbRepos(db)[0].repoIndex).toMatchObject({
+        status: 'ready',
+        packageManager: 'pnpm'
+      })
+    })
+
+    it('stores a recoverable refresh failure for an existing Repo Index', async () => {
+      const repoPath = await mkdtemp(path.join(os.tmpdir(), 'pilog-refresh-fail-'))
+      await mkdir(path.join(repoPath, 'src'))
+      clientMock.getOctokitClient.mockReturnValue({})
+      clientMock.listLabels.mockResolvedValue([])
+
+      const repo = await service.linkRepo(db, {
+        localPath: repoPath,
+        githubRepo: mockGitHubRepo,
+        defaultBranch: 'main'
+      })
+
+      await rm(repoPath, { recursive: true, force: true })
+
+      const refreshed = await service.refreshRepoIndex(db, repo.id)
+
+      expect(refreshed?.repoIndex).toMatchObject({
+        status: 'failed',
+        lastIndexedAt: repo.repoIndex?.lastIndexedAt,
+        packageManager: repo.repoIndex?.packageManager,
+        importantDirectories: [{ path: 'src', role: 'Source' }],
+        errorMessage: expect.stringContaining('ENOENT')
+      })
+      expect(listDbRepos(db)[0].repoIndex).toMatchObject({
+        status: 'failed',
+        importantDirectories: [{ path: 'src', role: 'Source' }]
+      })
     })
   })
 })

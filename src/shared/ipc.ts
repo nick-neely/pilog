@@ -131,7 +131,7 @@ export type RepoIndexStatus =
       status: 'failed'
       lastIndexedAt: string | null
       indexVersion: number
-      packageManager: null
+      packageManager: string | null
       frameworkSignals: string[]
       importantDirectories: RepoIndexDirectory[]
       exclusionSummary: RepoIndexExclusionSummary
@@ -401,6 +401,7 @@ export type IpcContract = {
   'repos:list': { request: void; response: Repo[] }
   'repos:detectLocal': { request: { localPath: string }; response: DetectLocalRepoResult }
   'repos:link': { request: LinkRepoRequest; response: Repo }
+  'repos:refreshIndex': { request: { id: string }; response: Repo | null }
   'repos:updateAutoPublishSettings': {
     request: UpdateRepoAutoPublishSettingsRequest
     response: Repo | null

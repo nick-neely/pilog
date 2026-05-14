@@ -21,7 +21,8 @@ describe('getRepoIndexStatusLabel', () => {
   it('maps missing and failed Repo Index states without hiding failures', () => {
     expect(getRepoIndexStatusLabel(null)).toEqual({
       label: 'Not created',
-      ariaLabel: 'Repo Index not created'
+      ariaLabel: 'Repo Index not created',
+      canRefresh: false
     })
 
     expect(
@@ -43,7 +44,36 @@ describe('getRepoIndexStatusLabel', () => {
       })
     ).toEqual({
       label: 'Failed: EACCES: permission denied',
-      ariaLabel: 'Repo Index failed: EACCES: permission denied'
+      ariaLabel: 'Repo Index failed: EACCES: permission denied',
+      canRefresh: true
+    })
+  })
+
+  it('maps an active refresh without losing the previous freshness label', () => {
+    const view = getRepoIndexStatusLabel(
+      {
+        status: 'ready',
+        lastIndexedAt: '2026-05-14T12:30:00.000Z',
+        indexVersion: 1,
+        packageManager: 'pnpm',
+        frameworkSignals: [],
+        importantDirectories: [],
+        exclusionSummary: {
+          dependency: 0,
+          buildOutput: 0,
+          generated: 0,
+          binaryHeavy: 0,
+          ignored: 0
+        },
+        errorMessage: null
+      },
+      { refreshing: true }
+    )
+
+    expect(view).toEqual({
+      label: expect.stringContaining('Refreshing'),
+      ariaLabel: expect.stringContaining('Repo Index refresh in progress'),
+      canRefresh: false
     })
   })
 })

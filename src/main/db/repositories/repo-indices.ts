@@ -39,6 +39,7 @@ type UpsertRepoIndexInput =
       status: 'failed'
       indexVersion: number
       errorMessage: string
+      previousIndex?: RepoIndexStatus | null
     }
 
 export function upsertRepoIndex(
@@ -80,15 +81,16 @@ function buildRepoIndexValues(
   now: string
 ): typeof repoIndices.$inferInsert {
   if (input.status === 'failed') {
+    const previousIndex = input.previousIndex ?? null
     return {
       repoId,
       status: input.status,
       indexVersion: input.indexVersion,
-      lastIndexedAt: null,
-      packageManager: null,
-      frameworkSignals: JSON.stringify([]),
-      importantDirectories: JSON.stringify([]),
-      exclusionSummary: JSON.stringify(EMPTY_EXCLUSION_SUMMARY),
+      lastIndexedAt: previousIndex?.lastIndexedAt ?? null,
+      packageManager: previousIndex?.packageManager ?? null,
+      frameworkSignals: JSON.stringify(previousIndex?.frameworkSignals ?? []),
+      importantDirectories: JSON.stringify(previousIndex?.importantDirectories ?? []),
+      exclusionSummary: JSON.stringify(previousIndex?.exclusionSummary ?? EMPTY_EXCLUSION_SUMMARY),
       errorMessage: input.errorMessage,
       createdAt: now,
       updatedAt: now
@@ -130,7 +132,7 @@ function mapRepoIndexRow(row: RepoIndexRow): RepoIndexStatus {
       status: 'failed',
       lastIndexedAt: row.lastIndexedAt,
       indexVersion: row.indexVersion,
-      packageManager: null,
+      packageManager: row.packageManager,
       frameworkSignals,
       importantDirectories,
       exclusionSummary,

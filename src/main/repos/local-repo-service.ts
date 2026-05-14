@@ -7,8 +7,8 @@ import {
   type LocalGitMetadata
 } from './git'
 import { getOctokitClient, listLabels, listRepos } from '../github/client'
-import { createRepo } from '../db/repositories/repos'
-import { upsertRepoIndex } from '../db/repositories/repo-indices'
+import { createRepo, getRepoById } from '../db/repositories/repos'
+import { getRepoIndex, upsertRepoIndex } from '../db/repositories/repo-indices'
 import type { PilogDatabase } from '../db/client'
 import type {
   DetectLocalRepoResult,
@@ -117,6 +117,26 @@ export async function linkRepo(db: PilogDatabase, request: LinkRepoRequest): Pro
       status: 'failed',
       indexVersion: REPO_INDEX_VERSION,
       errorMessage: err instanceof Error ? err.message : 'Repo Index creation failed.'
+    })
+    return { ...repo, repoIndex }
+  }
+}
+
+export async function refreshRepoIndex(db: PilogDatabase, repoId: string): Promise<Repo | null> {
+  const repo = getRepoById(db, repoId)
+  if (!repo || !repo.repoIndex) return repo
+
+  try {
+    const snapshot = await createRepoIndexSnapshot(repo.localPath)
+    const repoIndex = upsertRepoIndex(db, repo.id, { status: 'ready', ...snapshot })
+    return { ...repo, repoIndex }
+  } catch (err) {
+    const previousIndex = getRepoIndex(db, repo.id)
+    const repoIndex = upsertRepoIndex(db, repo.id, {
+      status: 'failed',
+      indexVersion: previousIndex?.indexVersion ?? REPO_INDEX_VERSION,
+      previousIndex,
+      errorMessage: err instanceof Error ? err.message : 'Repo Index refresh failed.'
     })
     return { ...repo, repoIndex }
   }

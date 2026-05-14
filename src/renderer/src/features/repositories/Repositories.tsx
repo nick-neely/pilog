@@ -7,6 +7,7 @@ import {
   ArrowDown01Icon,
   ArrowLeft01Icon,
   ArrowUp01Icon,
+  Refresh01Icon,
   RepositoryIcon,
   Tick02Icon
 } from '@hugeicons/core-free-icons'
@@ -584,6 +585,7 @@ function RepoRow({
 }): React.JSX.Element {
   const [showNewIssue, setShowNewIssue] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [refreshingIndex, setRefreshingIndex] = useState(false)
 
   const hasGuardrails =
     repo.autoPublishEnabled ||
@@ -593,7 +595,20 @@ function RepoRow({
     repo.autoPublishDryRun ||
     !repo.autoPublishRequireConfirmation
   const repoLocation = formatRepoLocation(repo)
-  const repoIndexStatus = getRepoIndexStatusLabel(repo.repoIndex ?? null)
+  const repoIndexStatus = getRepoIndexStatusLabel(repo.repoIndex ?? null, {
+    refreshing: refreshingIndex
+  })
+
+  const handleRefreshIndex = async (): Promise<void> => {
+    if (!repoIndexStatus.canRefresh) return
+    setRefreshingIndex(true)
+    try {
+      await window.pilog.invoke('repos:refreshIndex', { id: repo.id })
+      onUpdated()
+    } finally {
+      setRefreshingIndex(false)
+    }
+  }
 
   return (
     <>
@@ -630,12 +645,27 @@ function RepoRow({
                 Branch: <span className="font-mono">{repo.defaultBranch}</span>
               </p>
             )}
-            <p className="text-xs text-muted-foreground" aria-label={repoIndexStatus.ariaLabel}>
+            <p
+              className="text-xs text-muted-foreground"
+              aria-label={repoIndexStatus.ariaLabel}
+              aria-live="polite"
+            >
               Repo Index: <span className="text-foreground">{repoIndexStatus.label}</span>
             </p>
           </div>
 
           <div className="flex shrink-0 items-center gap-1">
+            {repo.repoIndex ? (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleRefreshIndex}
+                disabled={!repoIndexStatus.canRefresh}
+              >
+                <HugeiconsIcon icon={Refresh01Icon} strokeWidth={2} data-icon="inline-start" />
+                {refreshingIndex ? 'Re-indexing...' : 'Re-index repo'}
+              </Button>
+            ) : null}
             <Button size="sm" variant="outline" onClick={() => setShowNewIssue(true)}>
               New Issue
             </Button>

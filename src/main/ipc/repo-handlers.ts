@@ -7,7 +7,7 @@ import {
   getRepoById,
   updateRepoAutoPublishSettings
 } from '../db/repositories/repos'
-import { detectLocalRepo, linkRepo } from '../repos/local-repo-service'
+import { detectLocalRepo, linkRepo, refreshRepoIndex } from '../repos/local-repo-service'
 import { resolveDefaultIssueTemplate } from '../github/issue-templates'
 import { getRuntimeReadiness } from '../runtime-readiness'
 
@@ -26,6 +26,10 @@ export function registerRepoIpcHandlers(db: PilogDatabase): void {
 
   ipcMain.handle('repos:link', async (_event, request: LinkRepoRequest) => {
     return linkRepo(db, request)
+  })
+
+  ipcMain.handle('repos:refreshIndex', async (_event, request: { id: string }) => {
+    return refreshRepoIndex(db, request.id)
   })
 
   ipcMain.handle(
