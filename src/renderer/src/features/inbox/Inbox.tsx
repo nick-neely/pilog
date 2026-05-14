@@ -23,6 +23,7 @@ import {
 } from '@renderer/components/ui/alert-dialog'
 import { Badge } from '@renderer/components/ui/badge'
 import { Button } from '@renderer/components/ui/button'
+import { Checkbox } from '@renderer/components/ui/checkbox'
 import {
   ContextMenu,
   ContextMenuContent,
@@ -70,6 +71,14 @@ import {
   GENERATION_EGRESS_DISCLOSURE,
   LOCAL_FIRST_DISCLOSURE
 } from '@shared/data-boundaries'
+import {
+  applyRepoDraftSettingsOverride,
+  isIssueStyleAudience,
+  isIssueStyleDepth,
+  normalizeRepoDraftSettings,
+  type RepoDraftSettings,
+  type UpdateRepoDraftSettingsRequest
+} from '@shared/ipc'
 import type {
   GenerateDraftsMode,
   GitHubStatus,
@@ -118,6 +127,10 @@ import {
   getGenerationRepoIndexStatus,
   type GenerationRepoIndexStatusView
 } from '../repositories/repo-index-status'
+import {
+  DRAFT_CONTENT_TOGGLE_LABELS,
+  draftSettingsSummary
+} from '../repositories/repo-draft-defaults'
 import { GitHubDeviceCode } from '../setup/GitHubDeviceCode'
 import { PiSetupPanel } from '../setup/PiSetupPanel'
 import { RepoLinkFlow } from '../setup/RepoLinkFlow'
@@ -202,6 +215,16 @@ type NoteDraftLink = {
   title: string
   status: IssueDraftStatus
   updatedAt: string
+}
+
+type DraftSettingsOverrideState = {
+  repoId: string
+  settings: RepoDraftSettings
+}
+
+type DraftSettingsMessageState = {
+  repoId: string
+  message: string
 }
 
 type AutoPublishPreviewState = {
@@ -340,6 +363,39 @@ function mapDraftLinksByNote(drafts: IssueDraftForReview[]): Map<string, NoteDra
   })
 
   return linksByNote
+}
+
+function getActiveDraftSettings(
+  repo: Repo | null,
+  override: RepoDraftSettings | null
+): RepoDraftSettings | null {
+  if (!repo) return null
+  if (override) return normalizeRepoDraftSettings(override)
+  return normalizeRepoDraftSettings(repo)
+}
+
+function hasDraftSettingsChanges(repo: Repo | null, active: RepoDraftSettings | null): boolean {
+  if (!repo || !active) return false
+  if (active.issueStyleDepth !== repo.issueStyleDepth) return true
+  if (active.issueStyleAudience !== repo.issueStyleAudience) return true
+
+  return DRAFT_CONTENT_TOGGLE_LABELS.some(
+    ({ key }) => active.draftContentToggles[key] !== repo.draftContentToggles[key]
+  )
+}
+
+function getDraftSettingsStatusMessage(input: {
+  repo: Repo
+  hasOverride: boolean
+  message: string | null
+}): string {
+  if (input.message) return input.message
+  if (input.hasOverride) return 'Overrides apply to this run only until saved.'
+  return `Repo default for ${input.repo.owner}/${input.repo.name}.`
+}
+
+function getDraftSettingsForRun(repo: Repo, override: RepoDraftSettings | null): RepoDraftSettings {
+  return normalizeRepoDraftSettings(applyRepoDraftSettingsOverride(repo, override ?? undefined))
 }
 
 function getGenerateDraftsReason(input: {
@@ -1869,6 +1925,30 @@ export function Inbox({
   const selectedRepo = selectedRepoId ? (reposById.get(selectedRepoId) ?? null) : null
   const currentInboxRepo =
     typeof repoFilter === 'string' ? (reposById.get(repoFilter) ?? null) : null
+  const draftSettingsRepo = selectedRepo ?? (!hasSelection ? currentInboxRepo : null)
+  const draftSettingsRepoId = draftSettingsRepo?.id ?? null
+  const [draftSettingsOverrideState, setDraftSettingsOverrideState] =
+    useState<DraftSettingsOverrideState | null>(null)
+  const [savingDraftSettingsDefault, setSavingDraftSettingsDefault] = useState(false)
+  const [draftSettingsMessageState, setDraftSettingsMessageState] =
+    useState<DraftSettingsMessageState | null>(null)
+  const draftSettingsOverride =
+    draftSettingsOverrideState?.repoId === draftSettingsRepoId
+      ? draftSettingsOverrideState.settings
+      : null
+  const draftSettingsMessage =
+    draftSettingsMessageState?.repoId === draftSettingsRepoId
+      ? draftSettingsMessageState.message
+      : null
+  const activeDraftSettings = getActiveDraftSettings(draftSettingsRepo, draftSettingsOverride)
+  const hasDraftSettingsOverride = hasDraftSettingsChanges(draftSettingsRepo, activeDraftSettings)
+  const draftSettingsStatusMessage = draftSettingsRepo
+    ? getDraftSettingsStatusMessage({
+        repo: draftSettingsRepo,
+        hasOverride: hasDraftSettingsOverride,
+        message: draftSettingsMessage
+      })
+    : null
   const canGenerateDrafts =
     hasSelection &&
     selectedNotesAllUnprocessed &&
@@ -1967,41 +2047,81 @@ export function Inbox({
       : 'No notes yet. Capture a thought from the footer below.'
   }, [statusFilter, repoFilter])
 
+  const updateRunDraftSettings = (next: RepoDraftSettings): void => {
+    if (!draftSettingsRepoId) return
+    setDraftSettingsOverrideState({
+      repoId: draftSettingsRepoId,
+      settings: normalizeRepoDraftSettings(next)
+    })
+    setDraftSettingsMessageState(null)
+  }
+
+  const handleSaveRunDraftSettingsAsDefault = async (): Promise<void> => {
+    if (!draftSettingsRepo || !activeDraftSettings || !hasDraftSettingsOverride) return
+    const repoId = draftSettingsRepo.id
+    setSavingDraftSettingsDefault(true)
+    setDraftSettingsMessageState(null)
+    const request: UpdateRepoDraftSettingsRequest = {
+      id: repoId,
+      ...activeDraftSettings
+    }
+    try {
+      const updated = await window.pilog.invoke('repos:updateDraftSettings', request)
+      if (!updated) {
+        setDraftSettingsMessageState({ repoId, message: 'Could not save repo defaults.' })
+        return
+      }
+      setRepos((current) => current.map((repo) => (repo.id === updated.id ? updated : repo)))
+      setDraftSettingsOverrideState(null)
+      setDraftSettingsMessageState({ repoId, message: 'Saved as repo default.' })
+    } catch {
+      setDraftSettingsMessageState({ repoId, message: 'Could not save repo defaults.' })
+    } finally {
+      setSavingDraftSettingsDefault(false)
+    }
+  }
+
   const handleGenerateDrafts = async (mode: GenerateDraftsMode): Promise<void> => {
     if (!canGenerateDrafts) return
     if (mode === 'auto-publish-preview' && !canGenerateAndPublish) return
     const selectedNoteSnapshot = [...selectedNotes]
     const selectedIdSnapshot = Array.from(selectedIds)
+    const draftSettingsSnapshot = selectedRepo
+      ? getDraftSettingsForRun(selectedRepo, draftSettingsOverride)
+      : undefined
     setGenerating(true)
     setGenerationError(null)
     try {
-      await window.pilog.runAgent({ noteIds: selectedIdSnapshot, mode }, async (event) => {
-        if (event.type === 'final') {
-          if (!mountedRef.current) return
-          await Promise.all([fetchNotes(), fetchStatusCounts(), fetchDraftLinks()])
-          if (mode === 'auto-publish-preview' && event.autoPublishPreview) {
-            setAutoPublishPreview({
-              open: true,
-              summary: event.autoPublishPreview,
-              drafts: event.drafts,
-              sourceNotes: selectedNoteSnapshot,
-              report: null,
-              publishing: false,
-              publishError: null
-            })
-          } else {
-            await completeOnboardingIfNeeded()
-            clearSelection()
-            onNavigateToDraftReview()
+      await window.pilog.runAgent(
+        { noteIds: selectedIdSnapshot, mode, draftSettingsOverride: draftSettingsSnapshot },
+        async (event) => {
+          if (event.type === 'final') {
+            if (!mountedRef.current) return
+            await Promise.all([fetchNotes(), fetchStatusCounts(), fetchDraftLinks()])
+            if (mode === 'auto-publish-preview' && event.autoPublishPreview) {
+              setAutoPublishPreview({
+                open: true,
+                summary: event.autoPublishPreview,
+                drafts: event.drafts,
+                sourceNotes: selectedNoteSnapshot,
+                report: null,
+                publishing: false,
+                publishError: null
+              })
+            } else {
+              await completeOnboardingIfNeeded()
+              clearSelection()
+              onNavigateToDraftReview()
+            }
+          }
+          if (event.type === 'error') {
+            if (!mountedRef.current) return
+            setGenerationError(
+              getGenerationErrorState({ message: event.message, cause: event.cause })
+            )
           }
         }
-        if (event.type === 'error') {
-          if (!mountedRef.current) return
-          setGenerationError(
-            getGenerationErrorState({ message: event.message, cause: event.cause })
-          )
-        }
-      })
+      )
     } catch (error) {
       if (mountedRef.current) {
         const message = getErrorMessage(error, String(error))
@@ -2085,6 +2205,7 @@ export function Inbox({
 
   const handleProcessCurrentInbox = async (): Promise<void> => {
     if (!currentInboxRepo || !canProcessCurrentInbox) return
+    const draftSettingsSnapshot = getDraftSettingsForRun(currentInboxRepo, draftSettingsOverride)
     setCurrentInboxMessage(null)
     setGenerationError(null)
     const sourceNoteSnapshot = await window.pilog.invoke('note:list', {
@@ -2094,7 +2215,11 @@ export function Inbox({
     setGenerating(true)
     try {
       const start = await window.pilog.runCurrentInboxAgent(
-        { repoId: currentInboxRepo.id, mode: 'auto-publish-preview' },
+        {
+          repoId: currentInboxRepo.id,
+          mode: 'auto-publish-preview',
+          draftSettingsOverride: draftSettingsSnapshot
+        },
         async (event) => {
           if (event.type === 'final') {
             if (!mountedRef.current) return
@@ -2577,6 +2702,106 @@ export function Inbox({
                       Configure Pi to generate drafts
                     </Button>
                   )}
+                  {draftSettingsRepo && activeDraftSettings ? (
+                    <div className="flex flex-col gap-2 rounded-md bg-muted/40 p-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="truncate text-xs font-medium">
+                            Style: {draftSettingsSummary(activeDraftSettings)}
+                          </p>
+                          <p className="text-xs text-muted-foreground" aria-live="polite">
+                            {draftSettingsStatusMessage}
+                          </p>
+                        </div>
+                        <Button
+                          type="button"
+                          size="xs"
+                          variant="outline"
+                          disabled={!hasDraftSettingsOverride || savingDraftSettingsDefault}
+                          onClick={() => void handleSaveRunDraftSettingsAsDefault()}
+                        >
+                          {savingDraftSettingsDefault ? 'Saving' : 'Save default'}
+                        </Button>
+                      </div>
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        <Select
+                          value={activeDraftSettings.issueStyleDepth}
+                          onValueChange={(value) => {
+                            if (!isIssueStyleDepth(value)) return
+                            updateRunDraftSettings({
+                              ...activeDraftSettings,
+                              issueStyleDepth: value
+                            })
+                          }}
+                          disabled={generating}
+                        >
+                          <SelectTrigger
+                            className="h-8 rounded-md text-xs"
+                            aria-label="Issue style depth"
+                          >
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectGroup>
+                              <SelectItem value="concise">Concise</SelectItem>
+                              <SelectItem value="balanced">Balanced</SelectItem>
+                              <SelectItem value="detailed">Detailed</SelectItem>
+                            </SelectGroup>
+                          </SelectContent>
+                        </Select>
+                        <Select
+                          value={activeDraftSettings.issueStyleAudience}
+                          onValueChange={(value) => {
+                            if (!isIssueStyleAudience(value)) return
+                            updateRunDraftSettings({
+                              ...activeDraftSettings,
+                              issueStyleAudience: value
+                            })
+                          }}
+                          disabled={generating}
+                        >
+                          <SelectTrigger
+                            className="h-8 rounded-md text-xs"
+                            aria-label="Issue style audience"
+                          >
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectGroup>
+                              <SelectItem value="internal">Internal</SelectItem>
+                              <SelectItem value="open_source">Open source</SelectItem>
+                            </SelectGroup>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="grid gap-1 sm:grid-cols-2">
+                        {DRAFT_CONTENT_TOGGLE_LABELS.map((item) => (
+                          <label
+                            key={item.key}
+                            htmlFor={`run-${item.key}-${draftSettingsRepo.id}`}
+                            className="flex min-w-0 items-center gap-2 rounded-sm px-1 py-0.5 text-xs"
+                          >
+                            <Checkbox
+                              id={`run-${item.key}-${draftSettingsRepo.id}`}
+                              checked={activeDraftSettings.draftContentToggles[item.key]}
+                              disabled={generating}
+                              onCheckedChange={(checked) =>
+                                updateRunDraftSettings({
+                                  ...activeDraftSettings,
+                                  draftContentToggles: {
+                                    ...activeDraftSettings.draftContentToggles,
+                                    [item.key]: checked === true
+                                  }
+                                })
+                              }
+                              aria-label={item.label}
+                            />
+                            <span className="truncate">{item.label}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
               ) : (
                 <div className="flex w-full flex-col gap-1.5">

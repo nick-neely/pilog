@@ -215,11 +215,26 @@ export type AutoPublishPublishReport = {
 export type GenerateDraftsRequest = {
   noteIds: string[]
   mode?: GenerateDraftsMode
+  draftSettingsOverride?: GenerateDraftSettingsOverride
 }
 
 export type GenerateCurrentInboxDraftsRequest = {
   repoId: string
   mode?: GenerateDraftsMode
+  draftSettingsOverride?: GenerateDraftSettingsOverride
+}
+
+export type GenerateDraftSettingsOverride = {
+  issueStyleDepth?: 'concise' | 'balanced' | 'detailed'
+  issueStyleAudience?: 'internal' | 'open_source'
+  draftContentToggles?: {
+    includeImplementationNotes?: boolean
+    includeAffectedFiles?: boolean
+    includeSourceNotes?: boolean
+    includeAcceptanceCriteria?: boolean
+    includeConfidenceRationale?: boolean
+    includeReproductionSteps?: boolean
+  }
 }
 
 export type GenerateDraftsStartResponse = {
