@@ -39,7 +39,6 @@ type UpsertRepoIndexInput =
       status: 'failed'
       indexVersion: number
       errorMessage: string
-      previousIndex?: RepoIndexStatus | null
     }
 
 export function upsertRepoIndex(
@@ -49,7 +48,7 @@ export function upsertRepoIndex(
 ): RepoIndexStatus {
   const now = new Date().toISOString()
   const existing = getRepoIndex(db, repoId)
-  const values = buildRepoIndexValues(repoId, input, now)
+  const values = buildRepoIndexValues(repoId, input, now, existing)
 
   if (existing) {
     db.update(repoIndices)
@@ -78,19 +77,19 @@ export function upsertRepoIndex(
 function buildRepoIndexValues(
   repoId: string,
   input: UpsertRepoIndexInput,
-  now: string
+  now: string,
+  existing: RepoIndexStatus | null
 ): typeof repoIndices.$inferInsert {
   if (input.status === 'failed') {
-    const previousIndex = input.previousIndex ?? null
     return {
       repoId,
       status: input.status,
       indexVersion: input.indexVersion,
-      lastIndexedAt: previousIndex?.lastIndexedAt ?? null,
-      packageManager: previousIndex?.packageManager ?? null,
-      frameworkSignals: JSON.stringify(previousIndex?.frameworkSignals ?? []),
-      importantDirectories: JSON.stringify(previousIndex?.importantDirectories ?? []),
-      exclusionSummary: JSON.stringify(previousIndex?.exclusionSummary ?? EMPTY_EXCLUSION_SUMMARY),
+      lastIndexedAt: existing?.lastIndexedAt ?? null,
+      packageManager: existing?.packageManager ?? null,
+      frameworkSignals: JSON.stringify(existing?.frameworkSignals ?? []),
+      importantDirectories: JSON.stringify(existing?.importantDirectories ?? []),
+      exclusionSummary: JSON.stringify(existing?.exclusionSummary ?? EMPTY_EXCLUSION_SUMMARY),
       errorMessage: input.errorMessage,
       createdAt: now,
       updatedAt: now

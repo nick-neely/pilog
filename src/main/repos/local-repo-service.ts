@@ -8,7 +8,7 @@ import {
 } from './git'
 import { getOctokitClient, listLabels, listRepos } from '../github/client'
 import { createRepo, getRepoById } from '../db/repositories/repos'
-import { getRepoIndex, upsertRepoIndex } from '../db/repositories/repo-indices'
+import { upsertRepoIndex } from '../db/repositories/repo-indices'
 import type { PilogDatabase } from '../db/client'
 import type {
   DetectLocalRepoResult,
@@ -131,11 +131,9 @@ export async function refreshRepoIndex(db: PilogDatabase, repoId: string): Promi
     const repoIndex = upsertRepoIndex(db, repo.id, { status: 'ready', ...snapshot })
     return { ...repo, repoIndex }
   } catch (err) {
-    const previousIndex = getRepoIndex(db, repo.id)
     const repoIndex = upsertRepoIndex(db, repo.id, {
       status: 'failed',
-      indexVersion: previousIndex?.indexVersion ?? REPO_INDEX_VERSION,
-      previousIndex,
+      indexVersion: repo.repoIndex.indexVersion,
       errorMessage: err instanceof Error ? err.message : 'Repo Index refresh failed.'
     })
     return { ...repo, repoIndex }
