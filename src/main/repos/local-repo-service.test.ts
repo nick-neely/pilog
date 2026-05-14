@@ -1,4 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
+import os from 'node:os'
+import path from 'node:path'
 import { createInMemoryDatabase, type PilogDatabase } from '../db/client'
 import { runMigrations } from '../db/migrations'
 import { listRepos as listDbRepos } from '../db/repositories/repos'
@@ -342,6 +345,64 @@ describe('local-repo-service', () => {
       ])
       expect(repo.githubLabelsSyncedAt).toBeDefined()
       expect(clientMock.listLabels).toHaveBeenCalledWith('nick-neely', 'pilog')
+    })
+
+    it('creates a local Repo Index with lightweight signals when linking succeeds', async () => {
+      const repoPath = await mkdtemp(path.join(os.tmpdir(), 'pilog-index-'))
+      await mkdir(path.join(repoPath, 'src'))
+      await mkdir(path.join(repoPath, 'components'))
+      await mkdir(path.join(repoPath, 'node_modules'))
+      await mkdir(path.join(repoPath, 'dist'))
+      await writeFile(path.join(repoPath, 'pnpm-lock.yaml'), '')
+      await writeFile(
+        path.join(repoPath, 'package.json'),
+        JSON.stringify({ dependencies: { react: '^19.0.0', vite: '^7.0.0' } })
+      )
+      clientMock.getOctokitClient.mockReturnValue({})
+      clientMock.listLabels.mockResolvedValue([])
+
+      const repo = await service.linkRepo(db, {
+        localPath: repoPath,
+        githubRepo: mockGitHubRepo,
+        defaultBranch: 'main'
+      })
+
+      expect(repo.repoIndex).toMatchObject({
+        status: 'ready',
+        indexVersion: 1,
+        packageManager: 'pnpm',
+        frameworkSignals: ['React', 'Vite'],
+        importantDirectories: [
+          { path: 'components', role: 'Components' },
+          { path: 'src', role: 'Source' }
+        ],
+        exclusionSummary: expect.objectContaining({
+          dependency: 1,
+          buildOutput: 1
+        }),
+        errorMessage: null
+      })
+      expect(repo.repoIndex?.lastIndexedAt).toBeDefined()
+      expect(listDbRepos(db)[0].repoIndex?.status).toBe('ready')
+    })
+
+    it('keeps repo linking usable and stores a visible Repo Index failure', async () => {
+      clientMock.getOctokitClient.mockReturnValue({})
+      clientMock.listLabels.mockResolvedValue([])
+
+      const repo = await service.linkRepo(db, {
+        localPath: '/missing/projects/pilog',
+        githubRepo: mockGitHubRepo,
+        defaultBranch: 'main'
+      })
+
+      expect(repo.id).toBeDefined()
+      expect(repo.repoIndex).toMatchObject({
+        status: 'failed',
+        indexVersion: 1,
+        errorMessage: expect.stringContaining('ENOENT')
+      })
+      expect(listDbRepos(db)[0].repoIndex?.status).toBe('failed')
     })
 
     it('is the only path that writes to the repos table', async () => {

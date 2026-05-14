@@ -111,8 +111,44 @@ export type Repo = {
   autoPublishDefaultLabel: string
   autoPublishDryRun: boolean
   autoPublishRequireConfirmation: boolean
+  repoIndex?: RepoIndexStatus | null
   createdAt: string
   updatedAt: string
+}
+
+export type RepoIndexStatus =
+  | {
+      status: 'ready'
+      lastIndexedAt: string
+      indexVersion: number
+      packageManager: string | null
+      frameworkSignals: string[]
+      importantDirectories: RepoIndexDirectory[]
+      exclusionSummary: RepoIndexExclusionSummary
+      errorMessage: null
+    }
+  | {
+      status: 'failed'
+      lastIndexedAt: string | null
+      indexVersion: number
+      packageManager: null
+      frameworkSignals: string[]
+      importantDirectories: RepoIndexDirectory[]
+      exclusionSummary: RepoIndexExclusionSummary
+      errorMessage: string
+    }
+
+export type RepoIndexDirectory = {
+  path: string
+  role: string
+}
+
+export type RepoIndexExclusionSummary = {
+  dependency: number
+  buildOutput: number
+  generated: number
+  binaryHeavy: number
+  ignored: number
 }
 
 export type RepoAccessKind = 'host' | 'wsl'

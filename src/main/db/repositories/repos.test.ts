@@ -50,6 +50,7 @@ describe('repos repository', () => {
     expect(repo.autoPublishDefaultLabel).toBe('triaged-by-pilog')
     expect(repo.autoPublishDryRun).toBe(false)
     expect(repo.autoPublishRequireConfirmation).toBe(true)
+    expect(repo.repoIndex).toBeNull()
     expect(repo.githubLabels).toEqual([
       { id: 1, name: 'bug', color: 'd73a4a', description: 'Something is broken' },
       { id: 2, name: 'ready-for-agent', color: '0e8a16', description: null }

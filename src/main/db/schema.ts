@@ -37,6 +37,22 @@ export const repos = sqliteTable('repos', {
   updatedAt: text('updated_at').notNull()
 })
 
+export const repoIndices = sqliteTable('repo_indices', {
+  repoId: text('repo_id')
+    .primaryKey()
+    .references(() => repos.id, { onDelete: 'cascade' }),
+  status: text('status', { enum: ['ready', 'failed'] }).notNull(),
+  indexVersion: integer('index_version').notNull(),
+  lastIndexedAt: text('last_indexed_at'),
+  packageManager: text('package_manager'),
+  frameworkSignals: text('framework_signals').notNull().default('[]'),
+  importantDirectories: text('important_directories').notNull().default('[]'),
+  exclusionSummary: text('exclusion_summary').notNull().default('{}'),
+  errorMessage: text('error_message'),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull()
+})
+
 export const issueDrafts = sqliteTable('issue_drafts', {
   id: text('id').primaryKey(),
   repoId: text('repo_id')

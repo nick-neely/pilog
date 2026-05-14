@@ -55,6 +55,22 @@ export function runMigrations(db: PilogDatabase): void {
   `)
 
   db.run(sql`
+    CREATE TABLE IF NOT EXISTS repo_indices (
+      repo_id TEXT PRIMARY KEY REFERENCES repos(id) ON DELETE CASCADE,
+      status TEXT NOT NULL,
+      index_version INTEGER NOT NULL,
+      last_indexed_at TEXT,
+      package_manager TEXT,
+      framework_signals TEXT NOT NULL DEFAULT '[]',
+      important_directories TEXT NOT NULL DEFAULT '[]',
+      exclusion_summary TEXT NOT NULL DEFAULT '{}',
+      error_message TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )
+  `)
+
+  db.run(sql`
     CREATE TABLE IF NOT EXISTS agent_runs (
       id TEXT PRIMARY KEY,
       repo_id TEXT REFERENCES repos(id),

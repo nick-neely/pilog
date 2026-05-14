@@ -8,6 +8,7 @@ import {
 } from './git'
 import { getOctokitClient, listLabels, listRepos } from '../github/client'
 import { createRepo } from '../db/repositories/repos'
+import { upsertRepoIndex } from '../db/repositories/repo-indices'
 import type { PilogDatabase } from '../db/client'
 import type {
   DetectLocalRepoResult,
@@ -22,6 +23,7 @@ import {
   getBlockingRuntimeReadinessMessage,
   getRuntimeReadiness
 } from '../runtime-readiness'
+import { createRepoIndexSnapshot, REPO_INDEX_VERSION } from './repo-indexer'
 
 export async function detectLocalRepo(localPath: string): Promise<DetectLocalRepoResult> {
   const access = parseRepoAccessDescriptor(localPath)
@@ -95,7 +97,7 @@ export async function linkRepo(db: PilogDatabase, request: LinkRepoRequest): Pro
   const labelCache = await fetchInitialLabelCache(request.githubRepo.owner, request.githubRepo.name)
   const accessFields = getRepoAccessFields(request.access)
 
-  return createRepo(db, {
+  const repo = createRepo(db, {
     name: request.githubRepo.name,
     owner: request.githubRepo.owner,
     localPath: request.localPath,
@@ -105,6 +107,22 @@ export async function linkRepo(db: PilogDatabase, request: LinkRepoRequest): Pro
     githubLabels: labelCache.labels,
     githubLabelsSyncedAt: labelCache.syncedAt
   })
+
+  try {
+    const snapshot = await createRepoIndexSnapshot(request.access?.displayPath ?? request.localPath)
+    repo.repoIndex = upsertRepoIndex(db, repo.id, {
+      status: 'ready',
+      ...snapshot
+    })
+  } catch (err) {
+    repo.repoIndex = upsertRepoIndex(db, repo.id, {
+      status: 'failed',
+      indexVersion: REPO_INDEX_VERSION,
+      errorMessage: err instanceof Error ? err.message : 'Repo Index creation failed.'
+    })
+  }
+
+  return repo
 }
 
 async function fetchInitialLabelCache(

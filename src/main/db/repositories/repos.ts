@@ -7,9 +7,11 @@ import {
   normalizeRepoAutoPublishSettings,
   type GitHubLabel,
   type Repo,
+  type RepoIndexStatus,
   type RepoAccessKind,
   type UpdateRepoAutoPublishSettingsRequest
 } from '@shared/ipc'
+import { getRepoIndex, listRepoIndices } from './repo-indices'
 
 export const repoColumns = {
   id: repos.id,
@@ -87,18 +89,24 @@ export function createRepo(
     githubLabels,
     githubLabelsSyncedAt,
     ...DEFAULT_REPO_AUTO_PUBLISH_SETTINGS,
+    repoIndex: null,
     createdAt: now,
     updatedAt: now
   }
 }
 
 export function listRepos(db: PilogDatabase): Repo[] {
-  return db.select(repoColumns).from(repos).all().map(mapRepoRow)
+  const indices = listRepoIndices(db)
+  return db
+    .select(repoColumns)
+    .from(repos)
+    .all()
+    .map((row) => mapRepoRow(row, indices.get(row.id) ?? null))
 }
 
 export function getRepoById(db: PilogDatabase, id: string): Repo | null {
   const row = db.select(repoColumns).from(repos).where(eq(repos.id, id)).get()
-  return row ? mapRepoRow(row) : null
+  return row ? mapRepoRow(row, getRepoIndex(db, row.id)) : null
 }
 
 export function updateRepoAutoPublishSettings(
@@ -164,11 +172,12 @@ export type RepoRow = {
   updatedAt: string
 }
 
-export function mapRepoRow(row: RepoRow): Repo {
+export function mapRepoRow(row: RepoRow, repoIndex: RepoIndexStatus | null = null): Repo {
   return {
     ...row,
     githubLabels: parseGithubLabels(row.githubLabels),
-    githubLabelsSyncedAt: row.githubLabelsSyncedAt ?? null
+    githubLabelsSyncedAt: row.githubLabelsSyncedAt ?? null,
+    repoIndex
   }
 }
 
