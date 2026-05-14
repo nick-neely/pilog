@@ -20,6 +20,10 @@ type WslGitFailureReason = Exclude<WslRepoDetectionFailureReason, 'unmatched'>
 type WslGitCommandResult =
   | { state: 'stdout'; stdout: string }
   | { state: 'wsl-failure'; reason: WslGitFailureReason }
+type GitCaptureOptions = {
+  includeDiffSummary: boolean
+}
+type CapturedNoteContext = Extract<NoteCaptureContext, { state: 'captured' }>
 
 export type GitMetadataReadResult =
   | { state: 'metadata'; metadata: LocalGitMetadata }
@@ -104,15 +108,19 @@ export async function readGitCaptureContext(
   deps: { execFile?: ExecFile; capturedAt?: string; includeDiffSummary?: boolean } = {}
 ): Promise<NoteCaptureContext> {
   const capturedAt = deps.capturedAt ?? new Date().toISOString()
+  const options = {
+    includeDiffSummary: deps.includeDiffSummary === true
+  }
   try {
     if (access.kind === 'host') {
-      return await readHostGitCaptureContext(access.displayPath, capturedAt, {
-        includeDiffSummary: deps.includeDiffSummary === true
-      })
+      return await readHostGitCaptureContext(access.displayPath, capturedAt, options)
     }
-    return await readWslGitCaptureContext(access, deps.execFile ?? defaultExecFile, capturedAt, {
-      includeDiffSummary: deps.includeDiffSummary === true
-    })
+    return await readWslGitCaptureContext(
+      access,
+      deps.execFile ?? defaultExecFile,
+      capturedAt,
+      options
+    )
   } catch {
     return { state: 'unavailable', capturedAt }
   }
@@ -121,7 +129,7 @@ export async function readGitCaptureContext(
 async function readHostGitCaptureContext(
   localPath: string,
   capturedAt: string,
-  options: { includeDiffSummary: boolean }
+  options: GitCaptureOptions
 ): Promise<NoteCaptureContext> {
   const git = simpleGit(localPath)
   const isRepo = await git.checkIsRepo().catch(() => false)
@@ -148,16 +156,14 @@ async function readHostGitCaptureContext(
     headSubject: normalizeGitValue(headSubject),
     capturedAt
   }
-  const diffSummary = parseDiffShortstat(diffShortstat)
-  if (diffSummary) context.diffSummary = diffSummary
-  return context
+  return withDiffSummary(context, diffShortstat)
 }
 
 async function readWslGitCaptureContext(
   access: WslRepoAccessDescriptor,
   runExecFile: ExecFile,
   capturedAt: string,
-  options: { includeDiffSummary: boolean }
+  options: GitCaptureOptions
 ): Promise<NoteCaptureContext> {
   const isRepoResult = await runWslGitResult(
     access,
@@ -190,11 +196,15 @@ async function readWslGitCaptureContext(
     headSubject: headSubject.state === 'stdout' ? normalizeGitValue(headSubject.stdout) : null,
     capturedAt
   }
-  const diffSummary = parseDiffShortstat(
-    diffShortstat?.state === 'stdout' ? diffShortstat.stdout : null
-  )
-  if (diffSummary) context.diffSummary = diffSummary
-  return context
+  return withDiffSummary(context, diffShortstat?.state === 'stdout' ? diffShortstat.stdout : null)
+}
+
+function withDiffSummary(
+  context: CapturedNoteContext,
+  diffShortstat: string | null
+): CapturedNoteContext {
+  const diffSummary = parseDiffShortstat(diffShortstat)
+  return diffSummary ? { ...context, diffSummary } : context
 }
 
 function parseDiffShortstat(stdout: string | null): GitDiffSummary | null {

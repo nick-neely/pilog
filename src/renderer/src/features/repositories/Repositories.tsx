@@ -56,7 +56,6 @@ import type {
   Repo,
   RepoAutoPublishSettings,
   RepoDraftSettings,
-  RepoPrivacySettings,
   UpdateRepoAutoPublishSettingsRequest,
   UpdateRepoDraftSettingsRequest,
   UpdateRepoPrivacySettingsRequest
@@ -746,19 +745,19 @@ function PrivacySettings({
   repo: Repo
   onUpdated: () => void
 }): React.JSX.Element {
-  const [settings, setSettings] = useState<RepoPrivacySettings>({
-    allowDiffSummaryCapture: repo.allowDiffSummaryCapture
-  })
+  const [allowDiffSummaryCapture, setAllowDiffSummaryCapture] = useState(
+    repo.allowDiffSummaryCapture
+  )
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
-  const isDirty = settings.allowDiffSummaryCapture !== repo.allowDiffSummaryCapture
+  const isDirty = allowDiffSummaryCapture !== repo.allowDiffSummaryCapture
 
   const handleSave = async (): Promise<void> => {
     setSaving(true)
     setMessage(null)
     const request: UpdateRepoPrivacySettingsRequest = {
       id: repo.id,
-      ...settings
+      allowDiffSummaryCapture
     }
     const updated = await window.pilog.invoke('repos:updatePrivacySettings', request)
     setSaving(false)
@@ -792,8 +791,8 @@ function PrivacySettings({
         </span>
         <Switch
           id={`diff-summary-capture-${repo.id}`}
-          checked={settings.allowDiffSummaryCapture}
-          onCheckedChange={(checked) => setSettings({ allowDiffSummaryCapture: checked })}
+          checked={allowDiffSummaryCapture}
+          onCheckedChange={setAllowDiffSummaryCapture}
           size="sm"
           disabled={saving}
         />
@@ -801,7 +800,7 @@ function PrivacySettings({
 
       <div className="flex items-center justify-between gap-3">
         <p className="text-xs text-muted-foreground" aria-live="polite">
-          {message ?? `Default is off. Current: ${repoPrivacySummary(settings)}`}
+          {message ?? `Default is off. Current: ${repoPrivacySummary({ allowDiffSummaryCapture })}`}
         </p>
         <Button size="sm" variant="outline" onClick={handleSave} disabled={!isDirty || saving}>
           {saving ? 'Saving…' : 'Save privacy'}
