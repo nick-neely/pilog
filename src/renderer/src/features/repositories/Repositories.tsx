@@ -47,7 +47,7 @@ import type {
   UpdateRepoAutoPublishSettingsRequest
 } from '@shared/ipc'
 import { DEFAULT_REPO_AUTO_PUBLISH_SETTINGS, normalizeRepoAutoPublishSettings } from '@shared/ipc'
-import { getRepoIndexStatusLabel } from './repo-index-status'
+import { REPO_INDEX_PRIVACY_COPY, getRepoIndexStatusLabel } from './repo-index-status'
 import { formatRepoLocation } from '@shared/repo-paths'
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
 import { getErrorMessage } from '../recovery-state'
@@ -651,6 +651,9 @@ function RepoRow({
               aria-live="polite"
             >
               Repo Index: <span className="text-foreground">{repoIndexStatus.label}</span>
+            </p>
+            <p className="max-w-2xl text-xs leading-5 text-muted-foreground">
+              {REPO_INDEX_PRIVACY_COPY}
             </p>
           </div>
 

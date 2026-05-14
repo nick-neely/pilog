@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getRepoIndexStatusLabel } from './repo-index-status'
+import { REPO_INDEX_PRIVACY_COPY, getRepoIndexStatusLabel } from './repo-index-status'
 
 describe('getRepoIndexStatusLabel', () => {
   it('maps a ready Repo Index to a last-indexed label', () => {
@@ -75,5 +75,13 @@ describe('getRepoIndexStatusLabel', () => {
       ariaLabel: expect.stringContaining('Repo Index refresh in progress'),
       canRefresh: false
     })
+  })
+
+  it('explains the Repo Index privacy boundary in product-facing copy', () => {
+    expect(REPO_INDEX_PRIVACY_COPY).toContain('structure and lightweight signals')
+    expect(REPO_INDEX_PRIVACY_COPY).toContain('File contents')
+    expect(REPO_INDEX_PRIVACY_COPY).toContain('embeddings')
+    expect(REPO_INDEX_PRIVACY_COPY).toContain('long code summaries')
+    expect(REPO_INDEX_PRIVACY_COPY).toContain('Live Repo Evidence')
   })
 })

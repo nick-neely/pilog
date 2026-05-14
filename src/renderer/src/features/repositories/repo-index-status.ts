@@ -1,5 +1,8 @@
 import type { RepoIndexStatus } from '@shared/ipc'
 
+export const REPO_INDEX_PRIVACY_COPY =
+  'Repo Index stores structure and lightweight signals only. File contents, embeddings, and long code summaries stay out of the index; Agent Runs use Live Repo Evidence for specific code claims.'
+
 export function getRepoIndexStatusLabel(
   repoIndex: RepoIndexStatus | null,
   options: { refreshing?: boolean } = {}

@@ -5,6 +5,7 @@ import path from 'node:path'
 import { createInMemoryDatabase, type PilogDatabase } from '../db/client'
 import { runMigrations } from '../db/migrations'
 import { listRepos as listDbRepos } from '../db/repositories/repos'
+import { repoIndices } from '../db/schema'
 import type { GitHubRepo } from '@shared/ipc'
 
 vi.mock('./git', () => ({
@@ -353,6 +354,10 @@ describe('local-repo-service', () => {
       await mkdir(path.join(repoPath, 'components'))
       await mkdir(path.join(repoPath, 'node_modules'))
       await mkdir(path.join(repoPath, 'dist'))
+      await writeFile(
+        path.join(repoPath, 'src', 'private.ts'),
+        'export const persistentSourceContentSentinel = "do-not-store";'
+      )
       await writeFile(path.join(repoPath, 'pnpm-lock.yaml'), '')
       await writeFile(
         path.join(repoPath, 'package.json'),
@@ -384,6 +389,10 @@ describe('local-repo-service', () => {
       })
       expect(repo.repoIndex?.lastIndexedAt).toBeDefined()
       expect(listDbRepos(db)[0].repoIndex?.status).toBe('ready')
+
+      const persistedRow = db.select().from(repoIndices).get()
+      expect(JSON.stringify(persistedRow)).not.toContain('persistentSourceContentSentinel')
+      expect(JSON.stringify(persistedRow)).not.toContain('do-not-store')
     })
 
     it('keeps repo linking usable and stores a visible Repo Index failure', async () => {
