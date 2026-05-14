@@ -67,6 +67,8 @@ export function buildIssueGenerationPrompt(input: { repo: Repo; notes: Note[] })
         `Note ${index + 1}`,
         `id: ${note.id}`,
         `status: ${note.status}`,
+        'captureContext:',
+        formatNoteCaptureContext(note.captureContext),
         'content:',
         note.content.trim() || '(empty note)'
       ].join('\n')
@@ -77,6 +79,8 @@ export function buildIssueGenerationPrompt(input: { repo: Repo; notes: Note[] })
     'You are generating GitHub issue drafts from rough developer scratchpad notes.',
     'Use the local repository context to infer likely affected areas, but do not invent details.',
     'Treat the Repo Index as navigation context only: use it to choose targeted live repo inspection paths.',
+    'Treat Capture Context as note-time context only: it reflects what was happening when each note was captured, not proof of the repo current state.',
+    'Capture Context can guide live repo inspection, especially branch and changed-file clues, but specific draft claims still require Live Repo Evidence.',
     'Specific claims about affected files, routes, components, framework behavior, or implementation details must be grounded in Live Repo Evidence from read-only repo tools during this run.',
     'A Repo Index path is only a lead; read or search the live file before naming it in affectedFiles, context, implementationNotes, or acceptanceCriteria.',
     'affectedFiles[].reason must explain the live inspection that supports the path, not only repeat Repo Index metadata.',
@@ -122,7 +126,7 @@ export function buildIssueGenerationPrompt(input: { repo: Repo; notes: Note[] })
     repoIndexBlock,
     '',
     'Live Repo Evidence:',
-    'Use the available read-only repo tools to verify specific draft claims before submitting drafts. The Repo Index is not verified evidence.',
+    'Use the available read-only repo tools to verify specific draft claims before submitting drafts. Capture Context and Repo Index are not verified current evidence.',
     '',
     'Cached GitHub label vocabulary:',
     labelBlock,
@@ -228,6 +232,26 @@ function formatRepoIndexForPrompt(repoIndex: RepoIndexStatus | null | undefined)
   return lines.join('\n')
 }
 
+function formatNoteCaptureContext(captureContext: Note['captureContext']): string {
+  if (!captureContext) return '(none recorded for this note)'
+
+  if (captureContext.state === 'unavailable') {
+    return ['state: unavailable', `capturedAt: ${captureContext.capturedAt}`].join('\n')
+  }
+
+  return [
+    'state: captured',
+    `branch: ${captureContext.branch ?? '(unknown)'}`,
+    'dirtyFiles:',
+    formatBulletList(captureContext.dirtyFiles),
+    'stagedFiles:',
+    formatBulletList(captureContext.stagedFiles),
+    `headSha: ${captureContext.headSha ?? '(unknown)'}`,
+    `headSubject: ${captureContext.headSubject ?? '(unknown)'}`,
+    `capturedAt: ${captureContext.capturedAt}`
+  ].join('\n')
+}
+
 function formatInlineList(items: string[]): string {
   return items.length > 0 ? items.join(', ') : '(none)'
 }
@@ -236,6 +260,12 @@ function formatImportantDirectories(directories: RepoIndexDirectory[]): string {
   if (directories.length === 0) return '- (none)'
 
   return directories.map((directory) => `- ${directory.path}: ${directory.role}`).join('\n')
+}
+
+function formatBulletList(items: string[]): string {
+  if (items.length === 0) return '- (none)'
+
+  return items.map((item) => `- ${item}`).join('\n')
 }
 
 function formatExclusionSummary(summary: RepoIndexExclusionSummary): string[] {

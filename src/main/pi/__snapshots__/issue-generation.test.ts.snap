@@ -4,6 +4,8 @@ exports[`issue generation > assembles the PRD-guided prompt with repo path and s
 "You are generating GitHub issue drafts from rough developer scratchpad notes.
 Use the local repository context to infer likely affected areas, but do not invent details.
 Treat the Repo Index as navigation context only: use it to choose targeted live repo inspection paths.
+Treat Capture Context as note-time context only: it reflects what was happening when each note was captured, not proof of the repo current state.
+Capture Context can guide live repo inspection, especially branch and changed-file clues, but specific draft claims still require Live Repo Evidence.
 Specific claims about affected files, routes, components, framework behavior, or implementation details must be grounded in Live Repo Evidence from read-only repo tools during this run.
 A Repo Index path is only a lead; read or search the live file before naming it in affectedFiles, context, implementationNotes, or acceptanceCriteria.
 affectedFiles[].reason must explain the live inspection that supports the path, not only repeat Repo Index metadata.
@@ -50,7 +52,7 @@ status: unavailable
 No Repo Index is available. Fall back to bounded live traversal with repo tools.
 
 Live Repo Evidence:
-Use the available read-only repo tools to verify specific draft claims before submitting drafts. The Repo Index is not verified evidence.
+Use the available read-only repo tools to verify specific draft claims before submitting drafts. Capture Context and Repo Index are not verified current evidence.
 
 Cached GitHub label vocabulary:
 - bug: Something is broken
@@ -60,6 +62,8 @@ Selected notes:
 Note 1
 id: note-1
 status: unprocessed
+captureContext:
+(none recorded for this note)
 content:
 settings page spacing is weird on mobile"
 `;
