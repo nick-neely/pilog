@@ -1,10 +1,12 @@
-import { Search01Icon, Settings02Icon } from '@hugeicons/core-free-icons'
+import { InformationCircleIcon, Search01Icon, Settings02Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { Button } from '@renderer/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@renderer/components/ui/tooltip'
+import { getUpdateChromeIndicator } from '@renderer/features/settings/update-chrome-indicator'
 import { ViewTabs, type ViewTab } from '@renderer/features/shared/ViewTabs'
 import { cn } from '@renderer/lib/utils'
 import { PILOG_APP_SHORTCUTS, shortcutBindingMeta } from '@renderer/shortcuts/pilog-hotkeys'
+import type { AppUpdateStatus } from '@shared/ipc'
 import {
   ELECTRON_DRAG_REGION_CLASS,
   ELECTRON_NO_DRAG_REGION_CLASS,
@@ -37,6 +39,7 @@ interface AppShellProps {
    * shortcut never lies about what it'll do.
    */
   onOpenCommandPalette?: () => void
+  updateStatus?: AppUpdateStatus | null
   children: ReactNode
 }
 
@@ -47,9 +50,11 @@ export function AppShell({
   onNavigateToSettings,
   navigationSlot,
   onOpenCommandPalette,
+  updateStatus,
   children
 }: AppShellProps): React.JSX.Element {
   const commandPaletteShortcut = shortcutBindingMeta(PILOG_APP_SHORTCUTS.commandPalette).description
+  const updateIndicator = getUpdateChromeIndicator(updateStatus ?? null)
 
   return (
     <div className="flex h-screen flex-col bg-background text-foreground">
@@ -93,6 +98,28 @@ export function AppShell({
                 </Button>
               </TooltipTrigger>
               <TooltipContent>Search and commands</TooltipContent>
+            </Tooltip>
+          ) : null}
+          {updateIndicator ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  data-testid="open-software-updates"
+                  onClick={onNavigateToSettings}
+                  aria-label={updateIndicator.ariaLabel}
+                  className={cn(
+                    'gap-1.5 px-2 text-xs',
+                    updateIndicator.tone === 'restart' ? 'text-primary' : 'text-muted-foreground'
+                  )}
+                >
+                  <HugeiconsIcon icon={InformationCircleIcon} aria-hidden />
+                  <span>{updateIndicator.label}</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>{updateIndicator.tooltip}</TooltipContent>
             </Tooltip>
           ) : null}
           <Tooltip>
