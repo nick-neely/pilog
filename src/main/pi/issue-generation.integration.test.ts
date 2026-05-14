@@ -30,6 +30,7 @@ runIfEnabled('issue generation integration', () => {
       autoPublishDryRun: false,
       autoPublishRequireConfirmation: true,
       ...DEFAULT_REPO_DRAFT_SETTINGS,
+      allowDiffSummaryCapture: false,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     }

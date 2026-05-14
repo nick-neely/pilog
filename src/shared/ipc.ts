@@ -117,6 +117,7 @@ export type Repo = {
   issueStyleDepth: IssueStyleDepth
   issueStyleAudience: IssueStyleAudience
   draftContentToggles: DraftContentToggles
+  allowDiffSummaryCapture: boolean
   repoIndex?: RepoIndexStatus | null
   createdAt: string
   updatedAt: string
@@ -197,6 +198,16 @@ export type RepoDraftSettings = Pick<
   Repo,
   'issueStyleDepth' | 'issueStyleAudience' | 'draftContentToggles'
 >
+
+export type RepoPrivacySettings = Pick<Repo, 'allowDiffSummaryCapture'>
+
+export const DEFAULT_REPO_PRIVACY_SETTINGS = {
+  allowDiffSummaryCapture: false
+} as const satisfies RepoPrivacySettings
+
+export type UpdateRepoPrivacySettingsRequest = {
+  id: string
+} & RepoPrivacySettings
 
 export const DEFAULT_REPO_AUTO_PUBLISH_SETTINGS = {
   autoPublishEnabled: false,
@@ -498,6 +509,10 @@ export type IpcContract = {
   }
   'repos:updateDraftSettings': {
     request: UpdateRepoDraftSettingsRequest
+    response: Repo | null
+  }
+  'repos:updatePrivacySettings': {
+    request: UpdateRepoPrivacySettingsRequest
     response: Repo | null
   }
   'repos:getDefaultIssueTemplate': {

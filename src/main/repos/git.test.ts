@@ -259,7 +259,23 @@ describe('readGitCaptureContext', () => {
     expect(result.stagedFiles).toEqual(['staged.txt'])
     expect(result.headSha).toMatch(/^[0-9a-f]{40}$/)
     expect(result.headSubject).toBe('capture baseline')
+    expect(result.diffSummary).toBeUndefined()
     expect(result.capturedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/)
+  })
+
+  it('captures a structured diff summary only when explicitly enabled', async () => {
+    const result = await readGitCaptureContext(
+      { kind: 'host', displayPath: repoDir },
+      { includeDiffSummary: true }
+    )
+
+    expect(result.state).toBe('captured')
+    if (result.state !== 'captured') return
+    expect(result.diffSummary).toEqual({
+      filesChanged: 2,
+      insertions: 2,
+      deletions: 1
+    })
   })
 
   it('returns unavailable Capture Context when git metadata cannot be read', async () => {

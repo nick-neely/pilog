@@ -45,6 +45,9 @@ export const repos = sqliteTable('repos', {
     .default(
       '{"includeImplementationNotes":true,"includeAffectedFiles":true,"includeSourceNotes":true,"includeAcceptanceCriteria":true,"includeConfidenceRationale":true,"includeReproductionSteps":true}'
     ),
+  allowDiffSummaryCapture: integer('allow_diff_summary_capture', { mode: 'boolean' })
+    .notNull()
+    .default(false),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull()
 })

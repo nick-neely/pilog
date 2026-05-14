@@ -8,7 +8,8 @@ import {
   getRepoById,
   deleteRepo,
   updateRepoAutoPublishSettings,
-  updateRepoDraftSettings
+  updateRepoDraftSettings,
+  updateRepoPrivacySettings
 } from './repos'
 
 describe('repos repository', () => {
@@ -53,6 +54,7 @@ describe('repos repository', () => {
     expect(repo.autoPublishRequireConfirmation).toBe(true)
     expect(repo.issueStyleDepth).toBe('balanced')
     expect(repo.issueStyleAudience).toBe('internal')
+    expect(repo.allowDiffSummaryCapture).toBe(false)
     expect(repo.draftContentToggles).toEqual({
       includeImplementationNotes: true,
       includeAffectedFiles: true,
@@ -123,6 +125,7 @@ describe('repos repository', () => {
       githubLabelsSyncedAt: null,
       issueStyleDepth: 'balanced',
       issueStyleAudience: 'internal',
+      allowDiffSummaryCapture: false,
       draftContentToggles: {
         includeImplementationNotes: true,
         includeAffectedFiles: true,
@@ -242,6 +245,36 @@ describe('repos repository', () => {
         includeConfidenceRationale: true,
         includeReproductionSteps: true
       }
+    })
+
+    expect(updated).toBeNull()
+  })
+
+  it('persists diff summary privacy setting per repo and allows disabling it again', () => {
+    const first = createRepo(db, sampleInput)
+    const second = createRepo(db, { ...sampleInput, name: 'other', localPath: '/other' })
+
+    const enabled = updateRepoPrivacySettings(db, first.id, { allowDiffSummaryCapture: true })
+
+    expect(enabled).toMatchObject({
+      id: first.id,
+      allowDiffSummaryCapture: true
+    })
+    expect(getRepoById(db, second.id)).toMatchObject({
+      allowDiffSummaryCapture: false
+    })
+
+    const disabled = updateRepoPrivacySettings(db, first.id, { allowDiffSummaryCapture: false })
+
+    expect(disabled).toMatchObject({
+      id: first.id,
+      allowDiffSummaryCapture: false
+    })
+  })
+
+  it('returns null when updating privacy settings for a missing repo', () => {
+    const updated = updateRepoPrivacySettings(db, 'non-existent', {
+      allowDiffSummaryCapture: true
     })
 
     expect(updated).toBeNull()

@@ -5,6 +5,7 @@ import { repos } from '../schema'
 import {
   DEFAULT_REPO_AUTO_PUBLISH_SETTINGS,
   DEFAULT_REPO_DRAFT_SETTINGS,
+  DEFAULT_REPO_PRIVACY_SETTINGS,
   normalizeRepoAutoPublishSettings,
   normalizeRepoDraftSettings,
   type DraftContentToggles,
@@ -13,7 +14,8 @@ import {
   type RepoIndexStatus,
   type RepoAccessKind,
   type UpdateRepoAutoPublishSettingsRequest,
-  type UpdateRepoDraftSettingsRequest
+  type UpdateRepoDraftSettingsRequest,
+  type UpdateRepoPrivacySettingsRequest
 } from '@shared/ipc'
 import { getRepoIndex, listRepoIndices } from './repo-indices'
 
@@ -37,6 +39,7 @@ export const repoColumns = {
   issueStyleDepth: repos.issueStyleDepth,
   issueStyleAudience: repos.issueStyleAudience,
   draftContentToggles: repos.draftContentToggles,
+  allowDiffSummaryCapture: repos.allowDiffSummaryCapture,
   createdAt: repos.createdAt,
   updatedAt: repos.updatedAt
 } as const
@@ -79,6 +82,7 @@ export function createRepo(
       githubLabelsSyncedAt: githubLabelsSyncedAt ?? undefined,
       ...DEFAULT_REPO_AUTO_PUBLISH_SETTINGS,
       ...DEFAULT_REPO_DRAFT_SETTINGS,
+      ...DEFAULT_REPO_PRIVACY_SETTINGS,
       draftContentToggles: JSON.stringify(DEFAULT_REPO_DRAFT_SETTINGS.draftContentToggles),
       createdAt: now,
       updatedAt: now
@@ -99,6 +103,7 @@ export function createRepo(
     githubLabelsSyncedAt,
     ...DEFAULT_REPO_AUTO_PUBLISH_SETTINGS,
     ...DEFAULT_REPO_DRAFT_SETTINGS,
+    ...DEFAULT_REPO_PRIVACY_SETTINGS,
     repoIndex: null,
     createdAt: now,
     updatedAt: now
@@ -159,6 +164,24 @@ export function updateRepoDraftSettings(
   return getRepoById(db, id)
 }
 
+export function updateRepoPrivacySettings(
+  db: PilogDatabase,
+  id: string,
+  input: Omit<UpdateRepoPrivacySettingsRequest, 'id'>
+): Repo | null {
+  const now = new Date().toISOString()
+
+  db.update(repos)
+    .set({
+      allowDiffSummaryCapture: input.allowDiffSummaryCapture,
+      updatedAt: now
+    })
+    .where(eq(repos.id, id))
+    .run()
+
+  return getRepoById(db, id)
+}
+
 export function updateRepoGithubLabels(
   db: PilogDatabase,
   id: string,
@@ -202,6 +225,7 @@ export type RepoRow = {
   issueStyleDepth: string
   issueStyleAudience: string
   draftContentToggles: string
+  allowDiffSummaryCapture: boolean
   createdAt: string
   updatedAt: string
 }

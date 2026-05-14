@@ -60,6 +60,7 @@ function baseInput(overrides: Partial<IssueGenerationInput> = {}): IssueGenerati
       autoPublishDryRun: false,
       autoPublishRequireConfirmation: true,
       ...DEFAULT_REPO_DRAFT_SETTINGS,
+      allowDiffSummaryCapture: false,
       createdAt: '2026-05-08T00:00:00.000Z',
       updatedAt: '2026-05-08T00:00:00.000Z'
     },

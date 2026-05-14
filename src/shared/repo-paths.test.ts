@@ -70,6 +70,7 @@ function makeRepo(overrides: Partial<Repo>): Repo {
     autoPublishDryRun: true,
     autoPublishRequireConfirmation: true,
     ...DEFAULT_REPO_DRAFT_SETTINGS,
+    allowDiffSummaryCapture: false,
     createdAt: '2026-05-13T00:00:00.000Z',
     updatedAt: '2026-05-13T00:00:00.000Z',
     ...overrides

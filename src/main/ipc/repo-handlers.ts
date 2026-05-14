@@ -3,14 +3,16 @@ import type { PilogDatabase } from '../db/client'
 import type {
   LinkRepoRequest,
   UpdateRepoAutoPublishSettingsRequest,
-  UpdateRepoDraftSettingsRequest
+  UpdateRepoDraftSettingsRequest,
+  UpdateRepoPrivacySettingsRequest
 } from '@shared/ipc'
 import {
   listRepos,
   deleteRepo,
   getRepoById,
   updateRepoAutoPublishSettings,
-  updateRepoDraftSettings
+  updateRepoDraftSettings,
+  updateRepoPrivacySettings
 } from '../db/repositories/repos'
 import { detectLocalRepo, linkRepo, refreshRepoIndex } from '../repos/local-repo-service'
 import { resolveDefaultIssueTemplate } from '../github/issue-templates'
@@ -47,6 +49,13 @@ export function registerRepoIpcHandlers(db: PilogDatabase): void {
   ipcMain.handle('repos:updateDraftSettings', (_event, request: UpdateRepoDraftSettingsRequest) => {
     return updateRepoDraftSettings(db, request.id, request)
   })
+
+  ipcMain.handle(
+    'repos:updatePrivacySettings',
+    (_event, request: UpdateRepoPrivacySettingsRequest) => {
+      return updateRepoPrivacySettings(db, request.id, request)
+    }
+  )
 
   ipcMain.handle('repos:getDefaultIssueTemplate', (_event, request: { id: string }) => {
     const repo = getRepoById(db, request.id)

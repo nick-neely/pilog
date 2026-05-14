@@ -99,7 +99,9 @@ async function getCaptureContextForNote(
   if (!repoId) return null
   const repo = getRepoById(db, repoId)
   if (!repo) return { state: 'unavailable', capturedAt: new Date().toISOString() }
-  return readGitCaptureContext(repoToAccessDescriptor(repo))
+  return readGitCaptureContext(repoToAccessDescriptor(repo), {
+    includeDiffSummary: repo.allowDiffSummaryCapture
+  })
 }
 
 function repoToAccessDescriptor(

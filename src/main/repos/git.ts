@@ -6,6 +6,7 @@ import type {
   RepoAccessDescriptor,
   WslRepoDetectionFailureReason
 } from '@shared/ipc'
+import type { GitDiffSummary } from '@shared/types'
 
 export type LocalGitMetadata = {
   remoteUrl: string
@@ -100,14 +101,18 @@ export async function readGitMetadataResult(
 
 export async function readGitCaptureContext(
   access: RepoAccessDescriptor,
-  deps: { execFile?: ExecFile; capturedAt?: string } = {}
+  deps: { execFile?: ExecFile; capturedAt?: string; includeDiffSummary?: boolean } = {}
 ): Promise<NoteCaptureContext> {
   const capturedAt = deps.capturedAt ?? new Date().toISOString()
   try {
     if (access.kind === 'host') {
-      return await readHostGitCaptureContext(access.displayPath, capturedAt)
+      return await readHostGitCaptureContext(access.displayPath, capturedAt, {
+        includeDiffSummary: deps.includeDiffSummary === true
+      })
     }
-    return await readWslGitCaptureContext(access, deps.execFile ?? defaultExecFile, capturedAt)
+    return await readWslGitCaptureContext(access, deps.execFile ?? defaultExecFile, capturedAt, {
+      includeDiffSummary: deps.includeDiffSummary === true
+    })
   } catch {
     return { state: 'unavailable', capturedAt }
   }
@@ -115,20 +120,22 @@ export async function readGitCaptureContext(
 
 async function readHostGitCaptureContext(
   localPath: string,
-  capturedAt: string
+  capturedAt: string,
+  options: { includeDiffSummary: boolean }
 ): Promise<NoteCaptureContext> {
   const git = simpleGit(localPath)
   const isRepo = await git.checkIsRepo().catch(() => false)
   if (!isRepo) return { state: 'unavailable', capturedAt }
 
-  const [branch, headSha, headSubject, status] = await Promise.all([
+  const [branch, headSha, headSubject, status, diffShortstat] = await Promise.all([
     git.revparse(['--abbrev-ref', 'HEAD']).catch(() => null),
     git.revparse(['HEAD']).catch(() => null),
     git.raw(['log', '-1', '--pretty=%s']).catch(() => null),
-    git.status()
+    git.status(),
+    options.includeDiffSummary ? git.diff(['--shortstat', 'HEAD']).catch(() => null) : null
   ])
 
-  return {
+  const context: NoteCaptureContext = {
     state: 'captured',
     branch: normalizeGitValue(branch),
     dirtyFiles: sortedUniquePaths(
@@ -141,12 +148,16 @@ async function readHostGitCaptureContext(
     headSubject: normalizeGitValue(headSubject),
     capturedAt
   }
+  const diffSummary = parseDiffShortstat(diffShortstat)
+  if (diffSummary) context.diffSummary = diffSummary
+  return context
 }
 
 async function readWslGitCaptureContext(
   access: WslRepoAccessDescriptor,
   runExecFile: ExecFile,
-  capturedAt: string
+  capturedAt: string,
+  options: { includeDiffSummary: boolean }
 ): Promise<NoteCaptureContext> {
   const isRepoResult = await runWslGitResult(
     access,
@@ -157,17 +168,20 @@ async function readWslGitCaptureContext(
     return { state: 'unavailable', capturedAt }
   }
 
-  const [branch, headSha, headSubject, status] = await Promise.all([
+  const [branch, headSha, headSubject, status, diffShortstat] = await Promise.all([
     runWslGitResult(access, ['rev-parse', '--abbrev-ref', 'HEAD'], runExecFile),
     runWslGitResult(access, ['rev-parse', 'HEAD'], runExecFile),
     runWslGitResult(access, ['log', '-1', '--pretty=%s'], runExecFile),
-    runWslGitResult(access, ['status', '--porcelain'], runExecFile)
+    runWslGitResult(access, ['status', '--porcelain'], runExecFile),
+    options.includeDiffSummary
+      ? runWslGitResult(access, ['diff', '--shortstat', 'HEAD'], runExecFile)
+      : null
   ])
 
   if (status.state !== 'stdout') return { state: 'unavailable', capturedAt }
   const paths = parsePorcelainStatus(status.stdout)
 
-  return {
+  const context: NoteCaptureContext = {
     state: 'captured',
     branch: branch.state === 'stdout' ? normalizeGitValue(branch.stdout) : null,
     dirtyFiles: paths.dirtyFiles,
@@ -176,6 +190,25 @@ async function readWslGitCaptureContext(
     headSubject: headSubject.state === 'stdout' ? normalizeGitValue(headSubject.stdout) : null,
     capturedAt
   }
+  const diffSummary = parseDiffShortstat(
+    diffShortstat?.state === 'stdout' ? diffShortstat.stdout : null
+  )
+  if (diffSummary) context.diffSummary = diffSummary
+  return context
+}
+
+function parseDiffShortstat(stdout: string | null): GitDiffSummary | null {
+  if (!stdout?.trim()) return null
+  return {
+    filesChanged: parseShortstatCount(stdout, /(\d+)\s+files?\s+changed/),
+    insertions: parseShortstatCount(stdout, /(\d+)\s+insertions?\(\+\)/),
+    deletions: parseShortstatCount(stdout, /(\d+)\s+deletions?\(-\)/)
+  }
+}
+
+function parseShortstatCount(stdout: string, pattern: RegExp): number {
+  const match = stdout.match(pattern)
+  return match ? Number.parseInt(match[1], 10) : 0
 }
 
 function parsePorcelainStatus(stdout: string): { dirtyFiles: string[]; stagedFiles: string[] } {

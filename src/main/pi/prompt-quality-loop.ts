@@ -145,6 +145,7 @@ async function exerciseGenerationTools(
         autoPublishDryRun: false,
         autoPublishRequireConfirmation: true,
         ...DEFAULT_REPO_DRAFT_SETTINGS,
+        allowDiffSummaryCapture: false,
         createdAt: FIXTURE_REPO_TIMESTAMP,
         updatedAt: FIXTURE_REPO_TIMESTAMP
       },

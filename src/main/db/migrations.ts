@@ -35,6 +35,7 @@ export function runMigrations(db: PilogDatabase): void {
       issue_style_depth TEXT NOT NULL DEFAULT 'balanced',
       issue_style_audience TEXT NOT NULL DEFAULT 'internal',
       draft_content_toggles TEXT NOT NULL DEFAULT '{"includeImplementationNotes":true,"includeAffectedFiles":true,"includeSourceNotes":true,"includeAcceptanceCriteria":true,"includeConfidenceRationale":true,"includeReproductionSteps":true}',
+      allow_diff_summary_capture INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     )
@@ -118,6 +119,7 @@ export function runMigrations(db: PilogDatabase): void {
     'draft_content_toggles',
     `TEXT NOT NULL DEFAULT '{"includeImplementationNotes":true,"includeAffectedFiles":true,"includeSourceNotes":true,"includeAcceptanceCriteria":true,"includeConfidenceRationale":true,"includeReproductionSteps":true}'`
   )
+  addColumnIfMissing(db, 'repos', 'allow_diff_summary_capture', 'INTEGER NOT NULL DEFAULT 0')
   addColumnIfMissing(db, 'issue_drafts', 'grouping_reason', "TEXT NOT NULL DEFAULT ''")
   addColumnIfMissing(db, 'issue_drafts', 'workflow_state', "TEXT NOT NULL DEFAULT 'ready'")
   addColumnIfMissing(db, 'issue_drafts', 'clarification_questions', "TEXT NOT NULL DEFAULT '[]'")

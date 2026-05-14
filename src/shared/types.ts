@@ -115,12 +115,19 @@ export type NoteCaptureContext =
       stagedFiles: string[]
       headSha: string | null
       headSubject: string | null
+      diffSummary?: GitDiffSummary
       capturedAt: string
     }
   | {
       state: 'unavailable'
       capturedAt: string
     }
+
+export type GitDiffSummary = {
+  filesChanged: number
+  insertions: number
+  deletions: number
+}
 
 export type AgentEvent =
   | { type: 'progress'; phase: string }

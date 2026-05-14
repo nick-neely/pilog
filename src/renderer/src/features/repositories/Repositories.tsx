@@ -56,8 +56,10 @@ import type {
   Repo,
   RepoAutoPublishSettings,
   RepoDraftSettings,
+  RepoPrivacySettings,
   UpdateRepoAutoPublishSettingsRequest,
-  UpdateRepoDraftSettingsRequest
+  UpdateRepoDraftSettingsRequest,
+  UpdateRepoPrivacySettingsRequest
 } from '@shared/ipc'
 import {
   DEFAULT_REPO_AUTO_PUBLISH_SETTINGS,
@@ -69,6 +71,7 @@ import {
 } from '@shared/ipc'
 import { REPO_INDEX_PRIVACY_COPY, getRepoIndexStatusLabel } from './repo-index-status'
 import { DRAFT_CONTENT_TOGGLE_LABELS, draftSettingsSummary } from './repo-draft-defaults'
+import { DIFF_SUMMARY_PRIVACY_COPY, repoPrivacySummary } from './repo-privacy-settings'
 import { formatRepoLocation } from '@shared/repo-paths'
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
 import { getErrorMessage } from '../recovery-state'
@@ -736,6 +739,78 @@ function DraftGenerationDefaults({
   )
 }
 
+function PrivacySettings({
+  repo,
+  onUpdated
+}: {
+  repo: Repo
+  onUpdated: () => void
+}): React.JSX.Element {
+  const [settings, setSettings] = useState<RepoPrivacySettings>({
+    allowDiffSummaryCapture: repo.allowDiffSummaryCapture
+  })
+  const [saving, setSaving] = useState(false)
+  const [message, setMessage] = useState<string | null>(null)
+  const isDirty = settings.allowDiffSummaryCapture !== repo.allowDiffSummaryCapture
+
+  const handleSave = async (): Promise<void> => {
+    setSaving(true)
+    setMessage(null)
+    const request: UpdateRepoPrivacySettingsRequest = {
+      id: repo.id,
+      ...settings
+    }
+    const updated = await window.pilog.invoke('repos:updatePrivacySettings', request)
+    setSaving(false)
+    if (!updated) {
+      setMessage('Privacy setting could not be saved.')
+      return
+    }
+    onUpdated()
+    setMessage('Privacy setting saved.')
+  }
+
+  return (
+    <div className="flex flex-col gap-4 pt-4">
+      <div className="flex max-w-[36rem] flex-col gap-1">
+        <p className="text-sm font-medium">Privacy</p>
+        <p className="text-sm leading-6 text-muted-foreground">
+          Applies only to {repo.owner}/{repo.name}. Capture Context keeps branch, HEAD, and changed
+          path metadata by default.
+        </p>
+      </div>
+
+      <label
+        htmlFor={`diff-summary-capture-${repo.id}`}
+        className="flex cursor-pointer items-start justify-between gap-3 rounded-md bg-muted/40 p-3"
+      >
+        <span className="flex max-w-[36rem] flex-col gap-1">
+          <span className="text-sm font-medium">Capture diff summaries</span>
+          <span className="text-xs leading-5 text-muted-foreground">
+            {DIFF_SUMMARY_PRIVACY_COPY}
+          </span>
+        </span>
+        <Switch
+          id={`diff-summary-capture-${repo.id}`}
+          checked={settings.allowDiffSummaryCapture}
+          onCheckedChange={(checked) => setSettings({ allowDiffSummaryCapture: checked })}
+          size="sm"
+          disabled={saving}
+        />
+      </label>
+
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-xs text-muted-foreground" aria-live="polite">
+          {message ?? `Default is off. Current: ${repoPrivacySummary(settings)}`}
+        </p>
+        <Button size="sm" variant="outline" onClick={handleSave} disabled={!isDirty || saving}>
+          {saving ? 'Saving…' : 'Save privacy'}
+        </Button>
+      </div>
+    </div>
+  )
+}
+
 function RepoRow({
   repo,
   onUnlink,
@@ -761,6 +836,7 @@ function RepoRow({
     refreshing: refreshingIndex
   })
   const draftSummary = draftSettingsSummary(repo)
+  const privacySummary = repoPrivacySummary(repo)
 
   const handleRefreshIndex = async (): Promise<void> => {
     if (!repoIndexStatus.canRefresh) return
@@ -842,9 +918,11 @@ function RepoRow({
               type="button"
               className="flex w-full items-center justify-between gap-2 border-t border-border px-4 py-2 text-xs text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
             >
-              <span className="font-medium">Draft defaults and auto-publish guardrails</span>
+              <span className="font-medium">
+                Privacy, draft defaults, and auto-publish guardrails
+              </span>
               <span className="min-w-0 flex-1 truncate text-left font-mono text-[11px]">
-                {draftSummary}
+                {privacySummary} {draftSummary}
               </span>
               <HugeiconsIcon
                 icon={settingsOpen ? ArrowUp01Icon : ArrowDown01Icon}
@@ -858,6 +936,12 @@ function RepoRow({
             <div className="flex flex-col gap-4 border-t border-border px-4 pb-4">
               <DraftGenerationDefaults
                 key={`draft-${repo.updatedAt}`}
+                repo={repo}
+                onUpdated={onUpdated}
+              />
+              <Separator />
+              <PrivacySettings
+                key={`privacy-${repo.updatedAt}`}
                 repo={repo}
                 onUpdated={onUpdated}
               />
