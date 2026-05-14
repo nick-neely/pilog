@@ -67,6 +67,8 @@ const draft: IssueDraftForReview = {
   affectedFiles: [{ path: 'src/save.ts', reason: 'Save flow' }],
   confidence: 'high',
   groupingReason: 'One note describes the loading state.',
+  workflowState: 'ready',
+  clarificationQuestions: [],
   status: 'draft',
   githubIssueUrl: null,
   createdAt: '2026-05-10T00:00:00.000Z',

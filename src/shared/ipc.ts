@@ -16,6 +16,7 @@ import type {
   IssueDraftSourceNote,
   IssueDraft,
   IssueDraftForReview,
+  IssueDraftWorkflowState,
   IssueDraftStatus,
   NoteCaptureContext,
   OnboardingState,
@@ -416,6 +417,7 @@ export type PathActionResult =
 
 export type ListIssueDraftsRequest = {
   status?: IssueDraftStatus | 'all'
+  workflowState?: IssueDraftWorkflowState | 'all'
 }
 
 export type UpdateIssueDraftStatusRequest = {

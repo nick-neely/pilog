@@ -7,7 +7,11 @@ import type {
   RepoIndexExclusionSummary,
   RepoIndexStatus
 } from '@shared/ipc'
-import type { AutoPublishPreviewSummary, SearchProvider } from '@shared/types'
+import type {
+  AutoPublishPreviewSummary,
+  IssueDraftWorkflowState,
+  SearchProvider
+} from '@shared/types'
 import type { RepoLabelLike } from '@shared/labels'
 import { matchLabelsToRepoLabels } from '@shared/labels'
 import {
@@ -16,9 +20,12 @@ import {
   type AgentEvent,
   type GeneratedIssueDraft
 } from '@shared/types'
+import {
+  formatIssueDraftBody,
+  getGeneratedDraftClarificationQuestions
+} from '../db/repositories/issue-drafts'
 import { and, eq, inArray } from 'drizzle-orm'
 import type { PilogDatabase } from '../db/client'
-import { formatIssueDraftBody } from '../db/repositories/issue-drafts'
 import { mapNoteRow } from '../db/repositories/notes'
 import { getRepoById, updateRepoGithubLabels } from '../db/repositories/repos'
 import { agentRuns, issueDrafts, notes } from '../db/schema'
@@ -339,6 +346,7 @@ export function persistGeneratedIssueDrafts(
 
     for (const draft of input.drafts) {
       const id = crypto.randomUUID()
+      const clarificationQuestions = getGeneratedDraftClarificationQuestions(draft)
       draftIds.push(id)
 
       tx.insert(issueDrafts)
@@ -352,6 +360,8 @@ export function persistGeneratedIssueDrafts(
           affectedFilesJson: JSON.stringify(draft.affectedFiles),
           confidence: draft.confidence,
           groupingReason: draft.groupingReason,
+          workflowState: getPersistedDraftWorkflowState(draft),
+          clarificationQuestions: JSON.stringify(clarificationQuestions),
           status: 'draft',
           createdAt: now,
           updatedAt: now
@@ -377,6 +387,13 @@ export function persistGeneratedIssueDrafts(
 
     return draftIds
   })
+}
+
+function getPersistedDraftWorkflowState(draft: GeneratedIssueDraft): IssueDraftWorkflowState {
+  if (draft.publishReady) return 'ready'
+  if ((draft.needsClarification?.filter(Boolean).length ?? 0) === 0) return 'ready'
+
+  return 'needs_clarification'
 }
 
 export function planAutoPublishPreviewDrafts(input: {
