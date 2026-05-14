@@ -105,7 +105,7 @@ describe('issue generation', () => {
     expect(prompt).toContain('status: unavailable')
     expect(prompt).toContain('No Repo Index is available. Fall back to bounded live traversal')
     expect(prompt).toContain('Live Repo Evidence:')
-    expect(prompt).toContain('The Repo Index is not verified evidence.')
+    expect(prompt).toContain('Capture Context and Repo Index are not verified current evidence.')
     expect(prompt).toContain('- bug: Something is broken')
     expect(prompt).toContain('- ready-for-agent')
   })
@@ -155,6 +155,97 @@ describe('issue generation', () => {
     expect(prompt).toContain(
       'Use the available read-only repo tools to verify specific draft claims'
     )
+  })
+
+  it('includes per-note Capture Context as note-time context', () => {
+    const prompt = buildIssueGenerationPrompt({
+      repo: promptRepo,
+      notes: [
+        {
+          ...promptNote,
+          captureContext: {
+            state: 'captured',
+            branch: 'feature/capture-context',
+            dirtyFiles: ['src/main/pi/issue-generation.ts', 'src/shared/types.ts'],
+            stagedFiles: ['src/main/db/repositories/notes.ts'],
+            headSha: 'abc1234',
+            headSubject: 'Store capture context with new notes',
+            capturedAt: '2026-05-14T21:15:00.000Z'
+          }
+        }
+      ]
+    })
+
+    expect(prompt).toContain('Treat Capture Context as note-time context only')
+    expect(prompt).toContain('Capture Context can guide live repo inspection')
+    expect(prompt).toContain('captureContext:')
+    expect(prompt).toContain('state: captured')
+    expect(prompt).toContain('branch: feature/capture-context')
+    expect(prompt).toContain('dirtyFiles:')
+    expect(prompt).toContain('- src/main/pi/issue-generation.ts')
+    expect(prompt).toContain('- src/shared/types.ts')
+    expect(prompt).toContain('stagedFiles:')
+    expect(prompt).toContain('- src/main/db/repositories/notes.ts')
+    expect(prompt).toContain('headSha: abc1234')
+    expect(prompt).toContain('headSubject: Store capture context with new notes')
+    expect(prompt).toContain('capturedAt: 2026-05-14T21:15:00.000Z')
+  })
+
+  it('keeps older notes without Capture Context usable', () => {
+    const prompt = buildIssueGenerationPrompt({
+      repo: promptRepo,
+      notes: [{ ...promptNote, captureContext: null }]
+    })
+
+    expect(prompt).toContain('captureContext:')
+    expect(prompt).toContain('(none recorded for this note)')
+    expect(prompt).toContain('content:\nsettings page spacing is weird on mobile')
+  })
+
+  it('includes Capture Context alongside Repo Index navigation context', () => {
+    const prompt = buildIssueGenerationPrompt({
+      repo: {
+        ...promptRepo,
+        repoIndex: {
+          status: 'ready',
+          lastIndexedAt: '2026-05-14T18:30:00.000Z',
+          indexVersion: 1,
+          packageManager: 'pnpm',
+          frameworkSignals: ['Electron', 'React'],
+          importantDirectories: [{ path: 'src/main/pi', role: 'issue generation runtime' }],
+          exclusionSummary: {
+            dependency: 1200,
+            buildOutput: 4,
+            generated: 2,
+            binaryHeavy: 1,
+            ignored: 8
+          },
+          errorMessage: null
+        }
+      },
+      notes: [
+        {
+          ...promptNote,
+          captureContext: {
+            state: 'captured',
+            branch: 'feature/context-quality',
+            dirtyFiles: ['src/main/pi/issue-generation.ts'],
+            stagedFiles: [],
+            headSha: null,
+            headSubject: null,
+            capturedAt: '2026-05-14T21:30:00.000Z'
+          }
+        }
+      ]
+    })
+
+    expect(prompt).toContain('Repo Index navigation context:')
+    expect(prompt).toContain('- src/main/pi: issue generation runtime')
+    expect(prompt).toContain('captureContext:')
+    expect(prompt).toContain('branch: feature/context-quality')
+    expect(prompt).toContain('- src/main/pi/issue-generation.ts')
+    expect(prompt).toContain('Live Repo Evidence:')
+    expect(prompt).toContain('Capture Context and Repo Index are not verified current evidence.')
   })
 
   it('includes saved issue style and draft content toggle defaults', () => {
