@@ -33,6 +33,12 @@ const IMPORTANT_DIRECTORY_ROLES = new Map<string, string>([
   ['scripts', 'Scripts']
 ])
 
+const DEPENDENCY_DIRECTORIES = ['node_modules', 'vendor']
+const BUILD_OUTPUT_DIRECTORIES = ['dist', 'build', 'out', '.next', 'coverage']
+const GENERATED_DIRECTORIES = ['generated', '.turbo', '.cache']
+const BINARY_HEAVY_DIRECTORIES = ['assets', 'public']
+const IGNORED_ENTRIES = ['.git', '.gitignore']
+
 export async function createRepoIndexSnapshot(localPath: string): Promise<RepoIndexSnapshot> {
   const entries = await readTopLevelEntries(localPath)
   const names = new Set(entries.map((entry) => entry.name))
@@ -130,11 +136,11 @@ function detectImportantDirectories(entries: Entry[]): RepoIndexDirectory[] {
 function summarizeExclusions(entries: Entry[]): RepoIndexExclusionSummary {
   const summary = { dependency: 0, buildOutput: 0, generated: 0, binaryHeavy: 0, ignored: 0 }
   for (const entry of entries) {
-    if (entry.name === 'node_modules' || entry.name === 'vendor') summary.dependency += 1
-    if (['dist', 'build', 'out', '.next', 'coverage'].includes(entry.name)) summary.buildOutput += 1
-    if (['generated', '.turbo', '.cache'].includes(entry.name)) summary.generated += 1
-    if (['assets', 'public'].includes(entry.name)) summary.binaryHeavy += 1
-    if (entry.name === '.git' || entry.name === '.gitignore') summary.ignored += 1
+    if (DEPENDENCY_DIRECTORIES.includes(entry.name)) summary.dependency += 1
+    if (BUILD_OUTPUT_DIRECTORIES.includes(entry.name)) summary.buildOutput += 1
+    if (GENERATED_DIRECTORIES.includes(entry.name)) summary.generated += 1
+    if (BINARY_HEAVY_DIRECTORIES.includes(entry.name)) summary.binaryHeavy += 1
+    if (IGNORED_ENTRIES.includes(entry.name)) summary.ignored += 1
   }
   return summary
 }

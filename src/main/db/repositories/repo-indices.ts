@@ -3,6 +3,14 @@ import type { PilogDatabase } from '../client'
 import { repoIndices } from '../schema'
 import type { RepoIndexDirectory, RepoIndexExclusionSummary, RepoIndexStatus } from '@shared/ipc'
 
+const EMPTY_EXCLUSION_SUMMARY: RepoIndexExclusionSummary = {
+  dependency: 0,
+  buildOutput: 0,
+  generated: 0,
+  binaryHeavy: 0,
+  ignored: 0
+}
+
 type RepoIndexRow = {
   repoId: string
   status: 'ready' | 'failed'
@@ -17,44 +25,30 @@ type RepoIndexRow = {
   updatedAt: string
 }
 
+type UpsertRepoIndexInput =
+  | {
+      status: 'ready'
+      indexVersion: number
+      lastIndexedAt: string
+      packageManager: string | null
+      frameworkSignals: string[]
+      importantDirectories: RepoIndexDirectory[]
+      exclusionSummary: RepoIndexExclusionSummary
+    }
+  | {
+      status: 'failed'
+      indexVersion: number
+      errorMessage: string
+    }
+
 export function upsertRepoIndex(
   db: PilogDatabase,
   repoId: string,
-  input:
-    | {
-        status: 'ready'
-        indexVersion: number
-        lastIndexedAt: string
-        packageManager: string | null
-        frameworkSignals: string[]
-        importantDirectories: RepoIndexDirectory[]
-        exclusionSummary: RepoIndexExclusionSummary
-      }
-    | {
-        status: 'failed'
-        indexVersion: number
-        errorMessage: string
-      }
+  input: UpsertRepoIndexInput
 ): RepoIndexStatus {
   const now = new Date().toISOString()
   const existing = getRepoIndex(db, repoId)
-  const values = {
-    repoId,
-    status: input.status,
-    indexVersion: input.indexVersion,
-    lastIndexedAt: input.status === 'ready' ? input.lastIndexedAt : null,
-    packageManager: input.status === 'ready' ? input.packageManager : null,
-    frameworkSignals: JSON.stringify(input.status === 'ready' ? input.frameworkSignals : []),
-    importantDirectories: JSON.stringify(input.status === 'ready' ? input.importantDirectories : []),
-    exclusionSummary: JSON.stringify(
-      input.status === 'ready'
-        ? input.exclusionSummary
-        : { dependency: 0, buildOutput: 0, generated: 0, binaryHeavy: 0, ignored: 0 }
-    ),
-    errorMessage: input.status === 'failed' ? input.errorMessage : null,
-    createdAt: now,
-    updatedAt: now
-  }
+  const values = buildRepoIndexValues(repoId, input, now)
 
   if (existing) {
     db.update(repoIndices)
@@ -78,6 +72,42 @@ export function upsertRepoIndex(
   const saved = getRepoIndex(db, repoId)
   if (!saved) throw new Error('Repo Index could not be saved.')
   return saved
+}
+
+function buildRepoIndexValues(
+  repoId: string,
+  input: UpsertRepoIndexInput,
+  now: string
+): typeof repoIndices.$inferInsert {
+  if (input.status === 'failed') {
+    return {
+      repoId,
+      status: input.status,
+      indexVersion: input.indexVersion,
+      lastIndexedAt: null,
+      packageManager: null,
+      frameworkSignals: JSON.stringify([]),
+      importantDirectories: JSON.stringify([]),
+      exclusionSummary: JSON.stringify(EMPTY_EXCLUSION_SUMMARY),
+      errorMessage: input.errorMessage,
+      createdAt: now,
+      updatedAt: now
+    }
+  }
+
+  return {
+    repoId,
+    status: input.status,
+    indexVersion: input.indexVersion,
+    lastIndexedAt: input.lastIndexedAt,
+    packageManager: input.packageManager,
+    frameworkSignals: JSON.stringify(input.frameworkSignals),
+    importantDirectories: JSON.stringify(input.importantDirectories),
+    exclusionSummary: JSON.stringify(input.exclusionSummary),
+    errorMessage: null,
+    createdAt: now,
+    updatedAt: now
+  }
 }
 
 export function getRepoIndex(db: PilogDatabase, repoId: string): RepoIndexStatus | null {
@@ -123,7 +153,9 @@ function mapRepoIndexRow(row: RepoIndexRow): RepoIndexStatus {
 function parseStringArray(value: string): string[] {
   try {
     const parsed = JSON.parse(value) as unknown
-    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string') : []
+    return Array.isArray(parsed)
+      ? parsed.filter((item): item is string => typeof item === 'string')
+      : []
   } catch {
     return []
   }
@@ -145,7 +177,6 @@ function parseDirectories(value: string): RepoIndexDirectory[] {
 }
 
 function parseExclusionSummary(value: string): RepoIndexExclusionSummary {
-  const fallback = { dependency: 0, buildOutput: 0, generated: 0, binaryHeavy: 0, ignored: 0 }
   try {
     const parsed = JSON.parse(value) as Partial<RepoIndexExclusionSummary>
     return {
@@ -156,7 +187,7 @@ function parseExclusionSummary(value: string): RepoIndexExclusionSummary {
       ignored: numberOrZero(parsed.ignored)
     }
   } catch {
-    return fallback
+    return EMPTY_EXCLUSION_SUMMARY
   }
 }
 

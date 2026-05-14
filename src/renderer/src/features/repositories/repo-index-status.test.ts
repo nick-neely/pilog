@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getRepoIndexStatusLabel } from './Repositories'
+import { getRepoIndexStatusLabel } from './repo-index-status'
 
 describe('getRepoIndexStatusLabel', () => {
   it('maps a ready Repo Index to a last-indexed label', () => {

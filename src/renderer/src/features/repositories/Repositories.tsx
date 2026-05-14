@@ -43,10 +43,10 @@ import type {
   GitHubIssueTemplate,
   Repo,
   RepoAutoPublishSettings,
-  RepoIndexStatus,
   UpdateRepoAutoPublishSettingsRequest
 } from '@shared/ipc'
 import { DEFAULT_REPO_AUTO_PUBLISH_SETTINGS, normalizeRepoAutoPublishSettings } from '@shared/ipc'
+import { getRepoIndexStatusLabel } from './repo-index-status'
 import { formatRepoLocation } from '@shared/repo-paths'
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
 import { getErrorMessage } from '../recovery-state'
@@ -671,39 +671,6 @@ function RepoRow({
       <NewIssueDialog repo={repo} open={showNewIssue} onOpenChange={setShowNewIssue} />
     </>
   )
-}
-
-export function getRepoIndexStatusLabel(repoIndex: RepoIndexStatus | null): {
-  label: string
-  ariaLabel: string
-} {
-  if (!repoIndex) {
-    return {
-      label: 'Not created',
-      ariaLabel: 'Repo Index not created'
-    }
-  }
-
-  if (repoIndex.status === 'failed') {
-    return {
-      label: `Failed${repoIndex.errorMessage ? `: ${repoIndex.errorMessage}` : ''}`,
-      ariaLabel: `Repo Index failed${repoIndex.errorMessage ? `: ${repoIndex.errorMessage}` : ''}`
-    }
-  }
-
-  return {
-    label: `Indexed ${formatIndexDate(repoIndex.lastIndexedAt)}`,
-    ariaLabel: `Repo Index last indexed ${formatIndexDate(repoIndex.lastIndexedAt)}`
-  }
-}
-
-function formatIndexDate(value: string): string {
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return value
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: 'medium',
-    timeStyle: 'short'
-  }).format(date)
 }
 
 export function Repositories({

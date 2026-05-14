@@ -110,19 +110,16 @@ export async function linkRepo(db: PilogDatabase, request: LinkRepoRequest): Pro
 
   try {
     const snapshot = await createRepoIndexSnapshot(request.access?.displayPath ?? request.localPath)
-    repo.repoIndex = upsertRepoIndex(db, repo.id, {
-      status: 'ready',
-      ...snapshot
-    })
+    const repoIndex = upsertRepoIndex(db, repo.id, { status: 'ready', ...snapshot })
+    return { ...repo, repoIndex }
   } catch (err) {
-    repo.repoIndex = upsertRepoIndex(db, repo.id, {
+    const repoIndex = upsertRepoIndex(db, repo.id, {
       status: 'failed',
       indexVersion: REPO_INDEX_VERSION,
       errorMessage: err instanceof Error ? err.message : 'Repo Index creation failed.'
     })
+    return { ...repo, repoIndex }
   }
-
-  return repo
 }
 
 async function fetchInitialLabelCache(
