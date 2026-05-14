@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createIssueGenerationTools, repoToToolAccessDescriptor } from './runtime'
 import type { IssueGenerationInput } from './issue-generation'
+import { DEFAULT_REPO_DRAFT_SETTINGS } from '@shared/ipc'
 
 describe('Pi runtime tool registration', () => {
   it('registers web_search only when web search is enabled and configured', () => {
@@ -58,6 +59,7 @@ function baseInput(overrides: Partial<IssueGenerationInput> = {}): IssueGenerati
       autoPublishDefaultLabel: 'triaged-by-pilog',
       autoPublishDryRun: false,
       autoPublishRequireConfirmation: true,
+      ...DEFAULT_REPO_DRAFT_SETTINGS,
       createdAt: '2026-05-08T00:00:00.000Z',
       updatedAt: '2026-05-08T00:00:00.000Z'
     },

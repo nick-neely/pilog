@@ -1,11 +1,16 @@
 import { ipcMain, dialog, BrowserWindow } from 'electron'
 import type { PilogDatabase } from '../db/client'
-import type { LinkRepoRequest, UpdateRepoAutoPublishSettingsRequest } from '@shared/ipc'
+import type {
+  LinkRepoRequest,
+  UpdateRepoAutoPublishSettingsRequest,
+  UpdateRepoDraftSettingsRequest
+} from '@shared/ipc'
 import {
   listRepos,
   deleteRepo,
   getRepoById,
-  updateRepoAutoPublishSettings
+  updateRepoAutoPublishSettings,
+  updateRepoDraftSettings
 } from '../db/repositories/repos'
 import { detectLocalRepo, linkRepo, refreshRepoIndex } from '../repos/local-repo-service'
 import { resolveDefaultIssueTemplate } from '../github/issue-templates'
@@ -38,6 +43,10 @@ export function registerRepoIpcHandlers(db: PilogDatabase): void {
       return updateRepoAutoPublishSettings(db, request.id, request)
     }
   )
+
+  ipcMain.handle('repos:updateDraftSettings', (_event, request: UpdateRepoDraftSettingsRequest) => {
+    return updateRepoDraftSettings(db, request.id, request)
+  })
 
   ipcMain.handle('repos:getDefaultIssueTemplate', (_event, request: { id: string }) => {
     const repo = getRepoById(db, request.id)

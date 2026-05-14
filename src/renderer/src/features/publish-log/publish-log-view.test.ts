@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { getPublishAuditEntryViewModel } from './publish-log-view'
-import type { PublishAuditLogEntry } from '@shared/ipc'
+import { DEFAULT_REPO_DRAFT_SETTINGS, type PublishAuditLogEntry } from '@shared/ipc'
 
 const baseEntry: PublishAuditLogEntry = {
   id: 'log-1',
@@ -24,6 +24,7 @@ const baseEntry: PublishAuditLogEntry = {
     autoPublishDefaultLabel: 'triaged-by-pilog',
     autoPublishDryRun: false,
     autoPublishRequireConfirmation: true,
+    ...DEFAULT_REPO_DRAFT_SETTINGS,
     createdAt: '2026-05-09T00:00:00.000Z',
     updatedAt: '2026-05-09T00:00:00.000Z'
   },

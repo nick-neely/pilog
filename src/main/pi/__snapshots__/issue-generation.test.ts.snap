@@ -33,6 +33,18 @@ localPath: /workspace/pilog
 defaultBranch: main
 githubLabelsSyncedAt: 2026-05-11T00:00:00.000Z
 
+Saved Issue Style:
+depth: balanced
+audience: internal
+
+Saved Draft Content Toggles:
+includeImplementationNotes: true
+includeAffectedFiles: true
+includeSourceNotes: true
+includeAcceptanceCriteria: true
+includeConfidenceRationale: true
+includeReproductionSteps: true
+
 Repo Index navigation context:
 status: unavailable
 No Repo Index is available. Fall back to bounded live traversal with repo tools.
