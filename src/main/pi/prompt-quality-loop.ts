@@ -35,6 +35,7 @@ export type PromptQualityFixtureResult = {
   sourceNoteGroups: string[][]
   labels: string[][]
   affectedFiles: string[][]
+  contextIncludes: string[][]
   clarificationDraftCount: number
 }
 
@@ -78,8 +79,16 @@ async function evaluatePromptQualityFixture(
     githubUrl: createFixtureGithubUrl(fixture.id),
     defaultBranch: 'main'
   })
+  const promptRepo = {
+    ...repo,
+    ...fixture.draftSettings,
+    draftContentToggles: {
+      ...repo.draftContentToggles,
+      ...fixture.draftSettings?.draftContentToggles
+    }
+  }
   const persistedNotes = fixture.notes.map((note) =>
-    createNote(db, { content: note.content, repoId: repo.id })
+    createNote(db, { content: note.content, repoId: repo.id, captureContext: note.captureContext })
   )
   const persistedNoteIdByFixtureId = createPersistedNoteIdMap(fixture, persistedNotes)
   const run = createAgentRun(db, {
@@ -87,8 +96,9 @@ async function evaluatePromptQualityFixture(
     inputNoteIds: persistedNotes.map((note) => note.id)
   })
   const prompt = buildIssueGenerationPrompt({
-    repo,
-    notes: createPromptNotes(fixture, persistedNotes)
+    repo: promptRepo,
+    notes: createPromptNotes(fixture, persistedNotes),
+    clarificationHistory: fixture.clarificationHistory
   })
   const promptIncludesRepoPath = prompt.includes(repoPath)
   const repoToolCalls = await exerciseGenerationTools(fixture, repo.localPath)
@@ -112,6 +122,7 @@ async function evaluatePromptQualityFixture(
   const result = createFixtureResult({
     fixture,
     promptIncludesRepoPath,
+    prompt,
     repoToolCalls,
     normalizedDrafts,
     storedDrafts
@@ -198,16 +209,19 @@ function normalizeFixtureDrafts(
 
 function createFixtureResult(input: {
   fixture: PromptQualityFixture
+  prompt: string
   promptIncludesRepoPath: boolean
   repoToolCalls: RepoToolName[]
   normalizedDrafts: GeneratedIssueDraft[]
   storedDrafts: IssueDraft[]
 }): PromptQualityFixtureResult {
-  const { fixture, promptIncludesRepoPath, repoToolCalls, normalizedDrafts, storedDrafts } = input
+  const { fixture, prompt, promptIncludesRepoPath, repoToolCalls, normalizedDrafts, storedDrafts } =
+    input
   const labels = normalizedDrafts.map((draft) => draft.suggestedLabels)
   const affectedFiles = normalizedDrafts.map((draft) =>
     draft.affectedFiles.map((file) => file.path)
   )
+  const contextIncludes = fixture.expected.contextIncludes ?? []
   const sourceNoteGroups = normalizedDrafts.map((draft) => draft.sourceNoteIds)
   const clarificationDraftCount = normalizedDrafts.filter(
     (draft) => (draft.needsClarification?.length ?? 0) > 0
@@ -237,6 +251,23 @@ function createFixtureResult(input: {
     normalizedDrafts.map((draft) => draft.implementationNotes),
     fixture.expected.implementationNotesIncludes ?? []
   )
+  expectItemIncludes(
+    failures,
+    'context',
+    normalizedDrafts.map((draft) => [draft.context]),
+    contextIncludes
+  )
+  expectItemIncludes(
+    failures,
+    'summary',
+    normalizedDrafts.map((draft) => [draft.summary]),
+    fixture.expected.summaryIncludes ?? []
+  )
+  for (const expectedPromptFragment of fixture.expected.promptIncludes ?? []) {
+    if (!prompt.includes(expectedPromptFragment)) {
+      failures.push(`prompt missed ${JSON.stringify(expectedPromptFragment)}`)
+    }
+  }
   if (!promptIncludesRepoPath) failures.push('prompt omitted the fixture repo path')
   for (const toolName of REQUIRED_REPO_TOOLS) {
     if (!repoToolCalls.includes(toolName)) failures.push(`repo tool was not exercised: ${toolName}`)
@@ -255,6 +286,7 @@ function createFixtureResult(input: {
     sourceNoteGroups,
     labels,
     affectedFiles,
+    contextIncludes,
     clarificationDraftCount
   }
 }
@@ -275,6 +307,22 @@ function expectIncludes(
     const actualItems = actual[index] ?? []
     for (const expected of expectedItems) {
       if (!actualItems.includes(expected)) {
+        failures.push(`${label} draft ${index + 1} missed ${JSON.stringify(expected)}`)
+      }
+    }
+  })
+}
+
+function expectItemIncludes(
+  failures: string[],
+  label: string,
+  actual: string[][],
+  expectedIncludes: string[][]
+): void {
+  expectedIncludes.forEach((expectedItems, index) => {
+    const actualItems = actual[index] ?? []
+    for (const expected of expectedItems) {
+      if (!actualItems.some((item) => item.includes(expected))) {
         failures.push(`${label} draft ${index + 1} missed ${JSON.stringify(expected)}`)
       }
     }

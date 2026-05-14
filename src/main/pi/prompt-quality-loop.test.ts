@@ -9,7 +9,9 @@ describe('prompt quality loop', () => {
     expect(report.fixtures.map((fixture) => fixture.id)).toEqual([
       'focused-bug',
       'related-note-grouping',
-      'broad-feature-refactor'
+      'broad-feature-refactor',
+      'context-aware-drafting',
+      'context-aware-regeneration'
     ])
 
     for (const fixture of report.fixtures) {
@@ -49,6 +51,22 @@ describe('prompt quality loop', () => {
         ],
         ['src/dashboard/Home.tsx']
       ],
+      clarificationDraftCount: 1
+    })
+    expect(report.fixturesById['context-aware-drafting']).toMatchObject({
+      draftCount: 1,
+      sourceNoteGroups: [['capture-context-note']],
+      labels: [['bug', 'frontend', 'regression']],
+      affectedFiles: [
+        ['src/features/issues/NewIssueDialog.tsx', 'src/features/issues/useIssueDraft.ts']
+      ],
+      clarificationDraftCount: 0
+    })
+    expect(report.fixturesById['context-aware-regeneration']).toMatchObject({
+      draftCount: 2,
+      sourceNoteGroups: [['vague-report-note'], ['vague-report-note']],
+      labels: [['needs-info'], ['bug', 'frontend']],
+      affectedFiles: [['src/activity/ActivitySummary.tsx'], ['src/activity/ActivitySummary.tsx']],
       clarificationDraftCount: 1
     })
   })

@@ -1,11 +1,20 @@
 import type { GeneratedIssueDraft } from '@shared/types'
+import type { ClarificationHistoryEntry, NoteCaptureContext } from '@shared/types'
+import type { RepoDraftSettings } from '@shared/ipc'
 import type { RepoLabelLike } from '@shared/labels'
 
 export type PromptQualityFixture = {
-  id: 'focused-bug' | 'related-note-grouping' | 'broad-feature-refactor'
+  id:
+    | 'focused-bug'
+    | 'related-note-grouping'
+    | 'broad-feature-refactor'
+    | 'context-aware-drafting'
+    | 'context-aware-regeneration'
   title: string
-  notes: Array<{ id: string; content: string }>
+  notes: Array<{ id: string; content: string; captureContext?: NoteCaptureContext | null }>
   repoLabels: RepoLabelLike[]
+  draftSettings?: Partial<RepoDraftSettings>
+  clarificationHistory?: ClarificationHistoryEntry[]
   primaryFile: string
   grepPattern: string
   response: GeneratedIssueDraft[]
@@ -16,6 +25,9 @@ export type PromptQualityFixture = {
     affectedFiles: string[][]
     acceptanceCriteriaIncludes: string[][]
     implementationNotesIncludes?: string[][]
+    contextIncludes?: string[][]
+    summaryIncludes?: string[][]
+    promptIncludes?: string[]
     clarificationDraftCount: number
   }
 }
@@ -238,6 +250,212 @@ export const promptQualityFixtures: PromptQualityFixture[] = [
           '- [ ] Stabilize expired-session recovery across session refresh and middleware redirects.'
         ],
         []
+      ],
+      clarificationDraftCount: 1
+    }
+  },
+  {
+    id: 'context-aware-drafting',
+    title: 'Context-aware drafting controls',
+    notes: [
+      {
+        id: 'capture-context-note',
+        content:
+          'The new issue dialog loses the selected repo when I reopen it after a failed save.',
+        captureContext: {
+          state: 'captured',
+          branch: 'fix/new-issue-dialog-repo',
+          dirtyFiles: [
+            'src/features/issues/NewIssueDialog.tsx',
+            'src/features/issues/useIssueDraft.ts'
+          ],
+          stagedFiles: ['src/features/issues/repository-selection.ts'],
+          headSha: 'cafef00d',
+          headSubject: 'Preserve repository selection in new issue flow',
+          capturedAt: '2026-05-14T22:10:00.000Z'
+        }
+      }
+    ],
+    repoLabels: [{ name: 'bug' }, { name: 'frontend' }, { name: 'regression' }],
+    draftSettings: {
+      issueStyleDepth: 'detailed',
+      issueStyleAudience: 'open_source',
+      draftContentToggles: {
+        includeImplementationNotes: false,
+        includeAffectedFiles: true,
+        includeSourceNotes: false,
+        includeAcceptanceCriteria: true,
+        includeConfidenceRationale: false,
+        includeReproductionSteps: true
+      }
+    },
+    primaryFile: 'src/features/issues/NewIssueDialog.tsx',
+    grepPattern: 'selectedRepoId',
+    response: [
+      {
+        title: 'Preserve selected repository after new issue save failure',
+        summary:
+          'Keep the selected repository stable when the new issue dialog is reopened after a failed save.',
+        context:
+          'Capture Context pointed generation at branch fix/new-issue-dialog-repo and the dirty NewIssueDialog/useIssueDraft files, and live inspection confirmed selectedRepoId is owned by NewIssueDialog.',
+        sourceNoteIds: ['capture-context-note'],
+        suggestedLabels: ['Bug', 'frontend', 'Regression'],
+        priority: 'medium',
+        affectedFiles: [
+          {
+            path: 'src/features/issues/NewIssueDialog.tsx',
+            reason:
+              'Live inspection found selectedRepoId state is reset when the dialog closes after save failure.'
+          },
+          {
+            path: 'src/features/issues/useIssueDraft.ts',
+            reason:
+              'Live inspection found failed save errors return through the issue draft hook used by the dialog.'
+          }
+        ],
+        acceptanceCriteria: [
+          'Reopening the new issue dialog after a failed save keeps the previously selected repository.',
+          'The issue can be retried without reselecting the repository.',
+          'The regression is covered by a test that exercises the failed-save path.'
+        ],
+        implementationNotes: [],
+        confidence: 'high',
+        groupingReason:
+          'Single focused bug note; Capture Context narrowed live inspection to the changed issue-dialog files.',
+        publishReady: true
+      }
+    ],
+    expected: {
+      draftCount: 1,
+      sourceNoteGroups: [['capture-context-note']],
+      labels: [['bug', 'frontend', 'regression']],
+      affectedFiles: [
+        ['src/features/issues/NewIssueDialog.tsx', 'src/features/issues/useIssueDraft.ts']
+      ],
+      acceptanceCriteriaIncludes: [
+        [
+          'Reopening the new issue dialog after a failed save keeps the previously selected repository.'
+        ]
+      ],
+      implementationNotesIncludes: [[]],
+      contextIncludes: [['Capture Context pointed generation at branch fix/new-issue-dialog-repo']],
+      promptIncludes: [
+        'branch: fix/new-issue-dialog-repo',
+        '- src/features/issues/NewIssueDialog.tsx',
+        'headSubject: Preserve repository selection in new issue flow',
+        'depth: detailed',
+        'audience: open_source',
+        'includeImplementationNotes: false',
+        'includeSourceNotes: false',
+        'includeConfidenceRationale: false',
+        'includeReproductionSteps: true'
+      ],
+      clarificationDraftCount: 0
+    }
+  },
+  {
+    id: 'context-aware-regeneration',
+    title: 'Clarification regeneration',
+    notes: [
+      {
+        id: 'vague-report-note',
+        content: 'The activity screen count is wrong after import.',
+        captureContext: {
+          state: 'captured',
+          branch: 'main',
+          dirtyFiles: ['src/activity/ActivitySummary.tsx'],
+          stagedFiles: [],
+          headSha: 'deadc0de',
+          headSubject: 'Tighten activity import summary',
+          capturedAt: '2026-05-14T22:20:00.000Z'
+        }
+      }
+    ],
+    repoLabels: [{ name: 'bug' }, { name: 'needs-info' }, { name: 'frontend' }],
+    clarificationHistory: [
+      {
+        question: 'Which count is wrong?',
+        answer: 'The imported item count in the activity summary footer.',
+        answeredAt: '2026-05-14T22:35:00.000Z'
+      },
+      {
+        question: 'What should the count include?',
+        answer: 'It should count only imported rows that completed successfully.',
+        answeredAt: '2026-05-14T22:36:00.000Z'
+      }
+    ],
+    primaryFile: 'src/activity/ActivitySummary.tsx',
+    grepPattern: 'successfulImportedRows',
+    response: [
+      {
+        title: 'Clarify activity import count before implementation',
+        summary: 'The original activity-screen note was too vague to publish without questions.',
+        context:
+          'Before answers were available, the note did not identify which activity count was wrong or the expected counting rule.',
+        sourceNoteIds: ['vague-report-note'],
+        suggestedLabels: ['Needs Info'],
+        priority: 'low',
+        affectedFiles: [
+          {
+            path: 'src/activity/ActivitySummary.tsx',
+            reason:
+              'Likely activity summary surface, but the exact count needed user clarification.'
+          }
+        ],
+        acceptanceCriteria: ['The clarified issue identifies the wrong count and expected rule.'],
+        implementationNotes: ['Ask for the count name and expected import-counting behavior.'],
+        confidence: 'low',
+        groupingReason: 'Kept vague activity note as a clarification draft.',
+        publishReady: false,
+        needsClarification: ['Which count is wrong?', 'What should the count include?']
+      },
+      {
+        title: 'Count only successful imports in the activity summary footer',
+        summary:
+          'Use Clarification History to scope the activity footer count to successfully imported rows.',
+        context:
+          'Clarification History identified the imported item count in the activity summary footer and defined the expected rule as successful imports only.',
+        sourceNoteIds: ['vague-report-note'],
+        suggestedLabels: ['Bug', 'frontend'],
+        priority: 'medium',
+        affectedFiles: [
+          {
+            path: 'src/activity/ActivitySummary.tsx',
+            reason:
+              'Live inspection found the footer renders successfulImportedRows for the import summary.'
+          }
+        ],
+        acceptanceCriteria: [
+          'The activity summary footer counts only rows that completed import successfully.',
+          'Failed or skipped import rows are excluded from the displayed imported item count.'
+        ],
+        implementationNotes: [
+          'Use the clarified successful-import rule when deriving the footer count.'
+        ],
+        confidence: 'high',
+        groupingReason:
+          'Regenerated from the original note plus Clarification History once the expected counting rule was known.',
+        publishReady: true
+      }
+    ],
+    expected: {
+      draftCount: 2,
+      sourceNoteGroups: [['vague-report-note'], ['vague-report-note']],
+      labels: [['needs-info'], ['bug', 'frontend']],
+      affectedFiles: [['src/activity/ActivitySummary.tsx'], ['src/activity/ActivitySummary.tsx']],
+      acceptanceCriteriaIncludes: [
+        ['The clarified issue identifies the wrong count and expected rule.'],
+        ['The activity summary footer counts only rows that completed import successfully.']
+      ],
+      contextIncludes: [
+        ['Before answers were available'],
+        ['Clarification History identified the imported item count']
+      ],
+      promptIncludes: [
+        'Clarification History:',
+        'question: Which count is wrong?',
+        'answer: The imported item count in the activity summary footer.',
+        'answer: It should count only imported rows that completed successfully.'
       ],
       clarificationDraftCount: 1
     }
