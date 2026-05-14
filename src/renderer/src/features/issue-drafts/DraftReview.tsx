@@ -722,17 +722,9 @@ export function DraftReview({
                   </EmptyContent>
                 </Empty>
               ) : drafts.length === 0 ? (
-                <ReviewEmptyState
-                  className="mt-10 p-6"
-                  title={emptyTitle}
-                  description={emptyDescription}
-                  statusFilter={statusFilter}
-                  statusCounts={statusCounts}
-                  failedRuns={failedRuns}
-                  onNavigateToInbox={onNavigateToInbox}
-                  onNavigateToAgentRuns={onNavigateToAgentRuns}
-                  onSetStatusFilter={setStatusFilter}
-                />
+                <Empty className="mt-12 border-none bg-transparent p-8 shadow-none">
+                  <EmptyDescription>{emptyDescription}</EmptyDescription>
+                </Empty>
               ) : (
                 <ul className="flex flex-col gap-1">
                   {drafts.map((draft) => {
@@ -848,11 +840,11 @@ export function DraftReview({
               onNavigateToAgentRuns={onNavigateToAgentRuns}
               onSetStatusFilter={setStatusFilter}
             />
-          ) : (
+          ) : drafts.length === 0 ? (
             <ReviewEmptyState
               className="h-full"
-              title="No draft selected"
-              description="Select a draft from the list to review and edit it."
+              title={emptyTitle}
+              description={emptyDescription}
               statusFilter={statusFilter}
               statusCounts={statusCounts}
               failedRuns={failedRuns}
@@ -860,6 +852,12 @@ export function DraftReview({
               onNavigateToAgentRuns={onNavigateToAgentRuns}
               onSetStatusFilter={setStatusFilter}
             />
+          ) : (
+            <Empty className="h-full border-none bg-transparent shadow-none">
+              <EmptyDescription>
+                Select a draft from the list to review and edit it.
+              </EmptyDescription>
+            </Empty>
           )}
         </ScrollArea>
       </main>

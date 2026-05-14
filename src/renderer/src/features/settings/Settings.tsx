@@ -79,7 +79,7 @@ import {
   SEARCH_PROVIDERS,
   isSearchProvider
 } from '@shared/types'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { GitHubDeviceCode } from '../setup/GitHubDeviceCode'
 import { PiSetupPanel } from '../setup/PiSetupPanel'
 import { useGitHubStatus } from '../setup/use-github-status'
@@ -314,16 +314,19 @@ function RuntimeReadinessRow({ item }: { item: RuntimeReadinessItem }): React.JS
 }
 
 export function Settings({
+  focusSection,
   onBack,
   onNavigateRepositories,
   onNavigateRunHistory,
   onNavigatePublishLog
 }: {
+  focusSection?: 'updates' | null
   onBack: () => void
   onNavigateRepositories?: () => void
   onNavigateRunHistory?: () => void
   onNavigatePublishLog?: () => void
 }): React.JSX.Element {
+  const updatesSectionRef = useRef<HTMLElement>(null)
   const [hotkey, setHotkey] = useSetting('hotkey.scratchpad')
   const [openAtLogin, setOpenAtLogin] = useSetting('openInboxAtLogin')
   const [hotkeyDraft, setHotkeyDraft] = useState<string | null>(null)
@@ -369,6 +372,15 @@ export function Settings({
   const handleOpenAtLoginChange = async (next: boolean): Promise<void> => {
     await setOpenAtLogin(next ? 'true' : 'false')
   }
+
+  // Deep-link scroll: run after layout so Radix ScrollArea measures correctly, and again once
+  // runtime readiness resolves — that card grows from a one-line placeholder to the full list,
+  // which would otherwise leave the updates section barely peeking past the fold.
+  const runtimeReadinessLoaded = runtimeReadiness !== null
+  useLayoutEffect(() => {
+    if (focusSection !== 'updates' || !updatesSectionRef.current) return
+    updatesSectionRef.current.scrollIntoView({ behavior: 'auto', block: 'start' })
+  }, [focusSection, runtimeReadinessLoaded])
 
   return (
     <div className="flex h-screen flex-col bg-background text-foreground">
@@ -529,7 +541,11 @@ export function Settings({
                     </Card>
                   </section>
 
-                  <section aria-live="polite" data-testid="settings-updates-section">
+                  <section
+                    ref={updatesSectionRef}
+                    aria-live="polite"
+                    data-testid="settings-updates-section"
+                  >
                     <Card
                       size="sm"
                       data-testid="settings-updates-card"

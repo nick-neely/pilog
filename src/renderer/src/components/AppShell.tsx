@@ -1,4 +1,9 @@
-import { InformationCircleIcon, Search01Icon, Settings02Icon } from '@hugeicons/core-free-icons'
+import {
+  ArrowUp01Icon,
+  ListRestartIcon,
+  Search01Icon,
+  Settings02Icon
+} from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { Button } from '@renderer/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@renderer/components/ui/tooltip'
@@ -35,6 +40,11 @@ interface AppShellProps {
   activeTab?: string
   onTabChange: (next: string) => void
   onNavigateToSettings: () => void
+  /**
+   * Called when the update indicator is clicked. Defaults to
+   * `onNavigateToSettings` if not provided.
+   */
+  onNavigateToSoftwareUpdates?: () => void
   navigationSlot?: ReactNode
   /**
    * If provided, the search/Cmd-K affordance shows in the strip.
@@ -51,6 +61,7 @@ export function AppShell({
   activeTab,
   onTabChange,
   onNavigateToSettings,
+  onNavigateToSoftwareUpdates,
   navigationSlot,
   onOpenCommandPalette,
   updateStatus,
@@ -84,6 +95,12 @@ export function AppShell({
           className={cn('min-w-4 flex-1 self-stretch', ELECTRON_DRAG_REGION_CLASS)}
         />
         <div className={cn('flex shrink-0 items-center gap-1', ELECTRON_NO_DRAG_REGION_CLASS)}>
+          {updateIndicator ? (
+            <UpdateChromeButton
+              indicator={updateIndicator}
+              onClick={onNavigateToSoftwareUpdates ?? onNavigateToSettings}
+            />
+          ) : null}
           {onOpenCommandPalette ? (
             <Tooltip>
               <TooltipTrigger asChild>
@@ -102,9 +119,6 @@ export function AppShell({
               </TooltipTrigger>
               <TooltipContent>Search and commands</TooltipContent>
             </Tooltip>
-          ) : null}
-          {updateIndicator ? (
-            <UpdateChromeButton indicator={updateIndicator} onClick={onNavigateToSettings} />
           ) : null}
           <Tooltip>
             <TooltipTrigger asChild>
@@ -135,23 +149,29 @@ function UpdateChromeButton({
   indicator: UpdateChromeIndicator
   onClick: () => void
 }): React.JSX.Element {
-  const textTone = indicator.tone === 'restart' ? 'text-primary' : 'text-muted-foreground'
+  const isRestart = indicator.tone === 'restart'
 
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <Button
+        <button
           type="button"
-          variant="outline"
-          size="sm"
           data-testid="open-software-updates"
           onClick={onClick}
           aria-label={indicator.ariaLabel}
-          className={cn('gap-1.5 px-2 text-xs', textTone)}
+          className={cn(
+            'inline-flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium transition-all duration-100 outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30 active:translate-y-px',
+            isRestart ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground'
+          )}
         >
-          <HugeiconsIcon icon={InformationCircleIcon} data-icon="inline-start" aria-hidden />
+          <HugeiconsIcon
+            icon={isRestart ? ListRestartIcon : ArrowUp01Icon}
+            data-icon="inline-start"
+            aria-hidden
+            className="size-3.5"
+          />
           <span>{indicator.label}</span>
-        </Button>
+        </button>
       </TooltipTrigger>
       <TooltipContent>{indicator.tooltip}</TooltipContent>
     </Tooltip>

@@ -9,14 +9,14 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator
 } from './components/ui/breadcrumb'
-import { Inbox } from './features/inbox/Inbox'
-import { Settings } from './features/settings/Settings'
-import { useAppUpdates } from './features/settings/use-app-updates'
-import { Repositories } from './features/repositories/Repositories'
 import { AgentRuns } from './features/agent-runs/AgentRuns'
+import type { RunNavigationOrigin } from './features/agent-runs/navigation'
+import { Inbox } from './features/inbox/Inbox'
 import { DraftReview } from './features/issue-drafts/DraftReview'
 import { PublishLog } from './features/publish-log/PublishLog'
-import type { RunNavigationOrigin } from './features/agent-runs/navigation'
+import { Repositories } from './features/repositories/Repositories'
+import { Settings } from './features/settings/Settings'
+import { useAppUpdates } from './features/settings/use-app-updates'
 import { PILOG_APP_SHORTCUTS, usePilogHotkey } from './shortcuts/pilog-hotkeys'
 
 type Route = 'inbox' | 'draft-review' | 'settings' | 'repositories' | 'agent-runs' | 'publish-log'
@@ -218,6 +218,7 @@ function App(): React.JSX.Element {
   const [focusedDraftId, setFocusedDraftId] = useState<string | null>(null)
   const [runOrigin, setRunOrigin] = useState<RunNavigationOrigin | null>(null)
   const [paletteOpen, setPaletteOpen] = useState(false)
+  const [settingsFocus, setSettingsFocus] = useState<'updates' | null>(null)
   const { status: updateStatus } = useAppUpdates()
 
   usePilogHotkey(PILOG_APP_SHORTCUTS.commandPalette, () => {
@@ -228,7 +229,14 @@ function App(): React.JSX.Element {
 
   const openInbox = (): void => setAppRoute('inbox')
   const openDrafts = (): void => setAppRoute('draft-review')
-  const openSettings = (): void => setAppRoute('settings')
+  const openSettings = (): void => {
+    setSettingsFocus(null)
+    setAppRoute('settings')
+  }
+  const openSoftwareUpdates = (): void => {
+    setSettingsFocus('updates')
+    setAppRoute('settings')
+  }
   const openNote = (noteId: string): void => {
     setFocusedNoteId(noteId)
     setAppRoute('inbox')
@@ -256,6 +264,7 @@ function App(): React.JSX.Element {
     return (
       <>
         <Settings
+          focusSection={settingsFocus}
           onBack={openInbox}
           onNavigateRepositories={() => setAppRoute('repositories')}
           onNavigateRunHistory={openRunHistory}
@@ -335,9 +344,10 @@ function App(): React.JSX.Element {
       activeTab={activeTab ?? undefined}
       onTabChange={(next) => setAppRoute(tabToRoute(next))}
       onNavigateToSettings={openSettings}
+      onNavigateToSoftwareUpdates={openSoftwareUpdates}
       navigationSlot={runBreadcrumbs ?? publishLogBreadcrumbs}
       onOpenCommandPalette={() => setPaletteOpen(true)}
-      updateStatus={updateStatus}
+      updateStatus={updateStatus ?? undefined}
     >
       {route === 'inbox' ? (
         <Inbox
