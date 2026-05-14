@@ -4,6 +4,7 @@ import { runMigrations } from '../migrations'
 import { createRepo } from './repos'
 import {
   createIssueDraft,
+  addClarificationAnswer,
   getIssueDraftById,
   listIssueDrafts,
   listIssueDraftsForReview,
@@ -138,6 +139,57 @@ describe('issue-drafts repository', () => {
       }
     )
     expect(listNotes(db, { repoId }).map((persisted) => persisted.status)).toEqual(['unprocessed'])
+  })
+
+  it('stores timestamped clarification history without rewriting source notes', () => {
+    const note = createNote(db, { content: 'dashboard chart looks wrong somewhere', repoId })
+    const draft = createIssueDraft(db, {
+      repoId,
+      draft: {
+        ...generatedDraft,
+        publishReady: false,
+        sourceNoteIds: [note.id],
+        needsClarification: ['Which dashboard screen is affected?']
+      }
+    })
+
+    const updated = addClarificationAnswer(db, {
+      id: draft.id,
+      question: ' Which dashboard screen is affected? ',
+      answer: ' The repository activity chart on the overview screen. '
+    })
+
+    expect(updated).toMatchObject({
+      id: draft.id,
+      workflowState: 'needs_clarification',
+      clarificationHistory: [
+        {
+          question: 'Which dashboard screen is affected?',
+          answer: 'The repository activity chart on the overview screen.'
+        }
+      ]
+    })
+    expect(updated?.clarificationHistory[0]?.answeredAt).toEqual(expect.any(String))
+    expect(updated?.updatedAt).not.toBe(draft.updatedAt)
+    expect(listIssueDraftsForReview(db, { workflowState: 'needs_clarification' })[0]).toMatchObject(
+      {
+        id: draft.id,
+        clarificationHistory: [
+          {
+            question: 'Which dashboard screen is affected?',
+            answer: 'The repository activity chart on the overview screen.'
+          }
+        ],
+        sourceNotes: [expect.objectContaining({ id: note.id, content: note.content })]
+      }
+    )
+    expect(listNotes(db, { repoId })).toEqual([
+      expect.objectContaining({
+        id: note.id,
+        content: 'dashboard chart looks wrong somewhere',
+        status: 'unprocessed'
+      })
+    ])
   })
 
   it('updates mutable draft fields and persists them for later listing', () => {

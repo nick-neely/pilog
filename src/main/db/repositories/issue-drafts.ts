@@ -5,6 +5,7 @@ import { issueDrafts, notes } from '../schema'
 import type {
   GeneratedIssueDraft,
   GitHubIssueTemplate,
+  ClarificationHistoryEntry,
   IssueDraft,
   IssueDraftForReview,
   IssueDraftWorkflowState,
@@ -28,6 +29,7 @@ const issueDraftColumns = {
   groupingReason: issueDrafts.groupingReason,
   workflowState: issueDrafts.workflowState,
   clarificationQuestions: issueDrafts.clarificationQuestions,
+  clarificationHistory: issueDrafts.clarificationHistory,
   status: issueDrafts.status,
   githubIssueUrl: issueDrafts.githubIssueUrl,
   createdAt: issueDrafts.createdAt,
@@ -67,6 +69,7 @@ export function createIssueDraft(
       groupingReason: input.draft.groupingReason,
       workflowState: workflow.state,
       clarificationQuestions: JSON.stringify(workflow.clarificationQuestions),
+      clarificationHistory: JSON.stringify([]),
       status: 'draft',
       createdAt: now,
       updatedAt: now
@@ -85,6 +88,7 @@ export function createIssueDraft(
     groupingReason: input.draft.groupingReason,
     workflowState: workflow.state,
     clarificationQuestions: workflow.clarificationQuestions,
+    clarificationHistory: [],
     status: 'draft',
     githubIssueUrl: null,
     createdAt: now,
@@ -188,6 +192,47 @@ export function updateIssueDraftStatus(
   return getIssueDraftById(db, input.id)
 }
 
+export function addClarificationAnswer(
+  db: PilogDatabase,
+  input: { id: string; question: string; answer: string }
+): IssueDraft | null {
+  const row = db
+    .select(issueDraftColumns)
+    .from(issueDrafts)
+    .where(eq(issueDrafts.id, input.id))
+    .get()
+  if (!row) return null
+
+  const draft = mapIssueDraft(row)
+  if (draft.workflowState !== 'needs_clarification') {
+    throw new Error('Only clarification drafts can store clarification answers.')
+  }
+
+  const question = input.question.trim()
+  const answer = input.answer.trim()
+  if (!question) throw new Error('Clarification question is required.')
+  if (!answer) throw new Error('Clarification answer is required.')
+  if (!draft.clarificationQuestions.includes(question)) {
+    throw new Error('Clarification answer must match a question on this draft.')
+  }
+
+  const now = nextUpdatedAt(draft.updatedAt)
+  const clarificationHistory: ClarificationHistoryEntry[] = [
+    ...draft.clarificationHistory,
+    { question, answer, answeredAt: now }
+  ]
+
+  db.update(issueDrafts)
+    .set({
+      clarificationHistory: JSON.stringify(clarificationHistory),
+      updatedAt: now
+    })
+    .where(eq(issueDrafts.id, input.id))
+    .run()
+
+  return getIssueDraftById(db, input.id)
+}
+
 export function splitIssueDraft(
   db: PilogDatabase,
   input: { id: string; movedSourceNoteIds: string[] }
@@ -249,6 +294,7 @@ export function splitIssueDraft(
         groupingReason,
         workflowState: draft.workflowState,
         clarificationQuestions: JSON.stringify(draft.clarificationQuestions),
+        clarificationHistory: JSON.stringify(draft.clarificationHistory),
         status: 'draft',
         githubIssueUrl: null,
         createdAt: now,
@@ -308,6 +354,10 @@ export function mergeIssueDrafts(
         clarificationQuestions: JSON.stringify(
           mergeUnique(target.clarificationQuestions, source.clarificationQuestions)
         ),
+        clarificationHistory: JSON.stringify([
+          ...target.clarificationHistory,
+          ...source.clarificationHistory
+        ]),
         status: 'draft',
         updatedAt: now
       })
@@ -393,11 +443,30 @@ function mapIssueDraft(row: typeof issueDrafts.$inferSelect): IssueDraft {
     groupingReason: row.groupingReason,
     workflowState: row.workflowState,
     clarificationQuestions: JSON.parse(row.clarificationQuestions),
+    clarificationHistory: parseClarificationHistory(row.clarificationHistory),
     status: row.status,
     githubIssueUrl: row.githubIssueUrl,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt
   }
+}
+
+function parseClarificationHistory(value: string): ClarificationHistoryEntry[] {
+  const parsed = JSON.parse(value) as unknown
+  if (!Array.isArray(parsed)) return []
+
+  return parsed.filter((entry): entry is ClarificationHistoryEntry => {
+    return (
+      entry !== null &&
+      typeof entry === 'object' &&
+      'question' in entry &&
+      'answer' in entry &&
+      'answeredAt' in entry &&
+      typeof entry.question === 'string' &&
+      typeof entry.answer === 'string' &&
+      typeof entry.answeredAt === 'string'
+    )
+  })
 }
 
 function getGeneratedDraftWorkflow(draft: GeneratedIssueDraft): {

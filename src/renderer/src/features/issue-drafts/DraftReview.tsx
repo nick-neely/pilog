@@ -1131,6 +1131,12 @@ function DraftEditor({
   const [merging, setMerging] = useState(false)
   const [mergeMessage, setMergeMessage] = useState<string | null>(null)
   const [mergeError, setMergeError] = useState<string | null>(null)
+  const [clarificationAnswers, setClarificationAnswers] = useState<Record<string, string>>({})
+  const [savingClarificationQuestion, setSavingClarificationQuestion] = useState<string | null>(
+    null
+  )
+  const [clarificationMessage, setClarificationMessage] = useState<string | null>(null)
+  const [clarificationError, setClarificationError] = useState<string | null>(null)
   const [repoLabelState, setRepoLabelState] = useState<RepoLabelLoadState>({
     key: null,
     labels: [],
@@ -1411,6 +1417,39 @@ function DraftEditor({
     }
   }, [canSubmitSplit, draft.id, onSplitComplete, splitSourceNoteIds, splitting])
 
+  const handleClarificationAnswerChange = useCallback((question: string, answer: string): void => {
+    setClarificationAnswers((current) => ({ ...current, [question]: answer }))
+  }, [])
+
+  const handleSubmitClarificationAnswer = useCallback(
+    async (question: string): Promise<void> => {
+      const answer = clarificationAnswers[question]?.trim() ?? ''
+      if (!answer || savingClarificationQuestion) return
+
+      setSavingClarificationQuestion(question)
+      setClarificationError(null)
+      setClarificationMessage(null)
+      try {
+        const updated = await window.pilog.invoke('issue-drafts:addClarificationAnswer', {
+          id: draft.id,
+          question,
+          answer
+        })
+        if (updated) {
+          setClarificationAnswers((current) => ({ ...current, [question]: '' }))
+          setSavedAt(formatTimestamp(updated.updatedAt))
+          setClarificationMessage('Answer saved to clarification history.')
+          await onSaved()
+        }
+      } catch (err) {
+        setClarificationError(getErrorMessage(err, 'Answer could not be saved.'))
+      } finally {
+        setSavingClarificationQuestion(null)
+      }
+    },
+    [clarificationAnswers, draft.id, onSaved, savingClarificationQuestion]
+  )
+
   usePilogHotkey(PILOG_APP_SHORTCUTS.save, () => handleSaveShortcut(), {
     allowInEditable: true
   })
@@ -1599,7 +1638,15 @@ function DraftEditor({
             <Badge variant="outline">{confidenceLabel(draft.confidence)}</Badge>
           </div>
 
-          <ClarificationQuestionsSection draft={draft} />
+          <ClarificationQuestionsSection
+            draft={draft}
+            answers={clarificationAnswers}
+            savingQuestion={savingClarificationQuestion}
+            message={clarificationMessage}
+            error={clarificationError}
+            onAnswerChange={handleClarificationAnswerChange}
+            onSubmitAnswer={handleSubmitClarificationAnswer}
+          />
 
           <section className="flex flex-col gap-2">
             <h3 className="text-sm font-semibold">Why this grouping</h3>
@@ -1762,26 +1809,103 @@ function DraftEditor({
 }
 
 export function ClarificationQuestionsSection({
-  draft
+  draft,
+  answers = {},
+  savingQuestion = null,
+  message = null,
+  error = null,
+  onAnswerChange,
+  onSubmitAnswer
 }: {
-  draft: Pick<IssueDraft, 'workflowState' | 'clarificationQuestions'>
+  draft: Pick<IssueDraft, 'workflowState' | 'clarificationQuestions' | 'clarificationHistory'>
+  answers?: Record<string, string>
+  savingQuestion?: string | null
+  message?: string | null
+  error?: string | null
+  onAnswerChange?: (question: string, answer: string) => void
+  onSubmitAnswer?: (question: string) => Promise<void>
 }): React.JSX.Element | null {
-  if (draft.workflowState !== 'needs_clarification' || draft.clarificationQuestions.length === 0) {
+  const hasQuestions =
+    draft.workflowState === 'needs_clarification' && draft.clarificationQuestions.length > 0
+  const hasHistory = draft.clarificationHistory.length > 0
+  if (!hasQuestions && !hasHistory) {
     return null
   }
 
   return (
-    <section className="flex flex-col gap-2" aria-labelledby="clarification-questions-heading">
+    <section className="flex flex-col gap-3" aria-labelledby="clarification-questions-heading">
       <h3 id="clarification-questions-heading" className="text-sm font-semibold">
         Clarification Questions
       </h3>
-      <div className="rounded-md border bg-muted/30 p-3">
-        <ul className="flex list-disc flex-col gap-1.5 pl-4 text-sm leading-relaxed text-foreground/90">
-          {draft.clarificationQuestions.map((question) => (
-            <li key={question}>{question}</li>
-          ))}
-        </ul>
-      </div>
+      {hasQuestions ? (
+        <div className="rounded-md border bg-muted/30 p-3">
+          <ul className="flex flex-col gap-3">
+            {draft.clarificationQuestions.map((question, index) => {
+              const answer = answers[question] ?? ''
+              const answerId = `clarification-answer-${index}`
+              return (
+                <li key={question} className="flex flex-col gap-2">
+                  <label htmlFor={answerId} className="text-sm leading-relaxed text-foreground/90">
+                    {question}
+                  </label>
+                  {onAnswerChange && onSubmitAnswer ? (
+                    <div className="flex flex-col gap-2">
+                      <Textarea
+                        id={answerId}
+                        value={answer}
+                        onChange={(event) => onAnswerChange(question, event.target.value)}
+                        className="min-h-20 text-sm leading-relaxed"
+                        placeholder="Write an answer"
+                      />
+                      <div className="flex justify-end">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={!answer.trim() || Boolean(savingQuestion)}
+                          onClick={() => void onSubmitAnswer(question)}
+                        >
+                          <HugeiconsIcon icon={Tick02Icon} data-icon="inline-start" aria-hidden />
+                          {savingQuestion === question ? 'Saving' : 'Save answer'}
+                        </Button>
+                      </div>
+                    </div>
+                  ) : null}
+                </li>
+              )
+            })}
+          </ul>
+          {message ? (
+            <p className="mt-3 text-xs leading-relaxed text-muted-foreground" role="status">
+              {message}
+            </p>
+          ) : null}
+          {error ? (
+            <p className="mt-3 text-xs leading-relaxed text-destructive" role="alert">
+              {error}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+      {hasHistory ? (
+        <div className="flex flex-col gap-2">
+          <h4 className="text-xs font-medium text-muted-foreground">Clarification History</h4>
+          <ol className="flex flex-col divide-y divide-border rounded-md border bg-background">
+            {draft.clarificationHistory.map((entry) => (
+              <li key={`${entry.answeredAt}:${entry.question}`} className="flex flex-col gap-1 p-3">
+                <p className="text-sm leading-relaxed text-foreground/90">{entry.question}</p>
+                <p className="text-sm leading-relaxed text-muted-foreground">{entry.answer}</p>
+                <time
+                  dateTime={entry.answeredAt}
+                  className="tabular text-xs text-muted-foreground/80"
+                >
+                  {formatTimestamp(entry.answeredAt)}
+                </time>
+              </li>
+            ))}
+          </ol>
+        </div>
+      ) : null}
     </section>
   )
 }

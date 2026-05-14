@@ -83,6 +83,7 @@ export const issueDrafts = sqliteTable('issue_drafts', {
     .notNull()
     .default('ready'),
   clarificationQuestions: text('clarification_questions').notNull().default('[]'),
+  clarificationHistory: text('clarification_history').notNull().default('[]'),
   status: text('status', { enum: ['draft', 'published', 'dismissed'] })
     .notNull()
     .default('draft'),

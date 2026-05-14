@@ -65,6 +65,7 @@ const issueDraftColumns = {
   groupingReason: issueDrafts.groupingReason,
   workflowState: issueDrafts.workflowState,
   clarificationQuestions: issueDrafts.clarificationQuestions,
+  clarificationHistory: issueDrafts.clarificationHistory,
   status: issueDrafts.status,
   githubIssueUrl: issueDrafts.githubIssueUrl,
   createdAt: issueDrafts.createdAt,
@@ -266,6 +267,7 @@ function mapIssueDraft(row: typeof issueDrafts.$inferSelect): IssueDraft {
     groupingReason: row.groupingReason,
     workflowState: row.workflowState,
     clarificationQuestions: parseStringArray(row.clarificationQuestions),
+    clarificationHistory: parseClarificationHistory(row.clarificationHistory),
     status: row.status,
     githubIssueUrl: row.githubIssueUrl,
     createdAt: row.createdAt,
@@ -293,6 +295,23 @@ function parseAffectedFiles(value: string): IssueDraft['affectedFiles'] {
       typeof item.reason === 'string'
     )
   })
+}
+
+function parseClarificationHistory(value: string): IssueDraft['clarificationHistory'] {
+  return parseJsonArray(value).filter(
+    (entry): entry is IssueDraft['clarificationHistory'][number] => {
+      return (
+        entry !== null &&
+        typeof entry === 'object' &&
+        'question' in entry &&
+        'answer' in entry &&
+        'answeredAt' in entry &&
+        typeof entry.question === 'string' &&
+        typeof entry.answer === 'string' &&
+        typeof entry.answeredAt === 'string'
+      )
+    }
+  )
 }
 
 function parseErrorCause(value: string | null): ErrorCause | null {

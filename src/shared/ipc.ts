@@ -405,6 +405,12 @@ export type UpdateIssueDraftRequest = {
   keptUnmatchedLabels?: string[]
 }
 
+export type AddClarificationAnswerRequest = {
+  id: string
+  question: string
+  answer: string
+}
+
 export type PathActionRequest = {
   path: string
   repoPath?: string | null
@@ -552,6 +558,10 @@ export type IpcContract = {
   }
   'issue-drafts:updateStatus': {
     request: UpdateIssueDraftStatusRequest
+    response: IssueDraft | null
+  }
+  'issue-drafts:addClarificationAnswer': {
+    request: AddClarificationAnswerRequest
     response: IssueDraft | null
   }
   'issue-drafts:merge': {
