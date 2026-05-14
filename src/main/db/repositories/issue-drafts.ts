@@ -50,8 +50,7 @@ export function createIssueDraft(
   const now = new Date().toISOString()
   const id = uuidv4()
   const body = formatIssueDraftBody(input.draft, input.template)
-  const workflowState = getGeneratedDraftWorkflowState(input.draft)
-  const clarificationQuestions = getGeneratedDraftClarificationQuestions(input.draft)
+  const workflow = getGeneratedDraftWorkflow(input.draft)
 
   db.insert(issueDrafts)
     .values({
@@ -64,8 +63,8 @@ export function createIssueDraft(
       affectedFilesJson: JSON.stringify(input.draft.affectedFiles),
       confidence: input.draft.confidence,
       groupingReason: input.draft.groupingReason,
-      workflowState,
-      clarificationQuestions: JSON.stringify(clarificationQuestions),
+      workflowState: workflow.state,
+      clarificationQuestions: JSON.stringify(workflow.clarificationQuestions),
       status: 'draft',
       createdAt: now,
       updatedAt: now
@@ -82,8 +81,8 @@ export function createIssueDraft(
     affectedFiles: input.draft.affectedFiles,
     confidence: input.draft.confidence,
     groupingReason: input.draft.groupingReason,
-    workflowState,
-    clarificationQuestions,
+    workflowState: workflow.state,
+    clarificationQuestions: workflow.clarificationQuestions,
     status: 'draft',
     githubIssueUrl: null,
     createdAt: now,
@@ -399,13 +398,18 @@ function mapIssueDraft(row: typeof issueDrafts.$inferSelect): IssueDraft {
   }
 }
 
-function getGeneratedDraftWorkflowState(draft: GeneratedIssueDraft): IssueDraftWorkflowState {
-  return !draft.publishReady && getGeneratedDraftClarificationQuestions(draft).length > 0
-    ? 'needs_clarification'
-    : 'ready'
+function getGeneratedDraftWorkflow(draft: GeneratedIssueDraft): {
+  state: IssueDraftWorkflowState
+  clarificationQuestions: string[]
+} {
+  const clarificationQuestions = getGeneratedDraftClarificationQuestions(draft)
+  const state =
+    !draft.publishReady && clarificationQuestions.length > 0 ? 'needs_clarification' : 'ready'
+
+  return { state, clarificationQuestions }
 }
 
-function getGeneratedDraftClarificationQuestions(draft: GeneratedIssueDraft): string[] {
+export function getGeneratedDraftClarificationQuestions(draft: GeneratedIssueDraft): string[] {
   return (draft.needsClarification ?? []).map((question) => question.trim()).filter(Boolean)
 }
 

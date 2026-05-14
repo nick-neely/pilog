@@ -258,6 +258,21 @@ function isClarificationDraft(draft: IssueDraft): boolean {
   return draft.status === 'draft' && draft.workflowState === 'needs_clarification'
 }
 
+function filterDraftsForReview(
+  drafts: IssueDraftForReview[],
+  statusFilter: DraftReviewFilter | undefined
+): IssueDraftForReview[] {
+  if (statusFilter === undefined) {
+    return [...drafts].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))
+  }
+
+  if (statusFilter === 'needs_clarification') {
+    return drafts.filter(isClarificationDraft)
+  }
+
+  return drafts.filter((draft) => draft.status === statusFilter)
+}
+
 function publishButtonLabel(input: { publishing: boolean; published: boolean }): string {
   if (input.publishing) return 'Publishing'
   if (input.published) return 'Published'
@@ -579,12 +594,7 @@ export function DraftReview({
         window.pilog.invoke('github:status'),
         window.pilog.invoke('agent-runs:list', { status: 'failed', limit: 3 })
       ])
-      const filteredDrafts =
-        statusFilter === undefined
-          ? [...allDrafts].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))
-          : statusFilter === 'needs_clarification'
-            ? allDrafts.filter(isClarificationDraft)
-            : allDrafts.filter((draft) => draft.status === statusFilter)
+      const filteredDrafts = filterDraftsForReview(allDrafts, statusFilter)
 
       setDrafts(filteredDrafts)
       setRepos(repoResult)
