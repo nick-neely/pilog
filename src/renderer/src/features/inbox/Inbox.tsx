@@ -114,7 +114,10 @@ import {
   getPublishRecoveryState,
   type RecoveryState
 } from '../recovery-state'
-import { getGenerationRepoIndexStatus } from '../repositories/repo-index-status'
+import {
+  getGenerationRepoIndexStatus,
+  type GenerationRepoIndexStatusView
+} from '../repositories/repo-index-status'
 import { GitHubDeviceCode } from '../setup/GitHubDeviceCode'
 import { PiSetupPanel } from '../setup/PiSetupPanel'
 import { RepoLinkFlow } from '../setup/RepoLinkFlow'
@@ -234,6 +237,24 @@ type OnboardingDraftPreview = {
 
 type GenerationErrorState = RecoveryState & {
   message: string
+}
+
+function GenerationRepoIndexSummary({
+  status
+}: {
+  status: GenerationRepoIndexStatusView
+}): React.JSX.Element {
+  return (
+    <div
+      className="flex flex-col gap-1 rounded-md border bg-muted/25 px-3 py-2"
+      aria-label={status.ariaLabel}
+    >
+      <p className="text-xs font-medium text-foreground">{status.label}</p>
+      {status.notice ? (
+        <p className="text-xs leading-5 text-muted-foreground">{status.notice}</p>
+      ) : null}
+    </div>
+  )
 }
 
 function getGenerationErrorState(input: {
@@ -1807,16 +1828,13 @@ export function Inbox({
   const selectedNotesShareRepo =
     selectedNotes.length > 0 && selectedRepoIds.size === 1 && !selectedRepoIds.has(null)
   const selectedNotesAllUnprocessed = selectedNotes.every((note) => note.status === 'unprocessed')
-  const selectedRepo =
-    selectedNotesShareRepo && selectedNotes[0]?.repoId
-      ? (reposById.get(selectedNotes[0].repoId) ?? null)
-      : null
+  const selectedRepoId = selectedNotesShareRepo ? selectedNotes[0]?.repoId : null
+  const selectedRepo = selectedRepoId ? (reposById.get(selectedRepoId) ?? null) : null
   const currentInboxRepo =
     typeof repoFilter === 'string' ? (reposById.get(repoFilter) ?? null) : null
-  const selectedGenerationRepoIndex =
-    selectedNotesShareRepo && selectedNotes[0]?.repoId
-      ? getGenerationRepoIndexStatus(selectedRepo)
-      : null
+  const selectedGenerationRepoIndex = selectedRepoId
+    ? getGenerationRepoIndexStatus(selectedRepo)
+    : null
   const currentInboxRepoIndex = currentInboxRepo
     ? getGenerationRepoIndexStatus(currentInboxRepo)
     : null
@@ -2518,19 +2536,7 @@ export function Inbox({
                     </div>
                   ) : null}
                   {selectedGenerationRepoIndex ? (
-                    <div
-                      className="flex flex-col gap-1 rounded-md border bg-muted/25 px-3 py-2"
-                      aria-label={selectedGenerationRepoIndex.ariaLabel}
-                    >
-                      <p className="text-xs font-medium text-foreground">
-                        {selectedGenerationRepoIndex.label}
-                      </p>
-                      {selectedGenerationRepoIndex.notice ? (
-                        <p className="text-xs leading-5 text-muted-foreground">
-                          {selectedGenerationRepoIndex.notice}
-                        </p>
-                      ) : null}
-                    </div>
+                    <GenerationRepoIndexSummary status={selectedGenerationRepoIndex} />
                   ) : null}
                   {!piStatus.configured && selectedNotesShareRepo && (
                     <Button
@@ -2601,19 +2607,7 @@ export function Inbox({
                     </div>
                   ) : null}
                   {currentInboxRepoIndex ? (
-                    <div
-                      className="flex flex-col gap-1 rounded-md border bg-muted/25 px-3 py-2"
-                      aria-label={currentInboxRepoIndex.ariaLabel}
-                    >
-                      <p className="text-xs font-medium text-foreground">
-                        {currentInboxRepoIndex.label}
-                      </p>
-                      {currentInboxRepoIndex.notice ? (
-                        <p className="text-xs leading-5 text-muted-foreground">
-                          {currentInboxRepoIndex.notice}
-                        </p>
-                      ) : null}
-                    </div>
+                    <GenerationRepoIndexSummary status={currentInboxRepoIndex} />
                   ) : null}
                   <Button
                     onClick={handleNewNote}

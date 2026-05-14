@@ -70,26 +70,25 @@ export function getGenerationRepoIndexStatus(
   options: { now?: Date } = {}
 ): GenerationRepoIndexStatusView {
   if (!repo) {
-    return {
+    return generationRepoIndexStatus({
       state: 'unavailable',
       label: 'Repo Index unavailable',
       ariaLabel: 'Repository unavailable before draft generation',
       notice:
         'Relink the repository before generating drafts. Existing readiness checks stop generation before a run starts.',
       blocksGeneration: true
-    }
+    })
   }
 
   const repoName = repo.name
   const repoIndex = repo.repoIndex ?? null
   if (!repoIndex || (repoIndex.status === 'failed' && !repoIndex.lastIndexedAt)) {
-    return {
+    return generationRepoIndexStatus({
       state: 'missing',
       label: 'Repo Index missing',
       ariaLabel: `Repo Index missing for ${repoName}`,
-      notice: LIVE_REPO_EVIDENCE_NOTICE,
-      blocksGeneration: false
-    }
+      notice: LIVE_REPO_EVIDENCE_NOTICE
+    })
   }
 
   const indexedAt = repoIndex.lastIndexedAt ? formatIndexDate(repoIndex.lastIndexedAt) : 'unknown'
@@ -97,21 +96,30 @@ export function getGenerationRepoIndexStatus(
     repoIndex.status === 'failed' ||
     isStaleRepoIndex(repoIndex.lastIndexedAt, options.now ?? new Date())
   ) {
-    return {
+    return generationRepoIndexStatus({
       state: 'stale',
       label: `Repo Index stale, indexed ${indexedAt}`,
       ariaLabel: `Repo Index stale for ${repoName}. Last indexed ${indexedAt}`,
-      notice: LIVE_REPO_EVIDENCE_NOTICE,
-      blocksGeneration: false
-    }
+      notice: LIVE_REPO_EVIDENCE_NOTICE
+    })
   }
 
-  return {
+  return generationRepoIndexStatus({
     state: 'fresh',
     label: `Repo Index fresh, indexed ${indexedAt}`,
     ariaLabel: `Repo Index fresh for ${repoName}. Last indexed ${indexedAt}`,
-    notice: null,
-    blocksGeneration: false
+    notice: null
+  })
+}
+
+function generationRepoIndexStatus(
+  view: Omit<GenerationRepoIndexStatusView, 'blocksGeneration'> & {
+    blocksGeneration?: boolean
+  }
+): GenerationRepoIndexStatusView {
+  return {
+    blocksGeneration: false,
+    ...view
   }
 }
 
