@@ -119,7 +119,10 @@ export function PublishLog({
               </EmptyHeader>
             </Empty>
           ) : (
-            <ol className="flex flex-col" aria-label="Published GitHub issues">
+            <ol
+              className="flex flex-col animate-in fade-in-0 duration-200 ease-[var(--ease-out-quart)] motion-reduce:animate-none"
+              aria-label="Published GitHub issues"
+            >
               {state.entries.map((entry, index) => (
                 <li key={entry.id}>
                   <PublishLogRow
@@ -155,7 +158,7 @@ function PublishLogRow({
   return (
     <article
       className={cn(
-        'group flex flex-col gap-2 rounded-md px-3 py-3 transition-colors',
+        'group flex flex-col gap-2 rounded-md px-3 py-3 transition-colors duration-150 ease-[var(--ease-out-quart)] motion-reduce:duration-0',
         'hover:bg-muted/40'
       )}
     >

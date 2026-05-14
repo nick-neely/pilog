@@ -76,6 +76,12 @@
   /* Scrollbar — warm neutral thumb, subtle hover lift */
   --scrollbar-thumb: oklch(0.75 0.009 70);
   --scrollbar-thumb-hover: oklch(0.65 0.011 70);
+
+  /* Motion — exponential ease curves for responsive feedback.
+     Quart out is the default: smooth, refined, mimics real friction. */
+  --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .dark {
@@ -190,6 +196,23 @@
   }
   .animate-progress-indeterminate {
     animation: progress-indeterminate 1.5s ease-in-out infinite;
+  }
+
+  /* Reduced motion: instant transitions, but preserve functional motion
+     (progress bars, loading spinners) so the UI never feels broken. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+    /* Preserve indeterminate progress and spinners at a slower, visible rate */
+    .animate-progress-indeterminate,
+    .animate-spin {
+      animation-duration: 1.5s !important;
+    }
   }
 }
 

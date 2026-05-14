@@ -2290,12 +2290,13 @@ export function Inbox({
                                   data-testid="note-row"
                                   onClick={(e) => handleNoteClick(note.id, index, e)}
                                   onContextMenu={() => focusNote(note.id, index)}
-                                  className={
-                                    'flex min-w-0 max-w-full w-full cursor-pointer items-start gap-3 overflow-hidden rounded-md border px-3 py-2.5 text-left transition-colors select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30 ' +
-                                    (isSelected
-                                      ? 'border-border bg-muted'
-                                      : 'border-transparent hover:bg-muted/60')
-                                  }
+                                  className={cn(
+                                    'flex min-w-0 max-w-full w-full cursor-pointer items-start gap-3 overflow-hidden rounded-md border px-3 py-2.5 text-left select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30',
+                                    'transition-all duration-150 ease-[var(--ease-out-quart)] motion-reduce:transition-colors motion-reduce:duration-0',
+                                    isSelected
+                                      ? 'border-border bg-muted translate-x-0.5'
+                                      : 'border-transparent hover:bg-muted/60'
+                                  )}
                                 >
                                   <span className="min-w-0 flex flex-1 flex-col gap-1">
                                     <Tooltip>

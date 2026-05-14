@@ -86,7 +86,7 @@ function StatusFilterItem({
       // pressed/not-pressed state correctly for each row.
       className={cn(
         'group/status-row flex h-7 min-w-0 cursor-pointer items-center gap-1.5 rounded-md px-1.5',
-        'text-xs transition-colors',
+        'text-xs transition-colors duration-150 ease-[var(--ease-out-quart)] motion-reduce:duration-0',
         'focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/30',
         active
           ? 'bg-muted font-medium text-foreground'
@@ -100,7 +100,7 @@ function StatusFilterItem({
       <span
         aria-hidden
         className={cn(
-          'size-1.5 shrink-0 rounded-full transition-colors',
+          'size-1.5 shrink-0 rounded-full transition-colors duration-150 ease-[var(--ease-out-quart)] motion-reduce:duration-0',
           active ? 'bg-primary' : 'border border-muted-foreground/40'
         )}
       />
@@ -108,7 +108,7 @@ function StatusFilterItem({
       <span
         aria-hidden
         className={cn(
-          'tabular shrink-0 text-[10px]',
+          'tabular shrink-0 text-[10px] transition-opacity duration-150 ease-[var(--ease-out-quart)] motion-reduce:duration-0',
           active ? 'text-foreground/70' : 'text-muted-foreground/60'
         )}
       >

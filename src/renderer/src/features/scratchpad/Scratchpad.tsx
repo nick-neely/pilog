@@ -14,6 +14,7 @@ import {
 } from '@renderer/components/ui/select'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@renderer/components/ui/tooltip'
 import type { Repo } from '@shared/ipc'
+import { cn } from '@renderer/lib/utils'
 import { shouldSave } from '@shared/scratchpad'
 import { useCallback, useEffect, useEffectEvent, useRef, useState } from 'react'
 
@@ -29,6 +30,8 @@ export function Scratchpad(): React.JSX.Element {
 
   const [repos, setRepos] = useState<Repo[]>([])
   const [selectedRepoId, setSelectedRepoId] = useState<string | null>(null)
+  const [showSavedHint, setShowSavedHint] = useState(false)
+  const savedHintTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     selectedRepoIdRef.current = selectedRepoId
@@ -48,6 +51,21 @@ export function Scratchpad(): React.JSX.Element {
     })
   }, [])
 
+  const clearSavedHint = useCallback((): void => {
+    if (savedHintTimeoutRef.current) {
+      clearTimeout(savedHintTimeoutRef.current)
+      savedHintTimeoutRef.current = null
+    }
+  }, [])
+
+  const triggerSavedHint = useCallback((): void => {
+    clearSavedHint()
+    setShowSavedHint(true)
+    savedHintTimeoutRef.current = setTimeout(() => {
+      setShowSavedHint(false)
+    }, 1500)
+  }, [clearSavedHint])
+
   const save = useCallback(async (): Promise<boolean> => {
     const content = viewRef.current?.state.doc.toString() ?? ''
     if (shouldSave(content, hasChangedRef.current)) {
@@ -59,13 +77,18 @@ export function Scratchpad(): React.JSX.Element {
         value: repoId ?? ''
       })
       hasChangedRef.current = false
+      triggerSavedHint()
       return true
     }
     return false
-  }, [])
+  }, [triggerSavedHint])
 
   const saveAndHide = useCallback(async (): Promise<void> => {
-    await save()
+    const didSave = await save()
+    // Brief pause so the saved hint registers before the window hides
+    if (didSave) {
+      await new Promise((resolve) => setTimeout(resolve, 200))
+    }
     window.pilog.send('scratchpad:hide')
   }, [save])
 
@@ -135,12 +158,18 @@ export function Scratchpad(): React.JSX.Element {
 
   useEffect(() => window.pilog.on('scratchpad:reset', handleResetEditor), [])
 
+  useEffect(() => {
+    return () => {
+      clearSavedHint()
+    }
+  }, [clearSavedHint])
+
   const handleRepoChange = (value: string): void => {
     setSelectedRepoId(value === NOTE_REPO_NONE ? null : value)
   }
 
   return (
-    <div className="flex h-screen w-screen flex-col bg-background">
+    <div className="relative flex h-screen w-screen flex-col bg-background">
       {/* Own row so typing never runs underneath the repo control */}
       <header className="flex shrink-0 items-center justify-end gap-2 border-b border-border/60 bg-background px-3 py-2">
         {repos.length === 0 ? (
@@ -179,6 +208,21 @@ export function Scratchpad(): React.JSX.Element {
         )}
       </header>
       <div ref={editorRef} className="min-h-0 flex-1 overflow-hidden" />
+      {/* Save hint — appears briefly after a successful save to confirm capture.
+           Sits at the bottom edge, mono text, muted tone so it never competes
+           with the editor body. Reduced-motion users see instant state. */}
+      <div
+        aria-live="polite"
+        aria-atomic="true"
+        className={cn(
+          'pointer-events-none absolute right-4 bottom-4 flex items-center gap-1.5 rounded-md bg-muted px-2.5 py-1.5 font-mono text-xs text-muted-foreground',
+          'transition-all duration-200 ease-[var(--ease-out-quart)] motion-reduce:transition-none motion-reduce:duration-0',
+          showSavedHint ? 'translate-y-0 opacity-100' : 'translate-y-1 opacity-0'
+        )}
+      >
+        <span className="size-1.5 rounded-full bg-primary" aria-hidden />
+        Saved
+      </div>
     </div>
   )
 }

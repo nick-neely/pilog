@@ -116,9 +116,10 @@ function hasDraftChanges(
 
 function draftCardClassName(selected: boolean): string {
   return cn(
-    'flex w-full max-w-full min-w-0 flex-col overflow-hidden rounded-md border px-3 py-2.5 text-left transition-colors',
+    'flex w-full max-w-full min-w-0 flex-col overflow-hidden rounded-md border px-3 py-2.5 text-left',
+    'transition-all duration-150 ease-[var(--ease-out-quart)] motion-reduce:transition-colors motion-reduce:duration-0',
     'focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30',
-    selected ? 'border-border bg-muted' : 'border-transparent hover:bg-muted/60'
+    selected ? 'border-border bg-muted translate-x-0.5' : 'border-transparent hover:bg-muted/60'
   )
 }
 

@@ -56,7 +56,7 @@ function CommandDialog({
         />
         <DialogPrimitive.Content
           data-slot="command-dialog-content"
-          className="fixed top-[18%] left-1/2 z-50 w-full max-w-lg -translate-x-1/2 overflow-hidden rounded-xl bg-popover text-popover-foreground shadow-xl ring-1 ring-foreground/5 outline-none duration-100 dark:ring-foreground/10 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95"
+          className="fixed top-[18%] left-1/2 z-50 w-full max-w-lg -translate-x-1/2 overflow-hidden rounded-xl bg-popover text-popover-foreground shadow-xl ring-1 ring-foreground/5 outline-none duration-150 ease-[var(--ease-out-quart)] motion-reduce:duration-0 dark:ring-foreground/10 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95"
         >
           {/* a11y title/description; visually hidden but announced */}
           <DialogPrimitive.Title className="sr-only">{title}</DialogPrimitive.Title>
