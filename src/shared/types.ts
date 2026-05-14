@@ -310,6 +310,12 @@ export type PiModelOption = {
 export type IssueDraftStatus = 'draft' | 'published' | 'dismissed'
 export type IssueDraftWorkflowState = 'ready' | 'needs_clarification'
 
+export type ClarificationHistoryEntry = {
+  question: string
+  answer: string
+  answeredAt: string
+}
+
 export type IssueDraft = {
   id: string
   repoId: string
@@ -322,6 +328,7 @@ export type IssueDraft = {
   groupingReason: string
   workflowState: IssueDraftWorkflowState
   clarificationQuestions: string[]
+  clarificationHistory: ClarificationHistoryEntry[]
   status: IssueDraftStatus
   githubIssueUrl: string | null
   createdAt: string

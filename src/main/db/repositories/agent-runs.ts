@@ -6,6 +6,7 @@ import type {
   ErrorCause,
   IssueDraft
 } from '@shared/types'
+import { parseClarificationHistory } from '@shared/clarification-history'
 import { desc, eq, inArray, sql } from 'drizzle-orm'
 import { v4 as uuidv4 } from 'uuid'
 import type { PilogDatabase } from '../client'
@@ -65,6 +66,7 @@ const issueDraftColumns = {
   groupingReason: issueDrafts.groupingReason,
   workflowState: issueDrafts.workflowState,
   clarificationQuestions: issueDrafts.clarificationQuestions,
+  clarificationHistory: issueDrafts.clarificationHistory,
   status: issueDrafts.status,
   githubIssueUrl: issueDrafts.githubIssueUrl,
   createdAt: issueDrafts.createdAt,
@@ -266,6 +268,7 @@ function mapIssueDraft(row: typeof issueDrafts.$inferSelect): IssueDraft {
     groupingReason: row.groupingReason,
     workflowState: row.workflowState,
     clarificationQuestions: parseStringArray(row.clarificationQuestions),
+    clarificationHistory: parseClarificationHistory(row.clarificationHistory),
     status: row.status,
     githubIssueUrl: row.githubIssueUrl,
     createdAt: row.createdAt,

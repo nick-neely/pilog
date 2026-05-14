@@ -70,6 +70,7 @@ const draft: IssueDraftForReview = {
   groupingReason: 'One note describes the loading state.',
   workflowState: 'ready',
   clarificationQuestions: [],
+  clarificationHistory: [],
   status: 'draft',
   githubIssueUrl: null,
   createdAt: '2026-05-10T00:00:00.000Z',

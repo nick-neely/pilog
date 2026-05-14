@@ -54,6 +54,7 @@ export function runMigrations(db: PilogDatabase): void {
       grouping_reason TEXT NOT NULL DEFAULT '',
       workflow_state TEXT NOT NULL DEFAULT 'ready',
       clarification_questions TEXT NOT NULL DEFAULT '[]',
+      clarification_history TEXT NOT NULL DEFAULT '[]',
       status TEXT NOT NULL DEFAULT 'draft',
       github_issue_url TEXT,
       created_at TEXT NOT NULL,
@@ -123,6 +124,7 @@ export function runMigrations(db: PilogDatabase): void {
   addColumnIfMissing(db, 'issue_drafts', 'grouping_reason', "TEXT NOT NULL DEFAULT ''")
   addColumnIfMissing(db, 'issue_drafts', 'workflow_state', "TEXT NOT NULL DEFAULT 'ready'")
   addColumnIfMissing(db, 'issue_drafts', 'clarification_questions', "TEXT NOT NULL DEFAULT '[]'")
+  addColumnIfMissing(db, 'issue_drafts', 'clarification_history', "TEXT NOT NULL DEFAULT '[]'")
   addColumnIfMissing(db, 'agent_runs', 'input_note_ids', "TEXT NOT NULL DEFAULT '[]'")
   addColumnIfMissing(db, 'agent_runs', 'output_draft_ids', "TEXT NOT NULL DEFAULT '[]'")
   addColumnIfMissing(db, 'agent_runs', 'error_cause', 'TEXT')

@@ -394,6 +394,7 @@ export function persistGeneratedIssueDrafts(
           groupingReason: draft.groupingReason,
           workflowState: getPersistedDraftWorkflowState(draft),
           clarificationQuestions: JSON.stringify(clarificationQuestions),
+          clarificationHistory: JSON.stringify([]),
           status: 'draft',
           createdAt: now,
           updatedAt: now

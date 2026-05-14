@@ -3,6 +3,7 @@ import { app, ipcMain } from 'electron'
 import type { PilogDatabase } from '../db/client'
 import { countRunsByStatus, getRunById, listRuns } from '../db/repositories/agent-runs'
 import {
+  addClarificationAnswer,
   listIssueDraftsForReview,
   mergeIssueDrafts,
   splitIssueDraft,
@@ -32,6 +33,7 @@ type DbChannel =
   | 'agent-runs:list'
   | 'agent-runs:counts'
   | 'issue-drafts:list'
+  | 'issue-drafts:addClarificationAnswer'
   | 'issue-drafts:merge'
   | 'issue-drafts:split'
   | 'issue-drafts:update'
@@ -55,6 +57,7 @@ type Handler<C extends DbChannel> = (
 ) => IpcResponse<C> | Promise<IpcResponse<C>>
 
 const ISSUE_DRAFT_CHANGE_CHANNELS = new Set<DbChannel>([
+  'issue-drafts:addClarificationAnswer',
   'issue-drafts:merge',
   'issue-drafts:split',
   'issue-drafts:update',
@@ -66,6 +69,7 @@ const handlers: { [C in DbChannel]: Handler<C> } = {
   'agent-runs:list': (db, request) => listRuns(db, request),
   'agent-runs:counts': (db) => countRunsByStatus(db),
   'issue-drafts:list': (db, request) => listIssueDraftsForReview(db, request),
+  'issue-drafts:addClarificationAnswer': (db, request) => addClarificationAnswer(db, request),
   'issue-drafts:merge': (db, request) => mergeIssueDrafts(db, request),
   'issue-drafts:split': (db, request) => splitIssueDraft(db, request),
   'issue-drafts:update': (db, request) => updateIssueDraft(db, request),
