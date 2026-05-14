@@ -1,7 +1,10 @@
-import type { GeneratedIssueDraft } from '@shared/types'
-import type { ClarificationHistoryEntry, NoteCaptureContext } from '@shared/types'
 import type { RepoDraftSettings } from '@shared/ipc'
 import type { RepoLabelLike } from '@shared/labels'
+import type {
+  ClarificationHistoryEntry,
+  GeneratedIssueDraft,
+  NoteCaptureContext
+} from '@shared/types'
 
 export type PromptQualityFixture = {
   id:

@@ -79,14 +79,6 @@ async function evaluatePromptQualityFixture(
     githubUrl: createFixtureGithubUrl(fixture.id),
     defaultBranch: 'main'
   })
-  const promptRepo = {
-    ...repo,
-    ...fixture.draftSettings,
-    draftContentToggles: {
-      ...repo.draftContentToggles,
-      ...fixture.draftSettings?.draftContentToggles
-    }
-  }
   const persistedNotes = fixture.notes.map((note) =>
     createNote(db, { content: note.content, repoId: repo.id, captureContext: note.captureContext })
   )
@@ -96,7 +88,7 @@ async function evaluatePromptQualityFixture(
     inputNoteIds: persistedNotes.map((note) => note.id)
   })
   const prompt = buildIssueGenerationPrompt({
-    repo: promptRepo,
+    repo: createPromptRepo(repo, fixture),
     notes: createPromptNotes(fixture, persistedNotes),
     clarificationHistory: fixture.clarificationHistory
   })
@@ -239,35 +231,31 @@ function createFixtureResult(input: {
     clarificationDraftCount,
     fixture.expected.clarificationDraftCount
   )
-  expectIncludes(
+  expectExactItems(
     failures,
     'acceptance criteria',
     normalizedDrafts.map((draft) => draft.acceptanceCriteria),
     fixture.expected.acceptanceCriteriaIncludes
   )
-  expectIncludes(
+  expectExactItems(
     failures,
     'implementation notes',
     normalizedDrafts.map((draft) => draft.implementationNotes),
     fixture.expected.implementationNotesIncludes ?? []
   )
-  expectItemIncludes(
+  expectSubstringItems(
     failures,
     'context',
     normalizedDrafts.map((draft) => [draft.context]),
     contextIncludes
   )
-  expectItemIncludes(
+  expectSubstringItems(
     failures,
     'summary',
     normalizedDrafts.map((draft) => [draft.summary]),
     fixture.expected.summaryIncludes ?? []
   )
-  for (const expectedPromptFragment of fixture.expected.promptIncludes ?? []) {
-    if (!prompt.includes(expectedPromptFragment)) {
-      failures.push(`prompt missed ${JSON.stringify(expectedPromptFragment)}`)
-    }
-  }
+  expectPromptIncludes(failures, prompt, fixture.expected.promptIncludes ?? [])
   if (!promptIncludesRepoPath) failures.push('prompt omitted the fixture repo path')
   for (const toolName of REQUIRED_REPO_TOOLS) {
     if (!repoToolCalls.includes(toolName)) failures.push(`repo tool was not exercised: ${toolName}`)
@@ -297,7 +285,7 @@ function expectEqual(failures: string[], label: string, actual: unknown, expecte
   }
 }
 
-function expectIncludes(
+function expectExactItems(
   failures: string[],
   label: string,
   actual: string[][],
@@ -313,7 +301,7 @@ function expectIncludes(
   })
 }
 
-function expectItemIncludes(
+function expectSubstringItems(
   failures: string[],
   label: string,
   actual: string[][],
@@ -327,6 +315,32 @@ function expectItemIncludes(
       }
     }
   })
+}
+
+function expectPromptIncludes(
+  failures: string[],
+  prompt: string,
+  expectedFragments: string[]
+): void {
+  for (const expectedFragment of expectedFragments) {
+    if (!prompt.includes(expectedFragment)) {
+      failures.push(`prompt missed ${JSON.stringify(expectedFragment)}`)
+    }
+  }
+}
+
+function createPromptRepo(
+  repo: ReturnType<typeof createRepo>,
+  fixture: PromptQualityFixture
+): ReturnType<typeof createRepo> {
+  return {
+    ...repo,
+    ...fixture.draftSettings,
+    draftContentToggles: {
+      ...repo.draftContentToggles,
+      ...fixture.draftSettings?.draftContentToggles
+    }
+  }
 }
 
 function createPersistedNoteIdMap(
