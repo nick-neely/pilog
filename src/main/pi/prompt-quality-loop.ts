@@ -1,4 +1,5 @@
 import type { AgentTool } from '@earendil-works/pi-agent-core'
+import { DEFAULT_REPO_DRAFT_SETTINGS } from '@shared/ipc'
 import { matchLabelsToRepoLabels } from '@shared/labels'
 import type { Note } from '@shared/ipc'
 import type { GeneratedIssueDraft, IssueDraft } from '@shared/types'
@@ -143,6 +144,7 @@ async function exerciseGenerationTools(
         autoPublishDefaultLabel: 'triaged-by-pilog',
         autoPublishDryRun: false,
         autoPublishRequireConfirmation: true,
+        ...DEFAULT_REPO_DRAFT_SETTINGS,
         createdAt: FIXTURE_REPO_TIMESTAMP,
         updatedAt: FIXTURE_REPO_TIMESTAMP
       },

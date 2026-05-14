@@ -4,12 +4,16 @@ import type { PilogDatabase } from '../client'
 import { repos } from '../schema'
 import {
   DEFAULT_REPO_AUTO_PUBLISH_SETTINGS,
+  DEFAULT_REPO_DRAFT_SETTINGS,
   normalizeRepoAutoPublishSettings,
+  normalizeRepoDraftSettings,
+  type DraftContentToggles,
   type GitHubLabel,
   type Repo,
   type RepoIndexStatus,
   type RepoAccessKind,
-  type UpdateRepoAutoPublishSettingsRequest
+  type UpdateRepoAutoPublishSettingsRequest,
+  type UpdateRepoDraftSettingsRequest
 } from '@shared/ipc'
 import { getRepoIndex, listRepoIndices } from './repo-indices'
 
@@ -30,6 +34,9 @@ export const repoColumns = {
   autoPublishDefaultLabel: repos.autoPublishDefaultLabel,
   autoPublishDryRun: repos.autoPublishDryRun,
   autoPublishRequireConfirmation: repos.autoPublishRequireConfirmation,
+  issueStyleDepth: repos.issueStyleDepth,
+  issueStyleAudience: repos.issueStyleAudience,
+  draftContentToggles: repos.draftContentToggles,
   createdAt: repos.createdAt,
   updatedAt: repos.updatedAt
 } as const
@@ -71,6 +78,8 @@ export function createRepo(
       githubLabels: JSON.stringify(githubLabels),
       githubLabelsSyncedAt: githubLabelsSyncedAt ?? undefined,
       ...DEFAULT_REPO_AUTO_PUBLISH_SETTINGS,
+      ...DEFAULT_REPO_DRAFT_SETTINGS,
+      draftContentToggles: JSON.stringify(DEFAULT_REPO_DRAFT_SETTINGS.draftContentToggles),
       createdAt: now,
       updatedAt: now
     })
@@ -89,6 +98,7 @@ export function createRepo(
     githubLabels,
     githubLabelsSyncedAt,
     ...DEFAULT_REPO_AUTO_PUBLISH_SETTINGS,
+    ...DEFAULT_REPO_DRAFT_SETTINGS,
     repoIndex: null,
     createdAt: now,
     updatedAt: now
@@ -120,6 +130,27 @@ export function updateRepoAutoPublishSettings(
   db.update(repos)
     .set({
       ...settings,
+      updatedAt: now
+    })
+    .where(eq(repos.id, id))
+    .run()
+
+  return getRepoById(db, id)
+}
+
+export function updateRepoDraftSettings(
+  db: PilogDatabase,
+  id: string,
+  input: Omit<UpdateRepoDraftSettingsRequest, 'id'>
+): Repo | null {
+  const now = new Date().toISOString()
+  const settings = normalizeRepoDraftSettings(input)
+
+  db.update(repos)
+    .set({
+      issueStyleDepth: settings.issueStyleDepth,
+      issueStyleAudience: settings.issueStyleAudience,
+      draftContentToggles: JSON.stringify(settings.draftContentToggles),
       updatedAt: now
     })
     .where(eq(repos.id, id))
@@ -168,16 +199,36 @@ export type RepoRow = {
   autoPublishDefaultLabel: string
   autoPublishDryRun: boolean
   autoPublishRequireConfirmation: boolean
+  issueStyleDepth: string
+  issueStyleAudience: string
+  draftContentToggles: string
   createdAt: string
   updatedAt: string
 }
 
 export function mapRepoRow(row: RepoRow, repoIndex: RepoIndexStatus | null = null): Repo {
+  const draftSettings = normalizeRepoDraftSettings({
+    issueStyleDepth: row.issueStyleDepth,
+    issueStyleAudience: row.issueStyleAudience,
+    draftContentToggles: parseDraftContentToggles(row.draftContentToggles)
+  })
+
   return {
     ...row,
     githubLabels: parseGithubLabels(row.githubLabels),
     githubLabelsSyncedAt: row.githubLabelsSyncedAt ?? null,
+    ...draftSettings,
     repoIndex
+  }
+}
+
+function parseDraftContentToggles(value: string): Partial<DraftContentToggles> {
+  try {
+    const parsed = JSON.parse(value) as unknown
+    if (!parsed || typeof parsed !== 'object') return {}
+    return parsed as Partial<DraftContentToggles>
+  } catch {
+    return {}
   }
 }
 

@@ -9,7 +9,7 @@ import {
   resolveDefaultIssueTemplate
 } from './issue-templates'
 import type { GeneratedIssueDraft } from '@shared/types'
-import type { Repo, RepoAccessDescriptor } from '@shared/ipc'
+import { DEFAULT_REPO_DRAFT_SETTINGS, type Repo, type RepoAccessDescriptor } from '@shared/ipc'
 import type { IssueTemplateFileSystem } from './issue-templates'
 
 const draft: GeneratedIssueDraft = {
@@ -321,6 +321,7 @@ function makeRepoRecord(overrides: Partial<Repo>): Repo {
     autoPublishDefaultLabel: 'triaged-by-pilog',
     autoPublishDryRun: false,
     autoPublishRequireConfirmation: true,
+    ...DEFAULT_REPO_DRAFT_SETTINGS,
     createdAt: '2026-05-13T00:00:00.000Z',
     updatedAt: '2026-05-13T00:00:00.000Z',
     ...overrides

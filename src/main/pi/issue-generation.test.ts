@@ -1,4 +1,4 @@
-import type { Note, Repo } from '@shared/ipc'
+import { DEFAULT_REPO_DRAFT_SETTINGS, type Note, type Repo } from '@shared/ipc'
 import { GeneratedIssueDraftsSchema, type GeneratedIssueDraft } from '@shared/types'
 import { eq } from 'drizzle-orm'
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
@@ -60,6 +60,7 @@ const promptRepo: Repo = {
   autoPublishDefaultLabel: 'triaged-by-pilog',
   autoPublishDryRun: false,
   autoPublishRequireConfirmation: true,
+  ...DEFAULT_REPO_DRAFT_SETTINGS,
   githubLabels: [],
   githubLabelsSyncedAt: null,
   createdAt: '2026-05-08T00:00:00.000Z',
@@ -153,6 +154,34 @@ describe('issue generation', () => {
     expect(prompt).toContain(
       'Use the available read-only repo tools to verify specific draft claims'
     )
+  })
+
+  it('includes saved issue style and draft content toggle defaults', () => {
+    const prompt = buildIssueGenerationPrompt({
+      repo: {
+        ...promptRepo,
+        issueStyleDepth: 'detailed',
+        issueStyleAudience: 'open_source',
+        draftContentToggles: {
+          includeImplementationNotes: false,
+          includeAffectedFiles: true,
+          includeSourceNotes: false,
+          includeAcceptanceCriteria: true,
+          includeConfidenceRationale: false,
+          includeReproductionSteps: true
+        }
+      },
+      notes: [promptNote]
+    })
+
+    expect(prompt).toContain('Saved Issue Style:')
+    expect(prompt).toContain('depth: detailed')
+    expect(prompt).toContain('audience: open_source')
+    expect(prompt).toContain('Saved Draft Content Toggles:')
+    expect(prompt).toContain('includeImplementationNotes: false')
+    expect(prompt).toContain('includeSourceNotes: false')
+    expect(prompt).toContain('includeConfidenceRationale: false')
+    expect(prompt).toContain('includeReproductionSteps: true')
   })
 
   it('requires live inspection before claiming a file suggested by the Repo Index', () => {

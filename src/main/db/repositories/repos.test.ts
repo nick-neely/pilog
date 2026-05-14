@@ -7,7 +7,8 @@ import {
   listRepos,
   getRepoById,
   deleteRepo,
-  updateRepoAutoPublishSettings
+  updateRepoAutoPublishSettings,
+  updateRepoDraftSettings
 } from './repos'
 
 describe('repos repository', () => {
@@ -50,6 +51,16 @@ describe('repos repository', () => {
     expect(repo.autoPublishDefaultLabel).toBe('triaged-by-pilog')
     expect(repo.autoPublishDryRun).toBe(false)
     expect(repo.autoPublishRequireConfirmation).toBe(true)
+    expect(repo.issueStyleDepth).toBe('balanced')
+    expect(repo.issueStyleAudience).toBe('internal')
+    expect(repo.draftContentToggles).toEqual({
+      includeImplementationNotes: true,
+      includeAffectedFiles: true,
+      includeSourceNotes: true,
+      includeAcceptanceCriteria: true,
+      includeConfidenceRationale: true,
+      includeReproductionSteps: true
+    })
     expect(repo.repoIndex).toBeNull()
     expect(repo.githubLabels).toEqual([
       { id: 1, name: 'bug', color: 'd73a4a', description: 'Something is broken' },
@@ -109,7 +120,17 @@ describe('repos repository', () => {
       wslDistro: null,
       wslPath: null,
       githubLabels: [],
-      githubLabelsSyncedAt: null
+      githubLabelsSyncedAt: null,
+      issueStyleDepth: 'balanced',
+      issueStyleAudience: 'internal',
+      draftContentToggles: {
+        includeImplementationNotes: true,
+        includeAffectedFiles: true,
+        includeSourceNotes: true,
+        includeAcceptanceCriteria: true,
+        includeConfidenceRationale: true,
+        includeReproductionSteps: true
+      }
     })
   })
 
@@ -141,6 +162,89 @@ describe('repos repository', () => {
       autoPublishDryRun: false,
       autoPublishRequireConfirmation: true
     })
+  })
+
+  it('persists draft generation defaults per repo', () => {
+    const first = createRepo(db, sampleInput)
+    const second = createRepo(db, { ...sampleInput, name: 'other', localPath: '/other' })
+
+    const updated = updateRepoDraftSettings(db, first.id, {
+      issueStyleDepth: 'detailed',
+      issueStyleAudience: 'open_source',
+      draftContentToggles: {
+        includeImplementationNotes: false,
+        includeAffectedFiles: true,
+        includeSourceNotes: false,
+        includeAcceptanceCriteria: true,
+        includeConfidenceRationale: false,
+        includeReproductionSteps: true
+      }
+    })
+
+    expect(updated).toMatchObject({
+      id: first.id,
+      issueStyleDepth: 'detailed',
+      issueStyleAudience: 'open_source',
+      draftContentToggles: {
+        includeImplementationNotes: false,
+        includeAffectedFiles: true,
+        includeSourceNotes: false,
+        includeAcceptanceCriteria: true,
+        includeConfidenceRationale: false,
+        includeReproductionSteps: true
+      }
+    })
+    expect(getRepoById(db, second.id)).toMatchObject({
+      issueStyleDepth: 'balanced',
+      issueStyleAudience: 'internal'
+    })
+  })
+
+  it('normalizes invalid draft generation defaults before persistence', () => {
+    const repo = createRepo(db, sampleInput)
+
+    const updated = updateRepoDraftSettings(db, repo.id, {
+      issueStyleDepth: 'short',
+      issueStyleAudience: 'community',
+      draftContentToggles: {
+        includeImplementationNotes: 'yes',
+        includeAffectedFiles: false,
+        includeSourceNotes: false,
+        includeAcceptanceCriteria: true,
+        includeConfidenceRationale: true,
+        includeReproductionSteps: 1
+      }
+    } as never)
+
+    expect(updated).toMatchObject({
+      issueStyleDepth: 'balanced',
+      issueStyleAudience: 'internal',
+      draftContentToggles: {
+        includeImplementationNotes: true,
+        includeAffectedFiles: false,
+        includeSourceNotes: false,
+        includeAcceptanceCriteria: true,
+        includeConfidenceRationale: true,
+        includeReproductionSteps: true
+      }
+    })
+  })
+
+  it('returns null when updating draft generation defaults for a missing repo', () => {
+    const updated = updateRepoDraftSettings(db, 'non-existent', {
+      issueStyleDepth: 'concise',
+      issueStyleAudience: 'internal',
+      draftContentToggles: {
+        includeImplementationNotes: true,
+        includeAffectedFiles: true,
+        includeSourceNotes: true,
+        includeAcceptanceCriteria: true,
+        includeConfidenceRationale: true,
+        includeReproductionSteps: true
+      }
+    })
+
+    expect(updated).toBeNull()
   })
 
   it('updates auto-publish guardrails for one repo only', () => {

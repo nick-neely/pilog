@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { formatRepoLocation, repoAccessFromRepo, resolveWslLinuxPath } from './repo-paths'
-import type { Repo } from './ipc'
+import { DEFAULT_REPO_DRAFT_SETTINGS, type Repo } from './ipc'
 
 describe('repo path helpers', () => {
   it('keeps WSL repository locations user-facing and distro-specific', () => {
@@ -69,6 +69,7 @@ function makeRepo(overrides: Partial<Repo>): Repo {
     autoPublishDefaultLabel: 'triage',
     autoPublishDryRun: true,
     autoPublishRequireConfirmation: true,
+    ...DEFAULT_REPO_DRAFT_SETTINGS,
     createdAt: '2026-05-13T00:00:00.000Z',
     updatedAt: '2026-05-13T00:00:00.000Z',
     ...overrides

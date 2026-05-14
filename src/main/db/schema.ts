@@ -34,6 +34,17 @@ export const repos = sqliteTable('repos', {
   autoPublishRequireConfirmation: integer('auto_publish_require_confirmation', { mode: 'boolean' })
     .notNull()
     .default(true),
+  issueStyleDepth: text('issue_style_depth', { enum: ['concise', 'balanced', 'detailed'] })
+    .notNull()
+    .default('balanced'),
+  issueStyleAudience: text('issue_style_audience', { enum: ['internal', 'open_source'] })
+    .notNull()
+    .default('internal'),
+  draftContentToggles: text('draft_content_toggles')
+    .notNull()
+    .default(
+      '{"includeImplementationNotes":true,"includeAffectedFiles":true,"includeSourceNotes":true,"includeAcceptanceCriteria":true,"includeConfidenceRationale":true,"includeReproductionSteps":true}'
+    ),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull()
 })

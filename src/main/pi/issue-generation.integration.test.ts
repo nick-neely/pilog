@@ -1,4 +1,4 @@
-import type { Note, Repo } from '@shared/ipc'
+import { DEFAULT_REPO_DRAFT_SETTINGS, type Note, type Repo } from '@shared/ipc'
 import type { GeneratedIssueDraft } from '@shared/types'
 import { execFileSync } from 'node:child_process'
 import { cpSync, mkdtempSync, readFileSync } from 'node:fs'
@@ -29,6 +29,7 @@ runIfEnabled('issue generation integration', () => {
       autoPublishDefaultLabel: 'triaged-by-pilog',
       autoPublishDryRun: false,
       autoPublishRequireConfirmation: true,
+      ...DEFAULT_REPO_DRAFT_SETTINGS,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     }

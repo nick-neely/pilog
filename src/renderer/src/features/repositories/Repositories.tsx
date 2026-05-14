@@ -15,6 +15,7 @@ import { HugeiconsIcon } from '@hugeicons/react'
 import { Alert, AlertDescription } from '@renderer/components/ui/alert'
 import { Badge } from '@renderer/components/ui/badge'
 import { Button } from '@renderer/components/ui/button'
+import { Checkbox } from '@renderer/components/ui/checkbox'
 import {
   Collapsible,
   CollapsibleContent,
@@ -32,6 +33,14 @@ import { Empty, EmptyDescription } from '@renderer/components/ui/empty'
 import { Input } from '@renderer/components/ui/input'
 import { Label } from '@renderer/components/ui/label'
 import { ScrollArea } from '@renderer/components/ui/scroll-area'
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '@renderer/components/ui/select'
 import { Separator } from '@renderer/components/ui/separator'
 import { Skeleton } from '@renderer/components/ui/skeleton'
 import { Switch } from '@renderer/components/ui/switch'
@@ -42,12 +51,24 @@ import type {
   CreateIssueRequest,
   GitHubLabel,
   GitHubIssueTemplate,
+  IssueStyleAudience,
+  IssueStyleDepth,
   Repo,
   RepoAutoPublishSettings,
-  UpdateRepoAutoPublishSettingsRequest
+  RepoDraftSettings,
+  UpdateRepoAutoPublishSettingsRequest,
+  UpdateRepoDraftSettingsRequest
 } from '@shared/ipc'
-import { DEFAULT_REPO_AUTO_PUBLISH_SETTINGS, normalizeRepoAutoPublishSettings } from '@shared/ipc'
+import {
+  DEFAULT_REPO_AUTO_PUBLISH_SETTINGS,
+  DEFAULT_REPO_DRAFT_SETTINGS,
+  isIssueStyleAudience,
+  isIssueStyleDepth,
+  normalizeRepoAutoPublishSettings,
+  normalizeRepoDraftSettings
+} from '@shared/ipc'
 import { REPO_INDEX_PRIVACY_COPY, getRepoIndexStatusLabel } from './repo-index-status'
+import { DRAFT_CONTENT_TOGGLE_LABELS, draftSettingsSummary } from './repo-draft-defaults'
 import { formatRepoLocation } from '@shared/repo-paths'
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
 import { getErrorMessage } from '../recovery-state'
@@ -574,6 +595,147 @@ function AutoPublishSettings({
   )
 }
 
+function DraftGenerationDefaults({
+  repo,
+  onUpdated
+}: {
+  repo: Repo
+  onUpdated: () => void
+}): React.JSX.Element {
+  const [depth, setDepth] = useState<IssueStyleDepth>(repo.issueStyleDepth)
+  const [audience, setAudience] = useState<IssueStyleAudience>(repo.issueStyleAudience)
+  const [toggles, setToggles] = useState(repo.draftContentToggles)
+  const [saving, setSaving] = useState(false)
+  const [message, setMessage] = useState<string | null>(null)
+
+  const formSettings = normalizeRepoDraftSettings({
+    issueStyleDepth: depth,
+    issueStyleAudience: audience,
+    draftContentToggles: toggles
+  })
+  const isDirty =
+    formSettings.issueStyleDepth !== repo.issueStyleDepth ||
+    formSettings.issueStyleAudience !== repo.issueStyleAudience ||
+    DRAFT_CONTENT_TOGGLE_LABELS.some(
+      ({ key }) => formSettings.draftContentToggles[key] !== repo.draftContentToggles[key]
+    )
+
+  const handleToggleChange = (
+    key: keyof RepoDraftSettings['draftContentToggles'],
+    checked: boolean
+  ): void => {
+    setToggles((current) => ({ ...current, [key]: checked }))
+  }
+
+  const handleDepthChange = (value: string): void => {
+    if (isIssueStyleDepth(value)) {
+      setDepth(value)
+    }
+  }
+
+  const handleAudienceChange = (value: string): void => {
+    if (isIssueStyleAudience(value)) {
+      setAudience(value)
+    }
+  }
+
+  const handleSave = async (): Promise<void> => {
+    setSaving(true)
+    setMessage(null)
+    const request: UpdateRepoDraftSettingsRequest = {
+      id: repo.id,
+      ...formSettings
+    }
+    const updated = await window.pilog.invoke('repos:updateDraftSettings', request)
+    setSaving(false)
+    if (!updated) {
+      setMessage('Draft defaults could not be saved.')
+      return
+    }
+    onUpdated()
+    setMessage('Draft defaults saved.')
+  }
+
+  return (
+    <div className="flex flex-col gap-4 pt-4">
+      <div className="flex max-w-[36rem] flex-col gap-1">
+        <p className="text-sm font-medium">Issue style defaults</p>
+        <p className="text-sm leading-6 text-muted-foreground">
+          Applies only to {repo.owner}/{repo.name}. Generation can use these defaults unless a run
+          overrides them.
+        </p>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="flex flex-col gap-2">
+          <Label htmlFor={`issue-style-depth-${repo.id}`}>Depth</Label>
+          <Select value={depth} onValueChange={handleDepthChange} disabled={saving}>
+            <SelectTrigger id={`issue-style-depth-${repo.id}`} className="w-full rounded-md">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                <SelectItem value="concise">Concise</SelectItem>
+                <SelectItem value="balanced">Balanced</SelectItem>
+                <SelectItem value="detailed">Detailed</SelectItem>
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex flex-col gap-2">
+          <Label htmlFor={`issue-style-audience-${repo.id}`}>Audience</Label>
+          <Select value={audience} onValueChange={handleAudienceChange} disabled={saving}>
+            <SelectTrigger id={`issue-style-audience-${repo.id}`} className="w-full rounded-md">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                <SelectItem value="internal">Internal</SelectItem>
+                <SelectItem value="open_source">Open source</SelectItem>
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      <fieldset className="flex flex-col gap-3">
+        <legend className="text-sm font-medium">Draft content toggles</legend>
+        <div className="grid gap-2 sm:grid-cols-2">
+          {DRAFT_CONTENT_TOGGLE_LABELS.map((item) => (
+            <label
+              key={item.key}
+              htmlFor={`${item.key}-${repo.id}`}
+              className="flex cursor-pointer items-start gap-3 rounded-md bg-muted/40 p-3"
+            >
+              <Checkbox
+                id={`${item.key}-${repo.id}`}
+                checked={formSettings.draftContentToggles[item.key]}
+                onCheckedChange={(checked) => handleToggleChange(item.key, checked === true)}
+                disabled={saving}
+                aria-label={item.label}
+              />
+              <span className="flex flex-col gap-1">
+                <span className="text-sm font-medium">{item.label}</span>
+                <span className="text-xs leading-5 text-muted-foreground">{item.description}</span>
+              </span>
+            </label>
+          ))}
+        </div>
+      </fieldset>
+
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-xs text-muted-foreground" aria-live="polite">
+          {message ??
+            `Defaults are ${draftSettingsSummary(DEFAULT_REPO_DRAFT_SETTINGS)} Current: ${draftSettingsSummary(formSettings)}`}
+        </p>
+        <Button size="sm" variant="outline" onClick={handleSave} disabled={!isDirty || saving}>
+          {saving ? 'Saving…' : 'Save draft defaults'}
+        </Button>
+      </div>
+    </div>
+  )
+}
+
 function RepoRow({
   repo,
   onUnlink,
@@ -598,6 +760,7 @@ function RepoRow({
   const repoIndexStatus = getRepoIndexStatusLabel(repo.repoIndex ?? null, {
     refreshing: refreshingIndex
   })
+  const draftSummary = draftSettingsSummary(repo)
 
   const handleRefreshIndex = async (): Promise<void> => {
     if (!repoIndexStatus.canRefresh) return
@@ -672,14 +835,17 @@ function RepoRow({
           </div>
         </div>
 
-        {/* Collapsible guardrails — progressive disclosure */}
+        {/* Collapsible repo defaults — progressive disclosure */}
         <Collapsible open={settingsOpen} onOpenChange={setSettingsOpen}>
           <CollapsibleTrigger asChild>
             <button
               type="button"
               className="flex w-full items-center justify-between gap-2 border-t border-border px-4 py-2 text-xs text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
             >
-              <span className="font-medium">Auto-publish guardrails</span>
+              <span className="font-medium">Draft defaults and auto-publish guardrails</span>
+              <span className="min-w-0 flex-1 truncate text-left font-mono text-[11px]">
+                {draftSummary}
+              </span>
               <HugeiconsIcon
                 icon={settingsOpen ? ArrowUp01Icon : ArrowDown01Icon}
                 strokeWidth={2}
@@ -689,7 +855,13 @@ function RepoRow({
             </button>
           </CollapsibleTrigger>
           <CollapsibleContent>
-            <div className="border-t border-border px-4 pb-4">
+            <div className="flex flex-col gap-4 border-t border-border px-4 pb-4">
+              <DraftGenerationDefaults
+                key={`draft-${repo.updatedAt}`}
+                repo={repo}
+                onUpdated={onUpdated}
+              />
+              <Separator />
               <AutoPublishSettings key={repo.updatedAt} repo={repo} onUpdated={onUpdated} />
             </div>
           </CollapsibleContent>

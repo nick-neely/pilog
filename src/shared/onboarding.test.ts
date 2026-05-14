@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import type { GitHubStatus, Note, PiStatus, Repo } from './ipc'
+import {
+  DEFAULT_REPO_DRAFT_SETTINGS,
+  type GitHubStatus,
+  type Note,
+  type PiStatus,
+  type Repo
+} from './ipc'
 import type { IssueDraftForReview } from './types'
 import {
   DEFAULT_ONBOARDING_STATE,
@@ -45,6 +51,7 @@ const repo: Repo = {
   autoPublishDefaultLabel: 'triaged-by-pilog',
   autoPublishDryRun: false,
   autoPublishRequireConfirmation: true,
+  ...DEFAULT_REPO_DRAFT_SETTINGS,
   createdAt: '2026-05-10T00:00:00.000Z',
   updatedAt: '2026-05-10T00:00:00.000Z'
 }

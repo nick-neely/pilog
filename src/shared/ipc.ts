@@ -113,6 +113,9 @@ export type Repo = {
   autoPublishDefaultLabel: string
   autoPublishDryRun: boolean
   autoPublishRequireConfirmation: boolean
+  issueStyleDepth: IssueStyleDepth
+  issueStyleAudience: IssueStyleAudience
+  draftContentToggles: DraftContentToggles
   repoIndex?: RepoIndexStatus | null
   createdAt: string
   updatedAt: string
@@ -177,6 +180,23 @@ export type RepoAutoPublishSettings = Pick<
   | 'autoPublishRequireConfirmation'
 >
 
+export type IssueStyleDepth = 'concise' | 'balanced' | 'detailed'
+export type IssueStyleAudience = 'internal' | 'open_source'
+
+export type DraftContentToggles = {
+  includeImplementationNotes: boolean
+  includeAffectedFiles: boolean
+  includeSourceNotes: boolean
+  includeAcceptanceCriteria: boolean
+  includeConfidenceRationale: boolean
+  includeReproductionSteps: boolean
+}
+
+export type RepoDraftSettings = Pick<
+  Repo,
+  'issueStyleDepth' | 'issueStyleAudience' | 'draftContentToggles'
+>
+
 export const DEFAULT_REPO_AUTO_PUBLISH_SETTINGS = {
   autoPublishEnabled: false,
   autoPublishMaxIssuesPerRun: 5,
@@ -206,6 +226,72 @@ export function normalizeRepoAutoPublishSettings(
 export type UpdateRepoAutoPublishSettingsRequest = {
   id: string
 } & RepoAutoPublishSettings
+
+export const DEFAULT_REPO_DRAFT_SETTINGS = {
+  issueStyleDepth: 'balanced',
+  issueStyleAudience: 'internal',
+  draftContentToggles: {
+    includeImplementationNotes: true,
+    includeAffectedFiles: true,
+    includeSourceNotes: true,
+    includeAcceptanceCriteria: true,
+    includeConfidenceRationale: true,
+    includeReproductionSteps: true
+  }
+} as const satisfies RepoDraftSettings
+
+export const ISSUE_STYLE_DEPTHS = ['concise', 'balanced', 'detailed'] as const
+export const ISSUE_STYLE_AUDIENCES = ['internal', 'open_source'] as const
+
+const DRAFT_CONTENT_TOGGLE_KEYS = [
+  'includeImplementationNotes',
+  'includeAffectedFiles',
+  'includeSourceNotes',
+  'includeAcceptanceCriteria',
+  'includeConfidenceRationale',
+  'includeReproductionSteps'
+] as const satisfies ReadonlyArray<keyof DraftContentToggles>
+
+type UnknownRepoDraftSettings = {
+  issueStyleDepth?: unknown
+  issueStyleAudience?: unknown
+  draftContentToggles?: Partial<Record<keyof DraftContentToggles, unknown>> | null
+}
+
+export function isIssueStyleDepth(value: unknown): value is IssueStyleDepth {
+  return typeof value === 'string' && ISSUE_STYLE_DEPTHS.includes(value as IssueStyleDepth)
+}
+
+export function isIssueStyleAudience(value: unknown): value is IssueStyleAudience {
+  return typeof value === 'string' && ISSUE_STYLE_AUDIENCES.includes(value as IssueStyleAudience)
+}
+
+export function normalizeRepoDraftSettings(input: UnknownRepoDraftSettings): RepoDraftSettings {
+  const defaultToggles = DEFAULT_REPO_DRAFT_SETTINGS.draftContentToggles
+  const inputToggles = input.draftContentToggles ?? {}
+  const draftContentToggles = DRAFT_CONTENT_TOGGLE_KEYS.reduce<DraftContentToggles>(
+    (normalized, key) => {
+      normalized[key] =
+        typeof inputToggles[key] === 'boolean' ? inputToggles[key] : defaultToggles[key]
+      return normalized
+    },
+    { ...defaultToggles }
+  )
+
+  return {
+    issueStyleDepth: isIssueStyleDepth(input.issueStyleDepth)
+      ? input.issueStyleDepth
+      : DEFAULT_REPO_DRAFT_SETTINGS.issueStyleDepth,
+    issueStyleAudience: isIssueStyleAudience(input.issueStyleAudience)
+      ? input.issueStyleAudience
+      : DEFAULT_REPO_DRAFT_SETTINGS.issueStyleAudience,
+    draftContentToggles
+  }
+}
+
+export type UpdateRepoDraftSettingsRequest = {
+  id: string
+} & RepoDraftSettings
 
 export type DetectLocalRepoResult =
   | { state: 'runtime-blocked'; message: string; recoveryAction: string }
@@ -406,6 +492,10 @@ export type IpcContract = {
   'repos:refreshIndex': { request: { id: string }; response: Repo | null }
   'repos:updateAutoPublishSettings': {
     request: UpdateRepoAutoPublishSettingsRequest
+    response: Repo | null
+  }
+  'repos:updateDraftSettings': {
+    request: UpdateRepoDraftSettingsRequest
     response: Repo | null
   }
   'repos:getDefaultIssueTemplate': {
