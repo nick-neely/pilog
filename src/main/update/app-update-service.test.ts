@@ -30,7 +30,7 @@ describe('resolveAppUpdateChannel', () => {
     expect(resolveAppUpdateChannel({ version: '1.1.0-preview.2' })).toBe('preview')
   })
 
-  it('lets build metadata explicitly select the V1 channel', () => {
+  it('lets build metadata explicitly select the preview channel', () => {
     expect(resolveAppUpdateChannel({ version: '1.0.0', updateChannel: 'preview' })).toBe('preview')
   })
 })

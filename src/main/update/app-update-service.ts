@@ -13,7 +13,7 @@ type UpdaterEvent =
   | 'update-downloaded'
   | 'error'
 
-type ScheduleStartupCheck = (callback: () => void, delayMs: number) => unknown
+type StartupCheckScheduler = (callback: () => void, delayMs: number) => unknown
 
 const STARTUP_UPDATE_CHECK_DELAY_MS = 5_000
 
@@ -141,24 +141,23 @@ export class AppUpdateService {
   }
 
   scheduleStartupCheck(
-    schedule: ScheduleStartupCheck = setTimeout,
+    scheduler: StartupCheckScheduler = setTimeout,
     delayMs = STARTUP_UPDATE_CHECK_DELAY_MS
   ): void {
-    if (this.startupCheckScheduled || this.status.state === 'disabled') return
-    if (!this.updater) return
+    if (this.startupCheckScheduled || !this.getUpdateChecker()) return
     this.startupCheckScheduled = true
 
-    schedule(() => {
+    scheduler(() => {
       void this.checkForUpdates()
     }, delayMs)
   }
 
   async checkForUpdates(): Promise<AppUpdateStatus> {
-    if (this.status.state === 'disabled') return this.status
-    if (!this.updater) return this.status
+    const updater = this.getUpdateChecker()
+    if (!updater) return this.status
     this.setStatus({ state: 'checking', errorMessage: null })
     try {
-      const result = await this.updater.checkForUpdates()
+      const result = await updater.checkForUpdates()
       this.setStatusFromCheckResult(result)
     } catch (error) {
       this.setErrorStatus(error, { lastCheckedAt: new Date().toISOString() })
@@ -219,6 +218,11 @@ export class AppUpdateService {
       errorMessage: getErrorMessage(error),
       ...patch
     })
+  }
+
+  private getUpdateChecker(): AppUpdateUpdater | null {
+    if (this.status.state === 'disabled') return null
+    return this.updater
   }
 }
 
