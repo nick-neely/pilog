@@ -50,6 +50,7 @@ export type AutoPublishPreviewPlan = {
 }
 
 export const GITHUB_LABEL_CACHE_REFRESH_INTERVAL_MS = 6 * 60 * 60 * 1000
+const UNKNOWN_CAPTURE_CONTEXT_VALUE = '(unknown)'
 
 type ListRepoLabels = (owner: string, repo: string) => Promise<GitHubLabel[]>
 
@@ -235,21 +236,22 @@ function formatRepoIndexForPrompt(repoIndex: RepoIndexStatus | null | undefined)
 function formatNoteCaptureContext(captureContext: Note['captureContext']): string {
   if (!captureContext) return '(none recorded for this note)'
 
-  if (captureContext.state === 'unavailable') {
-    return ['state: unavailable', `capturedAt: ${captureContext.capturedAt}`].join('\n')
+  switch (captureContext.state) {
+    case 'unavailable':
+      return ['state: unavailable', `capturedAt: ${captureContext.capturedAt}`].join('\n')
+    case 'captured':
+      return [
+        'state: captured',
+        `branch: ${captureContext.branch ?? UNKNOWN_CAPTURE_CONTEXT_VALUE}`,
+        'dirtyFiles:',
+        formatBulletList(captureContext.dirtyFiles),
+        'stagedFiles:',
+        formatBulletList(captureContext.stagedFiles),
+        `headSha: ${captureContext.headSha ?? UNKNOWN_CAPTURE_CONTEXT_VALUE}`,
+        `headSubject: ${captureContext.headSubject ?? UNKNOWN_CAPTURE_CONTEXT_VALUE}`,
+        `capturedAt: ${captureContext.capturedAt}`
+      ].join('\n')
   }
-
-  return [
-    'state: captured',
-    `branch: ${captureContext.branch ?? '(unknown)'}`,
-    'dirtyFiles:',
-    formatBulletList(captureContext.dirtyFiles),
-    'stagedFiles:',
-    formatBulletList(captureContext.stagedFiles),
-    `headSha: ${captureContext.headSha ?? '(unknown)'}`,
-    `headSubject: ${captureContext.headSubject ?? '(unknown)'}`,
-    `capturedAt: ${captureContext.capturedAt}`
-  ].join('\n')
 }
 
 function formatInlineList(items: string[]): string {
