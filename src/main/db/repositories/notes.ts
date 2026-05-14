@@ -177,8 +177,8 @@ function parseCaptureContext(value: string | null): NoteCaptureContext | null {
   if (!value) return null
   try {
     const parsed = JSON.parse(value) as unknown
-    if (!parsed || typeof parsed !== 'object') return null
-    const candidate = parsed as Partial<NoteCaptureContext>
+    if (!isRecord(parsed)) return null
+    const candidate = parsed
     if (candidate.state === 'unavailable' && typeof candidate.capturedAt === 'string') {
       return { state: 'unavailable', capturedAt: candidate.capturedAt }
     }
@@ -191,10 +191,8 @@ function parseCaptureContext(value: string | null): NoteCaptureContext | null {
       return {
         state: 'captured',
         branch: typeof candidate.branch === 'string' ? candidate.branch : null,
-        dirtyFiles: candidate.dirtyFiles.filter((path): path is string => typeof path === 'string'),
-        stagedFiles: candidate.stagedFiles.filter(
-          (path): path is string => typeof path === 'string'
-        ),
+        dirtyFiles: parseStringArray(candidate.dirtyFiles),
+        stagedFiles: parseStringArray(candidate.stagedFiles),
         headSha: typeof candidate.headSha === 'string' ? candidate.headSha : null,
         headSubject: typeof candidate.headSubject === 'string' ? candidate.headSubject : null,
         capturedAt: candidate.capturedAt
@@ -204,4 +202,14 @@ function parseCaptureContext(value: string | null): NoteCaptureContext | null {
     return null
   }
   return null
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object'
+}
+
+function parseStringArray(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === 'string')
+    : []
 }

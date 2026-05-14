@@ -131,12 +131,12 @@ async function readHostGitCaptureContext(
   return {
     state: 'captured',
     branch: normalizeGitValue(branch),
-    dirtyFiles: Array.from(
-      new Set(status.files.filter((file) => file.working_dir !== ' ').map((file) => file.path))
-    ).sort(),
-    stagedFiles: Array.from(
-      new Set(status.files.filter((file) => file.index !== ' ').map((file) => file.path))
-    ).sort(),
+    dirtyFiles: sortedUniquePaths(
+      status.files.filter((file) => file.working_dir !== ' ').map((file) => file.path)
+    ),
+    stagedFiles: sortedUniquePaths(
+      status.files.filter((file) => file.index !== ' ').map((file) => file.path)
+    ),
     headSha: normalizeGitValue(headSha),
     headSubject: normalizeGitValue(headSubject),
     capturedAt
@@ -191,14 +191,18 @@ function parsePorcelainStatus(stdout: string): { dirtyFiles: string[]; stagedFil
     if (workingTree !== ' ' || index === '?') dirtyFiles.add(path)
   }
   return {
-    dirtyFiles: Array.from(dirtyFiles).sort(),
-    stagedFiles: Array.from(stagedFiles).sort()
+    dirtyFiles: sortedUniquePaths(dirtyFiles),
+    stagedFiles: sortedUniquePaths(stagedFiles)
   }
 }
 
 function normalizeGitValue(value: string | null): string | null {
   const trimmed = value?.trim()
   return trimmed ? trimmed : null
+}
+
+function sortedUniquePaths(paths: Iterable<string>): string[] {
+  return Array.from(new Set(paths)).sort()
 }
 
 export function parseGitHubOwnerRepo(remoteUrl: string): { owner: string; name: string } | null {
