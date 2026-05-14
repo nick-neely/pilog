@@ -33,11 +33,11 @@ localPath: /workspace/pilog
 defaultBranch: main
 githubLabelsSyncedAt: 2026-05-11T00:00:00.000Z
 
-Saved Issue Style:
+Active Issue Style:
 depth: balanced
 audience: internal
 
-Saved Draft Content Toggles:
+Active Draft Content Toggles:
 includeImplementationNotes: true
 includeAffectedFiles: true
 includeSourceNotes: true

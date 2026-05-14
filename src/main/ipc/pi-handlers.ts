@@ -1,6 +1,12 @@
 import { BrowserWindow, MessageChannelMain, ipcMain, type IpcMainInvokeEvent } from 'electron'
 import { mkdirSync } from 'node:fs'
-import type { IpcRequest, IpcResponse, Note, Repo } from '@shared/ipc'
+import {
+  applyRepoDraftSettingsOverride,
+  type IpcRequest,
+  type IpcResponse,
+  type Note,
+  type Repo
+} from '@shared/ipc'
 import type { AgentEvent, ErrorCause, GenerateDraftsMode } from '@shared/types'
 import type { PilogDatabase } from '../db/client'
 import {
@@ -112,10 +118,15 @@ export function registerPiIpcHandlers(
   const runTimeoutMs = options?.runTimeoutMs ?? DEFAULT_AGENT_RUN_TIMEOUT_MS
   const startGenerationRun = async (
     event: IpcMainInvokeEvent,
-    input: { repo: Repo; notes: Note[]; mode: GenerateDraftsMode }
+    input: {
+      repo: Repo
+      notes: Note[]
+      mode: GenerateDraftsMode
+      draftSettingsOverride?: IpcRequest<'pi:generateDrafts:start'>['draftSettingsOverride']
+    }
   ): Promise<IpcResponse<'pi:generateDrafts:start'>> => {
     const { notes, mode } = input
-    let repo = input.repo
+    let repo = applyRepoDraftSettingsOverride(input.repo, input.draftSettingsOverride)
     const readiness = await getRuntimeReadiness({}, [repo])
     const readinessMessage = getBlockingRuntimeReadinessMessage(
       readiness,
@@ -358,7 +369,12 @@ export function registerPiIpcHandlers(
     ): Promise<IpcResponse<'pi:generateDrafts:start'>> => {
       const { repo, notes } = getSelectedNotesForGeneration(db, request.noteIds)
       const mode = request.mode ?? 'review'
-      return startGenerationRun(event, { repo, notes, mode })
+      return startGenerationRun(event, {
+        repo,
+        notes,
+        mode,
+        draftSettingsOverride: request.draftSettingsOverride
+      })
     }
   )
 
@@ -381,7 +397,8 @@ export function registerPiIpcHandlers(
       return startGenerationRun(event, {
         repo,
         notes,
-        mode: request.mode ?? 'auto-publish-preview'
+        mode: request.mode ?? 'auto-publish-preview',
+        draftSettingsOverride: request.draftSettingsOverride
       })
     }
   )

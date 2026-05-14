@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   DEFAULT_REPO_DRAFT_SETTINGS,
+  applyRepoDraftSettingsOverride,
   normalizeRepoAutoPublishSettings,
   normalizeRepoDraftSettings
 } from './ipc'
@@ -37,6 +38,55 @@ describe('normalizeRepoAutoPublishSettings', () => {
       autoPublishMaxIssuesPerRun: 1,
       autoPublishDefaultLabel: 'triaged-by-pilog'
     })
+  })
+})
+
+describe('applyRepoDraftSettingsOverride', () => {
+  it('applies a partial run override without mutating the repo defaults', () => {
+    const repo = {
+      issueStyleDepth: 'balanced',
+      issueStyleAudience: 'internal',
+      draftContentToggles: DEFAULT_REPO_DRAFT_SETTINGS.draftContentToggles
+    } as const
+
+    const active = applyRepoDraftSettingsOverride(
+      {
+        id: 'repo-1',
+        name: 'pilog',
+        owner: 'nick',
+        localPath: '/repo',
+        accessKind: 'host',
+        wslDistro: null,
+        wslPath: null,
+        githubUrl: null,
+        defaultBranch: null,
+        githubLabels: [],
+        githubLabelsSyncedAt: null,
+        autoPublishEnabled: false,
+        autoPublishMaxIssuesPerRun: 5,
+        autoPublishDefaultLabel: 'triaged-by-pilog',
+        autoPublishDryRun: false,
+        autoPublishRequireConfirmation: true,
+        ...repo,
+        repoIndex: null,
+        createdAt: '2026-05-14T00:00:00.000Z',
+        updatedAt: '2026-05-14T00:00:00.000Z'
+      },
+      {
+        issueStyleDepth: 'detailed',
+        draftContentToggles: {
+          includeImplementationNotes: false,
+          includeReproductionSteps: false
+        }
+      }
+    )
+
+    expect(active.issueStyleDepth).toBe('detailed')
+    expect(active.issueStyleAudience).toBe('internal')
+    expect(active.draftContentToggles.includeImplementationNotes).toBe(false)
+    expect(active.draftContentToggles.includeReproductionSteps).toBe(false)
+    expect(repo.issueStyleDepth).toBe('balanced')
+    expect(repo.draftContentToggles.includeImplementationNotes).toBe(true)
   })
 })
 

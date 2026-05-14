@@ -290,6 +290,27 @@ export function normalizeRepoDraftSettings(input: UnknownRepoDraftSettings): Rep
   }
 }
 
+export function applyRepoDraftSettingsOverride(
+  repo: Repo,
+  override?: UnknownRepoDraftSettings | null
+): Repo {
+  if (!override) return repo
+
+  const normalized = normalizeRepoDraftSettings({
+    issueStyleDepth: override.issueStyleDepth ?? repo.issueStyleDepth,
+    issueStyleAudience: override.issueStyleAudience ?? repo.issueStyleAudience,
+    draftContentToggles: {
+      ...repo.draftContentToggles,
+      ...(override.draftContentToggles ?? {})
+    }
+  })
+
+  return {
+    ...repo,
+    ...normalized
+  }
+}
+
 export type UpdateRepoDraftSettingsRequest = {
   id: string
 } & RepoDraftSettings

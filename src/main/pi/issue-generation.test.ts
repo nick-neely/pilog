@@ -156,7 +156,7 @@ describe('issue generation', () => {
     )
   })
 
-  it('includes saved issue style and draft content toggle defaults', () => {
+  it('includes active issue style and draft content toggle settings', () => {
     const prompt = buildIssueGenerationPrompt({
       repo: {
         ...promptRepo,
@@ -174,10 +174,10 @@ describe('issue generation', () => {
       notes: [promptNote]
     })
 
-    expect(prompt).toContain('Saved Issue Style:')
+    expect(prompt).toContain('Active Issue Style:')
     expect(prompt).toContain('depth: detailed')
     expect(prompt).toContain('audience: open_source')
-    expect(prompt).toContain('Saved Draft Content Toggles:')
+    expect(prompt).toContain('Active Draft Content Toggles:')
     expect(prompt).toContain('includeImplementationNotes: false')
     expect(prompt).toContain('includeSourceNotes: false')
     expect(prompt).toContain('includeConfidenceRationale: false')
