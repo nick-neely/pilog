@@ -67,6 +67,7 @@ describe('applyRepoDraftSettingsOverride', () => {
         autoPublishDefaultLabel: 'triaged-by-pilog',
         autoPublishDryRun: false,
         autoPublishRequireConfirmation: true,
+        allowDiffSummaryCapture: false,
         ...repo,
         repoIndex: null,
         createdAt: '2026-05-14T00:00:00.000Z',
