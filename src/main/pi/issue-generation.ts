@@ -1,5 +1,12 @@
 import type { AgentTool } from '@earendil-works/pi-agent-core'
-import type { GitHubLabel, Note, Repo, RepoIndexStatus } from '@shared/ipc'
+import type {
+  GitHubLabel,
+  Note,
+  Repo,
+  RepoIndexDirectory,
+  RepoIndexExclusionSummary,
+  RepoIndexStatus
+} from '@shared/ipc'
 import type { AutoPublishPreviewSummary, SearchProvider } from '@shared/types'
 import type { RepoLabelLike } from '@shared/labels'
 import { matchLabelsToRepoLabels } from '@shared/labels'
@@ -178,20 +185,16 @@ function formatRepoIndexForPrompt(repoIndex: RepoIndexStatus | null | undefined)
     ].join('\n')
   }
 
-  const lines = [
+  const lines: string[] = [
     `status: ${repoIndex.status}`,
     `lastIndexedAt: ${repoIndex.lastIndexedAt ?? '(never)'}`,
     `indexVersion: ${repoIndex.indexVersion}`,
     `packageManager: ${repoIndex.packageManager ?? '(unknown)'}`,
     `frameworkSignals: ${formatInlineList(repoIndex.frameworkSignals)}`,
     'importantDirectories:',
-    formatImportantDirectories(repoIndex),
+    formatImportantDirectories(repoIndex.importantDirectories),
     'exclusionSummary:',
-    `- dependency: ${repoIndex.exclusionSummary.dependency}`,
-    `- buildOutput: ${repoIndex.exclusionSummary.buildOutput}`,
-    `- generated: ${repoIndex.exclusionSummary.generated}`,
-    `- binaryHeavy: ${repoIndex.exclusionSummary.binaryHeavy}`,
-    `- ignored: ${repoIndex.exclusionSummary.ignored}`
+    ...formatExclusionSummary(repoIndex.exclusionSummary)
   ]
 
   if (repoIndex.status === 'failed') {
@@ -206,12 +209,20 @@ function formatInlineList(items: string[]): string {
   return items.length > 0 ? items.join(', ') : '(none)'
 }
 
-function formatImportantDirectories(repoIndex: RepoIndexStatus): string {
-  if (repoIndex.importantDirectories.length === 0) return '- (none)'
+function formatImportantDirectories(directories: RepoIndexDirectory[]): string {
+  if (directories.length === 0) return '- (none)'
 
-  return repoIndex.importantDirectories
-    .map((directory) => `- ${directory.path}: ${directory.role}`)
-    .join('\n')
+  return directories.map((directory) => `- ${directory.path}: ${directory.role}`).join('\n')
+}
+
+function formatExclusionSummary(summary: RepoIndexExclusionSummary): string[] {
+  return [
+    `- dependency: ${summary.dependency}`,
+    `- buildOutput: ${summary.buildOutput}`,
+    `- generated: ${summary.generated}`,
+    `- binaryHeavy: ${summary.binaryHeavy}`,
+    `- ignored: ${summary.ignored}`
+  ]
 }
 
 export function createSubmitIssueDraftsTool(
