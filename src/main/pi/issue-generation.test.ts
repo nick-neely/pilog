@@ -169,6 +169,109 @@ describe('issue generation', () => {
     )
   })
 
+  it('requires live inspection before claiming a file suggested by the Repo Index', () => {
+    const prompt = buildIssueGenerationPrompt({
+      repo: {
+        id: 'repo-1',
+        owner: 'nick-neely',
+        name: 'pilog',
+        localPath: '/workspace/pilog',
+        accessKind: 'host',
+        wslDistro: null,
+        wslPath: null,
+        githubUrl: 'https://github.com/nick-neely/pilog',
+        defaultBranch: 'main',
+        autoPublishEnabled: false,
+        autoPublishMaxIssuesPerRun: 5,
+        autoPublishDefaultLabel: 'triaged-by-pilog',
+        autoPublishDryRun: false,
+        autoPublishRequireConfirmation: true,
+        githubLabels: [],
+        githubLabelsSyncedAt: null,
+        repoIndex: {
+          status: 'ready',
+          lastIndexedAt: '2026-05-14T18:30:00.000Z',
+          indexVersion: 1,
+          packageManager: 'pnpm',
+          frameworkSignals: ['Electron', 'React'],
+          importantDirectories: [
+            { path: 'src/main/pi', role: 'issue generation runtime' },
+            { path: 'src/renderer/src/features/drafts', role: 'draft review UI candidate' }
+          ],
+          exclusionSummary: {
+            dependency: 1200,
+            buildOutput: 4,
+            generated: 2,
+            binaryHeavy: 1,
+            ignored: 8
+          },
+          errorMessage: null
+        },
+        createdAt: '2026-05-08T00:00:00.000Z',
+        updatedAt: '2026-05-08T00:00:00.000Z'
+      },
+      notes: [
+        {
+          id: 'note-1',
+          content: 'draft review should show which file claim was verified',
+          status: 'unprocessed',
+          repoId: 'repo-1',
+          runId: null,
+          createdAt: '2026-05-08T00:00:00.000Z',
+          updatedAt: '2026-05-08T00:00:00.000Z'
+        }
+      ]
+    })
+
+    expect(prompt).toContain('- src/renderer/src/features/drafts: draft review UI candidate')
+    expect(prompt).toContain(
+      'A Repo Index path is only a lead; read or search the live file before naming it in affectedFiles, context, implementationNotes, or acceptanceCriteria.'
+    )
+    expect(prompt).toContain(
+      'affectedFiles[].reason must explain the live inspection that supports the path, not only repeat Repo Index metadata.'
+    )
+  })
+
+  it('instructs clarification or lower confidence when live evidence cannot support a specific claim', () => {
+    const prompt = buildIssueGenerationPrompt({
+      repo: {
+        id: 'repo-1',
+        owner: 'nick-neely',
+        name: 'pilog',
+        localPath: '/workspace/pilog',
+        accessKind: 'host',
+        wslDistro: null,
+        wslPath: null,
+        githubUrl: 'https://github.com/nick-neely/pilog',
+        defaultBranch: 'main',
+        autoPublishEnabled: false,
+        autoPublishMaxIssuesPerRun: 5,
+        autoPublishDefaultLabel: 'triaged-by-pilog',
+        autoPublishDryRun: false,
+        autoPublishRequireConfirmation: true,
+        githubLabels: [],
+        githubLabelsSyncedAt: null,
+        createdAt: '2026-05-08T00:00:00.000Z',
+        updatedAt: '2026-05-08T00:00:00.000Z'
+      },
+      notes: [
+        {
+          id: 'note-1',
+          content: 'the dashboard thing is off after onboarding',
+          status: 'unprocessed',
+          repoId: 'repo-1',
+          runId: null,
+          createdAt: '2026-05-08T00:00:00.000Z',
+          updatedAt: '2026-05-08T00:00:00.000Z'
+        }
+      ]
+    })
+
+    expect(prompt).toContain(
+      'When live tools cannot verify a specific file, route, component, or behavior, avoid the specific claim or mark the draft low confidence with needsClarification questions.'
+    )
+  })
+
   it('keeps generation guidance usable when Repo Index creation failed', () => {
     const prompt = buildIssueGenerationPrompt({
       repo: {

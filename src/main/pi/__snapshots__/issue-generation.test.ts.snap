@@ -5,6 +5,9 @@ exports[`issue generation > assembles the PRD-guided prompt with repo path and s
 Use the local repository context to infer likely affected areas, but do not invent details.
 Treat the Repo Index as navigation context only: use it to choose targeted live repo inspection paths.
 Specific claims about affected files, routes, components, framework behavior, or implementation details must be grounded in Live Repo Evidence from read-only repo tools during this run.
+A Repo Index path is only a lead; read or search the live file before naming it in affectedFiles, context, implementationNotes, or acceptanceCriteria.
+affectedFiles[].reason must explain the live inspection that supports the path, not only repeat Repo Index metadata.
+When live tools cannot verify a specific file, route, component, or behavior, avoid the specific claim or mark the draft low confidence with needsClarification questions.
 Group related small notes into one issue when they affect the same feature, page, component, or user flow.
 Split notes into separate issues when they affect unrelated systems or require separate implementation work.
 If one source note contains multiple unrelated tasks, split it into separate drafts and reference that same source note from each draft.
