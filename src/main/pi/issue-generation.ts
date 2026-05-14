@@ -8,8 +8,8 @@ import type {
   RepoIndexStatus
 } from '@shared/ipc'
 import type {
-  ClarificationHistoryEntry,
   AutoPublishPreviewSummary,
+  ClarificationHistoryEntry,
   IssueDraft,
   IssueDraftWorkflowState,
   SearchProvider
@@ -354,12 +354,7 @@ export function getSelectedNotesForGeneration(
   const repo = getRepoById(db, repoId)
   if (!repo) throw new Error('The linked repository no longer exists.')
 
-  const order = new Map(noteIds.map((id, index) => [id, index]))
-  const orderedNotes = rows
-    .map(mapNoteRowForGeneration)
-    .sort((a, b) => order.get(a.id)! - order.get(b.id)!)
-
-  return { repo, notes: orderedNotes }
+  return { repo, notes: orderNoteRowsForGeneration(rows, noteIds) }
 }
 
 export function getClarificationDraftForRegeneration(
@@ -388,14 +383,9 @@ export function getClarificationDraftForRegeneration(
     throw new Error('One or more source notes for this clarification draft no longer exist.')
   }
 
-  const order = new Map(draft.sourceNoteIds.map((id, index) => [id, index]))
-  const orderedNotes = rows
-    .map(mapNoteRowForGeneration)
-    .sort((a, b) => order.get(a.id)! - order.get(b.id)!)
-
   return {
     repo,
-    notes: orderedNotes,
+    notes: orderNoteRowsForGeneration(rows, draft.sourceNoteIds),
     draft,
     clarificationHistory: draft.clarificationHistory
   }
@@ -423,6 +413,14 @@ export function getCurrentInboxNotesForGeneration(
 
 function mapNoteRowForGeneration(row: typeof notes.$inferSelect): Note {
   return mapNoteRow(row)
+}
+
+function orderNoteRowsForGeneration(
+  rows: (typeof notes.$inferSelect)[],
+  orderedIds: string[]
+): Note[] {
+  const order = new Map(orderedIds.map((id, index) => [id, index]))
+  return rows.map(mapNoteRowForGeneration).sort((a, b) => order.get(a.id)! - order.get(b.id)!)
 }
 
 export function persistGeneratedIssueDrafts(
@@ -453,15 +451,7 @@ export function persistGeneratedIssueDrafts(
         .values({
           id,
           repoId: input.repoId,
-          title: draft.title,
-          body: formatIssueDraftBody(draft, template),
-          labels: JSON.stringify(draft.suggestedLabels),
-          sourceNoteIds: JSON.stringify(draft.sourceNoteIds),
-          affectedFilesJson: JSON.stringify(draft.affectedFiles),
-          confidence: draft.confidence,
-          groupingReason: draft.groupingReason,
-          workflowState: getPersistedDraftWorkflowState(draft),
-          clarificationQuestions: JSON.stringify(clarificationQuestions),
+          ...getPersistedIssueDraftFields(draft, template, clarificationQuestions),
           clarificationHistory: JSON.stringify([]),
           status: 'draft',
           createdAt: now,
@@ -533,15 +523,7 @@ export function persistRegeneratedClarificationDraft(
     const now = new Date().toISOString()
     tx.update(issueDrafts)
       .set({
-        title: draft.title,
-        body: formatIssueDraftBody(draft, template),
-        labels: JSON.stringify(draft.suggestedLabels),
-        sourceNoteIds: JSON.stringify(draft.sourceNoteIds),
-        affectedFilesJson: JSON.stringify(draft.affectedFiles),
-        confidence: draft.confidence,
-        groupingReason: draft.groupingReason,
-        workflowState: getPersistedDraftWorkflowState(draft),
-        clarificationQuestions: JSON.stringify(clarificationQuestions),
+        ...getPersistedIssueDraftFields(draft, template, clarificationQuestions),
         status: 'draft',
         updatedAt: now
       })
@@ -561,6 +543,34 @@ export function persistRegeneratedClarificationDraft(
 
     return [input.clarificationDraftId]
   })
+}
+
+function getPersistedIssueDraftFields(
+  draft: GeneratedIssueDraft,
+  template: ReturnType<typeof resolveDefaultIssueTemplate>,
+  clarificationQuestions: string[]
+): {
+  title: string
+  body: string
+  labels: string
+  sourceNoteIds: string
+  affectedFilesJson: string
+  confidence: GeneratedIssueDraft['confidence']
+  groupingReason: string
+  workflowState: IssueDraftWorkflowState
+  clarificationQuestions: string
+} {
+  return {
+    title: draft.title,
+    body: formatIssueDraftBody(draft, template),
+    labels: JSON.stringify(draft.suggestedLabels),
+    sourceNoteIds: JSON.stringify(draft.sourceNoteIds),
+    affectedFilesJson: JSON.stringify(draft.affectedFiles),
+    confidence: draft.confidence,
+    groupingReason: draft.groupingReason,
+    workflowState: getPersistedDraftWorkflowState(draft),
+    clarificationQuestions: JSON.stringify(clarificationQuestions)
+  }
 }
 
 function getPersistedDraftWorkflowState(draft: GeneratedIssueDraft): IssueDraftWorkflowState {

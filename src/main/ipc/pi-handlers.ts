@@ -123,6 +123,35 @@ export function registerPiIpcHandlers(
   const runAgentImpl = options?.runAgentImpl ?? runAgent
   const listLabelsImpl = options?.listLabelsImpl ?? listLabels
   const runTimeoutMs = options?.runTimeoutMs ?? DEFAULT_AGENT_RUN_TIMEOUT_MS
+  const persistFinalDraftsForGeneration = (input: {
+    runId: string
+    repoId: string
+    selectedNoteIds: string[]
+    clarificationDraftId?: string
+    drafts: Extract<AgentEvent, { type: 'final' }>['drafts']
+    eventStream: unknown[]
+  }): void => {
+    if (input.clarificationDraftId) {
+      persistRegeneratedClarificationDraft(db, {
+        runId: input.runId,
+        repoId: input.repoId,
+        clarificationDraftId: input.clarificationDraftId,
+        selectedNoteIds: input.selectedNoteIds,
+        drafts: input.drafts,
+        eventStream: input.eventStream
+      })
+      return
+    }
+
+    persistGeneratedIssueDrafts(db, {
+      runId: input.runId,
+      repoId: input.repoId,
+      selectedNoteIds: input.selectedNoteIds,
+      drafts: input.drafts,
+      eventStream: input.eventStream
+    })
+  }
+
   const startGenerationRun = async (
     event: IpcMainInvokeEvent,
     input: {
@@ -208,24 +237,14 @@ export function registerPiIpcHandlers(
 
           if (eventForRenderer.type === 'final') {
             try {
-              if (input.clarificationDraftId) {
-                persistRegeneratedClarificationDraft(db, {
-                  runId: run.id,
-                  repoId: repo.id,
-                  clarificationDraftId: input.clarificationDraftId,
-                  selectedNoteIds: notes.map((note) => note.id),
-                  drafts: eventForRenderer.drafts,
-                  eventStream: active.eventStream
-                })
-              } else {
-                persistGeneratedIssueDrafts(db, {
-                  runId: run.id,
-                  repoId: repo.id,
-                  selectedNoteIds: notes.map((note) => note.id),
-                  drafts: eventForRenderer.drafts,
-                  eventStream: active.eventStream
-                })
-              }
+              persistFinalDraftsForGeneration({
+                runId: run.id,
+                repoId: repo.id,
+                selectedNoteIds: notes.map((note) => note.id),
+                clarificationDraftId: input.clarificationDraftId,
+                drafts: eventForRenderer.drafts,
+                eventStream: active.eventStream
+              })
               active.finalized = true
             } catch (error) {
               const message = error instanceof Error ? error.message : String(error)
