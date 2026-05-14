@@ -269,6 +269,7 @@ export type PiModelOption = {
 }
 
 export type IssueDraftStatus = 'draft' | 'published' | 'dismissed'
+export type IssueDraftWorkflowState = 'ready' | 'needs_clarification'
 
 export type IssueDraft = {
   id: string
@@ -280,6 +281,8 @@ export type IssueDraft = {
   affectedFiles: Array<{ path: string; reason: string }>
   confidence: 'low' | 'medium' | 'high'
   groupingReason: string
+  workflowState: IssueDraftWorkflowState
+  clarificationQuestions: string[]
   status: IssueDraftStatus
   githubIssueUrl: string | null
   createdAt: string

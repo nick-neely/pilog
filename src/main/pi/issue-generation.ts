@@ -347,6 +347,13 @@ export function persistGeneratedIssueDrafts(
           affectedFilesJson: JSON.stringify(draft.affectedFiles),
           confidence: draft.confidence,
           groupingReason: draft.groupingReason,
+          workflowState:
+            !draft.publishReady && (draft.needsClarification?.filter(Boolean).length ?? 0) > 0
+              ? 'needs_clarification'
+              : 'ready',
+          clarificationQuestions: JSON.stringify(
+            (draft.needsClarification ?? []).map((question) => question.trim()).filter(Boolean)
+          ),
           status: 'draft',
           createdAt: now,
           updatedAt: now

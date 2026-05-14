@@ -396,6 +396,44 @@ describe('issue generation', () => {
     expect(JSON.parse(finalizedRun?.eventStream ?? '[]')).toEqual([{ type: 'final' }])
   })
 
+  it('persists generated clarification drafts without adding a source note status', () => {
+    const db = createInMemoryDatabase()
+    runMigrations(db)
+    const repo = createRepo(db, {
+      owner: 'nick-neely',
+      name: 'pilog',
+      localPath: '/workspace/pilog',
+      githubUrl: 'https://github.com/nick-neely/pilog',
+      defaultBranch: 'main'
+    })
+    const note = createNote(db, { content: 'dashboard chart is off somewhere', repoId: repo.id })
+    const run = createAgentRun(db, { repoId: repo.id, inputNoteIds: [note.id] })
+
+    persistGeneratedIssueDrafts(db, {
+      runId: run.id,
+      repoId: repo.id,
+      selectedNoteIds: [note.id],
+      drafts: [
+        {
+          ...draft,
+          publishReady: false,
+          sourceNoteIds: [note.id],
+          needsClarification: ['Which dashboard screen is affected?']
+        }
+      ],
+      eventStream: [{ type: 'final' }]
+    })
+
+    expect(db.select().from(issueDrafts).get()).toMatchObject({
+      status: 'draft',
+      workflowState: 'needs_clarification',
+      clarificationQuestions: JSON.stringify(['Which dashboard screen is affected?'])
+    })
+    expect(listNotes(db, { repoId: repo.id }).map((persisted) => persisted.status)).toEqual([
+      'drafted'
+    ])
+  })
+
   it('scaffolds persisted generated draft bodies from the linked repo issue template', () => {
     const db = createInMemoryDatabase()
     runMigrations(db)

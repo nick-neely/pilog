@@ -1,4 +1,4 @@
-import { desc, eq, inArray } from 'drizzle-orm'
+import { and, desc, eq, inArray } from 'drizzle-orm'
 import { v4 as uuidv4 } from 'uuid'
 import type { PilogDatabase } from '../client'
 import { issueDrafts, notes } from '../schema'
@@ -7,6 +7,7 @@ import type {
   GitHubIssueTemplate,
   IssueDraft,
   IssueDraftForReview,
+  IssueDraftWorkflowState,
   IssueDraftStatus
 } from '@shared/types'
 import {
@@ -24,6 +25,8 @@ const issueDraftColumns = {
   affectedFilesJson: issueDrafts.affectedFilesJson,
   confidence: issueDrafts.confidence,
   groupingReason: issueDrafts.groupingReason,
+  workflowState: issueDrafts.workflowState,
+  clarificationQuestions: issueDrafts.clarificationQuestions,
   status: issueDrafts.status,
   githubIssueUrl: issueDrafts.githubIssueUrl,
   createdAt: issueDrafts.createdAt,
@@ -47,6 +50,8 @@ export function createIssueDraft(
   const now = new Date().toISOString()
   const id = uuidv4()
   const body = formatIssueDraftBody(input.draft, input.template)
+  const workflowState = getGeneratedDraftWorkflowState(input.draft)
+  const clarificationQuestions = getGeneratedDraftClarificationQuestions(input.draft)
 
   db.insert(issueDrafts)
     .values({
@@ -59,6 +64,8 @@ export function createIssueDraft(
       affectedFilesJson: JSON.stringify(input.draft.affectedFiles),
       confidence: input.draft.confidence,
       groupingReason: input.draft.groupingReason,
+      workflowState,
+      clarificationQuestions: JSON.stringify(clarificationQuestions),
       status: 'draft',
       createdAt: now,
       updatedAt: now
@@ -75,6 +82,8 @@ export function createIssueDraft(
     affectedFiles: input.draft.affectedFiles,
     confidence: input.draft.confidence,
     groupingReason: input.draft.groupingReason,
+    workflowState,
+    clarificationQuestions,
     status: 'draft',
     githubIssueUrl: null,
     createdAt: now,
@@ -84,18 +93,30 @@ export function createIssueDraft(
 
 export function listIssueDrafts(
   db: PilogDatabase,
-  filter: { status?: IssueDraftStatus | 'all' } = {}
+  filter: {
+    status?: IssueDraftStatus | 'all'
+    workflowState?: IssueDraftWorkflowState | 'all'
+  } = {}
 ): IssueDraft[] {
   const status = filter.status ?? 'draft'
   const query = db.select(issueDraftColumns).from(issueDrafts)
-  const filtered = status === 'all' ? query : query.where(eq(issueDrafts.status, status))
+  const predicates = [
+    status === 'all' ? undefined : eq(issueDrafts.status, status),
+    filter.workflowState && filter.workflowState !== 'all'
+      ? eq(issueDrafts.workflowState, filter.workflowState)
+      : undefined
+  ].filter((predicate): predicate is NonNullable<typeof predicate> => predicate !== undefined)
+  const filtered = predicates.length === 0 ? query : query.where(and(...predicates))
 
   return filtered.orderBy(desc(issueDrafts.createdAt)).all().map(mapIssueDraft)
 }
 
 export function listIssueDraftsForReview(
   db: PilogDatabase,
-  filter: { status?: IssueDraftStatus | 'all' } = {}
+  filter: {
+    status?: IssueDraftStatus | 'all'
+    workflowState?: IssueDraftWorkflowState | 'all'
+  } = {}
 ): IssueDraftForReview[] {
   const drafts = listIssueDrafts(db, filter)
   const sourceNoteIds = [...new Set(drafts.flatMap((draft) => draft.sourceNoteIds))]
@@ -225,6 +246,8 @@ export function splitIssueDraft(
         affectedFilesJson: JSON.stringify(draft.affectedFiles),
         confidence: draft.confidence,
         groupingReason,
+        workflowState: draft.workflowState,
+        clarificationQuestions: JSON.stringify(draft.clarificationQuestions),
         status: 'draft',
         githubIssueUrl: null,
         createdAt: now,
@@ -279,6 +302,10 @@ export function mergeIssueDrafts(
         sourceNoteIds: JSON.stringify(mergeUnique(target.sourceNoteIds, source.sourceNoteIds)),
         affectedFilesJson: JSON.stringify(
           mergeAffectedFiles(target.affectedFiles, source.affectedFiles)
+        ),
+        workflowState: mergeWorkflowState(target, source),
+        clarificationQuestions: JSON.stringify(
+          mergeUnique(target.clarificationQuestions, source.clarificationQuestions)
         ),
         status: 'draft',
         updatedAt: now
@@ -363,11 +390,30 @@ function mapIssueDraft(row: typeof issueDrafts.$inferSelect): IssueDraft {
     affectedFiles: JSON.parse(row.affectedFilesJson),
     confidence: row.confidence,
     groupingReason: row.groupingReason,
+    workflowState: row.workflowState,
+    clarificationQuestions: JSON.parse(row.clarificationQuestions),
     status: row.status,
     githubIssueUrl: row.githubIssueUrl,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt
   }
+}
+
+function getGeneratedDraftWorkflowState(draft: GeneratedIssueDraft): IssueDraftWorkflowState {
+  return !draft.publishReady && getGeneratedDraftClarificationQuestions(draft).length > 0
+    ? 'needs_clarification'
+    : 'ready'
+}
+
+function getGeneratedDraftClarificationQuestions(draft: GeneratedIssueDraft): string[] {
+  return (draft.needsClarification ?? []).map((question) => question.trim()).filter(Boolean)
+}
+
+function mergeWorkflowState(target: IssueDraft, source: IssueDraft): IssueDraftWorkflowState {
+  return target.workflowState === 'needs_clarification' ||
+    source.workflowState === 'needs_clarification'
+    ? 'needs_clarification'
+    : 'ready'
 }
 
 function mergeDraftBodies(target: IssueDraft, source: IssueDraft): string {

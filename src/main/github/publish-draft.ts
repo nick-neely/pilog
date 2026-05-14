@@ -43,6 +43,9 @@ export async function publishReviewedDraft(
   const draft = getIssueDraftById(db, request.id)
   if (!draft) throw new Error('Draft not found')
   if (draft.status === 'published') throw new Error('Draft has already been published')
+  if (draft.workflowState === 'needs_clarification') {
+    throw new Error('Clarification drafts must be answered before publishing')
+  }
 
   const repo = getRepoById(db, draft.repoId)
   if (!repo) throw new Error('Linked repository not found')

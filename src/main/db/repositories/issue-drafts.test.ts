@@ -103,6 +103,43 @@ describe('issue-drafts repository', () => {
     })
   })
 
+  it('persists clarification drafts as a draft workflow state with source notes', () => {
+    const note = createNote(db, { content: 'dashboard chart looks wrong somewhere', repoId })
+    const draft = createIssueDraft(db, {
+      repoId,
+      draft: {
+        ...generatedDraft,
+        publishReady: false,
+        sourceNoteIds: [note.id],
+        needsClarification: ['Which dashboard screen is affected?', 'What value looks incorrect?']
+      }
+    })
+
+    expect(draft).toMatchObject({
+      status: 'draft',
+      workflowState: 'needs_clarification',
+      clarificationQuestions: [
+        'Which dashboard screen is affected?',
+        'What value looks incorrect?'
+      ],
+      sourceNoteIds: [note.id]
+    })
+    expect(listIssueDrafts(db, { workflowState: 'needs_clarification' })).toEqual([
+      expect.objectContaining({
+        id: draft.id,
+        status: 'draft',
+        workflowState: 'needs_clarification'
+      })
+    ])
+    expect(listIssueDraftsForReview(db, { workflowState: 'needs_clarification' })[0]).toMatchObject(
+      {
+        id: draft.id,
+        sourceNotes: [expect.objectContaining({ id: note.id, status: 'unprocessed' })]
+      }
+    )
+    expect(listNotes(db, { repoId }).map((persisted) => persisted.status)).toEqual(['unprocessed'])
+  })
+
   it('updates mutable draft fields and persists them for later listing', () => {
     const draft = createIssueDraft(db, { repoId, draft: generatedDraft })
 

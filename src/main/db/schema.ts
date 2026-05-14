@@ -67,6 +67,10 @@ export const issueDrafts = sqliteTable('issue_drafts', {
     .notNull()
     .default('medium'),
   groupingReason: text('grouping_reason').notNull().default(''),
+  workflowState: text('workflow_state', { enum: ['ready', 'needs_clarification'] })
+    .notNull()
+    .default('ready'),
+  clarificationQuestions: text('clarification_questions').notNull().default('[]'),
   status: text('status', { enum: ['draft', 'published', 'dismissed'] })
     .notNull()
     .default('draft'),

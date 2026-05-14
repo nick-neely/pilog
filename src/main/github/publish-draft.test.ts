@@ -293,6 +293,54 @@ describe('publishAutoPublishRun', () => {
     )
   })
 
+  it('skips clarification drafts in a confirmed auto-publish run', async () => {
+    const repo = createRepo(db, {
+      name: 'pilog',
+      owner: 'nick-neely',
+      localPath: '/tmp/pilog',
+      githubUrl: 'https://github.com/nick-neely/pilog',
+      defaultBranch: 'main'
+    })
+    const note = createNote(db, { content: 'dashboard chart is wrong somewhere', repoId: repo.id })
+    updateNoteStatus(db, note.id, 'drafted')
+    const draft = createIssueDraft(db, {
+      repoId: repo.id,
+      draft: {
+        ...generatedDraft,
+        publishReady: false,
+        sourceNoteIds: [note.id],
+        needsClarification: ['Which dashboard screen is affected?']
+      }
+    })
+    const run = createAgentRun(db, { repoId: repo.id, inputNoteIds: [note.id] })
+    finalizeAgentRun(db, {
+      id: run.id,
+      status: 'succeeded',
+      outputDraftIds: [draft.id],
+      eventStream: []
+    })
+    const createIssue = vi.fn()
+
+    const report = await publishAutoPublishRun(db, { runId: run.id }, createIssue)
+
+    expect(report).toMatchObject({
+      successCount: 0,
+      failureCount: 1,
+      failures: [
+        expect.objectContaining({
+          draftId: draft.id,
+          error: 'Clarification drafts must be answered before publishing'
+        })
+      ]
+    })
+    expect(createIssue).not.toHaveBeenCalled()
+    expect(getIssueDraftById(db, draft.id)).toMatchObject({
+      status: 'draft',
+      workflowState: 'needs_clarification'
+    })
+    expect(listNotes(db).map((persisted) => persisted.status)).toEqual(['drafted'])
+  })
+
   it('normalizes auto-publish labels and omits unmatched labels', async () => {
     const repo = createRepo(db, {
       name: 'pilog',

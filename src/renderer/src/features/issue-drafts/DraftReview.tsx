@@ -74,6 +74,16 @@ const EMPTY_STATUS_COUNTS: Record<IssueDraftStatus, number> = {
 }
 
 const ISSUE_DRAFT_STATUSES: readonly IssueDraftStatus[] = ['draft', 'dismissed', 'published']
+type DraftReviewFilter = IssueDraftStatus | 'needs_clarification'
+
+type DraftReviewCounts = Record<IssueDraftStatus, number> & {
+  needs_clarification: number
+}
+
+const EMPTY_DRAFT_REVIEW_COUNTS: DraftReviewCounts = {
+  ...EMPTY_STATUS_COUNTS,
+  needs_clarification: 0
+}
 
 type RepoLabelLoadState = {
   key: string | null
@@ -185,20 +195,32 @@ function statusLabel(status: IssueDraftStatus): string {
   }
 }
 
-function countDraftsByStatus(drafts: IssueDraft[]): Record<IssueDraftStatus, number> {
-  const counts = { ...EMPTY_STATUS_COUNTS }
+function workflowStateLabel(draft: IssueDraft): string {
+  if (draft.workflowState === 'needs_clarification') return 'Needs clarification'
+  return statusLabel(draft.status)
+}
+
+function countDraftsForReview(drafts: IssueDraft[]): DraftReviewCounts {
+  const counts = { ...EMPTY_DRAFT_REVIEW_COUNTS }
   for (const draft of drafts) {
     counts[draft.status] += 1
+    if (draft.status === 'draft' && draft.workflowState === 'needs_clarification') {
+      counts.needs_clarification += 1
+    }
   }
   return counts
 }
 
 function emptyDraftDescription(
-  statusFilter: IssueDraftStatus | undefined,
-  statusCounts: Record<IssueDraftStatus, number>
+  statusFilter: DraftReviewFilter | undefined,
+  statusCounts: DraftReviewCounts
 ): string {
   if (totalDraftCount(statusCounts) === 0) {
     return 'Generate drafts from selected inbox notes.'
+  }
+
+  if (statusFilter === 'needs_clarification') {
+    return 'No clarification drafts. Drafts that need answers will appear here.'
   }
 
   if (statusFilter === 'published' || statusFilter === 'dismissed') {
@@ -217,18 +239,23 @@ function emptyDraftDescription(
 }
 
 function emptyDraftTitle(
-  statusFilter: IssueDraftStatus | undefined,
-  statusCounts: Record<IssueDraftStatus, number>
+  statusFilter: DraftReviewFilter | undefined,
+  statusCounts: DraftReviewCounts
 ): string {
   if (totalDraftCount(statusCounts) === 0) return 'No drafts yet'
+  if (statusFilter === 'needs_clarification') return 'No clarification drafts'
   if (statusFilter === 'published' || statusFilter === 'dismissed') {
     return `No ${statusLabel(statusFilter).toLowerCase()} drafts`
   }
   return 'Review queue is clear'
 }
 
-function totalDraftCount(statusCounts: Record<IssueDraftStatus, number>): number {
+function totalDraftCount(statusCounts: DraftReviewCounts): number {
   return statusCounts.draft + statusCounts.dismissed + statusCounts.published
+}
+
+function isClarificationDraft(draft: IssueDraft): boolean {
+  return draft.status === 'draft' && draft.workflowState === 'needs_clarification'
 }
 
 function publishButtonLabel(input: { publishing: boolean; published: boolean }): string {
@@ -302,6 +329,16 @@ function publishBlockForDraft(repo: Repo | null, githubStatus: GitHubStatus): Pu
   }
 
   return null
+}
+
+function publishBlockForClarificationDraft(draft: IssueDraft): PublishBlock | null {
+  if (draft.workflowState !== 'needs_clarification') return null
+
+  return {
+    title: 'This draft needs clarification.',
+    description: 'Answer the questions before publishing a GitHub issue from this draft.',
+    action: null
+  }
 }
 
 function publishBlockActionHandler(
@@ -526,9 +563,8 @@ export function DraftReview({
   const [repos, setRepos] = useState<Repo[]>([])
   const [githubStatus, setGithubStatus] = useState<GitHubStatus>({ connected: false })
   const [failedRuns, setFailedRuns] = useState<AgentRunListItem[]>([])
-  const [statusFilter, setStatusFilter] = useState<IssueDraftStatus | undefined>(undefined)
-  const [statusCounts, setStatusCounts] =
-    useState<Record<IssueDraftStatus, number>>(EMPTY_STATUS_COUNTS)
+  const [statusFilter, setStatusFilter] = useState<DraftReviewFilter | undefined>(undefined)
+  const [statusCounts, setStatusCounts] = useState<DraftReviewCounts>(EMPTY_DRAFT_REVIEW_COUNTS)
   const [selectedDraftId, setSelectedDraftId] = useState<string | null>(null)
   const [loadingDrafts, setLoadingDrafts] = useState(true)
   const [draftsError, setDraftsError] = useState<string | null>(null)
@@ -546,13 +582,15 @@ export function DraftReview({
       const filteredDrafts =
         statusFilter === undefined
           ? [...allDrafts].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))
-          : allDrafts.filter((draft) => draft.status === statusFilter)
+          : statusFilter === 'needs_clarification'
+            ? allDrafts.filter(isClarificationDraft)
+            : allDrafts.filter((draft) => draft.status === statusFilter)
 
       setDrafts(filteredDrafts)
       setRepos(repoResult)
       setGithubStatus(githubResult)
       setFailedRuns(failedRunResult)
-      setStatusCounts(countDraftsByStatus(allDrafts))
+      setStatusCounts(countDraftsForReview(allDrafts))
       setSelectedDraftId((current) => {
         if (current && filteredDrafts.some((draft) => draft.id === current)) return current
         return filteredDrafts[0]?.id ?? null
@@ -600,7 +638,8 @@ export function DraftReview({
   const reposById = useMemo(() => new Map(repos.map((repo) => [repo.id, repo])), [repos])
   const selectedDraftRepo = selectedDraft ? (reposById.get(selectedDraft.repoId) ?? null) : null
   const selectedDraftPublishBlock = selectedDraft
-    ? publishBlockForDraft(selectedDraftRepo, githubStatus)
+    ? (publishBlockForClarificationDraft(selectedDraft) ??
+      publishBlockForDraft(selectedDraftRepo, githubStatus))
     : null
   const emptyDescription = emptyDraftDescription(statusFilter, statusCounts)
   const emptyTitle = emptyDraftTitle(statusFilter, statusCounts)
@@ -644,8 +683,11 @@ export function DraftReview({
             role="group"
             aria-label="Filter by status"
           >
-            {ISSUE_DRAFT_STATUSES.map((status) => {
+            {[...ISSUE_DRAFT_STATUSES, 'needs_clarification' as const].map((status) => {
               const active = statusFilter === status
+              const label =
+                status === 'needs_clarification' ? 'Needs clarification' : statusLabel(status)
+              const count = statusCounts[status]
               return (
                 <button
                   key={status}
@@ -669,7 +711,7 @@ export function DraftReview({
                       active ? 'bg-primary' : 'border border-muted-foreground/40'
                     )}
                   />
-                  <span className="flex-1 truncate text-left">{statusLabel(status)}</span>
+                  <span className="flex-1 truncate text-left">{label}</span>
                   <span
                     aria-hidden
                     className={cn(
@@ -677,16 +719,14 @@ export function DraftReview({
                       active ? 'text-foreground/70' : 'text-muted-foreground/60'
                     )}
                   >
-                    {statusCounts[status]}
+                    {count}
                   </span>
                   <span className="sr-only">
-                    {statusCounts[status]} {statusCounts[status] === 1 ? 'draft' : 'drafts'}
+                    {count} {count === 1 ? 'draft' : 'drafts'}
                   </span>
                 </button>
               )
             })}
-            {/* Balance the 2×2 grid (three filters) so the rail matches Inbox / Runs. */}
-            <div className="min-h-7" aria-hidden />
           </div>
         </div>
 
@@ -763,7 +803,7 @@ export function DraftReview({
                             </Tooltip>
                             <span className="flex min-w-0 items-center justify-between gap-2 text-xs">
                               <Badge variant="secondary" className="font-medium text-foreground/80">
-                                {statusLabel(draft.status)}
+                                {workflowStateLabel(draft)}
                               </Badge>
                               <span className="tabular shrink-0 whitespace-nowrap text-muted-foreground">
                                 {formatTimestamp(draft.updatedAt)}
@@ -879,12 +919,12 @@ function ReviewEmptyState({
   className: string
   title: string
   description: string
-  statusFilter: IssueDraftStatus | undefined
-  statusCounts: Record<IssueDraftStatus, number>
+  statusFilter: DraftReviewFilter | undefined
+  statusCounts: DraftReviewCounts
   failedRuns: AgentRunListItem[]
   onNavigateToInbox: () => void
   onNavigateToAgentRuns: (runId?: string, origin?: RunNavigationOrigin) => void
-  onSetStatusFilter: (status: IssueDraftStatus | undefined) => void
+  onSetStatusFilter: (status: DraftReviewFilter | undefined) => void
 }): React.JSX.Element {
   return (
     <Empty className={cn('border-none bg-transparent shadow-none', className)}>
@@ -909,10 +949,10 @@ function ReviewEmptyActions({
   onNavigateToInbox,
   onSetStatusFilter
 }: {
-  statusFilter: IssueDraftStatus | undefined
-  statusCounts: Record<IssueDraftStatus, number>
+  statusFilter: DraftReviewFilter | undefined
+  statusCounts: DraftReviewCounts
   onNavigateToInbox: () => void
-  onSetStatusFilter: (status: IssueDraftStatus | undefined) => void
+  onSetStatusFilter: (status: DraftReviewFilter | undefined) => void
 }): React.JSX.Element {
   const noDrafts = totalDraftCount(statusCounts) === 0
 
@@ -942,6 +982,17 @@ function ReviewEmptyActions({
             onClick={() => onSetStatusFilter('published')}
           >
             Show published drafts
+          </Button>
+        ) : null}
+        {(statusFilter === 'draft' || statusFilter === undefined) &&
+        statusCounts.needs_clarification > 0 ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => onSetStatusFilter('needs_clarification')}
+          >
+            Show clarification drafts
           </Button>
         ) : null}
       </div>
@@ -1534,9 +1585,11 @@ function DraftEditor({
 
         <aside className="flex min-w-0 flex-col gap-6">
           <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="secondary">{statusLabel(draft.status)}</Badge>
+            <Badge variant="secondary">{workflowStateLabel(draft)}</Badge>
             <Badge variant="outline">{confidenceLabel(draft.confidence)}</Badge>
           </div>
+
+          <ClarificationQuestionsSection draft={draft} />
 
           <section className="flex flex-col gap-2">
             <h3 className="text-sm font-semibold">Why this grouping</h3>
@@ -1695,6 +1748,31 @@ function DraftEditor({
         </aside>
       </div>
     </article>
+  )
+}
+
+export function ClarificationQuestionsSection({
+  draft
+}: {
+  draft: Pick<IssueDraft, 'workflowState' | 'clarificationQuestions'>
+}): React.JSX.Element | null {
+  if (draft.workflowState !== 'needs_clarification' || draft.clarificationQuestions.length === 0) {
+    return null
+  }
+
+  return (
+    <section className="flex flex-col gap-2" aria-labelledby="clarification-questions-heading">
+      <h3 id="clarification-questions-heading" className="text-sm font-semibold">
+        Clarification Questions
+      </h3>
+      <div className="rounded-md border bg-muted/30 p-3">
+        <ul className="flex list-disc flex-col gap-1.5 pl-4 text-sm leading-relaxed text-foreground/90">
+          {draft.clarificationQuestions.map((question) => (
+            <li key={question}>{question}</li>
+          ))}
+        </ul>
+      </div>
+    </section>
   )
 }
 
