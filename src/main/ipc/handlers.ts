@@ -1,4 +1,4 @@
-import type { IpcRequest, IpcResponse } from '@shared/ipc'
+import type { IpcRequest, IpcResponse, NoteCaptureContext, RepoAccessDescriptor } from '@shared/ipc'
 import { app, ipcMain } from 'electron'
 import type { PilogDatabase } from '../db/client'
 import { countRunsByStatus, getRunById, listRuns } from '../db/repositories/agent-runs'
@@ -24,6 +24,8 @@ import {
   setSetting
 } from '../db/repositories/settings'
 import { pathActions } from '../file-actions'
+import { getRepoById } from '../db/repositories/repos'
+import { readGitCaptureContext } from '../repos/git'
 
 type DbChannel =
   | 'agent-runs:get'
@@ -68,7 +70,10 @@ const handlers: { [C in DbChannel]: Handler<C> } = {
   'issue-drafts:split': (db, request) => splitIssueDraft(db, request),
   'issue-drafts:update': (db, request) => updateIssueDraft(db, request),
   'issue-drafts:updateStatus': (db, request) => updateIssueDraftStatus(db, request),
-  'note:create': (db, request) => createNote(db, request),
+  'note:create': async (db, request) => {
+    const captureContext = await getCaptureContextForNote(db, request.repoId)
+    return createNote(db, { ...request, captureContext })
+  },
   'note:list': (db, request) => listNotes(db, request),
   'note:counts': (db, request) => countNotesByStatus(db, request),
   'note:update': (db, request) => updateNote(db, request),
@@ -87,6 +92,30 @@ const handlers: { [C in DbChannel]: Handler<C> } = {
   }
 }
 
+async function getCaptureContextForNote(
+  db: PilogDatabase,
+  repoId: string | null | undefined
+): Promise<NoteCaptureContext | null> {
+  if (!repoId) return null
+  const repo = getRepoById(db, repoId)
+  if (!repo) return { state: 'unavailable', capturedAt: new Date().toISOString() }
+  return readGitCaptureContext(repoToAccessDescriptor(repo))
+}
+
+function repoToAccessDescriptor(
+  repo: NonNullable<ReturnType<typeof getRepoById>>
+): RepoAccessDescriptor {
+  if (repo.accessKind === 'wsl' && repo.wslDistro && repo.wslPath) {
+    return {
+      kind: 'wsl',
+      displayPath: repo.localPath,
+      distro: repo.wslDistro,
+      linuxPath: repo.wslPath
+    }
+  }
+  return { kind: 'host', displayPath: repo.localPath }
+}
+
 export function registerIpcHandlers(
   db: PilogDatabase,
   options?: {
@@ -99,7 +128,12 @@ export function registerIpcHandlers(
     ipcMain.handle(channel, (_event, request) => {
       const handler = handlers[channel] as Handler<typeof channel>
       const result = handler(db, request)
-      if (channel === 'note:create') options?.onNoteCreated?.()
+      if (channel === 'note:create') {
+        return Promise.resolve(result).then((created) => {
+          options?.onNoteCreated?.()
+          return created
+        })
+      }
       if (channel === 'setting:set' && request.key === 'hotkey.scratchpad') {
         options?.onGlobalHotkeyChanged?.()
       }

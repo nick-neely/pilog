@@ -172,6 +172,22 @@ function formatNoteTimestamp(iso: string): string {
   return (sameYear ? SHORT_NOTE_TIMESTAMP_FORMATTER : YEAR_NOTE_TIMESTAMP_FORMATTER).format(date)
 }
 
+function formatCaptureContext(note: Note): string | null {
+  const context = note.captureContext
+  if (!context) return null
+  if (context.state === 'unavailable') return 'Context unavailable'
+
+  const parts: string[] = []
+  if (context.branch) parts.push(context.branch)
+  if (context.headSha) {
+    const shortSha = context.headSha.slice(0, 7)
+    parts.push(context.headSubject ? `${shortSha} ${context.headSubject}` : shortSha)
+  }
+  const changedCount = new Set([...context.dirtyFiles, ...context.stagedFiles]).size
+  if (changedCount > 0) parts.push(`${changedCount} changed`)
+  return parts.length > 0 ? parts.join(' · ') : 'Context captured'
+}
+
 // repoFilter encoding for Select values (non-empty strings for Radix Select items).
 //   '__all__'     → undefined (All repos — no filter)
 //   '$unassigned' → null      (only notes with no repo)
@@ -1041,6 +1057,7 @@ function NoteDetail({
   const primaryDraftLink = draftLinks[0] ?? null
   const assignedRepo = note.repoId ? (repos.find((r) => r.id === note.repoId) ?? null) : null
   const repoIndexStatus = assignedRepo ? getGenerationRepoIndexStatus(assignedRepo) : null
+  const captureContextLabel = formatCaptureContext(note)
 
   const handleSave = useCallback(async (): Promise<void> => {
     await onSave(note.id, draft)
@@ -1152,6 +1169,11 @@ function NoteDetail({
             </Select>
           )}
           {repoIndexStatus ? <NoteRepoIndexIndicator status={repoIndexStatus} /> : null}
+          {captureContextLabel ? (
+            <span className="max-w-full truncate font-mono text-xs text-muted-foreground">
+              {captureContextLabel}
+            </span>
+          ) : null}
         </div>
         {note.runId && (
           <button

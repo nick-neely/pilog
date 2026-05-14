@@ -1,7 +1,11 @@
 import simpleGit from 'simple-git'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
-import type { RepoAccessDescriptor, WslRepoDetectionFailureReason } from '@shared/ipc'
+import type {
+  NoteCaptureContext,
+  RepoAccessDescriptor,
+  WslRepoDetectionFailureReason
+} from '@shared/ipc'
 
 export type LocalGitMetadata = {
   remoteUrl: string
@@ -92,6 +96,109 @@ export async function readGitMetadataResult(
     return metadata ? { state: 'metadata', metadata } : { state: 'missing' }
   }
   return readWslGitMetadataResult(access, deps.execFile ?? defaultExecFile)
+}
+
+export async function readGitCaptureContext(
+  access: RepoAccessDescriptor,
+  deps: { execFile?: ExecFile; capturedAt?: string } = {}
+): Promise<NoteCaptureContext> {
+  const capturedAt = deps.capturedAt ?? new Date().toISOString()
+  try {
+    if (access.kind === 'host') {
+      return await readHostGitCaptureContext(access.displayPath, capturedAt)
+    }
+    return await readWslGitCaptureContext(access, deps.execFile ?? defaultExecFile, capturedAt)
+  } catch {
+    return { state: 'unavailable', capturedAt }
+  }
+}
+
+async function readHostGitCaptureContext(
+  localPath: string,
+  capturedAt: string
+): Promise<NoteCaptureContext> {
+  const git = simpleGit(localPath)
+  const isRepo = await git.checkIsRepo().catch(() => false)
+  if (!isRepo) return { state: 'unavailable', capturedAt }
+
+  const [branch, headSha, headSubject, status] = await Promise.all([
+    git.revparse(['--abbrev-ref', 'HEAD']).catch(() => null),
+    git.revparse(['HEAD']).catch(() => null),
+    git.raw(['log', '-1', '--pretty=%s']).catch(() => null),
+    git.status()
+  ])
+
+  return {
+    state: 'captured',
+    branch: normalizeGitValue(branch),
+    dirtyFiles: Array.from(
+      new Set(status.files.filter((file) => file.working_dir !== ' ').map((file) => file.path))
+    ).sort(),
+    stagedFiles: Array.from(
+      new Set(status.files.filter((file) => file.index !== ' ').map((file) => file.path))
+    ).sort(),
+    headSha: normalizeGitValue(headSha),
+    headSubject: normalizeGitValue(headSubject),
+    capturedAt
+  }
+}
+
+async function readWslGitCaptureContext(
+  access: WslRepoAccessDescriptor,
+  runExecFile: ExecFile,
+  capturedAt: string
+): Promise<NoteCaptureContext> {
+  const isRepoResult = await runWslGitResult(
+    access,
+    ['rev-parse', '--is-inside-work-tree'],
+    runExecFile
+  )
+  if (isRepoResult.state !== 'stdout' || isRepoResult.stdout.trim() !== 'true') {
+    return { state: 'unavailable', capturedAt }
+  }
+
+  const [branch, headSha, headSubject, status] = await Promise.all([
+    runWslGitResult(access, ['rev-parse', '--abbrev-ref', 'HEAD'], runExecFile),
+    runWslGitResult(access, ['rev-parse', 'HEAD'], runExecFile),
+    runWslGitResult(access, ['log', '-1', '--pretty=%s'], runExecFile),
+    runWslGitResult(access, ['status', '--porcelain'], runExecFile)
+  ])
+
+  if (status.state !== 'stdout') return { state: 'unavailable', capturedAt }
+  const paths = parsePorcelainStatus(status.stdout)
+
+  return {
+    state: 'captured',
+    branch: branch.state === 'stdout' ? normalizeGitValue(branch.stdout) : null,
+    dirtyFiles: paths.dirtyFiles,
+    stagedFiles: paths.stagedFiles,
+    headSha: headSha.state === 'stdout' ? normalizeGitValue(headSha.stdout) : null,
+    headSubject: headSubject.state === 'stdout' ? normalizeGitValue(headSubject.stdout) : null,
+    capturedAt
+  }
+}
+
+function parsePorcelainStatus(stdout: string): { dirtyFiles: string[]; stagedFiles: string[] } {
+  const dirtyFiles = new Set<string>()
+  const stagedFiles = new Set<string>()
+  for (const line of stdout.split('\n')) {
+    if (!line.trim()) continue
+    const index = line[0]
+    const workingTree = line[1]
+    const path = line.slice(3).split(' -> ').pop()?.trim()
+    if (!path) continue
+    if (index !== ' ' && index !== '?') stagedFiles.add(path)
+    if (workingTree !== ' ' || index === '?') dirtyFiles.add(path)
+  }
+  return {
+    dirtyFiles: Array.from(dirtyFiles).sort(),
+    stagedFiles: Array.from(stagedFiles).sort()
+  }
+}
+
+function normalizeGitValue(value: string | null): string | null {
+  const trimmed = value?.trim()
+  return trimmed ? trimmed : null
 }
 
 export function parseGitHubOwnerRepo(remoteUrl: string): { owner: string; name: string } | null {

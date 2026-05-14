@@ -4,6 +4,7 @@ import type { PilogDatabase } from '../client'
 import { issueDrafts, notes, publishLog, repos } from '../schema'
 import type { PublishAuditLogEntry, PublishLogEntry } from '@shared/ipc'
 import type { IssueDraftSourceNote } from '@shared/types'
+import { mapNoteRow } from './notes'
 import { mapRepoRow, repoColumns } from './repos'
 
 const publishLogColumns = {
@@ -20,6 +21,7 @@ const sourceNoteColumns = {
   status: notes.status,
   repoId: notes.repoId,
   runId: notes.runId,
+  captureContext: notes.captureContext,
   createdAt: notes.createdAt,
   updatedAt: notes.updatedAt
 } as const
@@ -135,5 +137,5 @@ function getSourceNotesById(
     .where(inArray(notes.id, uniqueSourceNoteIds))
     .all()
 
-  return new Map(sourceNotes.map((note) => [note.id, note]))
+  return new Map(sourceNotes.map((note) => [note.id, mapNoteRow(note)]))
 }

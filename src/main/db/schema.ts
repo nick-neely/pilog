@@ -4,6 +4,7 @@ export const notes = sqliteTable('notes', {
   id: text('id').primaryKey(),
   repoId: text('repo_id'),
   runId: text('run_id'),
+  captureContext: text('capture_context'),
   content: text('content').notNull(),
   status: text('status', { enum: ['unprocessed', 'drafted', 'published', 'dismissed'] })
     .notNull()

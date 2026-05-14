@@ -41,6 +41,7 @@ runIfEnabled('issue generation integration', () => {
       status: 'unprocessed',
       repoId: repo.id,
       runId: null,
+      captureContext: null,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     }))

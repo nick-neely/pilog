@@ -6,6 +6,7 @@ import type {
   CountNotesRequest,
   ListNotesRequest,
   Note,
+  NoteCaptureContext,
   NoteStatus,
   NoteStatusCounts
 } from '@shared/ipc'
@@ -16,17 +17,19 @@ const noteColumns = {
   status: notes.status,
   repoId: notes.repoId,
   runId: notes.runId,
+  captureContext: notes.captureContext,
   createdAt: notes.createdAt,
   updatedAt: notes.updatedAt
 } as const
 
 export function createNote(
   db: PilogDatabase,
-  input: { content: string; repoId?: string | null }
+  input: { content: string; repoId?: string | null; captureContext?: NoteCaptureContext | null }
 ): Note {
   const now = new Date().toISOString()
   const id = uuidv4()
   const repoId = input.repoId ?? null
+  const captureContext = input.captureContext ?? null
 
   db.insert(notes)
     .values({
@@ -34,6 +37,7 @@ export function createNote(
       content: input.content,
       status: 'unprocessed',
       repoId,
+      captureContext: captureContext ? JSON.stringify(captureContext) : null,
       createdAt: now,
       updatedAt: now
     })
@@ -45,6 +49,7 @@ export function createNote(
     status: 'unprocessed',
     repoId,
     runId: null,
+    captureContext,
     createdAt: now,
     updatedAt: now
   }
@@ -73,7 +78,10 @@ export function listNotes(db: PilogDatabase, filter?: ListNotesRequest): Note[] 
   const query = db.select(noteColumns).from(notes)
   const ordered = conditions.length > 0 ? query.where(and(...conditions)) : query
 
-  return ordered.orderBy(desc(notes.createdAt), desc(sql`rowid`)).all()
+  return ordered
+    .orderBy(desc(notes.createdAt), desc(sql`rowid`))
+    .all()
+    .map(mapNoteRow)
 }
 
 /**
@@ -130,7 +138,7 @@ export function updateNoteStatus(db: PilogDatabase, id: string, status: NoteStat
     .get()
 
   if (!row) throw new Error(`Note not found: ${id}`)
-  return row
+  return mapNoteRow(row)
 }
 
 export function updateNote(
@@ -148,10 +156,52 @@ export function updateNote(
 
   const row = db.update(notes).set(patch).where(eq(notes.id, input.id)).returning(noteColumns).get()
 
-  return row ?? null
+  return row ? mapNoteRow(row) : null
 }
 
 export function deleteNote(db: PilogDatabase, input: { id: string }): boolean {
   const result = db.delete(notes).where(eq(notes.id, input.id)).run()
   return result.changes > 0
+}
+
+type NoteRow = typeof notes.$inferSelect
+
+export function mapNoteRow(row: Pick<NoteRow, keyof typeof noteColumns>): Note {
+  return {
+    ...row,
+    captureContext: parseCaptureContext(row.captureContext)
+  }
+}
+
+function parseCaptureContext(value: string | null): NoteCaptureContext | null {
+  if (!value) return null
+  try {
+    const parsed = JSON.parse(value) as unknown
+    if (!parsed || typeof parsed !== 'object') return null
+    const candidate = parsed as Partial<NoteCaptureContext>
+    if (candidate.state === 'unavailable' && typeof candidate.capturedAt === 'string') {
+      return { state: 'unavailable', capturedAt: candidate.capturedAt }
+    }
+    if (
+      candidate.state === 'captured' &&
+      typeof candidate.capturedAt === 'string' &&
+      Array.isArray(candidate.dirtyFiles) &&
+      Array.isArray(candidate.stagedFiles)
+    ) {
+      return {
+        state: 'captured',
+        branch: typeof candidate.branch === 'string' ? candidate.branch : null,
+        dirtyFiles: candidate.dirtyFiles.filter((path): path is string => typeof path === 'string'),
+        stagedFiles: candidate.stagedFiles.filter(
+          (path): path is string => typeof path === 'string'
+        ),
+        headSha: typeof candidate.headSha === 'string' ? candidate.headSha : null,
+        headSubject: typeof candidate.headSubject === 'string' ? candidate.headSubject : null,
+        capturedAt: candidate.capturedAt
+      }
+    }
+  } catch {
+    return null
+  }
+  return null
 }

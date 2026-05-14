@@ -107,6 +107,21 @@ export type ErrorCause =
   | 'timeout'
   | 'cancelled'
 
+export type NoteCaptureContext =
+  | {
+      state: 'captured'
+      branch: string | null
+      dirtyFiles: string[]
+      stagedFiles: string[]
+      headSha: string | null
+      headSubject: string | null
+      capturedAt: string
+    }
+  | {
+      state: 'unavailable'
+      capturedAt: string
+    }
+
 export type AgentEvent =
   | { type: 'progress'; phase: string }
   | { type: 'partial'; text: string }
@@ -143,6 +158,8 @@ export type AgentRunDetail = AgentRunListItem & {
     content: string
     status: 'unprocessed' | 'drafted' | 'published' | 'dismissed'
     repoId: string | null
+    runId: string | null
+    captureContext: NoteCaptureContext | null
     createdAt: string
     updatedAt: string
   }>
@@ -292,6 +309,7 @@ export type IssueDraftSourceNote = {
   status: 'unprocessed' | 'drafted' | 'published' | 'dismissed'
   repoId: string | null
   runId: string | null
+  captureContext: NoteCaptureContext | null
   createdAt: string
   updatedAt: string
 }

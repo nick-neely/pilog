@@ -169,6 +169,44 @@ describe('notes repository', () => {
   })
 
   describe('repoId support', () => {
+    it('createNote stores Capture Context when provided', () => {
+      const captureContext = {
+        state: 'captured' as const,
+        branch: 'main',
+        dirtyFiles: ['src/app.ts'],
+        stagedFiles: ['README.md'],
+        headSha: '0123456789abcdef0123456789abcdef01234567',
+        headSubject: 'Initial commit',
+        capturedAt: '2026-05-14T21:00:00.000Z'
+      }
+
+      const note = createNote(db, { content: 'repo note', repoId: 'repo-123', captureContext })
+
+      expect(note.captureContext).toEqual(captureContext)
+      expect(listNotes(db)[0].captureContext).toEqual(captureContext)
+    })
+
+    it('createNote stores unavailable Capture Context without failing note persistence', () => {
+      const captureContext = {
+        state: 'unavailable' as const,
+        capturedAt: '2026-05-14T21:00:00.000Z'
+      }
+
+      const note = createNote(db, { content: 'repo note', repoId: 'repo-123', captureContext })
+
+      expect(note.content).toBe('repo note')
+      expect(note.captureContext).toEqual(captureContext)
+    })
+
+    it('loads existing notes without Capture Context as null', () => {
+      db.run(
+        `INSERT INTO notes (id, content, status, repo_id, created_at, updated_at)
+         VALUES ('legacy-note', 'old note', 'unprocessed', 'repo-123', '2026-05-14T20:00:00.000Z', '2026-05-14T20:00:00.000Z')`
+      )
+
+      expect(listNotes(db)[0].captureContext).toBeNull()
+    })
+
     it('createNote stores repoId when provided', () => {
       const note = createNote(db, { content: 'repo note', repoId: 'repo-123' })
       expect(note.repoId).toBe('repo-123')

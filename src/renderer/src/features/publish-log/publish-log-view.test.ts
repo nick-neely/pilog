@@ -54,6 +54,7 @@ describe('getPublishAuditEntryViewModel', () => {
           status: 'published',
           repoId: 'repo-1',
           runId: 'run-1',
+          captureContext: null,
           createdAt: '2026-05-09T19:00:00.000Z',
           updatedAt: '2026-05-09T20:00:00.000Z'
         }

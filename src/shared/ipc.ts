@@ -17,6 +17,7 @@ import type {
   IssueDraft,
   IssueDraftForReview,
   IssueDraftStatus,
+  NoteCaptureContext,
   OnboardingState,
   PiActiveConfig,
   PiModelOption,
@@ -34,6 +35,7 @@ export type Note = {
   status: NoteStatus
   repoId: string | null
   runId: string | null
+  captureContext: NoteCaptureContext | null
   createdAt: string
   updatedAt: string
 }
@@ -537,6 +539,7 @@ export type {
   GenerateDraftsMode,
   GitHubIssueTemplate,
   IssueDraftStatus,
+  NoteCaptureContext,
   OnboardingState,
   PiActiveConfig,
   PiModelOption,

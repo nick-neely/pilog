@@ -19,6 +19,7 @@ import {
 import { and, eq, inArray } from 'drizzle-orm'
 import type { PilogDatabase } from '../db/client'
 import { formatIssueDraftBody } from '../db/repositories/issue-drafts'
+import { mapNoteRow } from '../db/repositories/notes'
 import { getRepoById, updateRepoGithubLabels } from '../db/repositories/repos'
 import { agentRuns, issueDrafts, notes } from '../db/schema'
 import { resolveDefaultIssueTemplate } from '../github/issue-templates'
@@ -302,15 +303,7 @@ export function getCurrentInboxNotesForGeneration(
 }
 
 function mapNoteRowForGeneration(row: typeof notes.$inferSelect): Note {
-  return {
-    id: row.id,
-    content: row.content,
-    status: row.status,
-    repoId: row.repoId,
-    runId: row.runId ?? null,
-    createdAt: row.createdAt,
-    updatedAt: row.updatedAt
-  }
+  return mapNoteRow(row)
 }
 
 export function persistGeneratedIssueDrafts(

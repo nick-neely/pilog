@@ -13,6 +13,7 @@ import {
   applyIssueTemplateToDraftBody,
   formatFallbackIssueDraftBody
 } from '../../github/issue-templates'
+import { mapNoteRow } from './notes'
 
 const issueDraftColumns = {
   id: issueDrafts.id,
@@ -36,6 +37,7 @@ const sourceNoteColumns = {
   status: notes.status,
   repoId: notes.repoId,
   runId: notes.runId,
+  captureContext: notes.captureContext,
   createdAt: notes.createdAt,
   updatedAt: notes.updatedAt
 } as const
@@ -109,7 +111,7 @@ export function listIssueDraftsForReview(
     .from(notes)
     .where(inArray(notes.id, sourceNoteIds))
     .all()
-  const sourceNotesById = new Map(sourceNotes.map((note) => [note.id, note]))
+  const sourceNotesById = new Map(sourceNotes.map((note) => [note.id, mapNoteRow(note)]))
 
   return drafts.map((draft) => ({
     ...draft,

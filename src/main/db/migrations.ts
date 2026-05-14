@@ -6,6 +6,7 @@ export function runMigrations(db: PilogDatabase): void {
     CREATE TABLE IF NOT EXISTS notes (
       id TEXT PRIMARY KEY,
       repo_id TEXT,
+      capture_context TEXT,
       content TEXT NOT NULL,
       status TEXT NOT NULL DEFAULT 'unprocessed',
       created_at TEXT NOT NULL,
@@ -88,6 +89,7 @@ export function runMigrations(db: PilogDatabase): void {
   `)
 
   addColumnIfMissing(db, 'notes', 'run_id', 'TEXT')
+  addColumnIfMissing(db, 'notes', 'capture_context', 'TEXT')
   addColumnIfMissing(db, 'repos', 'access_kind', "TEXT NOT NULL DEFAULT 'host'")
   addColumnIfMissing(db, 'repos', 'wsl_distro', 'TEXT')
   addColumnIfMissing(db, 'repos', 'wsl_path', 'TEXT')

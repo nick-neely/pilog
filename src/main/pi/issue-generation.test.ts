@@ -72,6 +72,7 @@ const promptNote: Note = {
   status: 'unprocessed',
   repoId: 'repo-1',
   runId: null,
+  captureContext: null,
   createdAt: '2026-05-08T00:00:00.000Z',
   updatedAt: '2026-05-08T00:00:00.000Z'
 }

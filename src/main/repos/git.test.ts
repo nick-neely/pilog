@@ -8,7 +8,8 @@ import {
   isGitRepo,
   parseRepoAccessDescriptor,
   readGitMetadata,
-  readGitMetadataResult
+  readGitMetadataResult,
+  readGitCaptureContext
 } from './git'
 
 describe('readLocalGitMetadata', () => {
@@ -224,6 +225,49 @@ describe('readGitMetadata', () => {
       state: 'wsl-failure',
       reason: 'no-origin',
       access
+    })
+  })
+})
+
+describe('readGitCaptureContext', () => {
+  let repoDir: string
+
+  beforeAll(() => {
+    repoDir = mkdtempSync(join(tmpdir(), 'pilog-capture-context-'))
+    execSync('git init', { cwd: repoDir })
+    execSync('git config user.email "test@test.com"', { cwd: repoDir })
+    execSync('git config user.name "Test"', { cwd: repoDir })
+    writeFileSync(join(repoDir, 'README.md'), '# Test\n')
+    execSync('git add README.md', { cwd: repoDir })
+    execSync('git commit -m "capture baseline"', { cwd: repoDir })
+    writeFileSync(join(repoDir, 'README.md'), '# Changed\n')
+    writeFileSync(join(repoDir, 'staged.txt'), 'staged\n')
+    execSync('git add staged.txt', { cwd: repoDir })
+  })
+
+  afterAll(() => {
+    rmSync(repoDir, { recursive: true, force: true })
+  })
+
+  it('captures branch, working tree paths, and HEAD metadata for a host repo', async () => {
+    const result = await readGitCaptureContext({ kind: 'host', displayPath: repoDir })
+
+    expect(result.state).toBe('captured')
+    if (result.state !== 'captured') return
+    expect(result.branch).toMatch(/\S+/)
+    expect(result.dirtyFiles).toEqual(['README.md'])
+    expect(result.stagedFiles).toEqual(['staged.txt'])
+    expect(result.headSha).toMatch(/^[0-9a-f]{40}$/)
+    expect(result.headSubject).toBe('capture baseline')
+    expect(result.capturedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/)
+  })
+
+  it('returns unavailable Capture Context when git metadata cannot be read', async () => {
+    const result = await readGitCaptureContext({ kind: 'host', displayPath: '/missing/pilog' })
+
+    expect(result).toEqual({
+      state: 'unavailable',
+      capturedAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/)
     })
   })
 })

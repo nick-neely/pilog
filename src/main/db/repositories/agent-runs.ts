@@ -10,6 +10,7 @@ import { desc, eq, inArray, sql } from 'drizzle-orm'
 import { v4 as uuidv4 } from 'uuid'
 import type { PilogDatabase } from '../client'
 import { agentRuns, issueDrafts, notes } from '../schema'
+import { mapNoteRow } from './notes'
 
 const ERROR_CAUSES = [
   'auth_invalid',
@@ -46,6 +47,8 @@ const noteColumns = {
   content: notes.content,
   status: notes.status,
   repoId: notes.repoId,
+  runId: notes.runId,
+  captureContext: notes.captureContext,
   createdAt: notes.createdAt,
   updatedAt: notes.updatedAt
 } as const
@@ -227,7 +230,7 @@ function mapRunListItem(row: typeof agentRuns.$inferSelect): AgentRunListItem {
 function loadNotesByIds(db: PilogDatabase, ids: string[]): AgentRunDetail['sourceNotes'] {
   if (ids.length === 0) return []
   const rows = db.select(noteColumns).from(notes).where(inArray(notes.id, ids)).all()
-  const byId = new Map(rows.map((row) => [row.id, row]))
+  const byId = new Map(rows.map((row) => [row.id, mapNoteRow(row)]))
   return ids.flatMap((id) => {
     const row = byId.get(id)
     return row ? [row] : []
