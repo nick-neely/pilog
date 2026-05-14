@@ -1,18 +1,31 @@
-import { describe, expect, it } from 'vitest'
-import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
+import { afterEach, describe, expect, it } from 'vitest'
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { createRepoIndexSnapshot } from './repo-indexer'
 
+const SOURCE_CONTENT_SENTINEL = 'repoIndexSecretSentinel'
+const SOURCE_VALUE_SENTINEL = 'do-not-store-source-content'
+const LONG_CODE_SUMMARY =
+  'This source file authenticates requests, validates session cookies, fetches private billing metadata, and coordinates several implementation details that should not be persisted as a long code summary.'
+
 describe('createRepoIndexSnapshot', () => {
+  const tempRepoPaths: string[] = []
+
+  afterEach(async () => {
+    await Promise.all(
+      tempRepoPaths.splice(0).map((repoPath) => rm(repoPath, { recursive: true, force: true }))
+    )
+  })
+
   it('stores lightweight repo signals without source contents or long code summaries', async () => {
-    const repoPath = await mkdtemp(path.join(os.tmpdir(), 'pilog-index-privacy-'))
-    const sourceContent = 'export const repoIndexSecretSentinel = "do-not-store-source-content"'
-    const longCodeSummary =
-      'This source file authenticates requests, validates session cookies, fetches private billing metadata, and coordinates several implementation details that should not be persisted as a long code summary.'
+    const repoPath = await createTempRepo('pilog-index-privacy-')
 
     await mkdir(path.join(repoPath, 'src'))
-    await writeFile(path.join(repoPath, 'src', 'auth.ts'), `${sourceContent}\n// ${longCodeSummary}`)
+    await writeFile(
+      path.join(repoPath, 'src', 'auth.ts'),
+      `export const ${SOURCE_CONTENT_SENTINEL} = "${SOURCE_VALUE_SENTINEL}"\n// ${LONG_CODE_SUMMARY}`
+    )
     await writeFile(
       path.join(repoPath, 'package.json'),
       JSON.stringify({ dependencies: { react: '^19.0.0', vite: '^7.0.0' } })
@@ -27,14 +40,14 @@ describe('createRepoIndexSnapshot', () => {
       frameworkSignals: ['React', 'Vite'],
       importantDirectories: [{ path: 'src', role: 'Source' }]
     })
-    expect(serializedSnapshot).not.toContain('repoIndexSecretSentinel')
-    expect(serializedSnapshot).not.toContain('do-not-store-source-content')
+    expect(serializedSnapshot).not.toContain(SOURCE_CONTENT_SENTINEL)
+    expect(serializedSnapshot).not.toContain(SOURCE_VALUE_SENTINEL)
     expect(serializedSnapshot).not.toContain('authenticates requests')
-    expect(serializedSnapshot).not.toContain(longCodeSummary)
+    expect(serializedSnapshot).not.toContain(LONG_CODE_SUMMARY)
   })
 
   it('summarizes dependency, generated, ignored, and build-output paths as exclusions', async () => {
-    const repoPath = await mkdtemp(path.join(os.tmpdir(), 'pilog-index-exclusions-'))
+    const repoPath = await createTempRepo('pilog-index-exclusions-')
     await mkdir(path.join(repoPath, 'node_modules'))
     await mkdir(path.join(repoPath, 'dist'))
     await mkdir(path.join(repoPath, 'generated'))
@@ -56,4 +69,10 @@ describe('createRepoIndexSnapshot', () => {
     expect(serializedSnapshot).not.toContain('dist/')
     expect(serializedSnapshot).not.toContain('generated/')
   })
+
+  async function createTempRepo(prefix: string): Promise<string> {
+    const repoPath = await mkdtemp(path.join(os.tmpdir(), prefix))
+    tempRepoPaths.push(repoPath)
+    return repoPath
+  }
 })
