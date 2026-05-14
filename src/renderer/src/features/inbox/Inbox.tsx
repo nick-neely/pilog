@@ -114,6 +114,7 @@ import {
   getPublishRecoveryState,
   type RecoveryState
 } from '../recovery-state'
+import { getGenerationRepoIndexStatus } from '../repositories/repo-index-status'
 import { GitHubDeviceCode } from '../setup/GitHubDeviceCode'
 import { PiSetupPanel } from '../setup/PiSetupPanel'
 import { RepoLinkFlow } from '../setup/RepoLinkFlow'
@@ -296,6 +297,7 @@ function getGenerateDraftsReason(input: {
   hasSelection: boolean
   selectedNotesShareRepo: boolean
   selectedNotesAllUnprocessed: boolean
+  selectedRepoAvailable: boolean
   piStatus: PiStatus
   generating: boolean
 }): string {
@@ -303,6 +305,7 @@ function getGenerateDraftsReason(input: {
   if (!input.hasSelection) return 'Select one or more notes to generate drafts.'
   if (!input.selectedNotesAllUnprocessed) return 'Selected notes have already been drafted.'
   if (!input.selectedNotesShareRepo) return 'Selected notes must share one linked repository.'
+  if (!input.selectedRepoAvailable) return 'Relink the repository before generating drafts.'
   if (!input.piStatus.configured) {
     if (input.piStatus.reason === 'missing-credential')
       return 'Configure Pi credentials in Settings.'
@@ -1810,16 +1813,25 @@ export function Inbox({
       : null
   const currentInboxRepo =
     typeof repoFilter === 'string' ? (reposById.get(repoFilter) ?? null) : null
+  const selectedGenerationRepoIndex =
+    selectedNotesShareRepo && selectedNotes[0]?.repoId
+      ? getGenerationRepoIndexStatus(selectedRepo)
+      : null
+  const currentInboxRepoIndex = currentInboxRepo
+    ? getGenerationRepoIndexStatus(currentInboxRepo)
+    : null
   const canGenerateDrafts =
     hasSelection &&
     selectedNotesAllUnprocessed &&
     selectedNotesShareRepo &&
+    Boolean(selectedRepo) &&
     piStatus.configured &&
     !generating
   const generateDraftsReason = getGenerateDraftsReason({
     hasSelection,
     selectedNotesShareRepo,
     selectedNotesAllUnprocessed,
+    selectedRepoAvailable: Boolean(selectedRepo),
     piStatus,
     generating
   })
@@ -2505,6 +2517,21 @@ export function Inbox({
                       ) : null}
                     </div>
                   ) : null}
+                  {selectedGenerationRepoIndex ? (
+                    <div
+                      className="flex flex-col gap-1 rounded-md border bg-muted/25 px-3 py-2"
+                      aria-label={selectedGenerationRepoIndex.ariaLabel}
+                    >
+                      <p className="text-xs font-medium text-foreground">
+                        {selectedGenerationRepoIndex.label}
+                      </p>
+                      {selectedGenerationRepoIndex.notice ? (
+                        <p className="text-xs leading-5 text-muted-foreground">
+                          {selectedGenerationRepoIndex.notice}
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : null}
                   {!piStatus.configured && selectedNotesShareRepo && (
                     <Button
                       type="button"
@@ -2570,6 +2597,21 @@ export function Inbox({
                             </div>
                           </HoverCardContent>
                         </HoverCard>
+                      ) : null}
+                    </div>
+                  ) : null}
+                  {currentInboxRepoIndex ? (
+                    <div
+                      className="flex flex-col gap-1 rounded-md border bg-muted/25 px-3 py-2"
+                      aria-label={currentInboxRepoIndex.ariaLabel}
+                    >
+                      <p className="text-xs font-medium text-foreground">
+                        {currentInboxRepoIndex.label}
+                      </p>
+                      {currentInboxRepoIndex.notice ? (
+                        <p className="text-xs leading-5 text-muted-foreground">
+                          {currentInboxRepoIndex.notice}
+                        </p>
                       ) : null}
                     </div>
                   ) : null}

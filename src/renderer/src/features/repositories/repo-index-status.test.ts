@@ -1,18 +1,24 @@
 import { describe, expect, it } from 'vitest'
-import { REPO_INDEX_PRIVACY_COPY, getRepoIndexStatusLabel } from './repo-index-status'
+import {
+  REPO_INDEX_PRIVACY_COPY,
+  getGenerationRepoIndexStatus,
+  getRepoIndexStatusLabel
+} from './repo-index-status'
+
+const READY_INDEX = {
+  status: 'ready' as const,
+  lastIndexedAt: '2026-05-14T12:30:00.000Z',
+  indexVersion: 1,
+  packageManager: 'pnpm',
+  frameworkSignals: ['React', 'Vite'],
+  importantDirectories: [{ path: 'src', role: 'Source' }],
+  exclusionSummary: { dependency: 1, buildOutput: 1, generated: 0, binaryHeavy: 0, ignored: 1 },
+  errorMessage: null
+}
 
 describe('getRepoIndexStatusLabel', () => {
   it('maps a ready Repo Index to a last-indexed label', () => {
-    const view = getRepoIndexStatusLabel({
-      status: 'ready',
-      lastIndexedAt: '2026-05-14T12:30:00.000Z',
-      indexVersion: 1,
-      packageManager: 'pnpm',
-      frameworkSignals: ['React', 'Vite'],
-      importantDirectories: [{ path: 'src', role: 'Source' }],
-      exclusionSummary: { dependency: 1, buildOutput: 1, generated: 0, binaryHeavy: 0, ignored: 1 },
-      errorMessage: null
-    })
+    const view = getRepoIndexStatusLabel(READY_INDEX)
 
     expect(view.label).toContain('Indexed')
     expect(view.ariaLabel).toContain('Repo Index last indexed')
@@ -83,5 +89,59 @@ describe('getRepoIndexStatusLabel', () => {
     expect(REPO_INDEX_PRIVACY_COPY).toContain('embeddings')
     expect(REPO_INDEX_PRIVACY_COPY).toContain('long code summaries')
     expect(REPO_INDEX_PRIVACY_COPY).toContain('Live Repo Evidence')
+  })
+})
+
+describe('getGenerationRepoIndexStatus', () => {
+  it('shows fresh Repo Index context without a notice', () => {
+    const view = getGenerationRepoIndexStatus(
+      { name: 'pilog', repoIndex: READY_INDEX },
+      { now: new Date('2026-05-14T13:00:00.000Z') }
+    )
+
+    expect(view.state).toBe('fresh')
+    expect(view.label).toContain('fresh')
+    expect(view.notice).toBeNull()
+    expect(view.blocksGeneration).toBe(false)
+  })
+
+  it('shows stale Repo Index context as non-blocking live-check guidance', () => {
+    const view = getGenerationRepoIndexStatus(
+      {
+        name: 'pilog',
+        repoIndex: { ...READY_INDEX, lastIndexedAt: '2026-05-01T12:30:00.000Z' }
+      },
+      { now: new Date('2026-05-14T13:00:00.000Z') }
+    )
+
+    expect(view.state).toBe('stale')
+    expect(view.label).toContain('stale')
+    expect(view.notice).toContain('Live Repo Evidence')
+    expect(view.notice).toContain('specific file claims')
+    expect(view.blocksGeneration).toBe(false)
+  })
+
+  it('shows missing Repo Index context as non-blocking live-check guidance', () => {
+    const view = getGenerationRepoIndexStatus(
+      { name: 'pilog', repoIndex: null },
+      { now: new Date('2026-05-14T13:00:00.000Z') }
+    )
+
+    expect(view.state).toBe('missing')
+    expect(view.label).toContain('missing')
+    expect(view.notice).toContain('Live Repo Evidence')
+    expect(view.notice).toContain('specific file claims')
+    expect(view.blocksGeneration).toBe(false)
+  })
+
+  it('shows unavailable repos as blocking readiness state', () => {
+    const view = getGenerationRepoIndexStatus(null, {
+      now: new Date('2026-05-14T13:00:00.000Z')
+    })
+
+    expect(view.state).toBe('unavailable')
+    expect(view.label).toContain('unavailable')
+    expect(view.notice).toContain('Relink')
+    expect(view.blocksGeneration).toBe(true)
   })
 })
