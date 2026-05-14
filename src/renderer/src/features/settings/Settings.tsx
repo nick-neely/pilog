@@ -65,7 +65,6 @@ import { useTheme } from '@renderer/theme/useTheme'
 import { LOCAL_FIRST_DISCLOSURE } from '@shared/data-boundaries'
 import type {
   AdvancedSettings,
-  AppUpdateStatus,
   GitHubAuthProgress,
   RuntimeReadiness,
   RuntimeReadinessItem,
@@ -86,6 +85,7 @@ import { PiSetupPanel } from '../setup/PiSetupPanel'
 import { useGitHubStatus } from '../setup/use-github-status'
 import { usePiConfig } from '../setup/use-pi-config'
 import { getUpdateStatusView } from './update-status-view'
+import { useAppUpdates } from './use-app-updates'
 
 const SEARCH_PROVIDER_LABELS: Record<SearchProvider, string> = {
   brave: 'Brave',
@@ -142,13 +142,6 @@ type AdvancedSettingsState = {
   setWebSearchProvider: (provider: SearchProvider) => Promise<void>
   setWebSearchApiKey: (apiKey: string) => void
   saveWebSearchApiKey: () => Promise<void>
-}
-
-type UpdateState = {
-  status: AppUpdateStatus | null
-  check: () => Promise<void>
-  download: () => Promise<void>
-  restart: () => Promise<void>
 }
 
 type RuntimeReadinessState = {
@@ -263,38 +256,6 @@ function useAdvancedSettings(): AdvancedSettingsState {
     setWebSearchApiKey,
     saveWebSearchApiKey
   }
-}
-
-function useAppUpdates(): UpdateState {
-  const [status, setStatus] = useState<AppUpdateStatus | null>(null)
-
-  useEffect(() => {
-    let mounted = true
-    window.pilog.invoke('app-updates:getStatus').then((next) => {
-      if (mounted) setStatus(next)
-    })
-    const unsubscribe = window.pilog.onUpdateStatus((next) => {
-      setStatus(next)
-    })
-    return () => {
-      mounted = false
-      unsubscribe()
-    }
-  }, [])
-
-  const check = useCallback(async () => {
-    setStatus(await window.pilog.invoke('app-updates:check'))
-  }, [])
-
-  const download = useCallback(async () => {
-    setStatus(await window.pilog.invoke('app-updates:download'))
-  }, [])
-
-  const restart = useCallback(async () => {
-    setStatus(await window.pilog.invoke('app-updates:restart'))
-  }, [])
-
-  return { status, check, download, restart }
 }
 
 function useRuntimeReadiness(): RuntimeReadinessState {

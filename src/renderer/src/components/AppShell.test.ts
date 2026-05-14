@@ -35,14 +35,17 @@ function renderShell(updateStatus: AppUpdateStatus): string {
     createElement(
       TooltipProvider,
       null,
-      createElement(AppShell, {
-        tabs: [{ value: 'inbox', label: 'Inbox' }],
-        activeTab: 'inbox',
-        onTabChange: vi.fn(),
-        onNavigateToSettings: vi.fn(),
-        updateStatus,
-        children: createElement('main', null, 'Content')
-      })
+      createElement(
+        AppShell,
+        {
+          tabs: [{ value: 'inbox', label: 'Inbox' }],
+          activeTab: 'inbox',
+          onTabChange: vi.fn(),
+          onNavigateToSettings: vi.fn(),
+          updateStatus
+        },
+        createElement('main', null, 'Content')
+      )
     )
   )
 }

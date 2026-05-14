@@ -2,7 +2,10 @@ import { InformationCircleIcon, Search01Icon, Settings02Icon } from '@hugeicons/
 import { HugeiconsIcon } from '@hugeicons/react'
 import { Button } from '@renderer/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@renderer/components/ui/tooltip'
-import { getUpdateChromeIndicator } from '@renderer/features/settings/update-chrome-indicator'
+import {
+  getUpdateChromeIndicator,
+  type UpdateChromeIndicator
+} from '@renderer/features/settings/update-chrome-indicator'
 import { ViewTabs, type ViewTab } from '@renderer/features/shared/ViewTabs'
 import { cn } from '@renderer/lib/utils'
 import { PILOG_APP_SHORTCUTS, shortcutBindingMeta } from '@renderer/shortcuts/pilog-hotkeys'
@@ -40,7 +43,7 @@ interface AppShellProps {
    */
   onOpenCommandPalette?: () => void
   updateStatus?: AppUpdateStatus | null
-  children: ReactNode
+  children?: ReactNode
 }
 
 export function AppShell({
@@ -101,26 +104,7 @@ export function AppShell({
             </Tooltip>
           ) : null}
           {updateIndicator ? (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  data-testid="open-software-updates"
-                  onClick={onNavigateToSettings}
-                  aria-label={updateIndicator.ariaLabel}
-                  className={cn(
-                    'gap-1.5 px-2 text-xs',
-                    updateIndicator.tone === 'restart' ? 'text-primary' : 'text-muted-foreground'
-                  )}
-                >
-                  <HugeiconsIcon icon={InformationCircleIcon} aria-hidden />
-                  <span>{updateIndicator.label}</span>
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>{updateIndicator.tooltip}</TooltipContent>
-            </Tooltip>
+            <UpdateChromeButton indicator={updateIndicator} onClick={onNavigateToSettings} />
           ) : null}
           <Tooltip>
             <TooltipTrigger asChild>
@@ -141,5 +125,35 @@ export function AppShell({
       </header>
       <div className="min-h-0 flex-1 border-t">{children}</div>
     </div>
+  )
+}
+
+function UpdateChromeButton({
+  indicator,
+  onClick
+}: {
+  indicator: UpdateChromeIndicator
+  onClick: () => void
+}): React.JSX.Element {
+  const textTone = indicator.tone === 'restart' ? 'text-primary' : 'text-muted-foreground'
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          data-testid="open-software-updates"
+          onClick={onClick}
+          aria-label={indicator.ariaLabel}
+          className={cn('gap-1.5 px-2 text-xs', textTone)}
+        >
+          <HugeiconsIcon icon={InformationCircleIcon} data-icon="inline-start" aria-hidden />
+          <span>{indicator.label}</span>
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>{indicator.tooltip}</TooltipContent>
+    </Tooltip>
   )
 }

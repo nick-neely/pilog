@@ -1,4 +1,4 @@
-import { useEffect, useState, useSyncExternalStore } from 'react'
+import { useState, useSyncExternalStore } from 'react'
 import { AppShell } from './components/AppShell'
 import { GlobalCommandPalette } from './components/GlobalCommandPalette'
 import {
@@ -11,13 +11,13 @@ import {
 } from './components/ui/breadcrumb'
 import { Inbox } from './features/inbox/Inbox'
 import { Settings } from './features/settings/Settings'
+import { useAppUpdates } from './features/settings/use-app-updates'
 import { Repositories } from './features/repositories/Repositories'
 import { AgentRuns } from './features/agent-runs/AgentRuns'
 import { DraftReview } from './features/issue-drafts/DraftReview'
 import { PublishLog } from './features/publish-log/PublishLog'
 import type { RunNavigationOrigin } from './features/agent-runs/navigation'
 import { PILOG_APP_SHORTCUTS, usePilogHotkey } from './shortcuts/pilog-hotkeys'
-import type { AppUpdateStatus } from '@shared/ipc'
 
 type Route = 'inbox' | 'draft-review' | 'settings' | 'repositories' | 'agent-runs' | 'publish-log'
 type ViewTabValue = 'inbox' | 'drafts'
@@ -218,21 +218,7 @@ function App(): React.JSX.Element {
   const [focusedDraftId, setFocusedDraftId] = useState<string | null>(null)
   const [runOrigin, setRunOrigin] = useState<RunNavigationOrigin | null>(null)
   const [paletteOpen, setPaletteOpen] = useState(false)
-  const [updateStatus, setUpdateStatus] = useState<AppUpdateStatus | null>(null)
-
-  useEffect(() => {
-    let mounted = true
-    window.pilog.invoke('app-updates:getStatus').then((next) => {
-      if (mounted) setUpdateStatus(next)
-    })
-    const unsubscribe = window.pilog.onUpdateStatus((next) => {
-      setUpdateStatus(next)
-    })
-    return () => {
-      mounted = false
-      unsubscribe()
-    }
-  }, [])
+  const { status: updateStatus } = useAppUpdates()
 
   usePilogHotkey(PILOG_APP_SHORTCUTS.commandPalette, () => {
     setPaletteOpen((open) => !open)
