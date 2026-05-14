@@ -1,3 +1,4 @@
+import type { Note, Repo } from '@shared/ipc'
 import { GeneratedIssueDraftsSchema, type GeneratedIssueDraft } from '@shared/types'
 import { eq } from 'drizzle-orm'
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
@@ -44,43 +45,49 @@ const draft: GeneratedIssueDraft = {
   publishReady: true
 }
 
+const promptRepo: Repo = {
+  id: 'repo-1',
+  owner: 'nick-neely',
+  name: 'pilog',
+  localPath: '/workspace/pilog',
+  accessKind: 'host',
+  wslDistro: null,
+  wslPath: null,
+  githubUrl: 'https://github.com/nick-neely/pilog',
+  defaultBranch: 'main',
+  autoPublishEnabled: false,
+  autoPublishMaxIssuesPerRun: 5,
+  autoPublishDefaultLabel: 'triaged-by-pilog',
+  autoPublishDryRun: false,
+  autoPublishRequireConfirmation: true,
+  githubLabels: [],
+  githubLabelsSyncedAt: null,
+  createdAt: '2026-05-08T00:00:00.000Z',
+  updatedAt: '2026-05-08T00:00:00.000Z'
+}
+
+const promptNote: Note = {
+  id: 'note-1',
+  content: 'settings page spacing is weird on mobile',
+  status: 'unprocessed',
+  repoId: 'repo-1',
+  runId: null,
+  createdAt: '2026-05-08T00:00:00.000Z',
+  updatedAt: '2026-05-08T00:00:00.000Z'
+}
+
 describe('issue generation', () => {
   it('assembles the PRD-guided prompt with repo path and selected notes', () => {
     const prompt = buildIssueGenerationPrompt({
       repo: {
-        id: 'repo-1',
-        owner: 'nick-neely',
-        name: 'pilog',
-        localPath: '/workspace/pilog',
-        accessKind: 'host',
-        wslDistro: null,
-        wslPath: null,
-        githubUrl: 'https://github.com/nick-neely/pilog',
-        defaultBranch: 'main',
-        autoPublishEnabled: false,
-        autoPublishMaxIssuesPerRun: 5,
-        autoPublishDefaultLabel: 'triaged-by-pilog',
-        autoPublishDryRun: false,
-        autoPublishRequireConfirmation: true,
+        ...promptRepo,
         githubLabels: [
           { id: 1, name: 'bug', color: 'd73a4a', description: 'Something is broken' },
           { id: 2, name: 'ready-for-agent', color: '0e8a16', description: null }
         ],
-        githubLabelsSyncedAt: '2026-05-11T00:00:00.000Z',
-        createdAt: '2026-05-08T00:00:00.000Z',
-        updatedAt: '2026-05-08T00:00:00.000Z'
+        githubLabelsSyncedAt: '2026-05-11T00:00:00.000Z'
       },
-      notes: [
-        {
-          id: 'note-1',
-          content: 'settings page spacing is weird on mobile',
-          status: 'unprocessed',
-          repoId: 'repo-1',
-          runId: null,
-          createdAt: '2026-05-08T00:00:00.000Z',
-          updatedAt: '2026-05-08T00:00:00.000Z'
-        }
-      ]
+      notes: [promptNote]
     })
 
     expect(prompt).toMatchSnapshot()
@@ -103,22 +110,7 @@ describe('issue generation', () => {
   it('includes a ready Repo Index as navigation context without treating it as evidence', () => {
     const prompt = buildIssueGenerationPrompt({
       repo: {
-        id: 'repo-1',
-        owner: 'nick-neely',
-        name: 'pilog',
-        localPath: '/workspace/pilog',
-        accessKind: 'host',
-        wslDistro: null,
-        wslPath: null,
-        githubUrl: 'https://github.com/nick-neely/pilog',
-        defaultBranch: 'main',
-        autoPublishEnabled: false,
-        autoPublishMaxIssuesPerRun: 5,
-        autoPublishDefaultLabel: 'triaged-by-pilog',
-        autoPublishDryRun: false,
-        autoPublishRequireConfirmation: true,
-        githubLabels: [],
-        githubLabelsSyncedAt: null,
+        ...promptRepo,
         repoIndex: {
           status: 'ready',
           lastIndexedAt: '2026-05-14T18:30:00.000Z',
@@ -137,19 +129,12 @@ describe('issue generation', () => {
             ignored: 8
           },
           errorMessage: null
-        },
-        createdAt: '2026-05-08T00:00:00.000Z',
-        updatedAt: '2026-05-08T00:00:00.000Z'
+        }
       },
       notes: [
         {
-          id: 'note-1',
-          content: 'draft generation starts blind and searches too broadly',
-          status: 'unprocessed',
-          repoId: 'repo-1',
-          runId: null,
-          createdAt: '2026-05-08T00:00:00.000Z',
-          updatedAt: '2026-05-08T00:00:00.000Z'
+          ...promptNote,
+          content: 'draft generation starts blind and searches too broadly'
         }
       ]
     })
@@ -172,22 +157,7 @@ describe('issue generation', () => {
   it('requires live inspection before claiming a file suggested by the Repo Index', () => {
     const prompt = buildIssueGenerationPrompt({
       repo: {
-        id: 'repo-1',
-        owner: 'nick-neely',
-        name: 'pilog',
-        localPath: '/workspace/pilog',
-        accessKind: 'host',
-        wslDistro: null,
-        wslPath: null,
-        githubUrl: 'https://github.com/nick-neely/pilog',
-        defaultBranch: 'main',
-        autoPublishEnabled: false,
-        autoPublishMaxIssuesPerRun: 5,
-        autoPublishDefaultLabel: 'triaged-by-pilog',
-        autoPublishDryRun: false,
-        autoPublishRequireConfirmation: true,
-        githubLabels: [],
-        githubLabelsSyncedAt: null,
+        ...promptRepo,
         repoIndex: {
           status: 'ready',
           lastIndexedAt: '2026-05-14T18:30:00.000Z',
@@ -206,19 +176,12 @@ describe('issue generation', () => {
             ignored: 8
           },
           errorMessage: null
-        },
-        createdAt: '2026-05-08T00:00:00.000Z',
-        updatedAt: '2026-05-08T00:00:00.000Z'
+        }
       },
       notes: [
         {
-          id: 'note-1',
-          content: 'draft review should show which file claim was verified',
-          status: 'unprocessed',
-          repoId: 'repo-1',
-          runId: null,
-          createdAt: '2026-05-08T00:00:00.000Z',
-          updatedAt: '2026-05-08T00:00:00.000Z'
+          ...promptNote,
+          content: 'draft review should show which file claim was verified'
         }
       ]
     })
@@ -234,35 +197,11 @@ describe('issue generation', () => {
 
   it('instructs clarification or lower confidence when live evidence cannot support a specific claim', () => {
     const prompt = buildIssueGenerationPrompt({
-      repo: {
-        id: 'repo-1',
-        owner: 'nick-neely',
-        name: 'pilog',
-        localPath: '/workspace/pilog',
-        accessKind: 'host',
-        wslDistro: null,
-        wslPath: null,
-        githubUrl: 'https://github.com/nick-neely/pilog',
-        defaultBranch: 'main',
-        autoPublishEnabled: false,
-        autoPublishMaxIssuesPerRun: 5,
-        autoPublishDefaultLabel: 'triaged-by-pilog',
-        autoPublishDryRun: false,
-        autoPublishRequireConfirmation: true,
-        githubLabels: [],
-        githubLabelsSyncedAt: null,
-        createdAt: '2026-05-08T00:00:00.000Z',
-        updatedAt: '2026-05-08T00:00:00.000Z'
-      },
+      repo: promptRepo,
       notes: [
         {
-          id: 'note-1',
-          content: 'the dashboard thing is off after onboarding',
-          status: 'unprocessed',
-          repoId: 'repo-1',
-          runId: null,
-          createdAt: '2026-05-08T00:00:00.000Z',
-          updatedAt: '2026-05-08T00:00:00.000Z'
+          ...promptNote,
+          content: 'the dashboard thing is off after onboarding'
         }
       ]
     })
@@ -275,22 +214,7 @@ describe('issue generation', () => {
   it('keeps generation guidance usable when Repo Index creation failed', () => {
     const prompt = buildIssueGenerationPrompt({
       repo: {
-        id: 'repo-1',
-        owner: 'nick-neely',
-        name: 'pilog',
-        localPath: '/workspace/pilog',
-        accessKind: 'host',
-        wslDistro: null,
-        wslPath: null,
-        githubUrl: 'https://github.com/nick-neely/pilog',
-        defaultBranch: 'main',
-        autoPublishEnabled: false,
-        autoPublishMaxIssuesPerRun: 5,
-        autoPublishDefaultLabel: 'triaged-by-pilog',
-        autoPublishDryRun: false,
-        autoPublishRequireConfirmation: true,
-        githubLabels: [],
-        githubLabelsSyncedAt: null,
+        ...promptRepo,
         repoIndex: {
           status: 'failed',
           lastIndexedAt: null,
@@ -306,9 +230,7 @@ describe('issue generation', () => {
             ignored: 0
           },
           errorMessage: 'Repository path was unavailable.'
-        },
-        createdAt: '2026-05-08T00:00:00.000Z',
-        updatedAt: '2026-05-08T00:00:00.000Z'
+        }
       },
       notes: []
     })
