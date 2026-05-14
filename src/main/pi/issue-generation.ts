@@ -1,5 +1,5 @@
 import type { AgentTool } from '@earendil-works/pi-agent-core'
-import type { GitHubLabel, Note, Repo } from '@shared/ipc'
+import type { GitHubLabel, Note, Repo, RepoIndexStatus } from '@shared/ipc'
 import type { AutoPublishPreviewSummary, SearchProvider } from '@shared/types'
 import type { RepoLabelLike } from '@shared/labels'
 import { matchLabelsToRepoLabels } from '@shared/labels'
@@ -45,6 +45,7 @@ type RepoLabelRefreshOptions = {
 
 export function buildIssueGenerationPrompt(input: { repo: Repo; notes: Note[] }): string {
   const labelBlock = formatRepoLabelVocabulary(input.repo.githubLabels)
+  const repoIndexBlock = formatRepoIndexForPrompt(input.repo.repoIndex)
   const noteBlock = input.notes
     .map((note, index) => {
       return [
@@ -60,6 +61,8 @@ export function buildIssueGenerationPrompt(input: { repo: Repo; notes: Note[] })
   return [
     'You are generating GitHub issue drafts from rough developer scratchpad notes.',
     'Use the local repository context to infer likely affected areas, but do not invent details.',
+    'Treat the Repo Index as navigation context only: use it to choose targeted live repo inspection paths.',
+    'Specific claims about affected files, routes, components, framework behavior, or implementation details must be grounded in Live Repo Evidence from read-only repo tools during this run.',
     'Group related small notes into one issue when they affect the same feature, page, component, or user flow.',
     'Split notes into separate issues when they affect unrelated systems or require separate implementation work.',
     'If one source note contains multiple unrelated tasks, split it into separate drafts and reference that same source note from each draft.',
@@ -84,6 +87,12 @@ export function buildIssueGenerationPrompt(input: { repo: Repo; notes: Note[] })
     `localPath: ${input.repo.localPath}`,
     `defaultBranch: ${input.repo.defaultBranch ?? '(unknown)'}`,
     `githubLabelsSyncedAt: ${input.repo.githubLabelsSyncedAt ?? '(never)'}`,
+    '',
+    'Repo Index navigation context:',
+    repoIndexBlock,
+    '',
+    'Live Repo Evidence:',
+    'Use the available read-only repo tools to verify specific draft claims before submitting drafts. The Repo Index is not verified evidence.',
     '',
     'Cached GitHub label vocabulary:',
     labelBlock,
@@ -158,6 +167,50 @@ function formatRepoLabelVocabulary(labels: GitHubLabel[]): string {
       const description = label.description?.trim()
       return description ? `- ${label.name}: ${description}` : `- ${label.name}`
     })
+    .join('\n')
+}
+
+function formatRepoIndexForPrompt(repoIndex: RepoIndexStatus | null | undefined): string {
+  if (!repoIndex) {
+    return [
+      'status: unavailable',
+      'No Repo Index is available. Fall back to bounded live traversal with repo tools.'
+    ].join('\n')
+  }
+
+  const lines = [
+    `status: ${repoIndex.status}`,
+    `lastIndexedAt: ${repoIndex.lastIndexedAt ?? '(never)'}`,
+    `indexVersion: ${repoIndex.indexVersion}`,
+    `packageManager: ${repoIndex.packageManager ?? '(unknown)'}`,
+    `frameworkSignals: ${formatInlineList(repoIndex.frameworkSignals)}`,
+    'importantDirectories:',
+    formatImportantDirectories(repoIndex),
+    'exclusionSummary:',
+    `- dependency: ${repoIndex.exclusionSummary.dependency}`,
+    `- buildOutput: ${repoIndex.exclusionSummary.buildOutput}`,
+    `- generated: ${repoIndex.exclusionSummary.generated}`,
+    `- binaryHeavy: ${repoIndex.exclusionSummary.binaryHeavy}`,
+    `- ignored: ${repoIndex.exclusionSummary.ignored}`
+  ]
+
+  if (repoIndex.status === 'failed') {
+    lines.push(`errorMessage: ${repoIndex.errorMessage}`)
+    lines.push('Index creation failed. Fall back to bounded live traversal with repo tools.')
+  }
+
+  return lines.join('\n')
+}
+
+function formatInlineList(items: string[]): string {
+  return items.length > 0 ? items.join(', ') : '(none)'
+}
+
+function formatImportantDirectories(repoIndex: RepoIndexStatus): string {
+  if (repoIndex.importantDirectories.length === 0) return '- (none)'
+
+  return repoIndex.importantDirectories
+    .map((directory) => `- ${directory.path}: ${directory.role}`)
     .join('\n')
 }
 

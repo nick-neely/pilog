@@ -14,6 +14,7 @@ import { runMigrations } from '../db/migrations'
 import { createAgentRun } from '../db/repositories/agent-runs'
 import { createNote, listNotes, updateNoteStatus } from '../db/repositories/notes'
 import { listPublishLog } from '../db/repositories/publish-log'
+import { upsertRepoIndex } from '../db/repositories/repo-indices'
 import { createRepo } from '../db/repositories/repos'
 import { agentRuns, issueDrafts } from '../db/schema'
 import { publishAutoPublishRun } from '../github/publish-draft'
@@ -24,6 +25,7 @@ import {
   hydrateRepoLabelsIfNeeded,
   refreshRepoLabelsIfStale,
   getCurrentInboxNotesForGeneration,
+  getSelectedNotesForGeneration,
   persistGeneratedIssueDrafts,
   validateAndCollectSourceNoteIds
 } from './issue-generation'
@@ -89,8 +91,170 @@ describe('issue generation', () => {
     expect(prompt).toContain('Return structured JSON only')
     expect(prompt).toContain('Mark vague notes as needing clarification.')
     expect(prompt).toContain('Prefer exact label names from the cached GitHub label vocabulary')
+    expect(prompt).toContain('Repo Index navigation context:')
+    expect(prompt).toContain('status: unavailable')
+    expect(prompt).toContain('No Repo Index is available. Fall back to bounded live traversal')
+    expect(prompt).toContain('Live Repo Evidence:')
+    expect(prompt).toContain('The Repo Index is not verified evidence.')
     expect(prompt).toContain('- bug: Something is broken')
     expect(prompt).toContain('- ready-for-agent')
+  })
+
+  it('includes a ready Repo Index as navigation context without treating it as evidence', () => {
+    const prompt = buildIssueGenerationPrompt({
+      repo: {
+        id: 'repo-1',
+        owner: 'nick-neely',
+        name: 'pilog',
+        localPath: '/workspace/pilog',
+        accessKind: 'host',
+        wslDistro: null,
+        wslPath: null,
+        githubUrl: 'https://github.com/nick-neely/pilog',
+        defaultBranch: 'main',
+        autoPublishEnabled: false,
+        autoPublishMaxIssuesPerRun: 5,
+        autoPublishDefaultLabel: 'triaged-by-pilog',
+        autoPublishDryRun: false,
+        autoPublishRequireConfirmation: true,
+        githubLabels: [],
+        githubLabelsSyncedAt: null,
+        repoIndex: {
+          status: 'ready',
+          lastIndexedAt: '2026-05-14T18:30:00.000Z',
+          indexVersion: 1,
+          packageManager: 'pnpm',
+          frameworkSignals: ['Electron', 'React', 'Vite'],
+          importantDirectories: [
+            { path: 'src/main/pi', role: 'issue generation runtime' },
+            { path: 'src/main/pi/tools', role: 'bounded live repo tools' }
+          ],
+          exclusionSummary: {
+            dependency: 1200,
+            buildOutput: 4,
+            generated: 2,
+            binaryHeavy: 1,
+            ignored: 8
+          },
+          errorMessage: null
+        },
+        createdAt: '2026-05-08T00:00:00.000Z',
+        updatedAt: '2026-05-08T00:00:00.000Z'
+      },
+      notes: [
+        {
+          id: 'note-1',
+          content: 'draft generation starts blind and searches too broadly',
+          status: 'unprocessed',
+          repoId: 'repo-1',
+          runId: null,
+          createdAt: '2026-05-08T00:00:00.000Z',
+          updatedAt: '2026-05-08T00:00:00.000Z'
+        }
+      ]
+    })
+
+    expect(prompt).toContain('Treat the Repo Index as navigation context only')
+    expect(prompt).toContain('must be grounded in Live Repo Evidence')
+    expect(prompt).toContain('Repo Index navigation context:')
+    expect(prompt).toContain('status: ready')
+    expect(prompt).toContain('lastIndexedAt: 2026-05-14T18:30:00.000Z')
+    expect(prompt).toContain('packageManager: pnpm')
+    expect(prompt).toContain('frameworkSignals: Electron, React, Vite')
+    expect(prompt).toContain('- src/main/pi: issue generation runtime')
+    expect(prompt).toContain('- src/main/pi/tools: bounded live repo tools')
+    expect(prompt).toContain('- dependency: 1200')
+    expect(prompt).toContain(
+      'Use the available read-only repo tools to verify specific draft claims'
+    )
+  })
+
+  it('keeps generation guidance usable when Repo Index creation failed', () => {
+    const prompt = buildIssueGenerationPrompt({
+      repo: {
+        id: 'repo-1',
+        owner: 'nick-neely',
+        name: 'pilog',
+        localPath: '/workspace/pilog',
+        accessKind: 'host',
+        wslDistro: null,
+        wslPath: null,
+        githubUrl: 'https://github.com/nick-neely/pilog',
+        defaultBranch: 'main',
+        autoPublishEnabled: false,
+        autoPublishMaxIssuesPerRun: 5,
+        autoPublishDefaultLabel: 'triaged-by-pilog',
+        autoPublishDryRun: false,
+        autoPublishRequireConfirmation: true,
+        githubLabels: [],
+        githubLabelsSyncedAt: null,
+        repoIndex: {
+          status: 'failed',
+          lastIndexedAt: null,
+          indexVersion: 1,
+          packageManager: null,
+          frameworkSignals: [],
+          importantDirectories: [],
+          exclusionSummary: {
+            dependency: 0,
+            buildOutput: 0,
+            generated: 0,
+            binaryHeavy: 0,
+            ignored: 0
+          },
+          errorMessage: 'Repository path was unavailable.'
+        },
+        createdAt: '2026-05-08T00:00:00.000Z',
+        updatedAt: '2026-05-08T00:00:00.000Z'
+      },
+      notes: []
+    })
+
+    expect(prompt).toContain('status: failed')
+    expect(prompt).toContain('errorMessage: Repository path was unavailable.')
+    expect(prompt).toContain('Index creation failed. Fall back to bounded live traversal')
+  })
+
+  it('loads the persisted Repo Index when selecting notes for generation', () => {
+    const db = createInMemoryDatabase()
+    runMigrations(db)
+    const repo = createRepo(db, {
+      owner: 'nick-neely',
+      name: 'pilog',
+      localPath: '/workspace/pilog',
+      githubUrl: 'https://github.com/nick-neely/pilog',
+      defaultBranch: 'main'
+    })
+    const note = createNote(db, {
+      content: 'use repo index before broad traversal',
+      repoId: repo.id
+    })
+    upsertRepoIndex(db, repo.id, {
+      status: 'ready',
+      indexVersion: 1,
+      lastIndexedAt: '2026-05-14T18:30:00.000Z',
+      packageManager: 'pnpm',
+      frameworkSignals: ['Electron'],
+      importantDirectories: [{ path: 'src/main/pi', role: 'generation runtime' }],
+      exclusionSummary: {
+        dependency: 10,
+        buildOutput: 1,
+        generated: 0,
+        binaryHeavy: 0,
+        ignored: 2
+      }
+    })
+
+    const selected = getSelectedNotesForGeneration(db, [note.id])
+
+    expect(selected.repo.repoIndex).toMatchObject({
+      status: 'ready',
+      lastIndexedAt: '2026-05-14T18:30:00.000Z',
+      packageManager: 'pnpm',
+      frameworkSignals: ['Electron'],
+      importantDirectories: [{ path: 'src/main/pi', role: 'generation runtime' }]
+    })
+    expect(buildIssueGenerationPrompt(selected)).toContain('- src/main/pi: generation runtime')
   })
 
   it('lazily hydrates empty migrated repo label caches before generation', async () => {

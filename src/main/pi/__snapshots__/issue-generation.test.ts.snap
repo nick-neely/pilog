@@ -3,6 +3,8 @@
 exports[`issue generation > assembles the PRD-guided prompt with repo path and selected notes 1`] = `
 "You are generating GitHub issue drafts from rough developer scratchpad notes.
 Use the local repository context to infer likely affected areas, but do not invent details.
+Treat the Repo Index as navigation context only: use it to choose targeted live repo inspection paths.
+Specific claims about affected files, routes, components, framework behavior, or implementation details must be grounded in Live Repo Evidence from read-only repo tools during this run.
 Group related small notes into one issue when they affect the same feature, page, component, or user flow.
 Split notes into separate issues when they affect unrelated systems or require separate implementation work.
 If one source note contains multiple unrelated tasks, split it into separate drafts and reference that same source note from each draft.
@@ -27,6 +29,13 @@ name: pilog
 localPath: /workspace/pilog
 defaultBranch: main
 githubLabelsSyncedAt: 2026-05-11T00:00:00.000Z
+
+Repo Index navigation context:
+status: unavailable
+No Repo Index is available. Fall back to bounded live traversal with repo tools.
+
+Live Repo Evidence:
+Use the available read-only repo tools to verify specific draft claims before submitting drafts. The Repo Index is not verified evidence.
 
 Cached GitHub label vocabulary:
 - bug: Something is broken
