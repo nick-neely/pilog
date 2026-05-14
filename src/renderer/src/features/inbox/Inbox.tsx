@@ -217,6 +217,16 @@ type NoteDraftLink = {
   updatedAt: string
 }
 
+type DraftSettingsOverrideState = {
+  repoId: string
+  settings: RepoDraftSettings
+}
+
+type DraftSettingsMessageState = {
+  repoId: string
+  message: string
+}
+
 type AutoPublishPreviewState = {
   open: boolean
   summary: AutoPublishPreviewSummary | null
@@ -353,6 +363,39 @@ function mapDraftLinksByNote(drafts: IssueDraftForReview[]): Map<string, NoteDra
   })
 
   return linksByNote
+}
+
+function getActiveDraftSettings(
+  repo: Repo | null,
+  override: RepoDraftSettings | null
+): RepoDraftSettings | null {
+  if (!repo) return null
+  if (override) return normalizeRepoDraftSettings(override)
+  return normalizeRepoDraftSettings(repo)
+}
+
+function hasDraftSettingsChanges(repo: Repo | null, active: RepoDraftSettings | null): boolean {
+  if (!repo || !active) return false
+  if (active.issueStyleDepth !== repo.issueStyleDepth) return true
+  if (active.issueStyleAudience !== repo.issueStyleAudience) return true
+
+  return DRAFT_CONTENT_TOGGLE_LABELS.some(
+    ({ key }) => active.draftContentToggles[key] !== repo.draftContentToggles[key]
+  )
+}
+
+function getDraftSettingsStatusMessage(input: {
+  repo: Repo
+  hasOverride: boolean
+  message: string | null
+}): string {
+  if (input.message) return input.message
+  if (input.hasOverride) return 'Overrides apply to this run only until saved.'
+  return `Repo default for ${input.repo.owner}/${input.repo.name}.`
+}
+
+function getDraftSettingsForRun(repo: Repo, override: RepoDraftSettings | null): RepoDraftSettings {
+  return normalizeRepoDraftSettings(applyRepoDraftSettingsOverride(repo, override ?? undefined))
 }
 
 function getGenerateDraftsReason(input: {
@@ -1884,25 +1927,28 @@ export function Inbox({
     typeof repoFilter === 'string' ? (reposById.get(repoFilter) ?? null) : null
   const draftSettingsRepo = selectedRepo ?? (!hasSelection ? currentInboxRepo : null)
   const draftSettingsRepoId = draftSettingsRepo?.id ?? null
-  const [draftSettingsOverride, setDraftSettingsOverride] =
-    useState<RepoDraftSettings | null>(null)
+  const [draftSettingsOverrideState, setDraftSettingsOverrideState] =
+    useState<DraftSettingsOverrideState | null>(null)
   const [savingDraftSettingsDefault, setSavingDraftSettingsDefault] = useState(false)
-  const [draftSettingsMessage, setDraftSettingsMessage] = useState<string | null>(null)
-  const activeDraftSettings =
-    draftSettingsRepo && draftSettingsOverride
-      ? normalizeRepoDraftSettings(draftSettingsOverride)
-      : draftSettingsRepo
-        ? normalizeRepoDraftSettings(draftSettingsRepo)
-        : null
-  const hasDraftSettingsOverride =
-    Boolean(draftSettingsRepo && activeDraftSettings) &&
-    (activeDraftSettings?.issueStyleDepth !== draftSettingsRepo?.issueStyleDepth ||
-      activeDraftSettings?.issueStyleAudience !== draftSettingsRepo?.issueStyleAudience ||
-      DRAFT_CONTENT_TOGGLE_LABELS.some(
-        ({ key }) =>
-          activeDraftSettings?.draftContentToggles[key] !==
-          draftSettingsRepo?.draftContentToggles[key]
-      ))
+  const [draftSettingsMessageState, setDraftSettingsMessageState] =
+    useState<DraftSettingsMessageState | null>(null)
+  const draftSettingsOverride =
+    draftSettingsOverrideState?.repoId === draftSettingsRepoId
+      ? draftSettingsOverrideState.settings
+      : null
+  const draftSettingsMessage =
+    draftSettingsMessageState?.repoId === draftSettingsRepoId
+      ? draftSettingsMessageState.message
+      : null
+  const activeDraftSettings = getActiveDraftSettings(draftSettingsRepo, draftSettingsOverride)
+  const hasDraftSettingsOverride = hasDraftSettingsChanges(draftSettingsRepo, activeDraftSettings)
+  const draftSettingsStatusMessage = draftSettingsRepo
+    ? getDraftSettingsStatusMessage({
+        repo: draftSettingsRepo,
+        hasOverride: hasDraftSettingsOverride,
+        message: draftSettingsMessage
+      })
+    : null
   const canGenerateDrafts =
     hasSelection &&
     selectedNotesAllUnprocessed &&
@@ -1938,11 +1984,6 @@ export function Inbox({
     currentInboxMessage,
     selectionCount
   })
-
-  useEffect(() => {
-    setDraftSettingsOverride(null)
-    setDraftSettingsMessage(null)
-  }, [draftSettingsRepoId])
 
   const handleInboxEscape = useCallback(
     (e: KeyboardEvent): void => {
@@ -2007,27 +2048,37 @@ export function Inbox({
   }, [statusFilter, repoFilter])
 
   const updateRunDraftSettings = (next: RepoDraftSettings): void => {
-    setDraftSettingsOverride(normalizeRepoDraftSettings(next))
-    setDraftSettingsMessage(null)
+    if (!draftSettingsRepoId) return
+    setDraftSettingsOverrideState({
+      repoId: draftSettingsRepoId,
+      settings: normalizeRepoDraftSettings(next)
+    })
+    setDraftSettingsMessageState(null)
   }
 
   const handleSaveRunDraftSettingsAsDefault = async (): Promise<void> => {
     if (!draftSettingsRepo || !activeDraftSettings || !hasDraftSettingsOverride) return
+    const repoId = draftSettingsRepo.id
     setSavingDraftSettingsDefault(true)
-    setDraftSettingsMessage(null)
+    setDraftSettingsMessageState(null)
     const request: UpdateRepoDraftSettingsRequest = {
-      id: draftSettingsRepo.id,
+      id: repoId,
       ...activeDraftSettings
     }
-    const updated = await window.pilog.invoke('repos:updateDraftSettings', request)
-    setSavingDraftSettingsDefault(false)
-    if (!updated) {
-      setDraftSettingsMessage('Could not save repo defaults.')
-      return
+    try {
+      const updated = await window.pilog.invoke('repos:updateDraftSettings', request)
+      if (!updated) {
+        setDraftSettingsMessageState({ repoId, message: 'Could not save repo defaults.' })
+        return
+      }
+      setRepos((current) => current.map((repo) => (repo.id === updated.id ? updated : repo)))
+      setDraftSettingsOverrideState(null)
+      setDraftSettingsMessageState({ repoId, message: 'Saved as repo default.' })
+    } catch {
+      setDraftSettingsMessageState({ repoId, message: 'Could not save repo defaults.' })
+    } finally {
+      setSavingDraftSettingsDefault(false)
     }
-    setRepos((current) => current.map((repo) => (repo.id === updated.id ? updated : repo)))
-    setDraftSettingsOverride(null)
-    setDraftSettingsMessage('Saved as repo default.')
   }
 
   const handleGenerateDrafts = async (mode: GenerateDraftsMode): Promise<void> => {
@@ -2036,9 +2087,7 @@ export function Inbox({
     const selectedNoteSnapshot = [...selectedNotes]
     const selectedIdSnapshot = Array.from(selectedIds)
     const draftSettingsSnapshot = selectedRepo
-      ? normalizeRepoDraftSettings(
-          applyRepoDraftSettingsOverride(selectedRepo, draftSettingsOverride ?? undefined)
-        )
+      ? getDraftSettingsForRun(selectedRepo, draftSettingsOverride)
       : undefined
     setGenerating(true)
     setGenerationError(null)
@@ -2156,9 +2205,7 @@ export function Inbox({
 
   const handleProcessCurrentInbox = async (): Promise<void> => {
     if (!currentInboxRepo || !canProcessCurrentInbox) return
-    const draftSettingsSnapshot = normalizeRepoDraftSettings(
-      applyRepoDraftSettingsOverride(currentInboxRepo, draftSettingsOverride ?? undefined)
-    )
+    const draftSettingsSnapshot = getDraftSettingsForRun(currentInboxRepo, draftSettingsOverride)
     setCurrentInboxMessage(null)
     setGenerationError(null)
     const sourceNoteSnapshot = await window.pilog.invoke('note:list', {
@@ -2663,11 +2710,7 @@ export function Inbox({
                             Style: {draftSettingsSummary(activeDraftSettings)}
                           </p>
                           <p className="text-xs text-muted-foreground" aria-live="polite">
-                            {hasDraftSettingsOverride
-                              ? (draftSettingsMessage ??
-                                'Overrides apply to this run only until saved.')
-                              : (draftSettingsMessage ??
-                                `Repo default for ${draftSettingsRepo.owner}/${draftSettingsRepo.name}.`)}
+                            {draftSettingsStatusMessage}
                           </p>
                         </div>
                         <Button
