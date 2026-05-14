@@ -15,6 +15,11 @@ import { runMigrations } from '../db/migrations'
 import { createAgentRun } from '../db/repositories/agent-runs'
 import { createNote, listNotes, updateNoteStatus } from '../db/repositories/notes'
 import { listPublishLog } from '../db/repositories/publish-log'
+import {
+  createIssueDraft,
+  addClarificationAnswer,
+  getIssueDraftById
+} from '../db/repositories/issue-drafts'
 import { upsertRepoIndex } from '../db/repositories/repo-indices'
 import { createRepo } from '../db/repositories/repos'
 import { agentRuns, issueDrafts } from '../db/schema'
@@ -26,8 +31,10 @@ import {
   hydrateRepoLabelsIfNeeded,
   refreshRepoLabelsIfStale,
   getCurrentInboxNotesForGeneration,
+  getClarificationDraftForRegeneration,
   getSelectedNotesForGeneration,
   persistGeneratedIssueDrafts,
+  persistRegeneratedClarificationDraft,
   validateAndCollectSourceNoteIds
 } from './issue-generation'
 
@@ -274,6 +281,26 @@ describe('issue generation', () => {
     expect(prompt).toContain('includeSourceNotes: false')
     expect(prompt).toContain('includeConfidenceRationale: false')
     expect(prompt).toContain('includeReproductionSteps: true')
+  })
+
+  it('includes Clarification History when regenerating a clarification draft', () => {
+    const prompt = buildIssueGenerationPrompt({
+      repo: promptRepo,
+      notes: [promptNote],
+      clarificationHistory: [
+        {
+          question: 'Which dashboard screen is affected?',
+          answer: 'The repository activity chart on the overview screen.',
+          answeredAt: '2026-05-14T21:45:00.000Z'
+        }
+      ]
+    })
+
+    expect(prompt).toContain('Clarification History:')
+    expect(prompt).toContain('Clarification 1')
+    expect(prompt).toContain('answeredAt: 2026-05-14T21:45:00.000Z')
+    expect(prompt).toContain('question: Which dashboard screen is affected?')
+    expect(prompt).toContain('answer: The repository activity chart on the overview screen.')
   })
 
   it('requires live inspection before claiming a file suggested by the Repo Index', () => {
@@ -554,6 +581,158 @@ describe('issue generation', () => {
     expect(listNotes(db, { repoId: repo.id }).map((persisted) => persisted.status)).toEqual([
       'drafted'
     ])
+  })
+
+  it('loads source notes and answers for clarification draft regeneration', () => {
+    const db = createInMemoryDatabase()
+    runMigrations(db)
+    const repo = createRepo(db, {
+      owner: 'nick-neely',
+      name: 'pilog',
+      localPath: '/workspace/pilog',
+      githubUrl: 'https://github.com/nick-neely/pilog',
+      defaultBranch: 'main'
+    })
+    const note = createNote(db, { content: 'dashboard chart is off somewhere', repoId: repo.id })
+    const clarificationDraft = createIssueDraft(db, {
+      repoId: repo.id,
+      draft: {
+        ...draft,
+        sourceNoteIds: [note.id],
+        publishReady: false,
+        needsClarification: ['Which dashboard screen is affected?']
+      }
+    })
+    addClarificationAnswer(db, {
+      id: clarificationDraft.id,
+      question: 'Which dashboard screen is affected?',
+      answer: 'The repository activity chart on the overview screen.'
+    })
+
+    const regeneration = getClarificationDraftForRegeneration(db, clarificationDraft.id)
+
+    expect(regeneration.repo.id).toBe(repo.id)
+    expect(regeneration.notes.map((sourceNote) => sourceNote.id)).toEqual([note.id])
+    expect(regeneration.notes[0]?.content).toBe('dashboard chart is off somewhere')
+    expect(regeneration.clarificationHistory).toMatchObject([
+      {
+        question: 'Which dashboard screen is affected?',
+        answer: 'The repository activity chart on the overview screen.'
+      }
+    ])
+  })
+
+  it('replaces a clarification draft with a publish-ready regenerated draft without rewriting source notes', () => {
+    const db = createInMemoryDatabase()
+    runMigrations(db)
+    const repo = createRepo(db, {
+      owner: 'nick-neely',
+      name: 'pilog',
+      localPath: '/workspace/pilog',
+      githubUrl: 'https://github.com/nick-neely/pilog',
+      defaultBranch: 'main'
+    })
+    const note = createNote(db, { content: 'dashboard chart is off somewhere', repoId: repo.id })
+    const run = createAgentRun(db, { repoId: repo.id, inputNoteIds: [note.id] })
+    const clarificationDraft = createIssueDraft(db, {
+      repoId: repo.id,
+      draft: {
+        ...draft,
+        title: 'Clarify dashboard chart issue',
+        sourceNoteIds: [note.id],
+        publishReady: false,
+        needsClarification: ['Which dashboard screen is affected?']
+      }
+    })
+    const answeredDraft = addClarificationAnswer(db, {
+      id: clarificationDraft.id,
+      question: 'Which dashboard screen is affected?',
+      answer: 'The repository activity chart on the overview screen.'
+    })
+
+    const draftIds = persistRegeneratedClarificationDraft(db, {
+      runId: run.id,
+      repoId: repo.id,
+      clarificationDraftId: clarificationDraft.id,
+      selectedNoteIds: [note.id],
+      drafts: [
+        {
+          ...draft,
+          title: 'Fix repository activity chart values',
+          sourceNoteIds: [note.id],
+          publishReady: true,
+          needsClarification: []
+        }
+      ],
+      eventStream: [{ type: 'final' }]
+    })
+
+    const regenerated = getIssueDraftById(db, clarificationDraft.id)
+    expect(draftIds).toEqual([clarificationDraft.id])
+    expect(regenerated).toMatchObject({
+      title: 'Fix repository activity chart values',
+      workflowState: 'ready',
+      clarificationQuestions: [],
+      clarificationHistory: answeredDraft?.clarificationHistory
+    })
+    expect(listNotes(db, { repoId: repo.id })[0]).toMatchObject({
+      id: note.id,
+      content: 'dashboard chart is off somewhere',
+      status: 'unprocessed'
+    })
+  })
+
+  it('keeps a regenerated clarification draft in clarification state when context is still insufficient', () => {
+    const db = createInMemoryDatabase()
+    runMigrations(db)
+    const repo = createRepo(db, {
+      owner: 'nick-neely',
+      name: 'pilog',
+      localPath: '/workspace/pilog',
+      githubUrl: 'https://github.com/nick-neely/pilog',
+      defaultBranch: 'main'
+    })
+    const note = createNote(db, { content: 'dashboard chart is off somewhere', repoId: repo.id })
+    const run = createAgentRun(db, { repoId: repo.id, inputNoteIds: [note.id] })
+    const clarificationDraft = createIssueDraft(db, {
+      repoId: repo.id,
+      draft: {
+        ...draft,
+        sourceNoteIds: [note.id],
+        publishReady: false,
+        needsClarification: ['Which dashboard screen is affected?']
+      }
+    })
+    const answeredDraft = addClarificationAnswer(db, {
+      id: clarificationDraft.id,
+      question: 'Which dashboard screen is affected?',
+      answer: 'The overview screen.'
+    })
+
+    persistRegeneratedClarificationDraft(db, {
+      runId: run.id,
+      repoId: repo.id,
+      clarificationDraftId: clarificationDraft.id,
+      selectedNoteIds: [note.id],
+      drafts: [
+        {
+          ...draft,
+          title: 'Clarify dashboard chart values',
+          sourceNoteIds: [note.id],
+          publishReady: false,
+          needsClarification: ['Which chart value is incorrect?']
+        }
+      ],
+      eventStream: [{ type: 'final' }]
+    })
+
+    expect(getIssueDraftById(db, clarificationDraft.id)).toMatchObject({
+      title: 'Clarify dashboard chart values',
+      workflowState: 'needs_clarification',
+      clarificationQuestions: ['Which chart value is incorrect?'],
+      clarificationHistory: answeredDraft?.clarificationHistory
+    })
+    expect(listNotes(db, { repoId: repo.id })[0]?.content).toBe('dashboard chart is off somewhere')
   })
 
   it('scaffolds persisted generated draft bodies from the linked repo issue template', () => {

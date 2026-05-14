@@ -7,7 +7,12 @@ import {
   type Note,
   type Repo
 } from '@shared/ipc'
-import type { AgentEvent, ErrorCause, GenerateDraftsMode } from '@shared/types'
+import type {
+  AgentEvent,
+  ClarificationHistoryEntry,
+  ErrorCause,
+  GenerateDraftsMode
+} from '@shared/types'
 import type { PilogDatabase } from '../db/client'
 import {
   createAgentRun,
@@ -43,9 +48,11 @@ import {
 } from '../pi/advanced-config'
 import {
   getCurrentInboxNotesForGeneration,
+  getClarificationDraftForRegeneration,
   getSelectedNotesForGeneration,
   planAutoPublishPreviewDrafts,
   persistGeneratedIssueDrafts,
+  persistRegeneratedClarificationDraft,
   refreshRepoLabelsIfStale,
   type RunAgent
 } from '../pi/issue-generation'
@@ -122,6 +129,8 @@ export function registerPiIpcHandlers(
       repo: Repo
       notes: Note[]
       mode: GenerateDraftsMode
+      clarificationDraftId?: string
+      clarificationHistory?: ClarificationHistoryEntry[]
       draftSettingsOverride?: IpcRequest<'pi:generateDrafts:start'>['draftSettingsOverride']
     }
   ): Promise<IpcResponse<'pi:generateDrafts:start'>> => {
@@ -182,6 +191,7 @@ export function registerPiIpcHandlers(
           notes,
           provider,
           model,
+          clarificationHistory: input.clarificationHistory,
           turnBudget: getTurnBudget(db),
           webSearch: webSearch.enabled ? webSearch : undefined,
           signal: controller.signal
@@ -198,13 +208,24 @@ export function registerPiIpcHandlers(
 
           if (eventForRenderer.type === 'final') {
             try {
-              persistGeneratedIssueDrafts(db, {
-                runId: run.id,
-                repoId: repo.id,
-                selectedNoteIds: notes.map((note) => note.id),
-                drafts: eventForRenderer.drafts,
-                eventStream: active.eventStream
-              })
+              if (input.clarificationDraftId) {
+                persistRegeneratedClarificationDraft(db, {
+                  runId: run.id,
+                  repoId: repo.id,
+                  clarificationDraftId: input.clarificationDraftId,
+                  selectedNoteIds: notes.map((note) => note.id),
+                  drafts: eventForRenderer.drafts,
+                  eventStream: active.eventStream
+                })
+              } else {
+                persistGeneratedIssueDrafts(db, {
+                  runId: run.id,
+                  repoId: repo.id,
+                  selectedNoteIds: notes.map((note) => note.id),
+                  drafts: eventForRenderer.drafts,
+                  eventStream: active.eventStream
+                })
+              }
               active.finalized = true
             } catch (error) {
               const message = error instanceof Error ? error.message : String(error)
@@ -367,6 +388,17 @@ export function registerPiIpcHandlers(
       event,
       request: IpcRequest<'pi:generateDrafts:start'>
     ): Promise<IpcResponse<'pi:generateDrafts:start'>> => {
+      if (request.clarificationDraftId) {
+        const regeneration = getClarificationDraftForRegeneration(db, request.clarificationDraftId)
+        return startGenerationRun(event, {
+          repo: regeneration.repo,
+          notes: regeneration.notes,
+          mode: 'review',
+          clarificationDraftId: regeneration.draft.id,
+          clarificationHistory: regeneration.clarificationHistory,
+          draftSettingsOverride: request.draftSettingsOverride
+        })
+      }
       const { repo, notes } = getSelectedNotesForGeneration(db, request.noteIds)
       const mode = request.mode ?? 'review'
       return startGenerationRun(event, {

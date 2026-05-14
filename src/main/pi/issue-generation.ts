@@ -8,7 +8,9 @@ import type {
   RepoIndexStatus
 } from '@shared/ipc'
 import type {
+  ClarificationHistoryEntry,
   AutoPublishPreviewSummary,
+  IssueDraft,
   IssueDraftWorkflowState,
   SearchProvider
 } from '@shared/types'
@@ -22,6 +24,7 @@ import {
 } from '@shared/types'
 import {
   formatIssueDraftBody,
+  getIssueDraftById,
   getGeneratedDraftClarificationQuestions
 } from '../db/repositories/issue-drafts'
 import { and, eq, inArray } from 'drizzle-orm'
@@ -35,6 +38,7 @@ export type IssueGenerationInput = {
   runId: string
   repo: Repo
   notes: Note[]
+  clarificationHistory?: ClarificationHistoryEntry[]
   provider: string
   model: string
   turnBudget: number
@@ -59,9 +63,14 @@ type RepoLabelRefreshOptions = {
   refreshIntervalMs?: number
 }
 
-export function buildIssueGenerationPrompt(input: { repo: Repo; notes: Note[] }): string {
+export function buildIssueGenerationPrompt(input: {
+  repo: Repo
+  notes: Note[]
+  clarificationHistory?: ClarificationHistoryEntry[]
+}): string {
   const labelBlock = formatRepoLabelVocabulary(input.repo.githubLabels)
   const repoIndexBlock = formatRepoIndexForPrompt(input.repo.repoIndex)
+  const clarificationHistoryBlock = formatClarificationHistoryForPrompt(input.clarificationHistory)
   const noteBlock = input.notes
     .map((note, index) => {
       return [
@@ -129,12 +138,32 @@ export function buildIssueGenerationPrompt(input: { repo: Repo; notes: Note[] })
     'Live Repo Evidence:',
     'Use the available read-only repo tools to verify specific draft claims before submitting drafts. Capture Context and Repo Index are not verified current evidence.',
     '',
+    'Clarification History:',
+    clarificationHistoryBlock,
+    '',
     'Cached GitHub label vocabulary:',
     labelBlock,
     '',
     'Selected notes:',
     noteBlock
   ].join('\n')
+}
+
+function formatClarificationHistoryForPrompt(
+  history: ClarificationHistoryEntry[] | null | undefined
+): string {
+  if (!history || history.length === 0) return '(none for this generation)'
+
+  return history
+    .map((entry, index) =>
+      [
+        `Clarification ${index + 1}`,
+        `answeredAt: ${entry.answeredAt}`,
+        `question: ${entry.question}`,
+        `answer: ${entry.answer}`
+      ].join('\n')
+    )
+    .join('\n\n')
 }
 
 export async function hydrateRepoLabelsIfNeeded(
@@ -333,6 +362,45 @@ export function getSelectedNotesForGeneration(
   return { repo, notes: orderedNotes }
 }
 
+export function getClarificationDraftForRegeneration(
+  db: PilogDatabase,
+  draftId: string
+): {
+  repo: Repo
+  notes: Note[]
+  draft: IssueDraft
+  clarificationHistory: ClarificationHistoryEntry[]
+} {
+  const draft = getIssueDraftById(db, draftId)
+  if (!draft) throw new Error('Clarification draft no longer exists.')
+  if (draft.status !== 'draft' || draft.workflowState !== 'needs_clarification') {
+    throw new Error('Only active clarification drafts can be regenerated.')
+  }
+  if (draft.clarificationHistory.length === 0) {
+    throw new Error('Answer at least one clarification question before regenerating.')
+  }
+
+  const repo = getRepoById(db, draft.repoId)
+  if (!repo) throw new Error('The linked repository no longer exists.')
+
+  const rows = db.select().from(notes).where(inArray(notes.id, draft.sourceNoteIds)).all()
+  if (rows.length !== draft.sourceNoteIds.length) {
+    throw new Error('One or more source notes for this clarification draft no longer exist.')
+  }
+
+  const order = new Map(draft.sourceNoteIds.map((id, index) => [id, index]))
+  const orderedNotes = rows
+    .map(mapNoteRowForGeneration)
+    .sort((a, b) => order.get(a.id)! - order.get(b.id)!)
+
+  return {
+    repo,
+    notes: orderedNotes,
+    draft,
+    clarificationHistory: draft.clarificationHistory
+  }
+}
+
 export function getCurrentInboxNotesForGeneration(
   db: PilogDatabase,
   repoId: string
@@ -419,6 +487,79 @@ export function persistGeneratedIssueDrafts(
       .run()
 
     return draftIds
+  })
+}
+
+export function persistRegeneratedClarificationDraft(
+  db: PilogDatabase,
+  input: {
+    runId: string
+    repoId: string
+    clarificationDraftId: string
+    selectedNoteIds: string[]
+    drafts: GeneratedIssueDraft[]
+    eventStream: unknown[]
+  }
+): string[] {
+  if (input.drafts.length !== 1) {
+    throw new Error('Clarification regeneration must return exactly one replacement draft.')
+  }
+
+  const repo = getRepoById(db, input.repoId)
+  const template = repo ? resolveDefaultIssueTemplate(repo) : null
+  const draft = input.drafts[0]!
+  validateAndCollectSourceNoteIds(input.selectedNoteIds, [draft])
+  const clarificationQuestions = getGeneratedDraftClarificationQuestions(draft)
+
+  return db.transaction((tx) => {
+    const row = tx
+      .select({
+        id: issueDrafts.id,
+        repoId: issueDrafts.repoId,
+        workflowState: issueDrafts.workflowState,
+        status: issueDrafts.status
+      })
+      .from(issueDrafts)
+      .where(eq(issueDrafts.id, input.clarificationDraftId))
+      .get()
+    if (!row) throw new Error('Clarification draft no longer exists.')
+    if (row.repoId !== input.repoId) {
+      throw new Error('Clarification draft belongs to a different repository.')
+    }
+    if (row.status !== 'draft' || row.workflowState !== 'needs_clarification') {
+      throw new Error('Only active clarification drafts can be regenerated.')
+    }
+
+    const now = new Date().toISOString()
+    tx.update(issueDrafts)
+      .set({
+        title: draft.title,
+        body: formatIssueDraftBody(draft, template),
+        labels: JSON.stringify(draft.suggestedLabels),
+        sourceNoteIds: JSON.stringify(draft.sourceNoteIds),
+        affectedFilesJson: JSON.stringify(draft.affectedFiles),
+        confidence: draft.confidence,
+        groupingReason: draft.groupingReason,
+        workflowState: getPersistedDraftWorkflowState(draft),
+        clarificationQuestions: JSON.stringify(clarificationQuestions),
+        status: 'draft',
+        updatedAt: now
+      })
+      .where(eq(issueDrafts.id, input.clarificationDraftId))
+      .run()
+
+    tx.update(agentRuns)
+      .set({
+        status: 'succeeded',
+        outputDraftIds: JSON.stringify([input.clarificationDraftId]),
+        eventStream: JSON.stringify(input.eventStream),
+        finishedAt: now,
+        updatedAt: now
+      })
+      .where(eq(agentRuns.id, input.runId))
+      .run()
+
+    return [input.clarificationDraftId]
   })
 }
 

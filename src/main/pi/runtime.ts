@@ -55,7 +55,11 @@ export async function* runAgent(input: IssueGenerationInput): AsyncIterable<Agen
     import('@earendil-works/pi-agent-core'),
     import('@earendil-works/pi-ai')
   ])
-  const prompt = buildIssueGenerationPrompt({ repo: input.repo, notes: input.notes })
+  const prompt = buildIssueGenerationPrompt({
+    repo: input.repo,
+    notes: input.notes,
+    clarificationHistory: input.clarificationHistory
+  })
   const authStorage = await createSafeStorageAuthStorage()
   const registry = await createModelRegistry(authStorage)
   const model =

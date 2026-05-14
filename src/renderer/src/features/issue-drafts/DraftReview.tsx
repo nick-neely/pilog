@@ -95,10 +95,12 @@ type ClarificationQuestionsSectionProps = {
   draft: Pick<IssueDraft, 'workflowState' | 'clarificationQuestions' | 'clarificationHistory'>
   answers?: Record<string, string>
   savingQuestion?: string | null
+  regenerating?: boolean
   message?: string | null
   error?: string | null
   onAnswerChange?: (question: string, answer: string) => void
   onSubmitAnswer?: (question: string) => Promise<void>
+  onRegenerateDraft?: () => Promise<void>
 }
 
 const DRAFT_TIMESTAMP_FORMATTER = new Intl.DateTimeFormat(undefined, {
@@ -1147,6 +1149,7 @@ function DraftEditor({
   )
   const [clarificationMessage, setClarificationMessage] = useState<string | null>(null)
   const [clarificationError, setClarificationError] = useState<string | null>(null)
+  const [regeneratingClarificationDraft, setRegeneratingClarificationDraft] = useState(false)
   const [repoLabelState, setRepoLabelState] = useState<RepoLabelLoadState>({
     key: null,
     labels: [],
@@ -1460,6 +1463,42 @@ function DraftEditor({
     [clarificationAnswers, draft.id, onSaved, savingClarificationQuestion]
   )
 
+  const handleRegenerateClarificationDraft = useCallback(async (): Promise<void> => {
+    if (regeneratingClarificationDraft || draft.clarificationHistory.length === 0) return
+
+    setRegeneratingClarificationDraft(true)
+    setClarificationError(null)
+    setClarificationMessage(null)
+    try {
+      await window.pilog.runAgent(
+        {
+          noteIds: draft.sourceNoteIds,
+          mode: 'review',
+          clarificationDraftId: draft.id
+        },
+        async (event) => {
+          if (event.type === 'final') {
+            setClarificationMessage('Draft regenerated from clarification history.')
+            await onSaved()
+          }
+          if (event.type === 'error') {
+            setClarificationError(getErrorMessage(event, event.message))
+          }
+        }
+      )
+    } catch (err) {
+      setClarificationError(getErrorMessage(err, 'Draft could not be regenerated.'))
+    } finally {
+      setRegeneratingClarificationDraft(false)
+    }
+  }, [
+    draft.clarificationHistory.length,
+    draft.id,
+    draft.sourceNoteIds,
+    onSaved,
+    regeneratingClarificationDraft
+  ])
+
   usePilogHotkey(PILOG_APP_SHORTCUTS.save, () => handleSaveShortcut(), {
     allowInEditable: true
   })
@@ -1652,10 +1691,12 @@ function DraftEditor({
             draft={draft}
             answers={clarificationAnswers}
             savingQuestion={savingClarificationQuestion}
+            regenerating={regeneratingClarificationDraft}
             message={clarificationMessage}
             error={clarificationError}
             onAnswerChange={handleClarificationAnswerChange}
             onSubmitAnswer={handleSubmitClarificationAnswer}
+            onRegenerateDraft={handleRegenerateClarificationDraft}
           />
 
           <section className="flex flex-col gap-2">
@@ -1822,15 +1863,18 @@ export function ClarificationQuestionsSection({
   draft,
   answers = {},
   savingQuestion = null,
+  regenerating = false,
   message = null,
   error = null,
   onAnswerChange,
-  onSubmitAnswer
+  onSubmitAnswer,
+  onRegenerateDraft
 }: ClarificationQuestionsSectionProps): React.JSX.Element | null {
   const hasQuestions =
     draft.workflowState === 'needs_clarification' && draft.clarificationQuestions.length > 0
   const hasHistory = draft.clarificationHistory.length > 0
   const canAnswerQuestions = Boolean(onAnswerChange && onSubmitAnswer)
+  const canRegenerate = hasHistory && Boolean(onRegenerateDraft)
   if (!hasQuestions && !hasHistory) {
     return null
   }
@@ -1892,7 +1936,21 @@ export function ClarificationQuestionsSection({
       ) : null}
       {hasHistory ? (
         <div className="flex flex-col gap-2">
-          <h4 className="text-xs font-medium text-muted-foreground">Clarification History</h4>
+          <div className="flex items-center justify-between gap-3">
+            <h4 className="text-xs font-medium text-muted-foreground">Clarification History</h4>
+            {canRegenerate ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="xs"
+                disabled={regenerating}
+                onClick={() => void onRegenerateDraft?.()}
+              >
+                <HugeiconsIcon icon={Tick02Icon} data-icon="inline-start" aria-hidden />
+                {regenerating ? 'Regenerating' : 'Regenerate draft'}
+              </Button>
+            ) : null}
+          </div>
           <ol className="flex flex-col divide-y divide-border rounded-md border bg-background">
             {draft.clarificationHistory.map((entry) => (
               <li key={`${entry.answeredAt}:${entry.question}`} className="flex flex-col gap-1 p-3">

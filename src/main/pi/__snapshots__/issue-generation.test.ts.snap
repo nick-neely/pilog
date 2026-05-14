@@ -54,6 +54,9 @@ No Repo Index is available. Fall back to bounded live traversal with repo tools.
 Live Repo Evidence:
 Use the available read-only repo tools to verify specific draft claims before submitting drafts. Capture Context and Repo Index are not verified current evidence.
 
+Clarification History:
+(none for this generation)
+
 Cached GitHub label vocabulary:
 - bug: Something is broken
 - ready-for-agent

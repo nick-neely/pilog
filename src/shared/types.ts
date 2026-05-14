@@ -216,6 +216,7 @@ export type GenerateDraftsRequest = {
   noteIds: string[]
   mode?: GenerateDraftsMode
   draftSettingsOverride?: GenerateDraftSettingsOverride
+  clarificationDraftId?: string
 }
 
 export type GenerateCurrentInboxDraftsRequest = {

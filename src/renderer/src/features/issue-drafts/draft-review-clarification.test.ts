@@ -49,6 +49,42 @@ describe('ClarificationQuestionsSection', () => {
     expect(html).toContain('The repository activity chart on the overview screen.')
   })
 
+  it('exposes explicit regeneration when clarification history has answers', () => {
+    const html = renderToStaticMarkup(
+      createElement(ClarificationQuestionsSection, {
+        draft: {
+          workflowState: 'needs_clarification',
+          clarificationQuestions: ['Which dashboard screen is affected?'],
+          clarificationHistory: [
+            {
+              question: 'Which dashboard screen is affected?',
+              answer: 'The repository activity chart on the overview screen.',
+              answeredAt: '2026-05-14T21:45:00.000Z'
+            }
+          ]
+        },
+        onRegenerateDraft: async () => {}
+      })
+    )
+
+    expect(html).toContain('Regenerate draft')
+  })
+
+  it('omits regeneration until at least one clarification answer is saved', () => {
+    const html = renderToStaticMarkup(
+      createElement(ClarificationQuestionsSection, {
+        draft: {
+          workflowState: 'needs_clarification',
+          clarificationQuestions: ['Which dashboard screen is affected?'],
+          clarificationHistory: []
+        },
+        onRegenerateDraft: async () => {}
+      })
+    )
+
+    expect(html).not.toContain('Regenerate draft')
+  })
+
   it('omits the section for publish-ready drafts', () => {
     const html = renderToStaticMarkup(
       createElement(ClarificationQuestionsSection, {
