@@ -62,6 +62,8 @@ import type {
 import {
   DEFAULT_REPO_AUTO_PUBLISH_SETTINGS,
   DEFAULT_REPO_DRAFT_SETTINGS,
+  isIssueStyleAudience,
+  isIssueStyleDepth,
   normalizeRepoAutoPublishSettings,
   normalizeRepoDraftSettings
 } from '@shared/ipc'
@@ -625,6 +627,18 @@ function DraftGenerationDefaults({
     setToggles((current) => ({ ...current, [key]: checked }))
   }
 
+  const handleDepthChange = (value: string): void => {
+    if (isIssueStyleDepth(value)) {
+      setDepth(value)
+    }
+  }
+
+  const handleAudienceChange = (value: string): void => {
+    if (isIssueStyleAudience(value)) {
+      setAudience(value)
+    }
+  }
+
   const handleSave = async (): Promise<void> => {
     setSaving(true)
     setMessage(null)
@@ -655,11 +669,7 @@ function DraftGenerationDefaults({
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="flex flex-col gap-2">
           <Label htmlFor={`issue-style-depth-${repo.id}`}>Depth</Label>
-          <Select
-            value={depth}
-            onValueChange={(value) => setDepth(value as IssueStyleDepth)}
-            disabled={saving}
-          >
+          <Select value={depth} onValueChange={handleDepthChange} disabled={saving}>
             <SelectTrigger id={`issue-style-depth-${repo.id}`} className="w-full rounded-md">
               <SelectValue />
             </SelectTrigger>
@@ -674,11 +684,7 @@ function DraftGenerationDefaults({
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor={`issue-style-audience-${repo.id}`}>Audience</Label>
-          <Select
-            value={audience}
-            onValueChange={(value) => setAudience(value as IssueStyleAudience)}
-            disabled={saving}
-          >
+          <Select value={audience} onValueChange={handleAudienceChange} disabled={saving}>
             <SelectTrigger id={`issue-style-audience-${repo.id}`} className="w-full rounded-md">
               <SelectValue />
             </SelectTrigger>

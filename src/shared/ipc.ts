@@ -238,8 +238,17 @@ export const DEFAULT_REPO_DRAFT_SETTINGS = {
   }
 } as const satisfies RepoDraftSettings
 
-const ISSUE_STYLE_DEPTHS = ['concise', 'balanced', 'detailed'] as const
-const ISSUE_STYLE_AUDIENCES = ['internal', 'open_source'] as const
+export const ISSUE_STYLE_DEPTHS = ['concise', 'balanced', 'detailed'] as const
+export const ISSUE_STYLE_AUDIENCES = ['internal', 'open_source'] as const
+
+const DRAFT_CONTENT_TOGGLE_KEYS = [
+  'includeImplementationNotes',
+  'includeAffectedFiles',
+  'includeSourceNotes',
+  'includeAcceptanceCriteria',
+  'includeConfidenceRationale',
+  'includeReproductionSteps'
+] as const satisfies ReadonlyArray<keyof DraftContentToggles>
 
 type UnknownRepoDraftSettings = {
   issueStyleDepth?: unknown
@@ -247,45 +256,34 @@ type UnknownRepoDraftSettings = {
   draftContentToggles?: Partial<Record<keyof DraftContentToggles, unknown>> | null
 }
 
+export function isIssueStyleDepth(value: unknown): value is IssueStyleDepth {
+  return typeof value === 'string' && ISSUE_STYLE_DEPTHS.includes(value as IssueStyleDepth)
+}
+
+export function isIssueStyleAudience(value: unknown): value is IssueStyleAudience {
+  return typeof value === 'string' && ISSUE_STYLE_AUDIENCES.includes(value as IssueStyleAudience)
+}
+
 export function normalizeRepoDraftSettings(input: UnknownRepoDraftSettings): RepoDraftSettings {
   const defaultToggles = DEFAULT_REPO_DRAFT_SETTINGS.draftContentToggles
   const inputToggles = input.draftContentToggles ?? {}
+  const draftContentToggles = DRAFT_CONTENT_TOGGLE_KEYS.reduce<DraftContentToggles>(
+    (normalized, key) => {
+      normalized[key] =
+        typeof inputToggles[key] === 'boolean' ? inputToggles[key] : defaultToggles[key]
+      return normalized
+    },
+    { ...defaultToggles }
+  )
 
   return {
-    issueStyleDepth: ISSUE_STYLE_DEPTHS.includes(input.issueStyleDepth as IssueStyleDepth)
-      ? (input.issueStyleDepth as IssueStyleDepth)
+    issueStyleDepth: isIssueStyleDepth(input.issueStyleDepth)
+      ? input.issueStyleDepth
       : DEFAULT_REPO_DRAFT_SETTINGS.issueStyleDepth,
-    issueStyleAudience: ISSUE_STYLE_AUDIENCES.includes(
-      input.issueStyleAudience as IssueStyleAudience
-    )
-      ? (input.issueStyleAudience as IssueStyleAudience)
+    issueStyleAudience: isIssueStyleAudience(input.issueStyleAudience)
+      ? input.issueStyleAudience
       : DEFAULT_REPO_DRAFT_SETTINGS.issueStyleAudience,
-    draftContentToggles: {
-      includeImplementationNotes:
-        typeof inputToggles.includeImplementationNotes === 'boolean'
-          ? inputToggles.includeImplementationNotes
-          : defaultToggles.includeImplementationNotes,
-      includeAffectedFiles:
-        typeof inputToggles.includeAffectedFiles === 'boolean'
-          ? inputToggles.includeAffectedFiles
-          : defaultToggles.includeAffectedFiles,
-      includeSourceNotes:
-        typeof inputToggles.includeSourceNotes === 'boolean'
-          ? inputToggles.includeSourceNotes
-          : defaultToggles.includeSourceNotes,
-      includeAcceptanceCriteria:
-        typeof inputToggles.includeAcceptanceCriteria === 'boolean'
-          ? inputToggles.includeAcceptanceCriteria
-          : defaultToggles.includeAcceptanceCriteria,
-      includeConfidenceRationale:
-        typeof inputToggles.includeConfidenceRationale === 'boolean'
-          ? inputToggles.includeConfidenceRationale
-          : defaultToggles.includeConfidenceRationale,
-      includeReproductionSteps:
-        typeof inputToggles.includeReproductionSteps === 'boolean'
-          ? inputToggles.includeReproductionSteps
-          : defaultToggles.includeReproductionSteps
-    }
+    draftContentToggles
   }
 }
 
