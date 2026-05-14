@@ -47,10 +47,16 @@ export function getGenerationContextRowView(input: {
 }
 
 function getRepoIndexFreshnessLabel(status: GenerationRepoIndexStatusView): string {
-  if (status.state === 'fresh') return 'Fresh'
-  if (status.state === 'stale') return 'Stale'
-  if (status.state === 'missing') return 'Not indexed'
-  return status.shortLabel
+  switch (status.state) {
+    case 'fresh':
+      return 'Fresh'
+    case 'stale':
+      return 'Stale'
+    case 'missing':
+      return 'Not indexed'
+    case 'unavailable':
+      return status.shortLabel
+  }
 }
 
 function summarizeCaptureContext(notes: Note[]): {
@@ -73,16 +79,19 @@ function summarizeCaptureContext(notes: Note[]): {
     )
   })
 
-  const branch =
-    branches.size === 0
-      ? null
-      : branches.size === 1
-        ? { label: 'Branch', value: Array.from(branches)[0] ?? '' }
-        : { label: 'Branches', value: String(branches.size) }
   const changedCount = changedFiles.size > 0 ? changedFiles.size : diffSummaryChangedFiles
 
   return {
-    branch,
+    branch: summarizeBranches(branches),
     changedFiles: changedCount > 0 ? changedCount : null
   }
+}
+
+function summarizeBranches(branches: ReadonlySet<string>): GenerationContextRowItem | null {
+  if (branches.size === 0) return null
+  if (branches.size === 1) {
+    return { label: 'Branch', value: Array.from(branches)[0] ?? '' }
+  }
+
+  return { label: 'Branches', value: String(branches.size) }
 }
