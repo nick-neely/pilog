@@ -4,12 +4,12 @@ import { defaultHighlightStyle, syntaxHighlighting } from '@codemirror/language'
 import { EditorState } from '@codemirror/state'
 import { EditorView, keymap } from '@codemirror/view'
 import {
-  ArrowDown01Icon,
-  ArrowLeft01Icon,
-  ArrowUp01Icon,
-  Refresh01Icon,
-  RepositoryIcon,
-  Tick02Icon
+    ArrowDown01Icon,
+    ArrowLeft01Icon,
+    ArrowUp01Icon,
+    Refresh01Icon,
+    RepositoryIcon,
+    Tick02Icon
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { Alert, AlertDescription } from '@renderer/components/ui/alert'
@@ -17,29 +17,29 @@ import { Badge } from '@renderer/components/ui/badge'
 import { Button } from '@renderer/components/ui/button'
 import { Checkbox } from '@renderer/components/ui/checkbox'
 import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger
+    Collapsible,
+    CollapsibleContent,
+    CollapsibleTrigger
 } from '@renderer/components/ui/collapsible'
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle
 } from '@renderer/components/ui/dialog'
 import { Empty, EmptyDescription } from '@renderer/components/ui/empty'
 import { Input } from '@renderer/components/ui/input'
 import { Label } from '@renderer/components/ui/label'
 import { ScrollArea } from '@renderer/components/ui/scroll-area'
 import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
+    Select,
+    SelectContent,
+    SelectGroup,
+    SelectItem,
+    SelectTrigger,
+    SelectValue
 } from '@renderer/components/ui/select'
 import { Separator } from '@renderer/components/ui/separator'
 import { Skeleton } from '@renderer/components/ui/skeleton'
@@ -48,56 +48,39 @@ import { Toggle } from '@renderer/components/ui/toggle'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@renderer/components/ui/tooltip'
 import { cn } from '@renderer/lib/utils'
 import type {
-  CreateIssueRequest,
-  GitHubLabel,
-  GitHubIssueTemplate,
-  IssueStyleAudience,
-  IssueStyleDepth,
-  Repo,
-  RepoAutoPublishSettings,
-  RepoDraftSettings,
-  UpdateRepoAutoPublishSettingsRequest,
-  UpdateRepoDraftSettingsRequest,
-  UpdateRepoPrivacySettingsRequest
+    CreateIssueRequest,
+    GitHubIssueTemplate,
+    GitHubLabel,
+    IssueStyleAudience,
+    IssueStyleDepth,
+    Repo,
+    RepoAutoPublishSettings,
+    RepoDraftSettings,
+    UpdateRepoAutoPublishSettingsRequest,
+    UpdateRepoDraftSettingsRequest,
+    UpdateRepoPrivacySettingsRequest
 } from '@shared/ipc'
 import {
-  DEFAULT_REPO_AUTO_PUBLISH_SETTINGS,
-  DEFAULT_REPO_DRAFT_SETTINGS,
-  isIssueStyleAudience,
-  isIssueStyleDepth,
-  normalizeRepoAutoPublishSettings,
-  normalizeRepoDraftSettings
+    DEFAULT_REPO_AUTO_PUBLISH_SETTINGS,
+    DEFAULT_REPO_DRAFT_SETTINGS,
+    isIssueStyleAudience,
+    isIssueStyleDepth,
+    normalizeRepoAutoPublishSettings,
+    normalizeRepoDraftSettings
 } from '@shared/ipc'
-import { REPO_INDEX_PRIVACY_COPY, getRepoIndexStatusLabel } from './repo-index-status'
-import { DRAFT_CONTENT_TOGGLE_LABELS, draftSettingsSummary } from './repo-draft-defaults'
-import { DIFF_SUMMARY_PRIVACY_COPY, repoPrivacySummary } from './repo-privacy-settings'
 import { formatRepoLocation } from '@shared/repo-paths'
-import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import { getErrorMessage } from '../recovery-state'
 import { RepoLinkFlow } from '../setup/RepoLinkFlow'
+import { DRAFT_CONTENT_TOGGLE_LABELS, draftSettingsSummary } from './repo-draft-defaults'
+import { REPO_INDEX_PRIVACY_COPY, getRepoIndexStatusLabel } from './repo-index-status'
+import { DIFF_SUMMARY_PRIVACY_COPY, repoPrivacySummary } from './repo-privacy-settings'
+import { useRepos } from './useRepos'
 
 /** `#rrggbb` for inline swatch, or neutral fallback if GitHub sends an odd value */
 function githubLabelHex(color: string): string | undefined {
   const hex = color.replace(/^#/, '')
   return /^[0-9a-fA-F]{6}$/.test(hex) ? `#${hex}` : undefined
-}
-
-function useRepos(): {
-  repos: Repo[]
-  reload: () => Promise<void>
-} {
-  const [repos, setRepos] = useState<Repo[]>([])
-
-  const reload = useCallback(async () => {
-    const list = await window.pilog.invoke('repos:list')
-    setRepos(list)
-  }, [])
-
-  useEffect(() => {
-    window.pilog.invoke('repos:list').then(setRepos)
-  }, [])
-
-  return { repos, reload }
 }
 
 type NewIssueState =
@@ -813,14 +796,16 @@ function PrivacySettings({
 function RepoRow({
   repo,
   onUnlink,
-  onUpdated
+  onUpdated,
+  initialOpen = false
 }: {
   repo: Repo
   onUnlink: (id: string) => void
   onUpdated: () => void
+  initialOpen?: boolean
 }): React.JSX.Element {
   const [showNewIssue, setShowNewIssue] = useState(false)
-  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(initialOpen)
   const [refreshingIndex, setRefreshingIndex] = useState(false)
 
   const hasGuardrails =
@@ -957,10 +942,12 @@ function RepoRow({
 
 export function Repositories({
   onBack,
-  onNavigateSettings
+  onNavigateSettings,
+  initialOpenRepoId
 }: {
   onBack: () => void
   onNavigateSettings: () => void
+  initialOpenRepoId?: string
 }): React.JSX.Element {
   const { repos, reload } = useRepos()
 
@@ -1012,6 +999,7 @@ export function Repositories({
                     repo={repo}
                     onUnlink={handleUnlink}
                     onUpdated={handleRepoUpdated}
+                    initialOpen={repo.id === initialOpenRepoId}
                   />
                 ))}
               </div>

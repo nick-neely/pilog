@@ -216,6 +216,7 @@ function App(): React.JSX.Element {
   const [focusedNoteId, setFocusedNoteId] = useState<string | null>(null)
   const [focusedRunId, setFocusedRunId] = useState<string | null>(null)
   const [focusedDraftId, setFocusedDraftId] = useState<string | null>(null)
+  const [focusedRepoId, setFocusedRepoId] = useState<string | null>(null)
   const [runOrigin, setRunOrigin] = useState<RunNavigationOrigin | null>(null)
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [settingsFocus, setSettingsFocus] = useState<'updates' | null>(null)
@@ -231,6 +232,7 @@ function App(): React.JSX.Element {
   const openDrafts = (): void => setAppRoute('draft-review')
   const openSettings = (): void => {
     setSettingsFocus(null)
+    setFocusedRepoId(null)
     setAppRoute('settings')
   }
   const openSoftwareUpdates = (): void => {
@@ -255,6 +257,10 @@ function App(): React.JSX.Element {
     setRunOrigin(origin ?? { kind: 'history' })
     setAppRoute('agent-runs')
   }
+  const openRepositories = (repoId?: string): void => {
+    setFocusedRepoId(repoId ?? null)
+    setAppRoute('repositories')
+  }
   const createNoteFromPalette = async (): Promise<void> => {
     const created = await window.pilog.invoke('note:create', { content: '' })
     openNote(created.id)
@@ -266,7 +272,8 @@ function App(): React.JSX.Element {
         <Settings
           focusSection={settingsFocus}
           onBack={openInbox}
-          onNavigateRepositories={() => setAppRoute('repositories')}
+          onNavigateRepositories={() => openRepositories()}
+          onNavigateToRepo={(repoId) => openRepositories(repoId)}
           onNavigateRunHistory={openRunHistory}
           onNavigatePublishLog={() => setAppRoute('publish-log')}
         />
@@ -289,7 +296,11 @@ function App(): React.JSX.Element {
   if (route === 'repositories') {
     return (
       <>
-        <Repositories onBack={openSettings} onNavigateSettings={openSettings} />
+        <Repositories
+          onBack={openSettings}
+          onNavigateSettings={openSettings}
+          initialOpenRepoId={focusedRepoId ?? undefined}
+        />
         <GlobalCommandPalette
           open={paletteOpen}
           onOpenChange={setPaletteOpen}
@@ -354,7 +365,7 @@ function App(): React.JSX.Element {
           focusNoteId={focusedNoteId}
           onFocusNoteHandled={() => setFocusedNoteId(null)}
           onNavigateToAgentRuns={openAgentRun}
-          onNavigateToRepositories={() => setAppRoute('repositories')}
+          onNavigateToRepositories={() => openRepositories()}
           onNavigateToSettings={openSettings}
           onNavigateToDraftReview={(draftId) => {
             if (draftId) openDraft(draftId)
@@ -368,7 +379,7 @@ function App(): React.JSX.Element {
           onNavigateToInbox={openInbox}
           onNavigateToAgentRuns={openAgentRun}
           onNavigateToSettings={openSettings}
-          onNavigateToRepositories={() => setAppRoute('repositories')}
+          onNavigateToRepositories={() => openRepositories()}
           onOpenSourceNote={openNote}
         />
       ) : route === 'publish-log' ? (

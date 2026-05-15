@@ -5,7 +5,8 @@ import {
   Cancel01Icon,
   FilePenIcon,
   GithubIcon,
-  InformationCircleIcon
+  InformationCircleIcon,
+  Settings02Icon
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { HotkeyInput } from '@renderer/components/HotkeyInput'
@@ -36,6 +37,7 @@ import { Empty, EmptyDescription } from '@renderer/components/ui/empty'
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@renderer/components/ui/hover-card'
 import { Kbd, KbdGroup } from '@renderer/components/ui/kbd'
 import { Label } from '@renderer/components/ui/label'
+import { Popover, PopoverContent, PopoverTrigger } from '@renderer/components/ui/popover'
 import { Progress } from '@renderer/components/ui/progress'
 import { ScrollArea } from '@renderer/components/ui/scroll-area'
 import {
@@ -71,14 +73,6 @@ import {
   GENERATION_EGRESS_DISCLOSURE,
   LOCAL_FIRST_DISCLOSURE
 } from '@shared/data-boundaries'
-import {
-  applyRepoDraftSettingsOverride,
-  isIssueStyleAudience,
-  isIssueStyleDepth,
-  normalizeRepoDraftSettings,
-  type RepoDraftSettings,
-  type UpdateRepoDraftSettingsRequest
-} from '@shared/ipc'
 import type {
   GenerateDraftsMode,
   GitHubStatus,
@@ -89,6 +83,14 @@ import type {
   OnboardingState,
   PiStatus,
   Repo
+} from '@shared/ipc'
+import {
+  applyRepoDraftSettingsOverride,
+  isIssueStyleAudience,
+  isIssueStyleDepth,
+  normalizeRepoDraftSettings,
+  type RepoDraftSettings,
+  type UpdateRepoDraftSettingsRequest
 } from '@shared/ipc'
 import type { LabelMatch } from '@shared/labels'
 import {
@@ -124,22 +126,18 @@ import {
   type RecoveryState
 } from '../recovery-state'
 import {
-  getGenerationRepoIndexStatus,
-  type GenerationRepoIndexStatusView
-} from '../repositories/repo-index-status'
-import {
   DRAFT_CONTENT_TOGGLE_LABELS,
   draftSettingsSummary
 } from '../repositories/repo-draft-defaults'
+import {
+  getGenerationRepoIndexStatus,
+  type GenerationRepoIndexStatusView
+} from '../repositories/repo-index-status'
+import { mergeGitHubAuthProgress } from '../setup/github-auth-progress'
 import { GitHubDeviceCode } from '../setup/GitHubDeviceCode'
 import { PiSetupPanel } from '../setup/PiSetupPanel'
 import { RepoLinkFlow } from '../setup/RepoLinkFlow'
-import { mergeGitHubAuthProgress } from '../setup/github-auth-progress'
 import { usePiConfig, type PiConfigState } from '../setup/use-pi-config'
-import {
-  getGenerationContextRowView,
-  type GenerationContextRowView
-} from './generation-context-row'
 import { INBOX_NOTE_PREVIEW_TOOLTIP_CLASS } from './inbox-note-preview-tooltip'
 import { StatusFilter } from './StatusFilter'
 
@@ -309,31 +307,6 @@ function NoteRepoIndexIndicator({
       <TooltipTrigger asChild>{indicator}</TooltipTrigger>
       <TooltipContent className="max-w-xs">{status.notice}</TooltipContent>
     </Tooltip>
-  )
-}
-
-function GenerationContextRow({ view }: { view: GenerationContextRowView }): React.JSX.Element {
-  return (
-    <div
-      role="status"
-      aria-label={view.ariaLabel}
-      data-testid="generation-context-row"
-      className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 rounded-md bg-muted/30 px-2.5 py-1.5 text-xs text-muted-foreground"
-    >
-      {view.items.map((item, index) => (
-        <Fragment key={`${item.label}-${index}`}>
-          {index > 0 ? (
-            <span aria-hidden className="text-muted-foreground/60">
-              ·
-            </span>
-          ) : null}
-          <span className="min-w-0">
-            <span>{item.label}: </span>
-            <span className="font-medium text-foreground/85">{item.value}</span>
-          </span>
-        </Fragment>
-      ))}
-    </div>
   )
 }
 
@@ -1116,6 +1089,17 @@ function extractAcceptanceCriteria(body: string): string[] {
     .filter(Boolean)
 }
 
+type NoteDetailDraftSettings = {
+  activeSettings: RepoDraftSettings
+  hasOverride: boolean
+  statusMessage: string | null
+  repoIndexStatus: GenerationRepoIndexStatusView | null
+  savingDefault: boolean
+  disabled: boolean
+  onUpdate: (settings: RepoDraftSettings) => void
+  onSaveAsDefault: () => void
+}
+
 function NoteDetail({
   note,
   repos,
@@ -1125,11 +1109,13 @@ function NoteDetail({
   onNavigateToRepositories,
   onNavigateToAgentRuns,
   onNavigateToDraftReview,
-  draftLinks
+  draftLinks,
+  draftSettings
 }: {
   note: Note
   repos: Repo[]
   draftLinks: NoteDraftLink[]
+  draftSettings?: NoteDetailDraftSettings
   onSave: (id: string, content: string) => Promise<void>
   onDelete: (id: string) => Promise<void>
   onRepoChange: (id: string, repoId: string | null) => Promise<void>
@@ -1215,10 +1201,145 @@ function NoteDetail({
       </div>
       {/* Repo and generation provenance, kept secondary to the editor body. */}
       <footer className="flex min-h-14 shrink-0 flex-wrap items-center justify-between gap-x-6 gap-y-2 border-t px-6 py-3">
-        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
-          <span className="text-xs font-medium text-muted-foreground">Repo</span>
+        <div className="flex min-w-0 items-center gap-x-3 overflow-hidden">
+          {draftSettings ? (
+            <Popover>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <PopoverTrigger asChild>
+                    <button
+                      type="button"
+                      disabled={draftSettings.disabled}
+                      aria-label={`Draft settings: ${draftSettingsSummary(draftSettings.activeSettings)}${draftSettings.hasOverride ? ' (overrides active)' : ''}`}
+                      className={cn(
+                        'relative inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-sm text-muted-foreground transition-colors',
+                        'hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50',
+                        'disabled:opacity-50'
+                      )}
+                    >
+                      <HugeiconsIcon icon={Settings02Icon} className="size-3.5" aria-hidden />
+                      {draftSettings.hasOverride && (
+                        <span
+                          className="absolute -top-0.5 -right-0.5 size-1.5 rounded-full bg-primary ring-1 ring-background"
+                          aria-hidden
+                        />
+                      )}
+                    </button>
+                  </PopoverTrigger>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-xs">
+                  <p className="text-xs">{draftSettingsSummary(draftSettings.activeSettings)}</p>
+                  {draftSettings.hasOverride && (
+                    <p className="text-xs text-primary">Overrides active for this run</p>
+                  )}
+                </TooltipContent>
+              </Tooltip>
+              <PopoverContent
+                align="start"
+                className="w-84 gap-3 rounded-xl"
+              >
+                <div className="flex flex-col gap-1">
+                  <p className="text-sm font-medium">Draft settings</p>
+                  {draftSettings.statusMessage ? (
+                    <p className="text-xs text-muted-foreground" aria-live="polite">
+                      {draftSettings.statusMessage}
+                    </p>
+                  ) : null}
+                </div>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <Select
+                    value={draftSettings.activeSettings.issueStyleDepth}
+                    onValueChange={(value) => {
+                      if (!isIssueStyleDepth(value)) return
+                      draftSettings.onUpdate({
+                        ...draftSettings.activeSettings,
+                        issueStyleDepth: value
+                      })
+                    }}
+                    disabled={draftSettings.disabled}
+                  >
+                    <SelectTrigger
+                      className="h-8 rounded-md text-xs"
+                      aria-label="Issue style depth"
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        <SelectItem value="concise">Concise</SelectItem>
+                        <SelectItem value="balanced">Balanced</SelectItem>
+                        <SelectItem value="detailed">Detailed</SelectItem>
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                  <Select
+                    value={draftSettings.activeSettings.issueStyleAudience}
+                    onValueChange={(value) => {
+                      if (!isIssueStyleAudience(value)) return
+                      draftSettings.onUpdate({
+                        ...draftSettings.activeSettings,
+                        issueStyleAudience: value
+                      })
+                    }}
+                    disabled={draftSettings.disabled}
+                  >
+                    <SelectTrigger
+                      className="h-8 rounded-md text-xs"
+                      aria-label="Issue style audience"
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        <SelectItem value="internal">Internal</SelectItem>
+                        <SelectItem value="open_source">Open source</SelectItem>
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-1 sm:grid-cols-2">
+                  {DRAFT_CONTENT_TOGGLE_LABELS.map((item) => (
+                    <label
+                      key={item.key}
+                      htmlFor={`note-${item.key}-${note.id}`}
+                      className="flex min-w-0 items-center gap-2 rounded-sm px-1 py-0.5 text-xs"
+                    >
+                      <Checkbox
+                        id={`note-${item.key}-${note.id}`}
+                        checked={draftSettings.activeSettings.draftContentToggles[item.key]}
+                        disabled={draftSettings.disabled}
+                        onCheckedChange={(checked) =>
+                          draftSettings.onUpdate({
+                            ...draftSettings.activeSettings,
+                            draftContentToggles: {
+                              ...draftSettings.activeSettings.draftContentToggles,
+                              [item.key]: checked === true
+                            }
+                          })
+                        }
+                        aria-label={item.label}
+                      />
+                      <span className="min-w-0 break-words leading-snug">{item.label}</span>
+                    </label>
+                  ))}
+                </div>
+                <div className="flex justify-end">
+                  <Button
+                    type="button"
+                    size="xs"
+                    variant="outline"
+                    disabled={!draftSettings.hasOverride || draftSettings.savingDefault}
+                    onClick={() => void draftSettings.onSaveAsDefault()}
+                  >
+                    {draftSettings.savingDefault ? 'Saving' : 'Save as default'}
+                  </Button>
+                </div>
+              </PopoverContent>
+            </Popover>
+          ) : null}
+          <span className="shrink-0 text-xs font-medium text-muted-foreground">Repo</span>
           {repos.length === 0 ? (
-            <span className="text-xs text-muted-foreground">
+            <span className="shrink-0 text-xs text-muted-foreground">
               No repos linked:{' '}
               <Button
                 type="button"
@@ -1237,7 +1358,7 @@ function NoteDetail({
               <SelectTrigger
                 aria-label="Repository"
                 size="sm"
-                className="max-w-[min(100%,14rem)] text-xs"
+                className="max-w-[min(100%,14rem)] shrink-0 text-xs"
               >
                 <SelectValue placeholder="Unassigned" />
               </SelectTrigger>
@@ -1253,10 +1374,16 @@ function NoteDetail({
               </SelectContent>
             </Select>
           )}
-          {repoIndexStatus ? <NoteRepoIndexIndicator status={repoIndexStatus} /> : null}
+          {repoIndexStatus ? (
+            <span className="flex h-8 shrink-0 items-center">
+              <NoteRepoIndexIndicator status={repoIndexStatus} />
+            </span>
+          ) : null}
           {captureContextLabel ? (
-            <span className="max-w-full truncate font-mono text-xs text-muted-foreground">
-              {captureContextLabel}
+            <span className="flex h-8 items-center">
+              <span className="min-w-0 truncate font-mono text-xs text-muted-foreground">
+                {captureContextLabel}
+              </span>
             </span>
           ) : null}
         </div>
@@ -1971,11 +2098,6 @@ export function Inbox({
       : null
   const activeDraftSettings = getActiveDraftSettings(draftSettingsRepo, draftSettingsOverride)
   const hasDraftSettingsOverride = hasDraftSettingsChanges(draftSettingsRepo, activeDraftSettings)
-  const selectedGenerationContextRow = getGenerationContextRowView({
-    repoIndexStatus: selectedRepo ? getGenerationRepoIndexStatus(selectedRepo) : null,
-    notes: selectedNotes,
-    draftSettings: activeDraftSettings
-  })
   const draftSettingsStatusMessage = draftSettingsRepo
     ? getDraftSettingsStatusMessage({
         repo: draftSettingsRepo,
@@ -2004,11 +2126,6 @@ export function Inbox({
     Boolean(currentInboxRepo?.autoPublishEnabled) &&
     piStatus.configured &&
     !generating
-  const generateAndPublishReason = getGenerateAndPublishReason({
-    canGenerateDrafts,
-    generateDraftsReason,
-    repo: selectedRepo
-  })
   const processCurrentInboxReason = getProcessCurrentInboxReason({
     repo: currentInboxRepo,
     piStatus,
@@ -2640,34 +2757,54 @@ export function Inbox({
                 // Triage-mode: draft generation (+ optional publish). Clearing the
                 // selection lives on the title strip (the count chip) and on Esc.
                 <div className="flex w-full flex-col gap-1.5">
-                  {selectedGenerationContextRow ? (
-                    <GenerationContextRow view={selectedGenerationContextRow} />
-                  ) : null}
-                  <div className="flex w-full items-center gap-2">
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <span className="flex-1">
-                          <Button
-                            size="sm"
-                            variant={canGenerateDrafts ? 'default' : 'outline'}
-                            disabled={!canGenerateDrafts}
-                            className="w-full justify-center"
-                            onClick={() => void handleGenerateDrafts('review')}
-                          >
-                            <HugeiconsIcon
-                              icon={FilePenIcon}
-                              data-icon="inline-start"
-                              aria-hidden
-                            />
-                            {generating ? 'Generating' : 'Generate Drafts'}
-                          </Button>
-                        </span>
-                      </TooltipTrigger>
-                      {!canGenerateDrafts && (
-                        <TooltipContent>{generateDraftsReason}</TooltipContent>
-                      )}
-                    </Tooltip>
-                    {canGenerateDrafts ? (
+                  {canGenerateAndPublish ? (
+                    // Both actions are viable — show them on one line.
+                    // Generate and Publish is the primary action for power users who
+                    // turned auto-publish on; Generate Drafts drops to a compact
+                    // secondary so it is still reachable without stacking.
+                    <div className="flex w-full items-center gap-2">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="flex-1">
+                            <Button
+                              size="sm"
+                              variant="default"
+                              disabled={generating}
+                              className="w-full justify-center"
+                              onClick={() => void handleGenerateDrafts('auto-publish-preview')}
+                            >
+                              <HugeiconsIcon
+                                icon={GithubIcon}
+                                data-icon="inline-start"
+                                aria-hidden
+                              />
+                              {generating ? 'Planning' : 'Generate and Publish'}
+                            </Button>
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          Generate drafts, then review planned GitHub writes
+                        </TooltipContent>
+                      </Tooltip>
+
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={generating}
+                              className="px-2.5"
+                              aria-label="Generate drafts only"
+                              onClick={() => void handleGenerateDrafts('review')}
+                            >
+                              <HugeiconsIcon icon={FilePenIcon} className="size-4" aria-hidden />
+                            </Button>
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent>Generate drafts without publishing</TooltipContent>
+                      </Tooltip>
+
                       <HoverCard>
                         <HoverCardTrigger asChild>
                           <button
@@ -2693,152 +2830,63 @@ export function Inbox({
                           </div>
                         </HoverCardContent>
                       </HoverCard>
-                    ) : null}
-                  </div>
-                  {selectedRepo ? (
+                    </div>
+                  ) : (
+                    // Auto-publish is off or prerequisites are missing — show the
+                    // single Generate Drafts button exactly as before.
                     <div className="flex w-full items-center gap-2">
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <span className="flex-1">
                             <Button
                               size="sm"
-                              variant={canGenerateAndPublish ? 'outline' : 'ghost'}
-                              disabled={!canGenerateAndPublish}
+                              variant={canGenerateDrafts ? 'default' : 'outline'}
+                              disabled={!canGenerateDrafts}
                               className="w-full justify-center"
-                              onClick={() => void handleGenerateDrafts('auto-publish-preview')}
+                              onClick={() => void handleGenerateDrafts('review')}
                             >
                               <HugeiconsIcon
-                                icon={GithubIcon}
+                                icon={FilePenIcon}
                                 data-icon="inline-start"
                                 aria-hidden
                               />
-                              {generating ? 'Planning' : 'Generate and Publish'}
+                              {generating ? 'Generating' : 'Generate Drafts'}
                             </Button>
                           </span>
                         </TooltipTrigger>
-                        {!canGenerateAndPublish && (
-                          <TooltipContent>{generateAndPublishReason}</TooltipContent>
+                        {!canGenerateDrafts && (
+                          <TooltipContent>{generateDraftsReason}</TooltipContent>
                         )}
                       </Tooltip>
-                      {canGenerateAndPublish ? (
-                        <span
-                          className="inline-flex size-4 shrink-0 items-center justify-center"
-                          aria-hidden
-                        />
+                      {canGenerateDrafts ? (
+                        <HoverCard>
+                          <HoverCardTrigger asChild>
+                            <button
+                              type="button"
+                              data-testid="generation-boundary-disclosure"
+                              className="inline-flex shrink-0 items-center justify-center rounded-sm text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                              aria-label="Data sharing information"
+                            >
+                              <HugeiconsIcon
+                                icon={InformationCircleIcon}
+                                className="size-4"
+                                aria-hidden
+                              />
+                            </button>
+                          </HoverCardTrigger>
+                          <HoverCardContent side="top" className="w-80 rounded-xl">
+                            <div className="space-y-2">
+                              <p className="text-sm font-medium">Data sharing</p>
+                              <Separator />
+                              <p className="text-xs leading-relaxed text-muted-foreground">
+                                {GENERATION_EGRESS_DISCLOSURE}
+                              </p>
+                            </div>
+                          </HoverCardContent>
+                        </HoverCard>
                       ) : null}
                     </div>
-                  ) : null}
-                  {!piStatus.configured && selectedNotesShareRepo && (
-                    <Button
-                      type="button"
-                      variant="link"
-                      size="sm"
-                      className="h-auto justify-start p-0 text-xs"
-                      onClick={onNavigateToSettings}
-                    >
-                      Configure Pi to generate drafts
-                    </Button>
                   )}
-                  {draftSettingsRepo && activeDraftSettings ? (
-                    <div className="flex flex-col gap-2 rounded-md bg-muted/40 p-3">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="truncate text-xs font-medium">
-                            Style: {draftSettingsSummary(activeDraftSettings)}
-                          </p>
-                          <p className="text-xs text-muted-foreground" aria-live="polite">
-                            {draftSettingsStatusMessage}
-                          </p>
-                        </div>
-                        <Button
-                          type="button"
-                          size="xs"
-                          variant="outline"
-                          disabled={!hasDraftSettingsOverride || savingDraftSettingsDefault}
-                          onClick={() => void handleSaveRunDraftSettingsAsDefault()}
-                        >
-                          {savingDraftSettingsDefault ? 'Saving' : 'Save default'}
-                        </Button>
-                      </div>
-                      <div className="grid gap-2 sm:grid-cols-2">
-                        <Select
-                          value={activeDraftSettings.issueStyleDepth}
-                          onValueChange={(value) => {
-                            if (!isIssueStyleDepth(value)) return
-                            updateRunDraftSettings({
-                              ...activeDraftSettings,
-                              issueStyleDepth: value
-                            })
-                          }}
-                          disabled={generating}
-                        >
-                          <SelectTrigger
-                            className="h-8 rounded-md text-xs"
-                            aria-label="Issue style depth"
-                          >
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectGroup>
-                              <SelectItem value="concise">Concise</SelectItem>
-                              <SelectItem value="balanced">Balanced</SelectItem>
-                              <SelectItem value="detailed">Detailed</SelectItem>
-                            </SelectGroup>
-                          </SelectContent>
-                        </Select>
-                        <Select
-                          value={activeDraftSettings.issueStyleAudience}
-                          onValueChange={(value) => {
-                            if (!isIssueStyleAudience(value)) return
-                            updateRunDraftSettings({
-                              ...activeDraftSettings,
-                              issueStyleAudience: value
-                            })
-                          }}
-                          disabled={generating}
-                        >
-                          <SelectTrigger
-                            className="h-8 rounded-md text-xs"
-                            aria-label="Issue style audience"
-                          >
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectGroup>
-                              <SelectItem value="internal">Internal</SelectItem>
-                              <SelectItem value="open_source">Open source</SelectItem>
-                            </SelectGroup>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="grid gap-1 sm:grid-cols-2">
-                        {DRAFT_CONTENT_TOGGLE_LABELS.map((item) => (
-                          <label
-                            key={item.key}
-                            htmlFor={`run-${item.key}-${draftSettingsRepo.id}`}
-                            className="flex min-w-0 items-center gap-2 rounded-sm px-1 py-0.5 text-xs"
-                          >
-                            <Checkbox
-                              id={`run-${item.key}-${draftSettingsRepo.id}`}
-                              checked={activeDraftSettings.draftContentToggles[item.key]}
-                              disabled={generating}
-                              onCheckedChange={(checked) =>
-                                updateRunDraftSettings({
-                                  ...activeDraftSettings,
-                                  draftContentToggles: {
-                                    ...activeDraftSettings.draftContentToggles,
-                                    [item.key]: checked === true
-                                  }
-                                })
-                              }
-                              aria-label={item.label}
-                            />
-                            <span className="truncate">{item.label}</span>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-                  ) : null}
                 </div>
               ) : (
                 <div className="flex w-full flex-col gap-1.5">
@@ -2936,6 +2984,20 @@ export function Inbox({
                 onNavigateToAgentRuns={onNavigateToAgentRuns}
                 onNavigateToDraftReview={onNavigateToDraftReview}
                 draftLinks={draftLinksByNote.get(selectedNote.id) ?? []}
+                draftSettings={
+                  activeDraftSettings && selectedRepo
+                    ? {
+                        activeSettings: activeDraftSettings,
+                        hasOverride: hasDraftSettingsOverride,
+                        statusMessage: draftSettingsStatusMessage,
+                        repoIndexStatus: getGenerationRepoIndexStatus(selectedRepo),
+                        savingDefault: savingDraftSettingsDefault,
+                        disabled: generating,
+                        onUpdate: updateRunDraftSettings,
+                        onSaveAsDefault: handleSaveRunDraftSettingsAsDefault
+                      }
+                    : undefined
+                }
               />
             ) : (
               <Empty className="h-full border-none bg-transparent shadow-none">

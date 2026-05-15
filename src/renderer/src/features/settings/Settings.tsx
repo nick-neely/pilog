@@ -1,60 +1,60 @@
 import {
-  Activity01Icon,
-  ArrowDown01Icon,
-  CheckmarkCircle01Icon,
-  ComputerIcon,
-  Delete02Icon,
-  Download01Icon,
-  EyeIcon,
-  GithubIcon,
-  InformationCircleIcon,
-  ListRestartIcon,
-  Moon02Icon,
-  Refresh01Icon,
-  Search01Icon,
-  Sun02Icon
+    Activity01Icon,
+    ArrowDown01Icon,
+    CheckmarkCircle01Icon,
+    ComputerIcon,
+    Delete02Icon,
+    Download01Icon,
+    EyeIcon,
+    GithubIcon,
+    InformationCircleIcon,
+    ListRestartIcon,
+    Moon02Icon,
+    Refresh01Icon,
+    Search01Icon,
+    Sun02Icon
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { HotkeyInput } from '@renderer/components/HotkeyInput'
 import { Alert, AlertDescription, AlertTitle } from '@renderer/components/ui/alert'
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    AlertDialogTrigger
 } from '@renderer/components/ui/alert-dialog'
 import { Avatar, AvatarFallback } from '@renderer/components/ui/avatar'
 import { Badge } from '@renderer/components/ui/badge'
 import { Button } from '@renderer/components/ui/button'
 import {
-  Card,
-  CardAction,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle
+    Card,
+    CardAction,
+    CardContent,
+    CardDescription,
+    CardFooter,
+    CardHeader,
+    CardTitle
 } from '@renderer/components/ui/card'
 import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger
+    Collapsible,
+    CollapsibleContent,
+    CollapsibleTrigger
 } from '@renderer/components/ui/collapsible'
 import { Input } from '@renderer/components/ui/input'
 import { Label } from '@renderer/components/ui/label'
 import { ScrollArea } from '@renderer/components/ui/scroll-area'
 import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
+    Select,
+    SelectContent,
+    SelectGroup,
+    SelectItem,
+    SelectTrigger,
+    SelectValue
 } from '@renderer/components/ui/select'
 import { Separator } from '@renderer/components/ui/separator'
 import { Switch } from '@renderer/components/ui/switch'
@@ -64,22 +64,24 @@ import { isThemeMode, type AppliedTheme, type ThemeMode } from '@renderer/theme/
 import { useTheme } from '@renderer/theme/useTheme'
 import { LOCAL_FIRST_DISCLOSURE } from '@shared/data-boundaries'
 import type {
-  AdvancedSettings,
-  GitHubAuthProgress,
-  RuntimeReadiness,
-  RuntimeReadinessItem,
-  SearchProvider,
-  SettingKey
+    AdvancedSettings,
+    GitHubAuthProgress,
+    RuntimeReadiness,
+    RuntimeReadinessItem,
+    SearchProvider,
+    SettingKey
 } from '@shared/ipc'
+import { formatRepoLocation } from '@shared/repo-paths'
 import { DEFAULT_GLOBAL_CAPTURE_SHORTCUT } from '@shared/shortcuts'
 import {
-  DEFAULT_TURN_BUDGET,
-  MAX_TURN_BUDGET,
-  MIN_TURN_BUDGET,
-  SEARCH_PROVIDERS,
-  isSearchProvider
+    DEFAULT_TURN_BUDGET,
+    MAX_TURN_BUDGET,
+    MIN_TURN_BUDGET,
+    SEARCH_PROVIDERS,
+    isSearchProvider
 } from '@shared/types'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useRepos } from '../repositories/useRepos'
 import { GitHubDeviceCode } from '../setup/GitHubDeviceCode'
 import { PiSetupPanel } from '../setup/PiSetupPanel'
 import { useGitHubStatus } from '../setup/use-github-status'
@@ -317,12 +319,14 @@ export function Settings({
   focusSection,
   onBack,
   onNavigateRepositories,
+  onNavigateToRepo,
   onNavigateRunHistory,
   onNavigatePublishLog
 }: {
   focusSection?: 'updates' | null
   onBack: () => void
   onNavigateRepositories?: () => void
+  onNavigateToRepo?: (repoId: string) => void
   onNavigateRunHistory?: () => void
   onNavigatePublishLog?: () => void
 }): React.JSX.Element {
@@ -337,6 +341,7 @@ export function Settings({
   const updates = useAppUpdates()
   const runtime = useRuntimeReadiness()
   const theme = useTheme()
+  const { repos } = useRepos()
 
   const displayValue = userEdited ? (hotkeyDraft ?? '') : (hotkey ?? '')
   const dirty = userEdited && hotkeyDraft !== (hotkey ?? '')
@@ -714,19 +719,61 @@ export function Settings({
                   </section>
 
                   <section className="flex flex-col gap-3">
-                    <h2 className="text-sm font-medium text-foreground">Repositories</h2>
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-sm font-medium text-foreground">Repositories</h2>
+                      {repos.length > 0 && (
+                        <span className="text-xs text-muted-foreground tabular">
+                          {repos.length} linked
+                        </span>
+                      )}
+                    </div>
                     <p className="text-xs text-muted-foreground">
                       Link local Git repositories to your GitHub account.
                     </p>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      disabled={!onNavigateRepositories}
-                      onClick={() => onNavigateRepositories?.()}
-                      className="justify-start self-start px-0"
-                    >
-                      Manage repositories &rarr;
-                    </Button>
+
+                    {repos.length > 0 && (
+                      <ul className="flex flex-col divide-y divide-border/60 rounded-md border border-border">
+                        {repos.map((repo) => {
+                          const location = formatRepoLocation(repo)
+                          return (
+                            <li
+                              key={repo.id}
+                              className="flex items-center gap-3 px-3 py-2.5 transition-colors hover:bg-muted/40"
+                            >
+                              <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                                <span className="truncate text-sm font-medium">
+                                  {repo.owner}/{repo.name}
+                                </span>
+                                <span className="truncate font-mono text-xs text-muted-foreground">
+                                  {location.label}
+                                </span>
+                              </div>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                disabled={!onNavigateToRepo}
+                                onClick={() => onNavigateToRepo?.(repo.id)}
+                                className="shrink-0"
+                              >
+                                Edit
+                              </Button>
+                            </li>
+                          )
+                        })}
+                      </ul>
+                    )}
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        disabled={!onNavigateRepositories}
+                        onClick={() => onNavigateRepositories?.()}
+                        className="justify-start self-start px-0"
+                      >
+                        Manage repositories &rarr;
+                      </Button>
+                    </div>
                   </section>
                 </TabsContent>
 
