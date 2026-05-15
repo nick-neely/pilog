@@ -10,10 +10,28 @@ import {
   ViewIcon
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
+import { Alert, AlertDescription, AlertTitle } from '@renderer/components/ui/alert'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle
+} from '@renderer/components/ui/alert-dialog'
 import { Badge } from '@renderer/components/ui/badge'
 import { Button } from '@renderer/components/ui/button'
 import { Checkbox } from '@renderer/components/ui/checkbox'
-import { Alert, AlertDescription, AlertTitle } from '@renderer/components/ui/alert'
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuGroup,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger
+} from '@renderer/components/ui/context-menu'
 import {
   Empty,
   EmptyContent,
@@ -47,8 +65,6 @@ import {
   usePilogHotkey
 } from '@renderer/shortcuts/pilog-hotkeys'
 import { PUBLISH_EGRESS_DISCLOSURE } from '@shared/data-boundaries'
-import { formatRepoLocation, repoAccessFromRepo } from '@shared/repo-paths'
-import { SHORTCUT_CONTRACT } from '@shared/shortcuts'
 import type {
   AgentRunListItem,
   GitHubLabel,
@@ -58,6 +74,8 @@ import type {
   UpdateIssueDraftRequest
 } from '@shared/ipc'
 import { matchLabelsToRepoLabels, type LabelMatch } from '@shared/labels'
+import { formatRepoLocation, repoAccessFromRepo } from '@shared/repo-paths'
+import { SHORTCUT_CONTRACT } from '@shared/shortcuts'
 import type {
   IssueDraft,
   IssueDraftForReview,
@@ -139,6 +157,7 @@ function hasDraftChanges(
 function draftCardClassName(selected: boolean): string {
   return cn(
     'flex w-full max-w-full min-w-0 flex-col overflow-hidden rounded-md border px-3 py-2.5 text-left',
+    'cursor-pointer select-none',
     'transition-all duration-150 ease-[var(--ease-out-quart)] motion-reduce:transition-colors motion-reduce:duration-0',
     'focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30',
     selected ? 'border-border bg-muted translate-x-0.5' : 'border-transparent hover:bg-muted/60'
@@ -264,6 +283,13 @@ function emptyDraftTitle(
 
 function totalDraftCount(statusCounts: DraftReviewCounts): number {
   return statusCounts.draft + statusCounts.dismissed + statusCounts.published
+}
+
+function firstSourceRunId(draft: IssueDraftForReview): string | null {
+  for (const note of draft.sourceNotes) {
+    if (note.runId) return note.runId
+  }
+  return null
 }
 
 function isClarificationDraft(draft: IssueDraft): boolean {
@@ -593,6 +619,7 @@ export function DraftReview({
   const [statusFilter, setStatusFilter] = useState<DraftReviewFilter | undefined>(undefined)
   const [statusCounts, setStatusCounts] = useState<DraftReviewCounts>(EMPTY_DRAFT_REVIEW_COUNTS)
   const [selectedDraftId, setSelectedDraftId] = useState<string | null>(null)
+  const [pendingDismissDraft, setPendingDismissDraft] = useState<IssueDraftForReview | null>(null)
   const [loadingDrafts, setLoadingDrafts] = useState(true)
   const [draftsError, setDraftsError] = useState<string | null>(null)
 
@@ -696,6 +723,38 @@ export function DraftReview({
     }
   )
 
+  const focusDraftInList = useCallback((id: string): void => {
+    setSelectedDraftId(id)
+  }, [])
+
+  const handleCopyDraftText = useCallback(async (draft: IssueDraftForReview): Promise<void> => {
+    const titleLine = normalizeDraftTitle(draft.title)
+    const body = draft.body.trimEnd()
+    const text = body.length > 0 ? `${titleLine}\n\n${body}` : titleLine
+    await navigator.clipboard.writeText(text)
+  }, [])
+
+  const handleDismissDraftById = useCallback(
+    async (id: string): Promise<void> => {
+      await window.pilog.invoke('issue-drafts:updateStatus', { id, status: 'dismissed' })
+      await fetchDrafts()
+    },
+    [fetchDrafts]
+  )
+
+  const handleRestoreDraft = useCallback(
+    async (draft: IssueDraftForReview): Promise<void> => {
+      if (draft.status !== 'dismissed') return
+      await window.pilog.invoke('issue-drafts:updateStatus', { id: draft.id, status: 'draft' })
+      await fetchDrafts()
+    },
+    [fetchDrafts]
+  )
+
+  const handleCopyPublishedLink = useCallback(async (url: string): Promise<void> => {
+    await navigator.clipboard.writeText(url)
+  }, [])
+
   return (
     <div className="flex h-full bg-background text-foreground">
       <aside className="flex w-80 min-w-0 shrink-0 flex-col overflow-hidden border-r">
@@ -798,62 +857,139 @@ export function DraftReview({
                       draft.labels.length > 0
                         ? `${confidenceLabel(draft.confidence)} · ${draft.labels.join(', ')}`
                         : confidenceLabel(draft.confidence)
+                    const firstSourceNoteId = draft.sourceNoteIds[0] ?? null
+                    const firstRunId = firstSourceRunId(draft)
+                    const publishedUrl =
+                      draft.status === 'published' &&
+                      draft.githubIssueUrl !== null &&
+                      draft.githubIssueUrl.trim().length > 0
+                        ? draft.githubIssueUrl
+                        : null
+                    const hasSecondaryActions =
+                      firstSourceNoteId !== null || firstRunId !== null || publishedUrl !== null
+                    const showStatusActions =
+                      draft.status === 'draft' || draft.status === 'dismissed'
                     return (
                       <li key={draft.id}>
-                        <button
-                          type="button"
-                          data-testid="draft-row"
-                          onClick={() => setSelectedDraftId(draft.id)}
-                          className={draftCardClassName(selectedDraftId === draft.id)}
-                        >
-                          <span className="flex min-w-0 flex-col gap-1">
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <span className="min-w-0 block truncate text-sm leading-snug">
-                                  {normalizeDraftTitle(draft.title)}
-                                </span>
-                              </TooltipTrigger>
-                              <TooltipContent>{normalizeDraftTitle(draft.title)}</TooltipContent>
-                            </Tooltip>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <span className="block truncate font-mono text-xs text-muted-foreground/80">
-                                  {repoLine}
-                                </span>
-                              </TooltipTrigger>
-                              <TooltipContent>{repoLine}</TooltipContent>
-                            </Tooltip>
-                            <span className="flex min-w-0 items-center justify-between gap-2 text-xs">
-                              <Badge variant="secondary" className="font-medium text-foreground/80">
-                                {workflowStateLabel(draft)}
-                              </Badge>
-                              <span className="tabular shrink-0 whitespace-nowrap text-muted-foreground">
-                                {formatTimestamp(draft.updatedAt)}
-                              </span>
-                            </span>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <span className="line-clamp-2 min-w-0 break-words text-xs leading-snug">
-                                  <span
-                                    className="mr-1.5 inline-flex align-middle items-center rounded border border-border/55 bg-muted/40 px-1 py-px text-[11px] font-medium leading-tight text-foreground/75"
-                                    aria-hidden
-                                  >
-                                    {confidenceSidebarShort(draft.confidence)}
-                                  </span>
-                                  <span className="sr-only">
-                                    {confidenceLabel(draft.confidence)}
-                                  </span>
-                                  {draft.labels.length > 0 ? (
-                                    <span className="align-middle text-muted-foreground">
-                                      {draft.labels.join(' · ')}
+                        <ContextMenu>
+                          <ContextMenuTrigger asChild>
+                            <button
+                              type="button"
+                              data-testid="draft-row"
+                              onClick={() => setSelectedDraftId(draft.id)}
+                              onContextMenu={() => focusDraftInList(draft.id)}
+                              className={draftCardClassName(selectedDraftId === draft.id)}
+                            >
+                              <span className="flex min-w-0 flex-col gap-1">
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span className="min-w-0 block truncate text-sm leading-snug">
+                                      {normalizeDraftTitle(draft.title)}
                                     </span>
-                                  ) : null}
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    {normalizeDraftTitle(draft.title)}
+                                  </TooltipContent>
+                                </Tooltip>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span className="block truncate font-mono text-xs text-muted-foreground/80">
+                                      {repoLine}
+                                    </span>
+                                  </TooltipTrigger>
+                                  <TooltipContent>{repoLine}</TooltipContent>
+                                </Tooltip>
+                                <span className="flex min-w-0 items-center justify-between gap-2 text-xs">
+                                  <Badge
+                                    variant="secondary"
+                                    className="font-medium text-foreground/80"
+                                  >
+                                    {workflowStateLabel(draft)}
+                                  </Badge>
+                                  <span className="tabular shrink-0 whitespace-nowrap text-muted-foreground">
+                                    {formatTimestamp(draft.updatedAt)}
+                                  </span>
                                 </span>
-                              </TooltipTrigger>
-                              <TooltipContent>{confidenceSidebarTooltip}</TooltipContent>
-                            </Tooltip>
-                          </span>
-                        </button>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span className="line-clamp-2 min-w-0 break-words text-xs leading-snug">
+                                      <span
+                                        className="mr-1.5 inline-flex align-middle items-center rounded border border-border/55 bg-muted/40 px-1 py-px text-[11px] font-medium leading-tight text-foreground/75"
+                                        aria-hidden
+                                      >
+                                        {confidenceSidebarShort(draft.confidence)}
+                                      </span>
+                                      <span className="sr-only">
+                                        {confidenceLabel(draft.confidence)}
+                                      </span>
+                                      {draft.labels.length > 0 ? (
+                                        <span className="align-middle text-muted-foreground">
+                                          {draft.labels.join(' · ')}
+                                        </span>
+                                      ) : null}
+                                    </span>
+                                  </TooltipTrigger>
+                                  <TooltipContent>{confidenceSidebarTooltip}</TooltipContent>
+                                </Tooltip>
+                              </span>
+                            </button>
+                          </ContextMenuTrigger>
+                          <ContextMenuContent alignOffset={-4}>
+                            <ContextMenuGroup>
+                              <ContextMenuItem onSelect={() => focusDraftInList(draft.id)}>
+                                Open draft
+                              </ContextMenuItem>
+                              <ContextMenuItem onSelect={() => void handleCopyDraftText(draft)}>
+                                Copy draft text
+                              </ContextMenuItem>
+                            </ContextMenuGroup>
+                            {hasSecondaryActions ? <ContextMenuSeparator /> : null}
+                            {firstSourceNoteId ? (
+                              <ContextMenuItem onSelect={() => onOpenSourceNote(firstSourceNoteId)}>
+                                {draft.sourceNoteIds.length > 1
+                                  ? 'Open first source note'
+                                  : 'Open source note'}
+                              </ContextMenuItem>
+                            ) : null}
+                            {firstRunId ? (
+                              <ContextMenuItem
+                                onSelect={() =>
+                                  onNavigateToAgentRuns(firstRunId, {
+                                    kind: 'draft',
+                                    draftId: draft.id,
+                                    label: normalizeDraftTitle(draft.title)
+                                  })
+                                }
+                              >
+                                View run
+                              </ContextMenuItem>
+                            ) : null}
+                            {publishedUrl ? (
+                              <ContextMenuItem
+                                onSelect={() => void handleCopyPublishedLink(publishedUrl)}
+                              >
+                                Copy published link
+                              </ContextMenuItem>
+                            ) : null}
+                            {showStatusActions ? (
+                              <>
+                                <ContextMenuSeparator />
+                                {draft.status === 'dismissed' ? (
+                                  <ContextMenuItem onSelect={() => void handleRestoreDraft(draft)}>
+                                    Restore draft
+                                  </ContextMenuItem>
+                                ) : (
+                                  <ContextMenuItem
+                                    variant="destructive"
+                                    onSelect={() => setPendingDismissDraft(draft)}
+                                  >
+                                    Dismiss draft...
+                                  </ContextMenuItem>
+                                )}
+                              </>
+                            ) : null}
+                          </ContextMenuContent>
+                        </ContextMenu>
                       </li>
                     )
                   })}
@@ -923,6 +1059,34 @@ export function DraftReview({
           )}
         </ScrollArea>
       </main>
+      <AlertDialog
+        open={pendingDismissDraft !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingDismissDraft(null)
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Dismiss this draft?</AlertDialogTitle>
+            <AlertDialogDescription>
+              It moves to Dismissed. You can restore it later from the Dismissed filter.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={() => {
+                const id = pendingDismissDraft?.id
+                setPendingDismissDraft(null)
+                if (id) void handleDismissDraftById(id)
+              }}
+            >
+              Dismiss
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
