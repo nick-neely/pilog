@@ -1,6 +1,6 @@
 import type { Repo, RepoAccessDescriptor } from './ipc'
 
-type RepoLocationDisplay = {
+export type RepoLocationDisplay = {
   label: string
   tooltipText: string
   context: string | null

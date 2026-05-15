@@ -1,60 +1,60 @@
 import {
-    Activity01Icon,
-    ArrowDown01Icon,
-    CheckmarkCircle01Icon,
-    ComputerIcon,
-    Delete02Icon,
-    Download01Icon,
-    EyeIcon,
-    GithubIcon,
-    InformationCircleIcon,
-    ListRestartIcon,
-    Moon02Icon,
-    Refresh01Icon,
-    Search01Icon,
-    Sun02Icon
+  Activity01Icon,
+  ArrowDown01Icon,
+  CheckmarkCircle01Icon,
+  ComputerIcon,
+  Delete02Icon,
+  Download01Icon,
+  EyeIcon,
+  GithubIcon,
+  InformationCircleIcon,
+  ListRestartIcon,
+  Moon02Icon,
+  Refresh01Icon,
+  Search01Icon,
+  Sun02Icon
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { HotkeyInput } from '@renderer/components/HotkeyInput'
 import { Alert, AlertDescription, AlertTitle } from '@renderer/components/ui/alert'
 import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-    AlertDialogTrigger
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger
 } from '@renderer/components/ui/alert-dialog'
 import { Avatar, AvatarFallback } from '@renderer/components/ui/avatar'
 import { Badge } from '@renderer/components/ui/badge'
 import { Button } from '@renderer/components/ui/button'
 import {
-    Card,
-    CardAction,
-    CardContent,
-    CardDescription,
-    CardFooter,
-    CardHeader,
-    CardTitle
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle
 } from '@renderer/components/ui/card'
 import {
-    Collapsible,
-    CollapsibleContent,
-    CollapsibleTrigger
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger
 } from '@renderer/components/ui/collapsible'
 import { Input } from '@renderer/components/ui/input'
 import { Label } from '@renderer/components/ui/label'
 import { ScrollArea } from '@renderer/components/ui/scroll-area'
 import {
-    Select,
-    SelectContent,
-    SelectGroup,
-    SelectItem,
-    SelectTrigger,
-    SelectValue
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
 } from '@renderer/components/ui/select'
 import { Separator } from '@renderer/components/ui/separator'
 import { Switch } from '@renderer/components/ui/switch'
@@ -64,21 +64,21 @@ import { isThemeMode, type AppliedTheme, type ThemeMode } from '@renderer/theme/
 import { useTheme } from '@renderer/theme/useTheme'
 import { LOCAL_FIRST_DISCLOSURE } from '@shared/data-boundaries'
 import type {
-    AdvancedSettings,
-    GitHubAuthProgress,
-    RuntimeReadiness,
-    RuntimeReadinessItem,
-    SearchProvider,
-    SettingKey
+  AdvancedSettings,
+  GitHubAuthProgress,
+  RuntimeReadiness,
+  RuntimeReadinessItem,
+  SearchProvider,
+  SettingKey
 } from '@shared/ipc'
 import { formatRepoLocation } from '@shared/repo-paths'
 import { DEFAULT_GLOBAL_CAPTURE_SHORTCUT } from '@shared/shortcuts'
 import {
-    DEFAULT_TURN_BUDGET,
-    MAX_TURN_BUDGET,
-    MIN_TURN_BUDGET,
-    SEARCH_PROVIDERS,
-    isSearchProvider
+  DEFAULT_TURN_BUDGET,
+  MAX_TURN_BUDGET,
+  MIN_TURN_BUDGET,
+  SEARCH_PROVIDERS,
+  isSearchProvider
 } from '@shared/types'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useRepos } from '../repositories/useRepos'

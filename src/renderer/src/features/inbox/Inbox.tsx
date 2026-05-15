@@ -104,7 +104,7 @@ import {
   type OnboardingSignals,
   type OnboardingStepId
 } from '@shared/onboarding'
-import { formatRepoLocation } from '@shared/repo-paths'
+import { formatRepoLocation, type RepoLocationDisplay } from '@shared/repo-paths'
 import {
   DEFAULT_GLOBAL_CAPTURE_SHORTCUT,
   formatShortcutForDisplay,
@@ -1234,10 +1234,7 @@ function NoteDetail({
                   )}
                 </TooltipContent>
               </Tooltip>
-              <PopoverContent
-                align="start"
-                className="w-84 gap-3 rounded-xl"
-              >
+              <PopoverContent align="start" className="w-84 gap-3 rounded-xl">
                 <div className="flex flex-col gap-1">
                   <p className="text-sm font-medium">Draft settings</p>
                   {draftSettings.statusMessage ? (
@@ -1436,95 +1433,48 @@ function AutoPublishPreviewDialog({
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent className="max-h-[min(42rem,calc(100vh-4rem))] max-w-3xl">
-        <AlertDialogHeader>
+      <AlertDialogContent className="max-h-[min(42rem,calc(100vh-4rem))] max-w-3xl flex flex-col">
+        <AlertDialogHeader className="shrink-0">
           <AlertDialogTitle>{title}</AlertDialogTitle>
           <AlertDialogDescription>{description}</AlertDialogDescription>
         </AlertDialogHeader>
         {publishError ? (
-          <div role="alert" className="rounded-md border bg-muted/50 px-3 py-2 text-sm">
+          <div role="alert" className="shrink-0 rounded-md border bg-muted/50 px-3 py-2 text-sm">
             {publishError}
           </div>
         ) : null}
         {report ? (
           <AutoPublishReport report={report} sourceNotesById={sourceNotesById} />
         ) : summary ? (
-          <div className="flex flex-col gap-3" role="status">
-            <p
-              data-testid="auto-publish-boundary-disclosure"
-              className="max-w-[68ch] text-sm leading-relaxed text-muted-foreground"
-            >
-              {AUTO_PUBLISH_EGRESS_DISCLOSURE}
-            </p>
-            <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-              <Badge variant="secondary">
-                {summary.plannedDraftCount} planned of {summary.generatedDraftCount}
-              </Badge>
-              <Badge variant="secondary">Limit {summary.maxIssuesPerRun}</Badge>
-              <Badge variant="secondary">Label {summary.defaultLabel}</Badge>
-              {summary.dryRun ? <Badge variant="secondary">Dry run, no GitHub writes</Badge> : null}
-            </div>
+          <div className="shrink-0 flex flex-col gap-4" role="status">
+            {summary.dryRun ? (
+              <DryRunNotice />
+            ) : (
+              <p
+                data-testid="auto-publish-boundary-disclosure"
+                className="max-w-[68ch] text-sm leading-relaxed text-muted-foreground"
+              >
+                {AUTO_PUBLISH_EGRESS_DISCLOSURE}
+              </p>
+            )}
+            <PlanMetaSummary summary={summary} />
           </div>
         ) : null}
         {!report ? (
-          <ScrollArea className="max-h-[24rem] pe-3">
-            <div className="flex flex-col gap-4">
+          <ScrollArea className="min-h-0 flex-1 pe-3">
+            <div className="flex flex-col gap-5">
               {drafts.map((draft, index) => (
-                <section key={`${draft.title}-${index}`} className="border-t pt-4 first:border-t-0">
-                  <div className="flex flex-col gap-2">
-                    <div className="flex flex-wrap items-start justify-between gap-2">
-                      <h3 className="max-w-[52ch] text-base font-semibold leading-snug">
-                        {draft.title}
-                      </h3>
-                      <Badge variant="outline">Confidence {draft.confidence}</Badge>
-                    </div>
-                    <p className="max-w-[68ch] text-sm leading-relaxed text-muted-foreground">
-                      {draft.summary}
-                    </p>
-                    <DraftLabelBadges
-                      labels={draft.suggestedLabels}
-                      labelMatches={draft.labelMatches}
-                    />
-                    <div className="grid gap-3 md:grid-cols-2">
-                      <div className="flex flex-col gap-1">
-                        <p className="text-xs font-medium text-muted-foreground">Source notes</p>
-                        <SourceNoteList
-                          noteIds={draft.sourceNoteIds}
-                          sourceNotesById={sourceNotesById}
-                          itemClassName="line-clamp-2 text-sm leading-relaxed"
-                        />
-                      </div>
-                      <div className="flex flex-col gap-1">
-                        <p className="text-xs font-medium text-muted-foreground">Affected files</p>
-                        {repoLocation?.context ? (
-                          <p className="text-xs leading-5 text-muted-foreground">
-                            {repoLocation.context}
-                          </p>
-                        ) : null}
-                        <ul className="flex flex-col gap-1">
-                          {draft.affectedFiles.map((file) => (
-                            <li key={file.path} className="min-w-0">
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <p className="truncate font-mono text-xs">{file.path}</p>
-                                </TooltipTrigger>
-                                <TooltipContent className="font-mono">{file.path}</TooltipContent>
-                              </Tooltip>
-                              <p className="line-clamp-2 text-xs text-muted-foreground">
-                                {file.reason}
-                              </p>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    </div>
-                  </div>
-                </section>
+                <DraftPreviewCard
+                  key={`${draft.title}-${index}`}
+                  draft={draft}
+                  repoLocation={repoLocation}
+                  sourceNotesById={sourceNotesById}
+                />
               ))}
             </div>
           </ScrollArea>
         ) : null}
-        <AlertDialogFooter>
+        <AlertDialogFooter className="shrink-0">
           <AlertDialogCancel disabled={publishing}>Close</AlertDialogCancel>
           {report || summary?.dryRun ? (
             <AlertDialogAction onClick={onOpenDrafts}>Open Drafts</AlertDialogAction>
@@ -1536,6 +1486,116 @@ function AutoPublishPreviewDialog({
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
+  )
+}
+
+function DryRunNotice(): React.JSX.Element {
+  return (
+    <div className="flex items-start gap-2.5 rounded-lg border border-border/70 bg-muted/40 p-3">
+      <HugeiconsIcon
+        icon={InformationCircleIcon}
+        className="mt-0.5 size-4 shrink-0 text-muted-foreground"
+        aria-hidden
+      />
+      <div className="flex flex-col gap-0.5">
+        <p className="text-sm font-medium">Dry run — no GitHub writes</p>
+        <p className="max-w-[68ch] text-sm leading-relaxed text-muted-foreground">
+          This plan was generated through your Pi provider. Publishing writes the selected drafts to
+          GitHub; closing keeps them as local drafts.
+        </p>
+      </div>
+    </div>
+  )
+}
+
+function PlanMetaSummary({ summary }: { summary: AutoPublishPreviewSummary }): React.JSX.Element {
+  return (
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
+      <span className="inline-flex items-center gap-1.5">
+        <span className="inline-block size-1.5 rounded-full bg-primary/60" aria-hidden />
+        <span>
+          {summary.plannedDraftCount} planned of {summary.generatedDraftCount}
+        </span>
+      </span>
+      <span className="inline-flex items-center gap-1.5">
+        <span className="inline-block size-1.5 rounded-full bg-primary/60" aria-hidden />
+        <span>Limit {summary.maxIssuesPerRun}</span>
+      </span>
+      <span className="inline-flex items-center gap-1.5">
+        <span className="inline-block size-1.5 rounded-full bg-primary/60" aria-hidden />
+        <span>Label {summary.defaultLabel}</span>
+      </span>
+    </div>
+  )
+}
+
+function ConfidenceBadge({ confidence }: { confidence: string }): React.JSX.Element {
+  const indicatorClass =
+    confidence === 'low'
+      ? 'bg-destructive/70'
+      : confidence === 'medium'
+        ? 'bg-primary/60'
+        : 'bg-primary/80'
+
+  return (
+    <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+      <span className={cn('inline-block size-1.5 rounded-full', indicatorClass)} aria-hidden />
+      <span className="capitalize">Confidence {confidence}</span>
+    </span>
+  )
+}
+
+function DraftPreviewCard({
+  draft,
+  repoLocation,
+  sourceNotesById
+}: {
+  draft: GeneratedIssueDraft
+  repoLocation: RepoLocationDisplay | null
+  sourceNotesById: Map<string, Note>
+}): React.JSX.Element {
+  return (
+    <section className="rounded-lg border bg-muted/20 p-4">
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <h3 className="max-w-[52ch] text-base font-semibold leading-snug">{draft.title}</h3>
+          <ConfidenceBadge confidence={draft.confidence} />
+        </div>
+        <p className="max-w-[68ch] text-sm leading-relaxed text-muted-foreground">
+          {draft.summary}
+        </p>
+        <DraftLabelBadges labels={draft.suggestedLabels} labelMatches={draft.labelMatches} />
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="flex flex-col gap-1.5">
+            <p className="text-xs font-medium text-muted-foreground">Source notes</p>
+            <SourceNoteList
+              noteIds={draft.sourceNoteIds}
+              sourceNotesById={sourceNotesById}
+              itemClassName="line-clamp-2 text-sm leading-relaxed"
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <p className="text-xs font-medium text-muted-foreground">Affected files</p>
+            {repoLocation?.context ? (
+              <p className="text-xs leading-5 text-muted-foreground">{repoLocation.context}</p>
+            ) : null}
+            <ul className="flex flex-col gap-1.5">
+              {draft.affectedFiles.map((file) => (
+                <li key={file.path} className="min-w-0">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <p className="truncate font-mono text-xs">{file.path}</p>
+                    </TooltipTrigger>
+                    <TooltipContent className="font-mono">{file.path}</TooltipContent>
+                  </Tooltip>
+                  <p className="line-clamp-2 text-xs text-muted-foreground">{file.reason}</p>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
   )
 }
 
@@ -1551,11 +1611,15 @@ function DraftLabelBadges({
   return (
     <div className="flex flex-wrap gap-1.5">
       {badges.map((label) => (
-        <Badge key={`${label.input}:${label.name}`} variant="secondary" className="gap-1">
+        <Badge
+          key={`${label.input}:${label.name}`}
+          variant={label.matched ? 'secondary' : 'outline'}
+          className="gap-1"
+        >
           <span>{label.name}</span>
-          <span className="rounded-sm border border-border/70 bg-background/50 px-1 text-[10px] leading-4 text-muted-foreground">
-            {label.matched ? 'Matched' : 'Unmatched, omitted'}
-          </span>
+          {!label.matched ? (
+            <span className="text-[10px] text-muted-foreground">omitted</span>
+          ) : null}
         </Badge>
       ))}
     </div>
@@ -1603,7 +1667,7 @@ function AutoPublishReport({
   sourceNotesById: Map<string, Note>
 }): React.JSX.Element {
   return (
-    <ScrollArea className="max-h-[24rem] pe-3">
+    <ScrollArea className="min-h-0 flex-1 pe-3">
       <div className="flex flex-col gap-5" role="status" aria-live="polite">
         {report.successes.length > 0 ? (
           <section className="flex flex-col gap-2">
