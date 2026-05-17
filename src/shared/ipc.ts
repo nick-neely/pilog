@@ -6,6 +6,8 @@ import type {
   AgentRunStatus,
   AgentRunStatusCounts,
   AutoPublishPublishReport,
+  AutoPublishUndoIssue,
+  AutoPublishUndoReport,
   AutoPublishPreviewSummary,
   GenerateCurrentInboxDraftsRequest,
   GenerateCurrentInboxDraftsStartResponse,
@@ -538,6 +540,12 @@ export type PublishAutoPublishRunRequest = {
   runId: string
 }
 
+export type UndoAutoPublishRunRequest = {
+  runId: string
+  repoId: string
+  issues: AutoPublishUndoIssue[]
+}
+
 export type AppUpdateChannel = 'stable' | 'preview'
 
 export type AppUpdateState =
@@ -670,6 +678,10 @@ export type IpcContract = {
     request: PublishAutoPublishRunRequest
     response: AutoPublishPublishReport
   }
+  'issue-drafts:undoAutoPublishRun': {
+    request: UndoAutoPublishRunRequest
+    response: AutoPublishUndoReport
+  }
   'publish-log:list': {
     request: { repoId?: string } | undefined
     response: PublishAuditLogEntry[]
@@ -724,6 +736,8 @@ export type {
   AgentRunStatus,
   AgentRunStatusCounts,
   AutoPublishPublishReport,
+  AutoPublishUndoIssue,
+  AutoPublishUndoReport,
   AutoPublishPreviewSummary,
   GenerateCurrentInboxDraftsRequest,
   GenerateCurrentInboxDraftsStartResponse,

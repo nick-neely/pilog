@@ -127,6 +127,40 @@ export async function createIssue(
   })
 }
 
+export async function commentIssue(
+  owner: string,
+  repo: string,
+  issueNumber: number,
+  body: string
+): Promise<{ url: string | null }> {
+  const client = getOctokitClient()
+  if (!client) throw new Error('Not authenticated')
+
+  return withRetry(async () => {
+    const { data } = await client.rest.issues.createComment({
+      owner,
+      repo,
+      issue_number: issueNumber,
+      body
+    })
+    return { url: data.html_url ?? null }
+  })
+}
+
+export async function closeIssue(owner: string, repo: string, issueNumber: number): Promise<void> {
+  const client = getOctokitClient()
+  if (!client) throw new Error('Not authenticated')
+
+  await withRetry(async () => {
+    await client.rest.issues.update({
+      owner,
+      repo,
+      issue_number: issueNumber,
+      state: 'closed'
+    })
+  })
+}
+
 async function withRetry<T>(fn: () => Promise<T>, maxRetries = 3, delayMs = 100): Promise<T> {
   let lastError: unknown
   for (let attempt = 0; attempt <= maxRetries; attempt++) {

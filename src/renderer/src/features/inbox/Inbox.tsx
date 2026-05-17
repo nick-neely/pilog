@@ -6,7 +6,8 @@ import {
   FilePenIcon,
   GithubIcon,
   InformationCircleIcon,
-  Settings02Icon
+  Settings02Icon,
+  Undo02Icon
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { HotkeyInput } from '@renderer/components/HotkeyInput'
@@ -115,6 +116,7 @@ import type {
   AutoPublishPreviewSummary,
   AutoPublishPublishReport,
   AutoPublishSkippedDraft,
+  AutoPublishUndoReport,
   GeneratedIssueDraft,
   IssueDraftForReview,
   IssueDraftStatus
@@ -243,6 +245,7 @@ type AutoPublishPreviewState = {
   sourceNotes: Note[]
   report: AutoPublishPublishReport | null
   publishing: boolean
+  undoing: boolean
   publishError: string | null
 }
 
@@ -1414,9 +1417,11 @@ function AutoPublishPreviewDialog({
   report,
   publishing,
   publishError,
+  undoing,
   onOpenChange,
   onOpenDrafts,
-  onPublish
+  onPublish,
+  onUndo
 }: {
   open: boolean
   summary: AutoPublishPreviewSummary | null
@@ -1425,10 +1430,12 @@ function AutoPublishPreviewDialog({
   sourceNotes: Note[]
   report: AutoPublishPublishReport | null
   publishing: boolean
+  undoing: boolean
   publishError: string | null
   onOpenChange: (open: boolean) => void
   onOpenDrafts: () => void
   onPublish: () => void
+  onUndo: () => void
 }): React.JSX.Element {
   const sourceNotesById = useMemo(
     () => new Map(sourceNotes.map((note) => [note.id, note])),
@@ -1437,6 +1444,8 @@ function AutoPublishPreviewDialog({
   const title = getAutoPublishDialogTitle(summary, report)
   const description = getAutoPublishDialogDescription(summary, report)
   const repoLocation = repo ? formatRepoLocation(repo) : null
+  const undoComplete =
+    report?.undo !== undefined && report.undo.successCount > 0 && report.undo.failureCount === 0
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
@@ -1485,8 +1494,21 @@ function AutoPublishPreviewDialog({
           </ScrollArea>
         ) : null}
         <AlertDialogFooter className="shrink-0">
-          <AlertDialogCancel disabled={publishing}>Close</AlertDialogCancel>
-          {report || summary?.dryRun ? (
+          <AlertDialogCancel disabled={publishing || undoing}>Close</AlertDialogCancel>
+          {report ? (
+            <>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={undoing || report.successes.length === 0 || undoComplete}
+                onClick={onUndo}
+              >
+                <HugeiconsIcon icon={Undo02Icon} className="size-4" aria-hidden />
+                {undoing ? 'Closing issues' : undoComplete ? 'Issues Closed' : 'Publish Undo'}
+              </Button>
+              <AlertDialogAction onClick={onOpenDrafts}>Open Drafts</AlertDialogAction>
+            </>
+          ) : summary?.dryRun ? (
             <AlertDialogAction onClick={onOpenDrafts}>Open Drafts</AlertDialogAction>
           ) : (
             <AlertDialogAction
@@ -1709,6 +1731,7 @@ function AutoPublishReport({
           <span>Run {report.runId}</span>
           <span>{formatDateTime(report.publishedAt)}</span>
         </div>
+        {report.undo ? <AutoPublishUndoSummary undo={report.undo} /> : null}
         {report.successes.length > 0 ? (
           <section className="flex flex-col gap-2">
             <h3 className="text-sm font-semibold">Published</h3>
@@ -1801,6 +1824,40 @@ function AutoPublishReport({
   )
 }
 
+function AutoPublishUndoSummary({
+  undo
+}: {
+  undo: AutoPublishUndoReport
+}): React.JSX.Element {
+  return (
+    <section className="flex flex-col gap-2 rounded-md border bg-muted/30 p-3">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="flex flex-col gap-0.5">
+          <h3 className="text-sm font-semibold">Publish Undo</h3>
+          <p className="text-sm text-muted-foreground">
+            {undo.successCount} closed, {undo.failureCount} failed.
+          </p>
+        </div>
+        <Badge variant={undo.failureCount > 0 ? 'outline' : 'secondary'}>
+          {undo.failureCount > 0 ? 'Partial' : 'Audited'}
+        </Badge>
+      </div>
+      {undo.failures.length > 0 ? (
+        <ul className="flex flex-col gap-2">
+          {undo.failures.map((failure) => (
+            <li key={`${failure.githubIssueNumber}:${failure.stage}`} className="text-sm">
+              <p className="font-medium leading-snug">{failure.title}</p>
+              <p className="text-muted-foreground">
+                Issue #{failure.githubIssueNumber}: {failure.stage} failed. {failure.error}
+              </p>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </section>
+  )
+}
+
 function ReportLabels({ labels }: { labels: string[] }): React.JSX.Element | null {
   if (labels.length === 0) return null
 
@@ -1889,6 +1946,7 @@ export function Inbox({
     sourceNotes: [],
     report: null,
     publishing: false,
+    undoing: false,
     publishError: null
   })
   const [statusFilter, setStatusFilter] = useState<NoteStatus | undefined>()
@@ -2409,6 +2467,7 @@ export function Inbox({
                 sourceNotes: selectedNoteSnapshot,
                 report: null,
                 publishing: false,
+                undoing: false,
                 publishError: null
               })
             } else {
@@ -2535,6 +2594,7 @@ export function Inbox({
                 sourceNotes: sourceNoteSnapshot,
                 report: null,
                 publishing: false,
+                undoing: false,
                 publishError: null
               })
             }
@@ -2585,6 +2645,36 @@ export function Inbox({
       setAutoPublishPreview((prev) => ({
         ...prev,
         publishing: false,
+        publishError: recovery.description
+      }))
+    }
+  }
+
+  const handleUndoAutoPublish = async (): Promise<void> => {
+    const report = autoPublishPreview.report
+    if (!report || autoPublishPreview.undoing || report.successes.length === 0) return
+    const issuesToUndo = report.undo?.failureCount ? report.undo.failures : report.successes
+
+    setAutoPublishPreview((prev) => ({ ...prev, undoing: true, publishError: null }))
+    try {
+      const undo = await window.pilog.invoke('issue-drafts:undoAutoPublishRun', {
+        runId: report.runId,
+        repoId: report.repoId,
+        issues: issuesToUndo
+      })
+      if (!mountedRef.current) return
+      setAutoPublishPreview((prev) => ({
+        ...prev,
+        report: prev.report ? { ...prev.report, undo } : prev.report,
+        undoing: false,
+        publishError: null
+      }))
+    } catch (error) {
+      if (!mountedRef.current) return
+      const recovery = getPublishRecoveryState(error)
+      setAutoPublishPreview((prev) => ({
+        ...prev,
+        undoing: false,
         publishError: recovery.description
       }))
     }
@@ -3179,6 +3269,7 @@ export function Inbox({
         sourceNotes={autoPublishPreview.sourceNotes}
         report={autoPublishPreview.report}
         publishing={autoPublishPreview.publishing}
+        undoing={autoPublishPreview.undoing}
         publishError={autoPublishPreview.publishError}
         onOpenChange={(open) => setAutoPublishPreview((prev) => ({ ...prev, open }))}
         onOpenDrafts={() => {
@@ -3187,6 +3278,7 @@ export function Inbox({
           onNavigateToDraftReview()
         }}
         onPublish={() => void handleConfirmAutoPublish()}
+        onUndo={() => void handleUndoAutoPublish()}
       />
       <AlertDialog
         open={pendingDeleteNote !== null}

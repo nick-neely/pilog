@@ -4,10 +4,16 @@ import type {
   CreatedIssue,
   GitHubLabel,
   PublishAutoPublishRunRequest,
-  PublishIssueDraftRequest
+  PublishIssueDraftRequest,
+  UndoAutoPublishRunRequest
 } from '@shared/ipc'
 import { filterLabelsForPublish } from '@shared/labels'
-import type { AutoPublishPublishReport, AutoPublishSkippedDraft, IssueDraft } from '@shared/types'
+import type {
+  AutoPublishPublishReport,
+  AutoPublishSkippedDraft,
+  AutoPublishUndoReport,
+  IssueDraft
+} from '@shared/types'
 import type { PilogDatabase } from '../db/client'
 import { issueDrafts, notes, publishLog } from '../db/schema'
 import { getIssueDraftById } from '../db/repositories/issue-drafts'
@@ -21,6 +27,15 @@ type CreateIssueClient = (
 ) => Promise<CreatedIssue>
 
 type ListLabelsClient = (owner: string, repo: string) => Promise<Array<Pick<GitHubLabel, 'name'>>>
+
+type CommentIssueClient = (
+  owner: string,
+  repo: string,
+  issueNumber: number,
+  body: string
+) => Promise<{ url: string | null }>
+
+type CloseIssueClient = (owner: string, repo: string, issueNumber: number) => Promise<void>
 
 type PublishClients =
   | CreateIssueClient
@@ -118,7 +133,8 @@ export async function publishAutoPublishRun(
         title: published.title,
         sourceNoteIds: published.sourceNoteIds,
         labels: published.labels,
-        githubIssueUrl: published.githubIssueUrl ?? ''
+        githubIssueUrl: published.githubIssueUrl ?? '',
+        githubIssueNumber: createdIssueNumberFromUrl(published.githubIssueUrl) ?? 0
       })
     } catch (error) {
       failures.push({
@@ -146,6 +162,77 @@ export async function publishAutoPublishRun(
     successes,
     failures,
     skippedDrafts
+  }
+}
+
+export async function undoAutoPublishRun(
+  db: PilogDatabase,
+  request: UndoAutoPublishRunRequest,
+  clients: { commentIssue: CommentIssueClient; closeIssue: CloseIssueClient }
+): Promise<AutoPublishUndoReport> {
+  const run = getRunById(db, request.runId)
+  if (!run) throw new Error('Auto-publish run not found')
+  if (run.repoId !== request.repoId) throw new Error('Auto-publish run does not match repository')
+  const repo = getRepoById(db, request.repoId)
+  if (!repo) throw new Error('Linked repository not found')
+
+  const successes: AutoPublishUndoReport['successes'] = []
+  const failures: AutoPublishUndoReport['failures'] = []
+
+  for (const issue of request.issues) {
+    const issueNumber = issue.githubIssueNumber || createdIssueNumberFromUrl(issue.githubIssueUrl)
+    if (!issueNumber) {
+      failures.push({
+        ...issue,
+        githubIssueNumber: 0,
+        stage: 'comment',
+        error: 'GitHub issue number could not be determined.'
+      })
+      continue
+    }
+
+    try {
+      const comment = await clients.commentIssue(
+        repo.owner,
+        repo.name,
+        issueNumber,
+        buildPublishUndoAuditComment(request.runId)
+      )
+
+      try {
+        await clients.closeIssue(repo.owner, repo.name, issueNumber)
+        successes.push({
+          ...issue,
+          githubIssueNumber: issueNumber,
+          auditCommentUrl: comment.url,
+          closedAt: new Date().toISOString()
+        })
+      } catch (error) {
+        failures.push({
+          ...issue,
+          githubIssueNumber: issueNumber,
+          stage: 'close',
+          error: formatPublishError(error)
+        })
+      }
+    } catch (error) {
+      failures.push({
+        ...issue,
+        githubIssueNumber: issueNumber,
+        stage: 'comment',
+        error: formatPublishError(error)
+      })
+    }
+  }
+
+  return {
+    runId: request.runId,
+    repoId: request.repoId,
+    attemptedAt: new Date().toISOString(),
+    successCount: successes.length,
+    failureCount: failures.length,
+    successes,
+    failures
   }
 }
 
@@ -178,6 +265,18 @@ function normalizeSkippedDraft(input: unknown): AutoPublishSkippedDraft | null {
     sourceNoteIds: stringArray(input.sourceNoteIds),
     labels: stringArray(input.labels)
   }
+}
+
+function buildPublishUndoAuditComment(runId: string): string {
+  return `Pilog Publish Undo requested for run ${runId}. Closing this issue for auditability; the original Pilog publish log and local issue draft remain unchanged.`
+}
+
+function createdIssueNumberFromUrl(url: string | null | undefined): number | null {
+  if (!url) return null
+  const match = /\/issues\/(\d+)(?:$|[/?#])/.exec(url)
+  if (!match) return null
+  const number = Number(match[1])
+  return Number.isInteger(number) && number > 0 ? number : null
 }
 
 function isRecord(input: unknown): input is Record<string, unknown> {

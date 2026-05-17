@@ -6,11 +6,11 @@ import {
   getGitHubStatus,
   type GitHubAuthRuntimeOptions
 } from '../github/auth'
-import { resetClient, listLabels, createIssue } from '../github/client'
+import { resetClient, listLabels, createIssue, commentIssue, closeIssue } from '../github/client'
 import type { PilogDatabase } from '../db/client'
 import type { CreateIssueRequest } from '@shared/ipc'
 import { recordPublish } from '../db/repositories/publish-log'
-import { publishAutoPublishRun, publishReviewedDraft } from '../github/publish-draft'
+import { publishAutoPublishRun, publishReviewedDraft, undoAutoPublishRun } from '../github/publish-draft'
 
 export function registerGitHubIpcHandlers(
   options: GitHubAuthRuntimeOptions,
@@ -95,6 +95,10 @@ export function registerGitHubIpcHandlers(
     callbacks?.onNoteChanged?.()
 
     return report
+  })
+
+  ipcMain.handle('issue-drafts:undoAutoPublishRun', async (_event, request) => {
+    return undoAutoPublishRun(db, request, { commentIssue, closeIssue })
   })
 }
 

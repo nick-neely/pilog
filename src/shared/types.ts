@@ -206,6 +206,7 @@ export type AutoPublishPublishReportItem = {
 
 export type AutoPublishPublishSuccess = AutoPublishPublishReportItem & {
   githubIssueUrl: string
+  githubIssueNumber: number
 }
 
 export type AutoPublishPublishFailure = AutoPublishPublishReportItem & {
@@ -227,6 +228,32 @@ export type AutoPublishPublishReport = {
   successes: AutoPublishPublishSuccess[]
   failures: AutoPublishPublishFailure[]
   skippedDrafts: AutoPublishSkippedDraft[]
+  undo?: AutoPublishUndoReport
+}
+
+export type AutoPublishUndoIssue = AutoPublishPublishReportItem & {
+  githubIssueUrl: string
+  githubIssueNumber: number
+}
+
+export type AutoPublishUndoSuccess = AutoPublishUndoIssue & {
+  auditCommentUrl: string | null
+  closedAt: string
+}
+
+export type AutoPublishUndoFailure = AutoPublishUndoIssue & {
+  stage: 'comment' | 'close'
+  error: string
+}
+
+export type AutoPublishUndoReport = {
+  runId: string
+  repoId: string
+  attemptedAt: string
+  successCount: number
+  failureCount: number
+  successes: AutoPublishUndoSuccess[]
+  failures: AutoPublishUndoFailure[]
 }
 
 export type GenerateDraftsRequest = {

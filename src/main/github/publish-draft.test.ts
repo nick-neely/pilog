@@ -6,7 +6,7 @@ import { createAgentRun, finalizeAgentRun } from '../db/repositories/agent-runs'
 import { createNote, listNotes, updateNoteStatus } from '../db/repositories/notes'
 import { listPublishLog } from '../db/repositories/publish-log'
 import { createRepo } from '../db/repositories/repos'
-import { publishAutoPublishRun, publishReviewedDraft } from './publish-draft'
+import { publishAutoPublishRun, publishReviewedDraft, undoAutoPublishRun } from './publish-draft'
 import type { GeneratedIssueDraft } from '@shared/types'
 
 const generatedDraft: GeneratedIssueDraft = {
@@ -279,6 +279,7 @@ describe('publishAutoPublishRun', () => {
         draftId: firstDraft.id,
         title: firstDraft.title,
         githubIssueUrl: 'https://github.com/nick-neely/pilog/issues/41',
+        githubIssueNumber: 41,
         sourceNoteIds: [firstNote.id],
         labels: ['bug']
       }),
@@ -286,6 +287,7 @@ describe('publishAutoPublishRun', () => {
         draftId: secondDraft.id,
         title: secondDraft.title,
         githubIssueUrl: 'https://github.com/nick-neely/pilog/issues/42',
+        githubIssueNumber: 42,
         sourceNoteIds: [secondNote.id],
         labels: ['ready-for-agent']
       })
@@ -604,3 +606,149 @@ describe('publishAutoPublishRun', () => {
     ])
   })
 })
+
+describe('undoAutoPublishRun', () => {
+  let db: PilogDatabase
+
+  beforeEach(() => {
+    db = createInMemoryDatabase()
+    runMigrations(db)
+  })
+
+  it('comments with the run ID before closing each published GitHub issue', async () => {
+    const { repo, run, draft, note, report } = await publishSingleAutoPublishDraft(db)
+    const commentIssue = vi.fn().mockResolvedValue({
+      url: 'https://github.com/nick-neely/pilog/issues/41#issuecomment-1'
+    })
+    const closeIssue = vi.fn().mockResolvedValue(undefined)
+
+    const undo = await undoAutoPublishRun(
+      db,
+      { runId: run.id, repoId: repo.id, issues: report.successes },
+      { commentIssue, closeIssue }
+    )
+
+    expect(commentIssue).toHaveBeenCalledWith(
+      'nick-neely',
+      'pilog',
+      41,
+      expect.stringContaining(run.id)
+    )
+    expect(closeIssue).toHaveBeenCalledWith('nick-neely', 'pilog', 41)
+    expect(undo).toMatchObject({
+      runId: run.id,
+      repoId: repo.id,
+      successCount: 1,
+      failureCount: 0,
+      failures: [],
+      successes: [
+        expect.objectContaining({
+          draftId: draft.id,
+          sourceNoteIds: [note.id],
+          githubIssueNumber: 41,
+          auditCommentUrl: 'https://github.com/nick-neely/pilog/issues/41#issuecomment-1'
+        })
+      ]
+    })
+  })
+
+  it('does not close an issue when the audit comment fails', async () => {
+    const { repo, run, report } = await publishSingleAutoPublishDraft(db)
+    const commentError = Object.assign(new Error('Forbidden'), { status: 403 })
+    const commentIssue = vi.fn().mockRejectedValue(commentError)
+    const closeIssue = vi.fn()
+
+    const undo = await undoAutoPublishRun(
+      db,
+      { runId: run.id, repoId: repo.id, issues: report.successes },
+      { commentIssue, closeIssue }
+    )
+
+    expect(closeIssue).not.toHaveBeenCalled()
+    expect(undo).toMatchObject({
+      successCount: 0,
+      failureCount: 1,
+      failures: [
+        expect.objectContaining({
+          githubIssueNumber: 41,
+          stage: 'comment',
+          error: 'GitHub 403: Forbidden'
+        })
+      ]
+    })
+  })
+
+  it('keeps close failures visible and retryable without rewriting local history', async () => {
+    const { repo, run, draft, note, report } = await publishSingleAutoPublishDraft(db)
+    const publishLogBeforeUndo = listPublishLog(db, { repoId: repo.id })
+    const commentIssue = vi.fn().mockResolvedValue({ url: null })
+    const closeIssue = vi
+      .fn()
+      .mockRejectedValue(Object.assign(new Error('Server Error'), { status: 500 }))
+
+    const undo = await undoAutoPublishRun(
+      db,
+      { runId: run.id, repoId: repo.id, issues: report.successes },
+      { commentIssue, closeIssue }
+    )
+
+    expect(undo).toMatchObject({
+      successCount: 0,
+      failureCount: 1,
+      failures: [
+        expect.objectContaining({
+          githubIssueNumber: 41,
+          stage: 'close',
+          error: 'GitHub 500: Server Error'
+        })
+      ]
+    })
+    expect(getIssueDraftById(db, draft.id)).toMatchObject({
+      status: 'published',
+      githubIssueUrl: 'https://github.com/nick-neely/pilog/issues/41'
+    })
+    expect(listNotes(db).map((persisted) => [persisted.id, persisted.status])).toEqual([
+      [note.id, 'published']
+    ])
+    expect(listPublishLog(db, { repoId: repo.id })).toEqual(publishLogBeforeUndo)
+  })
+})
+
+async function publishSingleAutoPublishDraft(db: PilogDatabase): Promise<{
+  repo: ReturnType<typeof createRepo>
+  note: ReturnType<typeof createNote>
+  draft: ReturnType<typeof createIssueDraft>
+  run: ReturnType<typeof createAgentRun>
+  report: Awaited<ReturnType<typeof publishAutoPublishRun>>
+}> {
+  const repo = createRepo(db, {
+    name: 'pilog',
+    owner: 'nick-neely',
+    localPath: '/tmp/pilog',
+    githubUrl: 'https://github.com/nick-neely/pilog',
+    defaultBranch: 'main'
+  })
+  const note = createNote(db, { content: 'save button spins', repoId: repo.id })
+  updateNoteStatus(db, note.id, 'drafted')
+  const draft = createIssueDraft(db, {
+    repoId: repo.id,
+    draft: { ...generatedDraft, sourceNoteIds: [note.id] }
+  })
+  const run = createAgentRun(db, { repoId: repo.id, inputNoteIds: [note.id] })
+  finalizeAgentRun(db, {
+    id: run.id,
+    status: 'succeeded',
+    outputDraftIds: [draft.id],
+    eventStream: []
+  })
+  const report = await publishAutoPublishRun(
+    db,
+    { runId: run.id },
+    vi.fn().mockResolvedValue({
+      url: 'https://github.com/nick-neely/pilog/issues/41',
+      number: 41
+    })
+  )
+
+  return { repo, note, draft, run, report }
+}
