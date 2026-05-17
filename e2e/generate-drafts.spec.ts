@@ -140,7 +140,8 @@ test('Generate and Publish dry run previews planned drafts without publish write
     await generateAndPublish.click()
 
     await expect(page.getByRole('alertdialog')).toContainText('Dry-run publish plan')
-    await expect(page.getByRole('alertdialog')).toContainText('Dry run, no GitHub writes')
+    await page.getByTestId('dry-run-publish-disclosure').focus()
+    await expect(page.getByText('Preview only')).toBeVisible()
     await expect(page.getByRole('alertdialog')).toContainText('Triage selected Pilog notes')
     await expect(page.getByRole('alertdialog')).toContainText('ready-for-agent')
 

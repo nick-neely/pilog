@@ -1,36 +1,36 @@
 import type { AgentTool } from '@earendil-works/pi-agent-core'
 import type {
+  DraftContentToggles,
   GitHubLabel,
   Note,
   Repo,
-  DraftContentToggles,
   RepoIndexDirectory,
   RepoIndexExclusionSummary,
   RepoIndexStatus
 } from '@shared/ipc'
+import type { RepoLabelLike } from '@shared/labels'
+import { matchLabelsToRepoLabels } from '@shared/labels'
 import type {
-  AutoPublishSkippedDraft,
   AutoPublishPreviewSummary,
+  AutoPublishSkippedDraft,
   ClarificationHistoryEntry,
   IssueDraft,
   IssueDraftWorkflowState,
   SearchProvider
 } from '@shared/types'
-import type { RepoLabelLike } from '@shared/labels'
-import { matchLabelsToRepoLabels } from '@shared/labels'
 import {
   GeneratedIssueDraftsSchema,
   SubmitIssueDraftsParameters,
   type AgentEvent,
   type GeneratedIssueDraft
 } from '@shared/types'
-import {
-  formatIssueDraftBody,
-  getIssueDraftById,
-  getGeneratedDraftClarificationQuestions
-} from '../db/repositories/issue-drafts'
 import { and, eq, inArray } from 'drizzle-orm'
 import type { PilogDatabase } from '../db/client'
+import {
+  formatIssueDraftBody,
+  getGeneratedDraftClarificationQuestions,
+  getIssueDraftById
+} from '../db/repositories/issue-drafts'
 import { mapNoteRow } from '../db/repositories/notes'
 import { getRepoById, updateRepoGithubLabels } from '../db/repositories/repos'
 import { agentRuns, issueDrafts, notes } from '../db/schema'
@@ -746,15 +746,17 @@ function buildAutoPublishPreviewMessage(input: {
   maxIssuesPerRun: number
   dryRun: boolean
 }): string {
-  const dryRunPrefix = input.dryRun
-    ? 'Dry run: Pilog planned these drafts and will not write to GitHub.'
-    : 'Pilog planned these drafts for review before any GitHub writes.'
+  if (input.heldBackCount === 0) {
+    return input.dryRun ? '' : 'Pilog planned these drafts for review before any GitHub writes.'
+  }
 
-  if (input.heldBackCount === 0) return dryRunPrefix
-
-  return `${dryRunPrefix} ${input.heldBackCount} ${
+  const heldBackMessage = `${input.heldBackCount} ${
     input.heldBackCount === 1 ? 'draft is' : 'drafts are'
   } held back by the ${input.maxIssuesPerRun}-issue limit.`
+
+  if (input.dryRun) return heldBackMessage
+
+  return `Pilog planned these drafts for review before any GitHub writes. ${heldBackMessage}`
 }
 
 export function validateAndCollectSourceNoteIds(

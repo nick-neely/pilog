@@ -13,28 +13,28 @@ import {
 import { createInMemoryDatabase } from '../db/client'
 import { runMigrations } from '../db/migrations'
 import { createAgentRun } from '../db/repositories/agent-runs'
-import { createNote, listNotes, updateNoteStatus } from '../db/repositories/notes'
-import { listPublishLog } from '../db/repositories/publish-log'
 import {
-  createIssueDraft,
   addClarificationAnswer,
+  createIssueDraft,
   getIssueDraftById
 } from '../db/repositories/issue-drafts'
+import { createNote, listNotes, updateNoteStatus } from '../db/repositories/notes'
+import { listPublishLog } from '../db/repositories/publish-log'
 import { upsertRepoIndex } from '../db/repositories/repo-indices'
 import { createRepo } from '../db/repositories/repos'
 import { agentRuns, issueDrafts } from '../db/schema'
 import { publishAutoPublishRun } from '../github/publish-draft'
 import {
-  planAutoPublishPreviewDrafts,
   buildIssueGenerationPrompt,
   createSubmitIssueDraftsTool,
-  hydrateRepoLabelsIfNeeded,
-  refreshRepoLabelsIfStale,
-  getCurrentInboxNotesForGeneration,
   getClarificationDraftForRegeneration,
+  getCurrentInboxNotesForGeneration,
   getSelectedNotesForGeneration,
+  hydrateRepoLabelsIfNeeded,
   persistGeneratedIssueDrafts,
   persistRegeneratedClarificationDraft,
+  planAutoPublishPreviewDrafts,
+  refreshRepoLabelsIfStale,
   validateAndCollectSourceNoteIds
 } from './issue-generation'
 
@@ -905,7 +905,7 @@ describe('issue generation', () => {
       dryRun: true,
       limited: true
     })
-    expect(plan.summary.message).toContain('1 draft is held back')
+    expect(plan.summary.message).toBe('1 draft is held back by the 2-issue limit.')
     expect(draftIds).toHaveLength(2)
     expect(persistedDrafts.map((persisted) => JSON.parse(persisted.labels))).toEqual([
       ['bug', 'triaged-by-pilog'],
@@ -1288,6 +1288,7 @@ describe('issue generation', () => {
 
     expect(plan.drafts.map((planned) => planned.title)).toEqual(['Polish settings spacing'])
     expect(plan.summary.skippedDrafts).toEqual([])
+    expect(plan.summary.message).toBe('')
   })
 
   it('normalizes auto-publish preview labels against repo labels', () => {

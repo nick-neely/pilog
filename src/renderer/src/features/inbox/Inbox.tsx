@@ -1450,51 +1450,63 @@ function AutoPublishPreviewDialog({
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent className="max-h-[min(42rem,calc(100vh-4rem))] max-w-3xl flex flex-col">
-        <AlertDialogHeader className="shrink-0">
-          <AlertDialogTitle>{title}</AlertDialogTitle>
-          <AlertDialogDescription>{description}</AlertDialogDescription>
-        </AlertDialogHeader>
-        {publishError ? (
-          <div role="alert" className="shrink-0 rounded-md border bg-muted/50 px-3 py-2 text-sm">
-            {publishError}
-          </div>
-        ) : null}
-        {report ? (
-          <AutoPublishReport report={report} sourceNotesById={sourceNotesById} />
-        ) : summary ? (
-          <div className="shrink-0 flex flex-col gap-4" role="status">
-            {summary.dryRun ? (
-              <DryRunNotice />
-            ) : (
-              <p
-                data-testid="auto-publish-boundary-disclosure"
-                className="max-w-[68ch] text-sm leading-relaxed text-muted-foreground"
-              >
-                {AUTO_PUBLISH_EGRESS_DISCLOSURE}
-              </p>
-            )}
-            <PlanMetaSummary summary={summary} />
-            {summary.skippedDrafts.length > 0 ? (
-              <SkippedDraftsSummary skippedDrafts={summary.skippedDrafts} />
-            ) : null}
-          </div>
-        ) : null}
-        {!report ? (
-          <ScrollArea className="min-h-0 flex-1 pe-3">
-            <div className="flex flex-col gap-5">
-              {drafts.map((draft, index) => (
-                <DraftPreviewCard
-                  key={`${draft.title}-${index}`}
-                  draft={draft}
-                  repoLocation={repoLocation}
-                  sourceNotesById={sourceNotesById}
-                />
-              ))}
+      <AlertDialogContent
+        className="max-h-[min(42rem,calc(100vh-4rem))] max-w-3xl !flex min-h-0 !flex-col gap-0 overflow-hidden p-0"
+        {...(description ? {} : { 'aria-describedby': undefined })}
+      >
+        <div className="flex shrink-0 flex-col gap-4 px-6 pt-6">
+          <AlertDialogHeader className="gap-3">
+            <div className="flex w-full min-w-0 items-center gap-2">
+              <AlertDialogTitle className="min-w-0 flex-1 text-left">{title}</AlertDialogTitle>
+              {summary?.dryRun && !report ? <DryRunPublishInfoHoverCard /> : null}
             </div>
-          </ScrollArea>
-        ) : null}
-        <AlertDialogFooter className="shrink-0">
+            {description ? (
+              <AlertDialogDescription className="text-left">{description}</AlertDialogDescription>
+            ) : null}
+          </AlertDialogHeader>
+          {publishError ? (
+            <div role="alert" className="rounded-md border bg-muted/50 px-3 py-2 text-sm">
+              {publishError}
+            </div>
+          ) : null}
+          {summary && !report ? (
+            <div role="status">
+              <PlanMetaSummary summary={summary} />
+            </div>
+          ) : null}
+        </div>
+        {report ? (
+          <div className="min-h-0 flex-1 overflow-hidden px-6">
+            <AutoPublishReport report={report} sourceNotesById={sourceNotesById} />
+          </div>
+        ) : (
+          <div className="min-h-0 flex-1 overflow-hidden px-6">
+            <ScrollArea className="h-full max-h-full pe-3">
+              <div className="flex flex-col gap-5 pb-4">
+                {summary && !summary.dryRun ? (
+                  <p
+                    data-testid="auto-publish-boundary-disclosure"
+                    className="max-w-[68ch] text-sm leading-relaxed text-muted-foreground"
+                  >
+                    {AUTO_PUBLISH_EGRESS_DISCLOSURE}
+                  </p>
+                ) : null}
+                {summary && summary.skippedDrafts.length > 0 ? (
+                  <SkippedDraftsSummary skippedDrafts={summary.skippedDrafts} />
+                ) : null}
+                {drafts.map((draft, index) => (
+                  <DraftPreviewCard
+                    key={`${draft.title}-${index}`}
+                    draft={draft}
+                    repoLocation={repoLocation}
+                    sourceNotesById={sourceNotesById}
+                  />
+                ))}
+              </div>
+            </ScrollArea>
+          </div>
+        )}
+        <AlertDialogFooter className="shrink-0 border-t border-border/60 bg-popover px-6 py-4">
           <AlertDialogCancel disabled={publishing || undoing}>Close</AlertDialogCancel>
           {report ? (
             <>
@@ -1551,22 +1563,30 @@ function SkippedDraftsSummary({
   )
 }
 
-function DryRunNotice(): React.JSX.Element {
+function DryRunPublishInfoHoverCard(): React.JSX.Element {
   return (
-    <div className="flex items-start gap-2.5 rounded-lg border border-border/70 bg-muted/40 p-3">
-      <HugeiconsIcon
-        icon={InformationCircleIcon}
-        className="mt-0.5 size-4 shrink-0 text-muted-foreground"
-        aria-hidden
-      />
-      <div className="flex flex-col gap-0.5">
-        <p className="text-sm font-medium">Dry run — no GitHub writes</p>
-        <p className="max-w-[68ch] text-sm leading-relaxed text-muted-foreground">
-          This plan was generated through your Pi provider. Publishing writes the selected drafts to
-          GitHub; closing keeps them as local drafts.
-        </p>
-      </div>
-    </div>
+    <HoverCard>
+      <HoverCardTrigger asChild>
+        <button
+          type="button"
+          data-testid="dry-run-publish-disclosure"
+          className="inline-flex shrink-0 items-center justify-center rounded-sm text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          aria-label="Dry run publish information"
+        >
+          <HugeiconsIcon icon={InformationCircleIcon} className="size-4" aria-hidden />
+        </button>
+      </HoverCardTrigger>
+      <HoverCardContent side="top" className="w-80 rounded-xl">
+        <div className="space-y-2">
+          <p className="text-sm font-medium">Preview only</p>
+          <Separator />
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            Pilog planned these drafts locally. Nothing is written to GitHub until you publish from
+            Drafts. Open Drafts to review or edit before closing.
+          </p>
+        </div>
+      </HoverCardContent>
+    </HoverCard>
   )
 }
 
@@ -1713,12 +1733,17 @@ function getAutoPublishDialogTitle(
 function getAutoPublishDialogDescription(
   summary: AutoPublishPreviewSummary | null,
   report: AutoPublishPublishReport | null
-): string {
+): string | null {
   if (report) {
     return `${report.successCount} published, ${report.skippedCount} skipped, ${report.failureCount} failed.`
   }
 
-  return summary?.message ?? 'Pilog planned these drafts for review before any GitHub writes.'
+  if (!summary) {
+    return 'Pilog planned these drafts for review before any GitHub writes.'
+  }
+
+  const message = summary.message.trim()
+  return message || null
 }
 
 function AutoPublishReport({
@@ -1729,8 +1754,8 @@ function AutoPublishReport({
   sourceNotesById: Map<string, Note>
 }): React.JSX.Element {
   return (
-    <ScrollArea className="min-h-0 flex-1 pe-3">
-      <div className="flex flex-col gap-5" role="status" aria-live="polite">
+    <ScrollArea className="h-full max-h-full pe-3">
+      <div className="flex flex-col gap-5 pb-4" role="status" aria-live="polite">
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
           <span>
             Repo {report.repo.owner}/{report.repo.name}
