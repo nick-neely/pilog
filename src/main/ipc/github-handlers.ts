@@ -10,7 +10,11 @@ import { resetClient, listLabels, createIssue, commentIssue, closeIssue } from '
 import type { PilogDatabase } from '../db/client'
 import type { CreateIssueRequest } from '@shared/ipc'
 import { recordPublish } from '../db/repositories/publish-log'
-import { publishAutoPublishRun, publishReviewedDraft, undoAutoPublishRun } from '../github/publish-draft'
+import {
+  publishAutoPublishRun,
+  publishReviewedDraft,
+  undoAutoPublishRun
+} from '../github/publish-draft'
 
 export function registerGitHubIpcHandlers(
   options: GitHubAuthRuntimeOptions,

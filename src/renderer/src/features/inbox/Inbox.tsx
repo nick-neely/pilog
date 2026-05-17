@@ -1446,6 +1446,7 @@ function AutoPublishPreviewDialog({
   const repoLocation = repo ? formatRepoLocation(repo) : null
   const undoComplete =
     report?.undo !== undefined && report.undo.successCount > 0 && report.undo.failureCount === 0
+  const undoLabel = getAutoPublishUndoButtonLabel({ undoing, undoComplete })
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
@@ -1504,7 +1505,7 @@ function AutoPublishPreviewDialog({
                 onClick={onUndo}
               >
                 <HugeiconsIcon icon={Undo02Icon} className="size-4" aria-hidden />
-                {undoing ? 'Closing issues' : undoComplete ? 'Issues Closed' : 'Publish Undo'}
+                {undoLabel}
               </Button>
               <AlertDialogAction onClick={onOpenDrafts}>Open Drafts</AlertDialogAction>
             </>
@@ -1522,6 +1523,12 @@ function AutoPublishPreviewDialog({
       </AlertDialogContent>
     </AlertDialog>
   )
+}
+
+function getAutoPublishUndoButtonLabel(input: { undoing: boolean; undoComplete: boolean }): string {
+  if (input.undoing) return 'Closing issues'
+  if (input.undoComplete) return 'Issues Closed'
+  return 'Publish Undo'
 }
 
 function SkippedDraftsSummary({
@@ -1824,11 +1831,7 @@ function AutoPublishReport({
   )
 }
 
-function AutoPublishUndoSummary({
-  undo
-}: {
-  undo: AutoPublishUndoReport
-}): React.JSX.Element {
+function AutoPublishUndoSummary({ undo }: { undo: AutoPublishUndoReport }): React.JSX.Element {
   return (
     <section className="flex flex-col gap-2 rounded-md border bg-muted/30 p-3">
       <div className="flex flex-wrap items-start justify-between gap-2">

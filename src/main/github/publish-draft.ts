@@ -37,6 +37,11 @@ type CommentIssueClient = (
 
 type CloseIssueClient = (owner: string, repo: string, issueNumber: number) => Promise<void>
 
+type UndoClients = {
+  commentIssue: CommentIssueClient
+  closeIssue: CloseIssueClient
+}
+
 type PublishClients =
   | CreateIssueClient
   | {
@@ -168,7 +173,7 @@ export async function publishAutoPublishRun(
 export async function undoAutoPublishRun(
   db: PilogDatabase,
   request: UndoAutoPublishRunRequest,
-  clients: { commentIssue: CommentIssueClient; closeIssue: CloseIssueClient }
+  clients: UndoClients
 ): Promise<AutoPublishUndoReport> {
   const run = getRunById(db, request.runId)
   if (!run) throw new Error('Auto-publish run not found')
@@ -180,48 +185,17 @@ export async function undoAutoPublishRun(
   const failures: AutoPublishUndoReport['failures'] = []
 
   for (const issue of request.issues) {
-    const issueNumber = issue.githubIssueNumber || createdIssueNumberFromUrl(issue.githubIssueUrl)
-    if (!issueNumber) {
-      failures.push({
-        ...issue,
-        githubIssueNumber: 0,
-        stage: 'comment',
-        error: 'GitHub issue number could not be determined.'
-      })
-      continue
-    }
+    const result = await undoPublishedIssue({
+      issue,
+      repo,
+      runId: request.runId,
+      clients
+    })
 
-    try {
-      const comment = await clients.commentIssue(
-        repo.owner,
-        repo.name,
-        issueNumber,
-        buildPublishUndoAuditComment(request.runId)
-      )
-
-      try {
-        await clients.closeIssue(repo.owner, repo.name, issueNumber)
-        successes.push({
-          ...issue,
-          githubIssueNumber: issueNumber,
-          auditCommentUrl: comment.url,
-          closedAt: new Date().toISOString()
-        })
-      } catch (error) {
-        failures.push({
-          ...issue,
-          githubIssueNumber: issueNumber,
-          stage: 'close',
-          error: formatPublishError(error)
-        })
-      }
-    } catch (error) {
-      failures.push({
-        ...issue,
-        githubIssueNumber: issueNumber,
-        stage: 'comment',
-        error: formatPublishError(error)
-      })
+    if (result.status === 'success') {
+      successes.push(result.issue)
+    } else {
+      failures.push(result.issue)
     }
   }
 
@@ -233,6 +207,75 @@ export async function undoAutoPublishRun(
     failureCount: failures.length,
     successes,
     failures
+  }
+}
+
+async function undoPublishedIssue(input: {
+  issue: UndoAutoPublishRunRequest['issues'][number]
+  repo: { owner: string; name: string }
+  runId: string
+  clients: UndoClients
+}): Promise<
+  | { status: 'success'; issue: AutoPublishUndoReport['successes'][number] }
+  | { status: 'failure'; issue: AutoPublishUndoReport['failures'][number] }
+> {
+  const issueNumber =
+    input.issue.githubIssueNumber || createdIssueNumberFromUrl(input.issue.githubIssueUrl)
+
+  if (!issueNumber) {
+    return {
+      status: 'failure',
+      issue: {
+        ...input.issue,
+        githubIssueNumber: 0,
+        stage: 'comment',
+        error: 'GitHub issue number could not be determined.'
+      }
+    }
+  }
+
+  const issue = { ...input.issue, githubIssueNumber: issueNumber }
+  let auditCommentUrl: string | null
+
+  try {
+    const comment = await input.clients.commentIssue(
+      input.repo.owner,
+      input.repo.name,
+      issueNumber,
+      buildPublishUndoAuditComment(input.runId)
+    )
+    auditCommentUrl = comment.url
+  } catch (error) {
+    return {
+      status: 'failure',
+      issue: {
+        ...issue,
+        stage: 'comment',
+        error: formatPublishError(error)
+      }
+    }
+  }
+
+  try {
+    await input.clients.closeIssue(input.repo.owner, input.repo.name, issueNumber)
+
+    return {
+      status: 'success',
+      issue: {
+        ...issue,
+        auditCommentUrl,
+        closedAt: new Date().toISOString()
+      }
+    }
+  } catch (error) {
+    return {
+      status: 'failure',
+      issue: {
+        ...issue,
+        stage: 'close',
+        error: formatPublishError(error)
+      }
+    }
   }
 }
 
