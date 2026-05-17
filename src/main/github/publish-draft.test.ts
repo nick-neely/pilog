@@ -652,6 +652,45 @@ describe('undoAutoPublishRun', () => {
     })
   })
 
+  it('preserves local publish history when undo succeeds through an audit comment', async () => {
+    const { repo, run, draft, note, report } = await publishSingleAutoPublishDraft(db)
+    const publishLogBeforeUndo = listPublishLog(db, { repoId: repo.id })
+    const commentIssue = vi.fn().mockResolvedValue({
+      url: 'https://github.com/nick-neely/pilog/issues/41#issuecomment-1'
+    })
+    const closeIssue = vi.fn().mockResolvedValue(undefined)
+
+    const undo = await undoAutoPublishRun(
+      db,
+      { runId: run.id, repoId: repo.id, issues: report.successes },
+      { commentIssue, closeIssue }
+    )
+
+    expect(undo).toMatchObject({
+      successCount: 1,
+      failureCount: 0,
+      successes: [
+        expect.objectContaining({
+          draftId: draft.id,
+          githubIssueNumber: 41,
+          auditCommentUrl: 'https://github.com/nick-neely/pilog/issues/41#issuecomment-1'
+        })
+      ]
+    })
+    expect(commentIssue.mock.invocationCallOrder[0]).toBeLessThan(
+      closeIssue.mock.invocationCallOrder[0]!
+    )
+    expect(getIssueDraftById(db, draft.id)).toMatchObject({
+      status: 'published',
+      workflowState: 'ready',
+      githubIssueUrl: 'https://github.com/nick-neely/pilog/issues/41'
+    })
+    expect(listNotes(db).map((persisted) => [persisted.id, persisted.status])).toEqual([
+      [note.id, 'published']
+    ])
+    expect(listPublishLog(db, { repoId: repo.id })).toEqual(publishLogBeforeUndo)
+  })
+
   it('does not close an issue when the audit comment fails', async () => {
     const { repo, run, report } = await publishSingleAutoPublishDraft(db)
     const commentError = Object.assign(new Error('Forbidden'), { status: 403 })

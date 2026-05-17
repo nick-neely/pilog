@@ -1026,6 +1026,132 @@ describe('issue generation', () => {
     ])
   })
 
+  it('regresses safer auto-publish eligibility and skipped outcome details together', () => {
+    const db = createInMemoryDatabase()
+    runMigrations(db)
+    const repo = createRepo(db, {
+      owner: 'nick-neely',
+      name: 'pilog',
+      localPath: '/workspace/pilog',
+      githubUrl: 'https://github.com/nick-neely/pilog',
+      defaultBranch: 'main'
+    })
+    const noteIds = [
+      'clarification draft source',
+      'low confidence source',
+      'medium confidence source',
+      'unknown files source',
+      'missing saved section source',
+      'publishable source'
+    ].map((content) => createNote(db, { content, repoId: repo.id }).id)
+    const run = createAgentRun(db, { repoId: repo.id, inputNoteIds: noteIds })
+
+    const plan = planAutoPublishPreviewDrafts({
+      runId: run.id,
+      repo: {
+        ...repo,
+        autoPublishEnabled: true,
+        autoPublishMaxIssuesPerRun: 5,
+        autoPublishDefaultLabel: 'triaged-by-pilog',
+        autoPublishDryRun: false,
+        autoPublishRequireConfirmation: true,
+        autoPublishMinimumConfidence: 'high',
+        autoPublishRequireKnownAffectedFiles: true,
+        draftContentToggles: {
+          ...repo.draftContentToggles,
+          includeImplementationNotes: true
+        }
+      },
+      drafts: [
+        {
+          ...draft,
+          title: 'Clarify vague inbox count',
+          sourceNoteIds: [noteIds[0]!],
+          publishReady: true,
+          needsClarification: ['Which count is wrong?'],
+          confidence: 'high'
+        },
+        {
+          ...draft,
+          title: 'Investigate intermittent setup crash',
+          sourceNoteIds: [noteIds[1]!],
+          confidence: 'low'
+        },
+        {
+          ...draft,
+          title: 'Polish repo settings summary',
+          sourceNoteIds: [noteIds[2]!],
+          confidence: 'medium'
+        },
+        {
+          ...draft,
+          title: 'Restore publish report empty state',
+          sourceNoteIds: [noteIds[3]!],
+          confidence: 'high',
+          affectedFiles: []
+        },
+        {
+          ...draft,
+          title: 'Repair draft defaults persistence',
+          sourceNoteIds: [noteIds[4]!],
+          confidence: 'high',
+          implementationNotes: []
+        },
+        {
+          ...draft,
+          title: 'Fix auto-publish confirmation copy',
+          sourceNoteIds: [noteIds[5]!],
+          confidence: 'high',
+          suggestedLabels: ['bug']
+        }
+      ]
+    })
+
+    expect(plan.drafts.map((planned) => planned.title)).toEqual([
+      'Fix auto-publish confirmation copy'
+    ])
+    expect(plan.summary).toMatchObject({
+      runId: run.id,
+      repoId: repo.id,
+      generatedDraftCount: 6,
+      plannedDraftCount: 1,
+      skippedDrafts: [
+        {
+          title: 'Clarify vague inbox count',
+          reason: 'Clarification drafts are not eligible.',
+          sourceNoteIds: [noteIds[0]!],
+          labels: draft.suggestedLabels
+        },
+        {
+          title: 'Investigate intermittent setup crash',
+          reason: 'Low-confidence drafts are not eligible.',
+          sourceNoteIds: [noteIds[1]!],
+          labels: draft.suggestedLabels
+        },
+        {
+          title: 'Polish repo settings summary',
+          reason: 'Repo requires high confidence for auto-publish.',
+          sourceNoteIds: [noteIds[2]!],
+          labels: draft.suggestedLabels
+        },
+        {
+          title: 'Restore publish report empty state',
+          reason: 'Repo requires known affected files for auto-publish.',
+          sourceNoteIds: [noteIds[3]!],
+          labels: draft.suggestedLabels
+        },
+        {
+          title: 'Repair draft defaults persistence',
+          reason:
+            'Repo requires saved draft content sections for auto-publish: implementation notes.',
+          sourceNoteIds: [noteIds[4]!],
+          labels: draft.suggestedLabels
+        }
+      ]
+    })
+    expect(plan.drafts[0]?.suggestedLabels).toEqual(['bug', 'triaged-by-pilog'])
+  })
+
   it('skips auto-publish drafts missing sections required by saved draft content toggles', () => {
     const db = createInMemoryDatabase()
     runMigrations(db)
