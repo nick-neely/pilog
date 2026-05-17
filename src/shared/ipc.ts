@@ -224,8 +224,10 @@ export const DEFAULT_REPO_AUTO_PUBLISH_SETTINGS = {
   autoPublishRequireKnownAffectedFiles: true
 } as const satisfies RepoAutoPublishSettings
 
+export type UnknownRepoAutoPublishSettings = Partial<Record<keyof RepoAutoPublishSettings, unknown>>
+
 export function normalizeRepoAutoPublishSettings(
-  input: RepoAutoPublishSettings | Record<string, unknown>
+  input: RepoAutoPublishSettings | UnknownRepoAutoPublishSettings
 ): RepoAutoPublishSettings {
   const rawMaxIssuesPerRun = input.autoPublishMaxIssuesPerRun
   const maxIssuesPerRun =
@@ -237,30 +239,38 @@ export function normalizeRepoAutoPublishSettings(
     typeof rawDefaultLabel === 'string'
       ? rawDefaultLabel.trim() || DEFAULT_REPO_AUTO_PUBLISH_SETTINGS.autoPublishDefaultLabel
       : DEFAULT_REPO_AUTO_PUBLISH_SETTINGS.autoPublishDefaultLabel
+  const autoPublishEnabled = normalizeBooleanSetting(
+    input.autoPublishEnabled,
+    DEFAULT_REPO_AUTO_PUBLISH_SETTINGS.autoPublishEnabled
+  )
+  const autoPublishDryRun = normalizeBooleanSetting(
+    input.autoPublishDryRun,
+    DEFAULT_REPO_AUTO_PUBLISH_SETTINGS.autoPublishDryRun
+  )
+  const autoPublishRequireConfirmation = normalizeBooleanSetting(
+    input.autoPublishRequireConfirmation,
+    DEFAULT_REPO_AUTO_PUBLISH_SETTINGS.autoPublishRequireConfirmation
+  )
+  const autoPublishRequireKnownAffectedFiles = normalizeBooleanSetting(
+    input.autoPublishRequireKnownAffectedFiles,
+    DEFAULT_REPO_AUTO_PUBLISH_SETTINGS.autoPublishRequireKnownAffectedFiles
+  )
 
   return {
-    autoPublishEnabled:
-      typeof input.autoPublishEnabled === 'boolean'
-        ? input.autoPublishEnabled
-        : DEFAULT_REPO_AUTO_PUBLISH_SETTINGS.autoPublishEnabled,
+    autoPublishEnabled,
     autoPublishMaxIssuesPerRun: maxIssuesPerRun,
     autoPublishDefaultLabel: defaultLabel,
-    autoPublishDryRun:
-      typeof input.autoPublishDryRun === 'boolean'
-        ? input.autoPublishDryRun
-        : DEFAULT_REPO_AUTO_PUBLISH_SETTINGS.autoPublishDryRun,
-    autoPublishRequireConfirmation:
-      typeof input.autoPublishRequireConfirmation === 'boolean'
-        ? input.autoPublishRequireConfirmation
-        : DEFAULT_REPO_AUTO_PUBLISH_SETTINGS.autoPublishRequireConfirmation,
+    autoPublishDryRun,
+    autoPublishRequireConfirmation,
     autoPublishMinimumConfidence: isAutoPublishMinimumConfidence(input.autoPublishMinimumConfidence)
       ? input.autoPublishMinimumConfidence
       : DEFAULT_REPO_AUTO_PUBLISH_SETTINGS.autoPublishMinimumConfidence,
-    autoPublishRequireKnownAffectedFiles:
-      typeof input.autoPublishRequireKnownAffectedFiles === 'boolean'
-        ? input.autoPublishRequireKnownAffectedFiles
-        : DEFAULT_REPO_AUTO_PUBLISH_SETTINGS.autoPublishRequireKnownAffectedFiles
+    autoPublishRequireKnownAffectedFiles
   }
+}
+
+function normalizeBooleanSetting(value: unknown, fallback: boolean): boolean {
+  return typeof value === 'boolean' ? value : fallback
 }
 
 export function isAutoPublishMinimumConfidence(

@@ -266,22 +266,28 @@ describe('publishAutoPublishRun', () => {
     expect(report).toMatchObject({
       runId: run.id,
       repoId: repo.id,
+      repo: { id: repo.id, owner: 'nick-neely', name: 'pilog' },
       successCount: 2,
       failureCount: 0,
+      skippedCount: 0,
+      skippedDrafts: [],
       failures: []
     })
+    expect(new Date(report.publishedAt).toString()).not.toBe('Invalid Date')
     expect(report.successes).toEqual([
       expect.objectContaining({
         draftId: firstDraft.id,
         title: firstDraft.title,
         githubIssueUrl: 'https://github.com/nick-neely/pilog/issues/41',
-        sourceNoteIds: [firstNote.id]
+        sourceNoteIds: [firstNote.id],
+        labels: ['bug']
       }),
       expect.objectContaining({
         draftId: secondDraft.id,
         title: secondDraft.title,
         githubIssueUrl: 'https://github.com/nick-neely/pilog/issues/42',
-        sourceNoteIds: [secondNote.id]
+        sourceNoteIds: [secondNote.id],
+        labels: ['ready-for-agent']
       })
     ])
     expect(listPublishLog(db, { repoId: repo.id })).toHaveLength(2)
@@ -291,6 +297,62 @@ describe('publishAutoPublishRun', () => {
         [secondNote.id, 'published']
       ])
     )
+  })
+
+  it('reports skipped-only auto-publish runs from the preview summary', async () => {
+    const repo = createRepo(db, {
+      name: 'pilog',
+      owner: 'nick-neely',
+      localPath: '/tmp/pilog',
+      githubUrl: 'https://github.com/nick-neely/pilog',
+      defaultBranch: 'main'
+    })
+    const note = createNote(db, { content: 'unclear settings bug', repoId: repo.id })
+    const run = createAgentRun(db, { repoId: repo.id, inputNoteIds: [note.id] })
+    finalizeAgentRun(db, {
+      id: run.id,
+      status: 'succeeded',
+      outputDraftIds: [],
+      eventStream: [
+        {
+          type: 'final',
+          autoPublishPreview: {
+            skippedDrafts: [
+              {
+                title: 'Ask which settings panel failed',
+                reason: 'Clarification drafts are not eligible.',
+                sourceNoteIds: [note.id],
+                labels: ['triaged-by-pilog']
+              }
+            ]
+          }
+        }
+      ]
+    })
+    const createIssue = vi.fn()
+
+    const report = await publishAutoPublishRun(db, { runId: run.id }, createIssue)
+
+    expect(report).toMatchObject({
+      runId: run.id,
+      repoId: repo.id,
+      repo: { id: repo.id, owner: 'nick-neely', name: 'pilog' },
+      successCount: 0,
+      failureCount: 0,
+      skippedCount: 1,
+      successes: [],
+      failures: [],
+      skippedDrafts: [
+        {
+          title: 'Ask which settings panel failed',
+          reason: 'Clarification drafts are not eligible.',
+          sourceNoteIds: [note.id],
+          labels: ['triaged-by-pilog']
+        }
+      ]
+    })
+    expect(createIssue).not.toHaveBeenCalled()
+    expect(listPublishLog(db, { repoId: repo.id })).toEqual([])
   })
 
   it('skips clarification drafts in a confirmed auto-publish run', async () => {
@@ -463,5 +525,82 @@ describe('publishAutoPublishRun', () => {
         [secondNote.id, 'drafted']
       ])
     )
+  })
+
+  it('reports mixed published and skipped auto-publish outcomes with provenance', async () => {
+    const repo = createRepo(db, {
+      name: 'pilog',
+      owner: 'nick-neely',
+      localPath: '/tmp/pilog',
+      githubUrl: 'https://github.com/nick-neely/pilog',
+      defaultBranch: 'main'
+    })
+    const publishedNote = createNote(db, { content: 'save button spins', repoId: repo.id })
+    const skippedNote = createNote(db, { content: 'login maybe broken', repoId: repo.id })
+    updateNoteStatus(db, publishedNote.id, 'drafted')
+    updateNoteStatus(db, skippedNote.id, 'drafted')
+    const draft = createIssueDraft(db, {
+      repoId: repo.id,
+      draft: {
+        ...generatedDraft,
+        sourceNoteIds: [publishedNote.id],
+        suggestedLabels: ['bug', 'triaged-by-pilog']
+      }
+    })
+    const run = createAgentRun(db, {
+      repoId: repo.id,
+      inputNoteIds: [publishedNote.id, skippedNote.id]
+    })
+    finalizeAgentRun(db, {
+      id: run.id,
+      status: 'succeeded',
+      outputDraftIds: [draft.id],
+      eventStream: [
+        {
+          type: 'final',
+          autoPublishPreview: {
+            skippedDrafts: [
+              {
+                title: 'Clarify login failure',
+                reason: 'Low-confidence drafts are not eligible.',
+                sourceNoteIds: [skippedNote.id],
+                labels: ['triaged-by-pilog']
+              }
+            ]
+          }
+        }
+      ]
+    })
+    const createIssue = vi.fn().mockResolvedValue({
+      url: 'https://github.com/nick-neely/pilog/issues/44',
+      number: 44
+    })
+
+    const report = await publishAutoPublishRun(db, { runId: run.id }, createIssue)
+
+    expect(report).toMatchObject({
+      runId: run.id,
+      repoId: repo.id,
+      repo: { id: repo.id, owner: 'nick-neely', name: 'pilog' },
+      successCount: 1,
+      failureCount: 0,
+      skippedCount: 1
+    })
+    expect(report.successes).toEqual([
+      expect.objectContaining({
+        draftId: draft.id,
+        githubIssueUrl: 'https://github.com/nick-neely/pilog/issues/44',
+        sourceNoteIds: [publishedNote.id],
+        labels: ['bug', 'triaged-by-pilog']
+      })
+    ])
+    expect(report.skippedDrafts).toEqual([
+      {
+        title: 'Clarify login failure',
+        reason: 'Low-confidence drafts are not eligible.',
+        sourceNoteIds: [skippedNote.id],
+        labels: ['triaged-by-pilog']
+      }
+    ])
   })
 })

@@ -179,6 +179,8 @@ export type GenerateDraftsMode = 'review' | 'auto-publish-preview'
 export type AutoPublishSkippedDraft = {
   title: string
   reason: string
+  sourceNoteIds: string[]
+  labels: string[]
 }
 
 export type AutoPublishPreviewSummary = {
@@ -199,6 +201,7 @@ export type AutoPublishPublishReportItem = {
   draftId: string
   title: string
   sourceNoteIds: string[]
+  labels: string[]
 }
 
 export type AutoPublishPublishSuccess = AutoPublishPublishReportItem & {
@@ -212,10 +215,18 @@ export type AutoPublishPublishFailure = AutoPublishPublishReportItem & {
 export type AutoPublishPublishReport = {
   runId: string
   repoId: string
+  repo: {
+    id: string
+    owner: string
+    name: string
+  }
+  publishedAt: string
   successCount: number
   failureCount: number
+  skippedCount: number
   successes: AutoPublishPublishSuccess[]
   failures: AutoPublishPublishFailure[]
+  skippedDrafts: AutoPublishSkippedDraft[]
 }
 
 export type GenerateDraftsRequest = {

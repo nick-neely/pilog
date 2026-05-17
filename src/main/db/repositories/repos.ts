@@ -15,7 +15,8 @@ import {
   type RepoAccessKind,
   type UpdateRepoAutoPublishSettingsRequest,
   type UpdateRepoDraftSettingsRequest,
-  type UpdateRepoPrivacySettingsRequest
+  type UpdateRepoPrivacySettingsRequest,
+  type UnknownRepoAutoPublishSettings
 } from '@shared/ipc'
 import { getRepoIndex, listRepoIndices } from './repo-indices'
 
@@ -129,7 +130,7 @@ export function getRepoById(db: PilogDatabase, id: string): Repo | null {
 export function updateRepoAutoPublishSettings(
   db: PilogDatabase,
   id: string,
-  input: Omit<UpdateRepoAutoPublishSettingsRequest, 'id'>
+  input: Omit<UpdateRepoAutoPublishSettingsRequest, 'id'> | UnknownRepoAutoPublishSettings
 ): Repo | null {
   const now = new Date().toISOString()
   const settings = normalizeRepoAutoPublishSettings(input)

@@ -7,7 +7,7 @@ import type {
   PublishIssueDraftRequest
 } from '@shared/ipc'
 import { filterLabelsForPublish } from '@shared/labels'
-import type { AutoPublishPublishReport, IssueDraft } from '@shared/types'
+import type { AutoPublishPublishReport, AutoPublishSkippedDraft, IssueDraft } from '@shared/types'
 import type { PilogDatabase } from '../db/client'
 import { issueDrafts, notes, publishLog } from '../db/schema'
 import { getIssueDraftById } from '../db/repositories/issue-drafts'
@@ -82,9 +82,12 @@ export async function publishAutoPublishRun(
   if (!run) throw new Error('Auto-publish run not found')
   if (run.status !== 'succeeded') throw new Error('Auto-publish run is not ready to publish')
   if (!run.repoId) throw new Error('Auto-publish run is missing a linked repository')
+  const repo = getRepoById(db, run.repoId)
+  if (!repo) throw new Error('Linked repository not found')
 
   const successes: AutoPublishPublishReport['successes'] = []
   const failures: AutoPublishPublishReport['failures'] = []
+  const skippedDrafts = getSkippedDraftsFromRun(run.eventStream)
 
   for (const draftId of run.outputDraftIds) {
     const draft = getIssueDraftById(db, draftId)
@@ -93,6 +96,7 @@ export async function publishAutoPublishRun(
         draftId,
         title: 'Missing draft',
         sourceNoteIds: [],
+        labels: [],
         error: 'Draft could not be loaded.'
       })
       continue
@@ -113,6 +117,7 @@ export async function publishAutoPublishRun(
         draftId: published.id,
         title: published.title,
         sourceNoteIds: published.sourceNoteIds,
+        labels: published.labels,
         githubIssueUrl: published.githubIssueUrl ?? ''
       })
     } catch (error) {
@@ -120,6 +125,7 @@ export async function publishAutoPublishRun(
         draftId: draft.id,
         title: draft.title,
         sourceNoteIds: draft.sourceNoteIds,
+        labels: draft.labels,
         error: formatPublishError(error)
       })
     }
@@ -128,11 +134,59 @@ export async function publishAutoPublishRun(
   return {
     runId: run.id,
     repoId: run.repoId,
+    repo: {
+      id: repo.id,
+      owner: repo.owner,
+      name: repo.name
+    },
+    publishedAt: new Date().toISOString(),
     successCount: successes.length,
     failureCount: failures.length,
+    skippedCount: skippedDrafts.length,
     successes,
-    failures
+    failures,
+    skippedDrafts
   }
+}
+
+function getSkippedDraftsFromRun(eventStream: unknown[]): AutoPublishSkippedDraft[] {
+  for (let index = eventStream.length - 1; index >= 0; index -= 1) {
+    const event = eventStream[index]
+    if (!isRecord(event)) continue
+    const preview = event.autoPublishPreview
+    if (!isRecord(preview) || !Array.isArray(preview.skippedDrafts)) continue
+
+    return preview.skippedDrafts.flatMap((draft) => {
+      const skippedDraft = normalizeSkippedDraft(draft)
+      return skippedDraft ? [skippedDraft] : []
+    })
+  }
+
+  return []
+}
+
+function normalizeSkippedDraft(input: unknown): AutoPublishSkippedDraft | null {
+  if (!isRecord(input)) {
+    return null
+  }
+  const reason = typeof input.reason === 'string' ? input.reason : ''
+  if (!reason) return null
+
+  return {
+    title: typeof input.title === 'string' && input.title.trim() ? input.title : 'Skipped draft',
+    reason,
+    sourceNoteIds: stringArray(input.sourceNoteIds),
+    labels: stringArray(input.labels)
+  }
+}
+
+function isRecord(input: unknown): input is Record<string, unknown> {
+  return typeof input === 'object' && input !== null
+}
+
+function stringArray(input: unknown): string[] {
+  if (!Array.isArray(input)) return []
+  return input.filter((value): value is string => typeof value === 'string')
 }
 
 function normalizePublishClients(clients: PublishClients): {
