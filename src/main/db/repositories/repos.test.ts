@@ -332,7 +332,7 @@ describe('repos repository', () => {
       autoPublishRequireConfirmation: true,
       autoPublishMinimumConfidence: 'low',
       autoPublishRequireKnownAffectedFiles: false
-    } as never)
+    })
 
     expect(updated).toMatchObject({
       autoPublishMinimumConfidence: 'high',

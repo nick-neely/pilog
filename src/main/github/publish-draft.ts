@@ -156,20 +156,25 @@ function getSkippedDraftsFromRun(eventStream: unknown[]): AutoPublishSkippedDraf
     const preview = event.autoPublishPreview
     if (!isRecord(preview) || !Array.isArray(preview.skippedDrafts)) continue
 
-    return preview.skippedDrafts.map(normalizeSkippedDraft).filter((draft) => draft.reason)
+    return preview.skippedDrafts.flatMap((draft) => {
+      const skippedDraft = normalizeSkippedDraft(draft)
+      return skippedDraft ? [skippedDraft] : []
+    })
   }
 
   return []
 }
 
-function normalizeSkippedDraft(input: unknown): AutoPublishSkippedDraft {
+function normalizeSkippedDraft(input: unknown): AutoPublishSkippedDraft | null {
   if (!isRecord(input)) {
-    return { title: 'Skipped draft', reason: '', sourceNoteIds: [], labels: [] }
+    return null
   }
+  const reason = typeof input.reason === 'string' ? input.reason : ''
+  if (!reason) return null
 
   return {
     title: typeof input.title === 'string' && input.title.trim() ? input.title : 'Skipped draft',
-    reason: typeof input.reason === 'string' ? input.reason : '',
+    reason,
     sourceNoteIds: stringArray(input.sourceNoteIds),
     labels: stringArray(input.labels)
   }

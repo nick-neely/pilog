@@ -1744,9 +1744,9 @@ function AutoPublishReport({
           <section className="flex flex-col gap-2">
             <h3 className="text-sm font-semibold">Skipped before GitHub</h3>
             <ul className="flex flex-col gap-2">
-              {report.skippedDrafts.map((item) => (
+              {report.skippedDrafts.map((item, index) => (
                 <li
-                  key={`${item.title}:${item.reason}`}
+                  key={`${item.title}:${item.reason}:${index}`}
                   className="rounded-md border bg-muted/30 p-3"
                 >
                   <div className="flex flex-col gap-2">
