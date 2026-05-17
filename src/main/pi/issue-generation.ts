@@ -58,6 +58,40 @@ export type AutoPublishPreviewPlan = {
 export const GITHUB_LABEL_CACHE_REFRESH_INTERVAL_MS = 6 * 60 * 60 * 1000
 const UNKNOWN_CAPTURE_CONTEXT_VALUE = '(unknown)'
 
+type RequiredDraftContentSection = {
+  toggle: keyof DraftContentToggles
+  label: string
+  isMissing: (draft: GeneratedIssueDraft) => boolean
+}
+
+const AUTO_PUBLISH_REQUIRED_DRAFT_CONTENT_SECTIONS: readonly RequiredDraftContentSection[] = [
+  {
+    toggle: 'includeImplementationNotes',
+    label: 'implementation notes',
+    isMissing: (draft) => draft.implementationNotes.length === 0
+  },
+  {
+    toggle: 'includeAffectedFiles',
+    label: 'affected files',
+    isMissing: (draft) => draft.affectedFiles.length === 0
+  },
+  {
+    toggle: 'includeSourceNotes',
+    label: 'source notes',
+    isMissing: (draft) => draft.sourceNoteIds.length === 0
+  },
+  {
+    toggle: 'includeAcceptanceCriteria',
+    label: 'acceptance criteria',
+    isMissing: (draft) => draft.acceptanceCriteria.length === 0
+  },
+  {
+    toggle: 'includeConfidenceRationale',
+    label: 'confidence rationale',
+    isMissing: (draft) => !draft.groupingReason.trim()
+  }
+]
+
 type ListRepoLabels = (owner: string, repo: string) => Promise<GitHubLabel[]>
 
 type RepoLabelRefreshOptions = {
@@ -691,25 +725,9 @@ function getMissingRequiredDraftContentSections(
   draft: GeneratedIssueDraft,
   toggles: DraftContentToggles
 ): string[] {
-  const missing: string[] = []
-
-  if (toggles.includeImplementationNotes && draft.implementationNotes.length === 0) {
-    missing.push('implementation notes')
-  }
-  if (toggles.includeAffectedFiles && draft.affectedFiles.length === 0) {
-    missing.push('affected files')
-  }
-  if (toggles.includeSourceNotes && draft.sourceNoteIds.length === 0) {
-    missing.push('source notes')
-  }
-  if (toggles.includeAcceptanceCriteria && draft.acceptanceCriteria.length === 0) {
-    missing.push('acceptance criteria')
-  }
-  if (toggles.includeConfidenceRationale && !draft.groupingReason.trim()) {
-    missing.push('confidence rationale')
-  }
-
-  return missing
+  return AUTO_PUBLISH_REQUIRED_DRAFT_CONTENT_SECTIONS.filter((section) => {
+    return toggles[section.toggle] && section.isMissing(draft)
+  }).map((section) => section.label)
 }
 
 function applyDefaultLabel(labels: string[], defaultLabel: string): string[] {

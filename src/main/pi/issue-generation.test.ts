@@ -1062,14 +1062,11 @@ describe('issue generation', () => {
       ]
     })
 
-    expect(plan.drafts.map((planned) => planned.title)).toEqual([
-      'Restore publish log empty state'
-    ])
+    expect(plan.drafts.map((planned) => planned.title)).toEqual(['Restore publish log empty state'])
     expect(plan.summary.skippedDrafts).toEqual([
       {
         title: 'Repair settings spacing',
-        reason:
-          'Repo requires saved draft content sections for auto-publish: implementation notes.'
+        reason: 'Repo requires saved draft content sections for auto-publish: implementation notes.'
       }
     ])
   })

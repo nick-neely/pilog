@@ -151,11 +151,7 @@ describe('applyRepoDraftSettingsForGenerationMode', () => {
   })
 
   it('uses saved repo draft defaults for auto-publish generation', () => {
-    const active = applyRepoDraftSettingsForGenerationMode(
-      repo,
-      'auto-publish-preview',
-      override
-    )
+    const active = applyRepoDraftSettingsForGenerationMode(repo, 'auto-publish-preview', override)
 
     expect(active.issueStyleDepth).toBe('balanced')
     expect(active.issueStyleAudience).toBe('internal')
