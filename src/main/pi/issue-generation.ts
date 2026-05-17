@@ -8,6 +8,7 @@ import type {
   RepoIndexStatus
 } from '@shared/ipc'
 import type {
+  AutoPublishSkippedDraft,
   AutoPublishPreviewSummary,
   ClarificationHistoryEntry,
   IssueDraft,
@@ -52,8 +53,6 @@ export type AutoPublishPreviewPlan = {
   drafts: GeneratedIssueDraft[]
   summary: AutoPublishPreviewSummary
 }
-
-type AutoPublishSkippedDraft = AutoPublishPreviewSummary['skippedDrafts'][number]
 
 export const GITHUB_LABEL_CACHE_REFRESH_INTERVAL_MS = 6 * 60 * 60 * 1000
 const UNKNOWN_CAPTURE_CONTEXT_VALUE = '(unknown)'
@@ -594,23 +593,7 @@ export function planAutoPublishPreviewDrafts(input: {
 
   const maxIssuesPerRun = Math.max(1, Math.floor(input.repo.autoPublishMaxIssuesPerRun))
   const defaultLabel = input.repo.autoPublishDefaultLabel.trim()
-  const eligibility = input.drafts.reduce<{
-    eligibleDrafts: GeneratedIssueDraft[]
-    skippedDrafts: AutoPublishSkippedDraft[]
-  }>(
-    (result, draft) => {
-      const reason = getAutoPublishEligibilitySkipReason(draft, input.repo)
-
-      if (reason) {
-        result.skippedDrafts.push({ title: draft.title, reason })
-      } else {
-        result.eligibleDrafts.push(draft)
-      }
-
-      return result
-    },
-    { eligibleDrafts: [], skippedDrafts: [] }
-  )
+  const eligibility = partitionAutoPublishEligibleDrafts(input.drafts, input.repo)
   const plannedDrafts = eligibility.eligibleDrafts.slice(0, maxIssuesPerRun).map((draft) => {
     const suggestedLabels = applyDefaultLabel(draft.suggestedLabels, defaultLabel)
     const labelMatches = matchLabelsToRepoLabels(suggestedLabels, input.repoLabels ?? [])
@@ -644,6 +627,30 @@ export function planAutoPublishPreviewDrafts(input: {
       })
     }
   }
+}
+
+function partitionAutoPublishEligibleDrafts(
+  drafts: GeneratedIssueDraft[],
+  repo: Repo
+): {
+  eligibleDrafts: GeneratedIssueDraft[]
+  skippedDrafts: AutoPublishSkippedDraft[]
+} {
+  const eligibleDrafts: GeneratedIssueDraft[] = []
+  const skippedDrafts: AutoPublishSkippedDraft[] = []
+
+  for (const draft of drafts) {
+    const reason = getAutoPublishEligibilitySkipReason(draft, repo)
+
+    if (reason) {
+      skippedDrafts.push({ title: draft.title, reason })
+      continue
+    }
+
+    eligibleDrafts.push(draft)
+  }
+
+  return { eligibleDrafts, skippedDrafts }
 }
 
 function getAutoPublishEligibilitySkipReason(

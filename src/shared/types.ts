@@ -176,15 +176,17 @@ export type AgentRunDetail = AgentRunListItem & {
 
 export type GenerateDraftsMode = 'review' | 'auto-publish-preview'
 
+export type AutoPublishSkippedDraft = {
+  title: string
+  reason: string
+}
+
 export type AutoPublishPreviewSummary = {
   runId: string
   repoId: string
   generatedDraftCount: number
   plannedDraftCount: number
-  skippedDrafts: Array<{
-    title: string
-    reason: string
-  }>
+  skippedDrafts: AutoPublishSkippedDraft[]
   maxIssuesPerRun: number
   defaultLabel: string
   dryRun: boolean

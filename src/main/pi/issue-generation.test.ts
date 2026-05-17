@@ -1000,7 +1000,10 @@ describe('issue generation', () => {
     })
     expect(plan.summary.skippedDrafts).toEqual([
       { title: 'Ask for reproduction details', reason: 'Clarification drafts are not eligible.' },
-      { title: 'Investigate flaky avatar upload', reason: 'Low-confidence drafts are not eligible.' },
+      {
+        title: 'Investigate flaky avatar upload',
+        reason: 'Low-confidence drafts are not eligible.'
+      },
       {
         title: 'Polish settings spacing',
         reason: 'Repo requires high confidence for auto-publish.'

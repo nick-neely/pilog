@@ -114,6 +114,7 @@ import {
 import type {
   AutoPublishPreviewSummary,
   AutoPublishPublishReport,
+  AutoPublishSkippedDraft,
   GeneratedIssueDraft,
   IssueDraftForReview,
   IssueDraftStatus
@@ -1458,7 +1459,9 @@ function AutoPublishPreviewDialog({
               </p>
             )}
             <PlanMetaSummary summary={summary} />
-            {summary.skippedDrafts.length > 0 ? <SkippedDraftsSummary summary={summary} /> : null}
+            {summary.skippedDrafts.length > 0 ? (
+              <SkippedDraftsSummary skippedDrafts={summary.skippedDrafts} />
+            ) : null}
           </div>
         ) : null}
         {!report ? (
@@ -1494,15 +1497,15 @@ function AutoPublishPreviewDialog({
 }
 
 function SkippedDraftsSummary({
-  summary
+  skippedDrafts
 }: {
-  summary: AutoPublishPreviewSummary
+  skippedDrafts: AutoPublishSkippedDraft[]
 }): React.JSX.Element {
   return (
     <section className="flex flex-col gap-2 rounded-lg border bg-muted/30 p-3">
       <h3 className="text-sm font-semibold">Skipped drafts</h3>
       <ul className="flex flex-col gap-2">
-        {summary.skippedDrafts.map((draft) => (
+        {skippedDrafts.map((draft) => (
           <li key={`${draft.title}:${draft.reason}`} className="flex flex-col gap-0.5">
             <p className="text-sm font-medium leading-snug">{draft.title}</p>
             <p className="text-sm leading-relaxed text-muted-foreground">{draft.reason}</p>
