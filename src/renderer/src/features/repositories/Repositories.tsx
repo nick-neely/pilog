@@ -64,6 +64,7 @@ import type {
 import {
   DEFAULT_REPO_AUTO_PUBLISH_SETTINGS,
   DEFAULT_REPO_DRAFT_SETTINGS,
+  isAutoPublishMinimumConfidence,
   isIssueStyleAudience,
   isIssueStyleDepth,
   normalizeRepoAutoPublishSettings,
@@ -476,6 +477,17 @@ function AutoPublishSettings({
     formSettings.autoPublishMinimumConfidence !== repo.autoPublishMinimumConfidence ||
     formSettings.autoPublishRequireKnownAffectedFiles !== repo.autoPublishRequireKnownAffectedFiles
 
+  const defaultGuardrailsSummary = [
+    autoPublishSettingsSummary(DEFAULT_REPO_AUTO_PUBLISH_SETTINGS),
+    `Defaults are ${DEFAULT_REPO_AUTO_PUBLISH_SETTINGS.autoPublishMaxIssuesPerRun} issues, ${DEFAULT_REPO_AUTO_PUBLISH_SETTINGS.autoPublishDefaultLabel}, confirmation on.`
+  ].join(' ')
+
+  const handleMinimumConfidenceChange = (value: string): void => {
+    if (isAutoPublishMinimumConfidence(value)) {
+      setMinimumConfidence(value)
+    }
+  }
+
   const handleSave = async (): Promise<void> => {
     setSaving(true)
     setMessage(null)
@@ -544,10 +556,7 @@ function AutoPublishSettings({
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="flex flex-col gap-2">
           <Label htmlFor={`auto-publish-confidence-${repo.id}`}>Minimum confidence</Label>
-          <Select
-            value={minimumConfidence}
-            onValueChange={(value) => setMinimumConfidence(value as AutoPublishMinimumConfidence)}
-          >
+          <Select value={minimumConfidence} onValueChange={handleMinimumConfidenceChange}>
             <SelectTrigger id={`auto-publish-confidence-${repo.id}`}>
               <SelectValue />
             </SelectTrigger>
@@ -621,8 +630,7 @@ function AutoPublishSettings({
 
       <div className="flex items-center justify-between gap-3">
         <p className="text-xs text-muted-foreground" aria-live="polite">
-          {message ??
-            `${autoPublishSettingsSummary(DEFAULT_REPO_AUTO_PUBLISH_SETTINGS)} Defaults are ${DEFAULT_REPO_AUTO_PUBLISH_SETTINGS.autoPublishMaxIssuesPerRun} issues, ${DEFAULT_REPO_AUTO_PUBLISH_SETTINGS.autoPublishDefaultLabel}, confirmation on.`}
+          {message ?? defaultGuardrailsSummary}
         </p>
         <Button size="sm" variant="outline" onClick={handleSave} disabled={!isDirty || saving}>
           {saving ? 'Saving…' : 'Save guardrails'}
