@@ -1,7 +1,7 @@
 import { BrowserWindow, MessageChannelMain, ipcMain, type IpcMainInvokeEvent } from 'electron'
 import { mkdirSync } from 'node:fs'
 import {
-  applyRepoDraftSettingsOverride,
+  applyRepoDraftSettingsForGenerationMode,
   type IpcRequest,
   type IpcResponse,
   type Note,
@@ -164,7 +164,11 @@ export function registerPiIpcHandlers(
     }
   ): Promise<IpcResponse<'pi:generateDrafts:start'>> => {
     const { notes, mode } = input
-    let repo = applyRepoDraftSettingsOverride(input.repo, input.draftSettingsOverride)
+    let repo = applyRepoDraftSettingsForGenerationMode(
+      input.repo,
+      mode,
+      input.draftSettingsOverride
+    )
     const readiness = await getRuntimeReadiness({}, [repo])
     const readinessMessage = getBlockingRuntimeReadinessMessage(
       readiness,

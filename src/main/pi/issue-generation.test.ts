@@ -501,7 +501,7 @@ describe('issue generation', () => {
           autoPublishDefaultLabel: 'ready-for-agent'
         },
         repoLabels: refreshed.githubLabels,
-        drafts: [{ ...draft, sourceNoteIds: [], suggestedLabels: ['Enhancement'] }]
+        drafts: [{ ...draft, sourceNoteIds: ['note-1'], suggestedLabels: ['Enhancement'] }]
       }).drafts[0]?.suggestedLabels
     ).toEqual(['enhancement', 'ready-for-agent'])
 
@@ -1013,6 +1013,111 @@ describe('issue generation', () => {
         reason: 'Repo requires known affected files for auto-publish.'
       }
     ])
+  })
+
+  it('skips auto-publish drafts missing sections required by saved draft content toggles', () => {
+    const db = createInMemoryDatabase()
+    runMigrations(db)
+    const repo = createRepo(db, {
+      owner: 'nick-neely',
+      name: 'pilog',
+      localPath: '/workspace/pilog',
+      githubUrl: 'https://github.com/nick-neely/pilog',
+      defaultBranch: 'main'
+    })
+    const noteIds = ['missing implementation notes', 'complete draft'].map((content) =>
+      createNote(db, { content, repoId: repo.id })
+    )
+    const run = createAgentRun(db, {
+      repoId: repo.id,
+      inputNoteIds: noteIds.map((note) => note.id)
+    })
+
+    const plan = planAutoPublishPreviewDrafts({
+      runId: run.id,
+      repo: {
+        ...repo,
+        autoPublishEnabled: true,
+        autoPublishMaxIssuesPerRun: 5,
+        autoPublishDefaultLabel: 'triaged-by-pilog',
+        autoPublishDryRun: true,
+        autoPublishRequireConfirmation: true,
+        autoPublishMinimumConfidence: 'medium',
+        autoPublishRequireKnownAffectedFiles: false
+      },
+      drafts: [
+        {
+          ...draft,
+          title: 'Repair settings spacing',
+          sourceNoteIds: [noteIds[0]!.id],
+          confidence: 'high',
+          implementationNotes: []
+        },
+        {
+          ...draft,
+          title: 'Restore publish log empty state',
+          sourceNoteIds: [noteIds[1]!.id],
+          confidence: 'high'
+        }
+      ]
+    })
+
+    expect(plan.drafts.map((planned) => planned.title)).toEqual([
+      'Restore publish log empty state'
+    ])
+    expect(plan.summary.skippedDrafts).toEqual([
+      {
+        title: 'Repair settings spacing',
+        reason:
+          'Repo requires saved draft content sections for auto-publish: implementation notes.'
+      }
+    ])
+  })
+
+  it('does not require draft content sections disabled in saved repo toggles for auto-publish', () => {
+    const db = createInMemoryDatabase()
+    runMigrations(db)
+    const repo = createRepo(db, {
+      owner: 'nick-neely',
+      name: 'pilog',
+      localPath: '/workspace/pilog',
+      githubUrl: 'https://github.com/nick-neely/pilog',
+      defaultBranch: 'main'
+    })
+    const note = createNote(db, { content: 'implementation notes are optional', repoId: repo.id })
+    const run = createAgentRun(db, { repoId: repo.id, inputNoteIds: [note.id] })
+
+    const plan = planAutoPublishPreviewDrafts({
+      runId: run.id,
+      repo: {
+        ...repo,
+        autoPublishEnabled: true,
+        autoPublishMaxIssuesPerRun: 5,
+        autoPublishDefaultLabel: 'triaged-by-pilog',
+        autoPublishDryRun: true,
+        autoPublishRequireConfirmation: true,
+        autoPublishMinimumConfidence: 'medium',
+        autoPublishRequireKnownAffectedFiles: false,
+        draftContentToggles: {
+          ...repo.draftContentToggles,
+          includeImplementationNotes: false
+        }
+      },
+      drafts: [
+        {
+          ...draft,
+          title: 'Publish without implementation notes',
+          sourceNoteIds: [note.id],
+          confidence: 'high',
+          implementationNotes: []
+        }
+      ]
+    })
+
+    expect(plan.drafts.map((planned) => planned.title)).toEqual([
+      'Publish without implementation notes'
+    ])
+    expect(plan.summary.skippedDrafts).toEqual([])
   })
 
   it('allows medium-confidence drafts when the repo auto-publish threshold is medium', () => {

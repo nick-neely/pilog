@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
   DEFAULT_REPO_DRAFT_SETTINGS,
+  applyRepoDraftSettingsForGenerationMode,
   applyRepoDraftSettingsOverride,
   normalizeRepoAutoPublishSettings,
-  normalizeRepoDraftSettings
+  normalizeRepoDraftSettings,
+  type Repo
 } from './ipc'
 
 describe('normalizeRepoAutoPublishSettings', () => {
@@ -98,6 +100,67 @@ describe('applyRepoDraftSettingsOverride', () => {
     expect(active.draftContentToggles.includeReproductionSteps).toBe(false)
     expect(repo.issueStyleDepth).toBe('balanced')
     expect(repo.draftContentToggles.includeImplementationNotes).toBe(true)
+  })
+})
+
+describe('applyRepoDraftSettingsForGenerationMode', () => {
+  const repo: Repo = {
+    id: 'repo-1',
+    name: 'pilog',
+    owner: 'nick',
+    localPath: '/repo',
+    accessKind: 'host',
+    wslDistro: null,
+    wslPath: null,
+    githubUrl: null,
+    defaultBranch: null,
+    githubLabels: [],
+    githubLabelsSyncedAt: null,
+    autoPublishEnabled: false,
+    autoPublishMaxIssuesPerRun: 5,
+    autoPublishDefaultLabel: 'triaged-by-pilog',
+    autoPublishDryRun: false,
+    autoPublishRequireConfirmation: true,
+    autoPublishMinimumConfidence: 'high',
+    autoPublishRequireKnownAffectedFiles: true,
+    allowDiffSummaryCapture: false,
+    issueStyleDepth: 'balanced',
+    issueStyleAudience: 'internal',
+    draftContentToggles: DEFAULT_REPO_DRAFT_SETTINGS.draftContentToggles,
+    repoIndex: null,
+    createdAt: '2026-05-14T00:00:00.000Z',
+    updatedAt: '2026-05-14T00:00:00.000Z'
+  }
+
+  const override = {
+    issueStyleDepth: 'detailed',
+    issueStyleAudience: 'open_source',
+    draftContentToggles: {
+      includeImplementationNotes: false,
+      includeSourceNotes: false
+    }
+  } as const
+
+  it('uses temporary draft overrides for review generation', () => {
+    const active = applyRepoDraftSettingsForGenerationMode(repo, 'review', override)
+
+    expect(active.issueStyleDepth).toBe('detailed')
+    expect(active.issueStyleAudience).toBe('open_source')
+    expect(active.draftContentToggles.includeImplementationNotes).toBe(false)
+    expect(active.draftContentToggles.includeSourceNotes).toBe(false)
+  })
+
+  it('uses saved repo draft defaults for auto-publish generation', () => {
+    const active = applyRepoDraftSettingsForGenerationMode(
+      repo,
+      'auto-publish-preview',
+      override
+    )
+
+    expect(active.issueStyleDepth).toBe('balanced')
+    expect(active.issueStyleAudience).toBe('internal')
+    expect(active.draftContentToggles.includeImplementationNotes).toBe(true)
+    expect(active.draftContentToggles.includeSourceNotes).toBe(true)
   })
 })
 

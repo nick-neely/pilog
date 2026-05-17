@@ -3,6 +3,7 @@ import type {
   GitHubLabel,
   Note,
   Repo,
+  DraftContentToggles,
   RepoIndexDirectory,
   RepoIndexExclusionSummary,
   RepoIndexStatus
@@ -673,7 +674,42 @@ function getAutoPublishEligibilitySkipReason(
     return 'Repo requires known affected files for auto-publish.'
   }
 
+  const missingRequiredSections = getMissingRequiredDraftContentSections(
+    draft,
+    repo.draftContentToggles
+  )
+  if (missingRequiredSections.length > 0) {
+    return `Repo requires saved draft content sections for auto-publish: ${missingRequiredSections.join(
+      ', '
+    )}.`
+  }
+
   return null
+}
+
+function getMissingRequiredDraftContentSections(
+  draft: GeneratedIssueDraft,
+  toggles: DraftContentToggles
+): string[] {
+  const missing: string[] = []
+
+  if (toggles.includeImplementationNotes && draft.implementationNotes.length === 0) {
+    missing.push('implementation notes')
+  }
+  if (toggles.includeAffectedFiles && draft.affectedFiles.length === 0) {
+    missing.push('affected files')
+  }
+  if (toggles.includeSourceNotes && draft.sourceNoteIds.length === 0) {
+    missing.push('source notes')
+  }
+  if (toggles.includeAcceptanceCriteria && draft.acceptanceCriteria.length === 0) {
+    missing.push('acceptance criteria')
+  }
+  if (toggles.includeConfidenceRationale && !draft.groupingReason.trim()) {
+    missing.push('confidence rationale')
+  }
+
+  return missing
 }
 
 function applyDefaultLabel(labels: string[], defaultLabel: string): string[] {

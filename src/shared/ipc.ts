@@ -356,6 +356,16 @@ export function applyRepoDraftSettingsOverride(
   }
 }
 
+export function applyRepoDraftSettingsForGenerationMode(
+  repo: Repo,
+  mode: 'review' | 'auto-publish-preview',
+  override?: UnknownRepoDraftSettings | null
+): Repo {
+  if (mode === 'auto-publish-preview') return repo
+
+  return applyRepoDraftSettingsOverride(repo, override)
+}
+
 export type UpdateRepoDraftSettingsRequest = {
   id: string
 } & RepoDraftSettings
