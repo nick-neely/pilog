@@ -497,6 +497,7 @@ describe('issue generation', () => {
         repo: {
           ...refreshed,
           autoPublishEnabled: true,
+          autoPublishMinimumConfidence: 'medium',
           autoPublishDefaultLabel: 'ready-for-agent'
         },
         repoLabels: refreshed.githubLabels,
@@ -847,24 +848,27 @@ describe('issue generation', () => {
       (content) => createNote(db, { content, repoId: repo.id }).id
     )
     const run = createAgentRun(db, { repoId: repo.id, inputNoteIds: noteIds })
-    const generatedDrafts = [
+    const generatedDrafts: GeneratedIssueDraft[] = [
       {
         ...draft,
         title: 'Fix settings spacing',
         sourceNoteIds: [noteIds[0]!],
-        suggestedLabels: ['bug', 'triaged-by-pilog']
+        suggestedLabels: ['bug', 'triaged-by-pilog'],
+        confidence: 'high'
       },
       {
         ...draft,
         title: 'Handle avatar errors',
         sourceNoteIds: [noteIds[1]!],
-        suggestedLabels: ['ux']
+        suggestedLabels: ['ux'],
+        confidence: 'high'
       },
       {
         ...draft,
         title: 'Repair auth redirect',
         sourceNoteIds: [noteIds[2]!],
-        suggestedLabels: []
+        suggestedLabels: [],
+        confidence: 'high'
       }
     ]
 
@@ -895,6 +899,7 @@ describe('issue generation', () => {
     expect(plan.summary).toMatchObject({
       generatedDraftCount: 3,
       plannedDraftCount: 2,
+      skippedDrafts: [],
       maxIssuesPerRun: 2,
       defaultLabel: 'triaged-by-pilog',
       dryRun: true,
@@ -907,6 +912,136 @@ describe('issue generation', () => {
       ['ux', 'triaged-by-pilog']
     ])
     expect(listPublishLog(db, { repoId: repo.id })).toEqual([])
+  })
+
+  it('skips ineligible auto-publish preview drafts before applying max issue count', () => {
+    const db = createInMemoryDatabase()
+    runMigrations(db)
+    const repo = createRepo(db, {
+      owner: 'nick-neely',
+      name: 'pilog',
+      localPath: '/workspace/pilog',
+      githubUrl: 'https://github.com/nick-neely/pilog',
+      defaultBranch: 'main'
+    })
+    const noteIds = [
+      'clarify vague note',
+      'low confidence bug',
+      'medium confidence change',
+      'high confidence change',
+      'missing file evidence',
+      'second high confidence change'
+    ].map((content) => createNote(db, { content, repoId: repo.id }).id)
+    const run = createAgentRun(db, { repoId: repo.id, inputNoteIds: noteIds })
+
+    const plan = planAutoPublishPreviewDrafts({
+      runId: run.id,
+      repo: {
+        ...repo,
+        autoPublishEnabled: true,
+        autoPublishMaxIssuesPerRun: 2,
+        autoPublishDefaultLabel: 'triaged-by-pilog',
+        autoPublishDryRun: true,
+        autoPublishRequireConfirmation: true,
+        autoPublishMinimumConfidence: 'high',
+        autoPublishRequireKnownAffectedFiles: true
+      },
+      drafts: [
+        {
+          ...draft,
+          title: 'Ask for reproduction details',
+          sourceNoteIds: [noteIds[0]!],
+          publishReady: false,
+          needsClarification: ['Which route fails?'],
+          confidence: 'medium'
+        },
+        {
+          ...draft,
+          title: 'Investigate flaky avatar upload',
+          sourceNoteIds: [noteIds[1]!],
+          confidence: 'low'
+        },
+        {
+          ...draft,
+          title: 'Polish settings spacing',
+          sourceNoteIds: [noteIds[2]!],
+          confidence: 'medium'
+        },
+        {
+          ...draft,
+          title: 'Repair auth redirect',
+          sourceNoteIds: [noteIds[3]!],
+          confidence: 'high'
+        },
+        {
+          ...draft,
+          title: 'Restore publish log empty state',
+          sourceNoteIds: [noteIds[4]!],
+          confidence: 'high',
+          affectedFiles: []
+        },
+        {
+          ...draft,
+          title: 'Fix draft review copy',
+          sourceNoteIds: [noteIds[5]!],
+          confidence: 'high'
+        }
+      ]
+    })
+
+    expect(plan.drafts.map((planned) => planned.title)).toEqual([
+      'Repair auth redirect',
+      'Fix draft review copy'
+    ])
+    expect(plan.summary).toMatchObject({
+      generatedDraftCount: 6,
+      plannedDraftCount: 2,
+      limited: false
+    })
+    expect(plan.summary.skippedDrafts).toEqual([
+      { title: 'Ask for reproduction details', reason: 'Clarification drafts are not eligible.' },
+      { title: 'Investigate flaky avatar upload', reason: 'Low-confidence drafts are not eligible.' },
+      {
+        title: 'Polish settings spacing',
+        reason: 'Repo requires high confidence for auto-publish.'
+      },
+      {
+        title: 'Restore publish log empty state',
+        reason: 'Repo requires known affected files for auto-publish.'
+      }
+    ])
+  })
+
+  it('allows medium-confidence drafts when the repo auto-publish threshold is medium', () => {
+    const db = createInMemoryDatabase()
+    runMigrations(db)
+    const repo = createRepo(db, {
+      owner: 'nick-neely',
+      name: 'pilog',
+      localPath: '/workspace/pilog',
+      githubUrl: 'https://github.com/nick-neely/pilog',
+      defaultBranch: 'main'
+    })
+    const note = createNote(db, { content: 'settings spacing can publish', repoId: repo.id })
+    const run = createAgentRun(db, { repoId: repo.id, inputNoteIds: [note.id] })
+
+    const plan = planAutoPublishPreviewDrafts({
+      runId: run.id,
+      repo: {
+        ...repo,
+        autoPublishEnabled: true,
+        autoPublishMaxIssuesPerRun: 2,
+        autoPublishDefaultLabel: 'triaged-by-pilog',
+        autoPublishDryRun: true,
+        autoPublishRequireConfirmation: true,
+        autoPublishMinimumConfidence: 'medium',
+        autoPublishRequireKnownAffectedFiles: true
+      },
+      drafts: [{ ...draft, title: 'Polish settings spacing', sourceNoteIds: [note.id] }]
+    })
+
+    expect(plan.drafts.map((planned) => planned.title)).toEqual(['Polish settings spacing'])
+    expect(plan.summary.skippedDrafts).toEqual([])
   })
 
   it('normalizes auto-publish preview labels against repo labels', () => {
@@ -931,7 +1066,7 @@ describe('issue generation', () => {
         autoPublishDefaultLabel: 'triaged-by-pilog',
         autoPublishDryRun: true,
         autoPublishRequireConfirmation: true,
-        autoPublishMinimumConfidence: 'high',
+        autoPublishMinimumConfidence: 'medium',
         autoPublishRequireKnownAffectedFiles: true
       },
       repoLabels: [{ name: 'ready-for-agent' }, { name: 'triaged-by-pilog' }],
@@ -1040,13 +1175,15 @@ describe('issue generation', () => {
           ...draft,
           title: 'Add loading state to save button',
           sourceNoteIds: [first.id],
-          suggestedLabels: []
+          suggestedLabels: [],
+          confidence: 'high'
         },
         {
           ...draft,
           title: 'Fix settings spacing',
           sourceNoteIds: [second.id],
-          suggestedLabels: ['ux']
+          suggestedLabels: ['ux'],
+          confidence: 'high'
         }
       ]
     })

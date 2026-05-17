@@ -53,6 +53,8 @@ export type AutoPublishPreviewPlan = {
   summary: AutoPublishPreviewSummary
 }
 
+type AutoPublishSkippedDraft = AutoPublishPreviewSummary['skippedDrafts'][number]
+
 export const GITHUB_LABEL_CACHE_REFRESH_INTERVAL_MS = 6 * 60 * 60 * 1000
 const UNKNOWN_CAPTURE_CONTEXT_VALUE = '(unknown)'
 
@@ -592,7 +594,24 @@ export function planAutoPublishPreviewDrafts(input: {
 
   const maxIssuesPerRun = Math.max(1, Math.floor(input.repo.autoPublishMaxIssuesPerRun))
   const defaultLabel = input.repo.autoPublishDefaultLabel.trim()
-  const plannedDrafts = input.drafts.slice(0, maxIssuesPerRun).map((draft) => {
+  const eligibility = input.drafts.reduce<{
+    eligibleDrafts: GeneratedIssueDraft[]
+    skippedDrafts: AutoPublishSkippedDraft[]
+  }>(
+    (result, draft) => {
+      const reason = getAutoPublishEligibilitySkipReason(draft, input.repo)
+
+      if (reason) {
+        result.skippedDrafts.push({ title: draft.title, reason })
+      } else {
+        result.eligibleDrafts.push(draft)
+      }
+
+      return result
+    },
+    { eligibleDrafts: [], skippedDrafts: [] }
+  )
+  const plannedDrafts = eligibility.eligibleDrafts.slice(0, maxIssuesPerRun).map((draft) => {
     const suggestedLabels = applyDefaultLabel(draft.suggestedLabels, defaultLabel)
     const labelMatches = matchLabelsToRepoLabels(suggestedLabels, input.repoLabels ?? [])
 
@@ -602,7 +621,7 @@ export function planAutoPublishPreviewDrafts(input: {
       labelMatches
     }
   })
-  const heldBackCount = Math.max(0, input.drafts.length - plannedDrafts.length)
+  const heldBackCount = Math.max(0, eligibility.eligibleDrafts.length - plannedDrafts.length)
   const limited = heldBackCount > 0
 
   return {
@@ -612,6 +631,7 @@ export function planAutoPublishPreviewDrafts(input: {
       repoId: input.repo.id,
       generatedDraftCount: input.drafts.length,
       plannedDraftCount: plannedDrafts.length,
+      skippedDrafts: eligibility.skippedDrafts,
       maxIssuesPerRun,
       defaultLabel,
       dryRun: input.repo.autoPublishDryRun,
@@ -624,6 +644,29 @@ export function planAutoPublishPreviewDrafts(input: {
       })
     }
   }
+}
+
+function getAutoPublishEligibilitySkipReason(
+  draft: GeneratedIssueDraft,
+  repo: Repo
+): string | null {
+  if (!draft.publishReady || (draft.needsClarification?.filter(Boolean).length ?? 0) > 0) {
+    return 'Clarification drafts are not eligible.'
+  }
+
+  if (draft.confidence === 'low') {
+    return 'Low-confidence drafts are not eligible.'
+  }
+
+  if (repo.autoPublishMinimumConfidence === 'high' && draft.confidence !== 'high') {
+    return 'Repo requires high confidence for auto-publish.'
+  }
+
+  if (repo.autoPublishRequireKnownAffectedFiles && draft.affectedFiles.length === 0) {
+    return 'Repo requires known affected files for auto-publish.'
+  }
+
+  return null
 }
 
 function applyDefaultLabel(labels: string[], defaultLabel: string): string[] {

@@ -181,6 +181,10 @@ export type AutoPublishPreviewSummary = {
   repoId: string
   generatedDraftCount: number
   plannedDraftCount: number
+  skippedDrafts: Array<{
+    title: string
+    reason: string
+  }>
   maxIssuesPerRun: number
   defaultLabel: string
   dryRun: boolean

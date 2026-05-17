@@ -1458,6 +1458,7 @@ function AutoPublishPreviewDialog({
               </p>
             )}
             <PlanMetaSummary summary={summary} />
+            {summary.skippedDrafts.length > 0 ? <SkippedDraftsSummary summary={summary} /> : null}
           </div>
         ) : null}
         {!report ? (
@@ -1479,13 +1480,36 @@ function AutoPublishPreviewDialog({
           {report || summary?.dryRun ? (
             <AlertDialogAction onClick={onOpenDrafts}>Open Drafts</AlertDialogAction>
           ) : (
-            <AlertDialogAction disabled={publishing || !summary} onClick={onPublish}>
+            <AlertDialogAction
+              disabled={publishing || !summary || summary.plannedDraftCount === 0}
+              onClick={onPublish}
+            >
               {publishing ? 'Publishing' : 'Publish to GitHub'}
             </AlertDialogAction>
           )}
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
+  )
+}
+
+function SkippedDraftsSummary({
+  summary
+}: {
+  summary: AutoPublishPreviewSummary
+}): React.JSX.Element {
+  return (
+    <section className="flex flex-col gap-2 rounded-lg border bg-muted/30 p-3">
+      <h3 className="text-sm font-semibold">Skipped drafts</h3>
+      <ul className="flex flex-col gap-2">
+        {summary.skippedDrafts.map((draft) => (
+          <li key={`${draft.title}:${draft.reason}`} className="flex flex-col gap-0.5">
+            <p className="text-sm font-medium leading-snug">{draft.title}</p>
+            <p className="text-sm leading-relaxed text-muted-foreground">{draft.reason}</p>
+          </li>
+        ))}
+      </ul>
+    </section>
   )
 }
 
