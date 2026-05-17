@@ -36,6 +36,8 @@ export const repoColumns = {
   autoPublishDefaultLabel: repos.autoPublishDefaultLabel,
   autoPublishDryRun: repos.autoPublishDryRun,
   autoPublishRequireConfirmation: repos.autoPublishRequireConfirmation,
+  autoPublishMinimumConfidence: repos.autoPublishMinimumConfidence,
+  autoPublishRequireKnownAffectedFiles: repos.autoPublishRequireKnownAffectedFiles,
   issueStyleDepth: repos.issueStyleDepth,
   issueStyleAudience: repos.issueStyleAudience,
   draftContentToggles: repos.draftContentToggles,
@@ -222,6 +224,8 @@ export type RepoRow = {
   autoPublishDefaultLabel: string
   autoPublishDryRun: boolean
   autoPublishRequireConfirmation: boolean
+  autoPublishMinimumConfidence: string
+  autoPublishRequireKnownAffectedFiles: boolean
   issueStyleDepth: string
   issueStyleAudience: string
   draftContentToggles: string
@@ -231,6 +235,15 @@ export type RepoRow = {
 }
 
 export function mapRepoRow(row: RepoRow, repoIndex: RepoIndexStatus | null = null): Repo {
+  const autoPublishSettings = normalizeRepoAutoPublishSettings({
+    autoPublishEnabled: row.autoPublishEnabled,
+    autoPublishMaxIssuesPerRun: row.autoPublishMaxIssuesPerRun,
+    autoPublishDefaultLabel: row.autoPublishDefaultLabel,
+    autoPublishDryRun: row.autoPublishDryRun,
+    autoPublishRequireConfirmation: row.autoPublishRequireConfirmation,
+    autoPublishMinimumConfidence: row.autoPublishMinimumConfidence,
+    autoPublishRequireKnownAffectedFiles: row.autoPublishRequireKnownAffectedFiles
+  })
   const draftSettings = normalizeRepoDraftSettings({
     issueStyleDepth: row.issueStyleDepth,
     issueStyleAudience: row.issueStyleAudience,
@@ -241,6 +254,7 @@ export function mapRepoRow(row: RepoRow, repoIndex: RepoIndexStatus | null = nul
     ...row,
     githubLabels: parseGithubLabels(row.githubLabels),
     githubLabelsSyncedAt: row.githubLabelsSyncedAt ?? null,
+    ...autoPublishSettings,
     ...draftSettings,
     repoIndex
   }

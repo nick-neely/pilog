@@ -52,6 +52,8 @@ describe('repos repository', () => {
     expect(repo.autoPublishDefaultLabel).toBe('triaged-by-pilog')
     expect(repo.autoPublishDryRun).toBe(false)
     expect(repo.autoPublishRequireConfirmation).toBe(true)
+    expect(repo.autoPublishMinimumConfidence).toBe('high')
+    expect(repo.autoPublishRequireKnownAffectedFiles).toBe(true)
     expect(repo.issueStyleDepth).toBe('balanced')
     expect(repo.issueStyleAudience).toBe('internal')
     expect(repo.allowDiffSummaryCapture).toBe(false)
@@ -126,6 +128,8 @@ describe('repos repository', () => {
       issueStyleDepth: 'balanced',
       issueStyleAudience: 'internal',
       allowDiffSummaryCapture: false,
+      autoPublishMinimumConfidence: 'high',
+      autoPublishRequireKnownAffectedFiles: true,
       draftContentToggles: {
         includeImplementationNotes: true,
         includeAffectedFiles: true,
@@ -163,7 +167,9 @@ describe('repos repository', () => {
       autoPublishMaxIssuesPerRun: 5,
       autoPublishDefaultLabel: 'triaged-by-pilog',
       autoPublishDryRun: false,
-      autoPublishRequireConfirmation: true
+      autoPublishRequireConfirmation: true,
+      autoPublishMinimumConfidence: 'high',
+      autoPublishRequireKnownAffectedFiles: true
     })
   })
 
@@ -289,7 +295,9 @@ describe('repos repository', () => {
       autoPublishMaxIssuesPerRun: 2,
       autoPublishDefaultLabel: 'needs-triage',
       autoPublishDryRun: true,
-      autoPublishRequireConfirmation: false
+      autoPublishRequireConfirmation: false,
+      autoPublishMinimumConfidence: 'medium',
+      autoPublishRequireKnownAffectedFiles: false
     })
 
     expect(updated).toMatchObject({
@@ -298,14 +306,37 @@ describe('repos repository', () => {
       autoPublishMaxIssuesPerRun: 2,
       autoPublishDefaultLabel: 'needs-triage',
       autoPublishDryRun: true,
-      autoPublishRequireConfirmation: false
+      autoPublishRequireConfirmation: false,
+      autoPublishMinimumConfidence: 'medium',
+      autoPublishRequireKnownAffectedFiles: false
     })
     expect(getRepoById(db, second.id)).toMatchObject({
       autoPublishEnabled: false,
       autoPublishMaxIssuesPerRun: 5,
       autoPublishDefaultLabel: 'triaged-by-pilog',
       autoPublishDryRun: false,
-      autoPublishRequireConfirmation: true
+      autoPublishRequireConfirmation: true,
+      autoPublishMinimumConfidence: 'high',
+      autoPublishRequireKnownAffectedFiles: true
+    })
+  })
+
+  it('normalizes unsafe auto-publish eligibility before persistence', () => {
+    const repo = createRepo(db, sampleInput)
+
+    const updated = updateRepoAutoPublishSettings(db, repo.id, {
+      autoPublishEnabled: true,
+      autoPublishMaxIssuesPerRun: 3,
+      autoPublishDefaultLabel: 'ready-for-agent',
+      autoPublishDryRun: false,
+      autoPublishRequireConfirmation: true,
+      autoPublishMinimumConfidence: 'low',
+      autoPublishRequireKnownAffectedFiles: false
+    } as never)
+
+    expect(updated).toMatchObject({
+      autoPublishMinimumConfidence: 'high',
+      autoPublishRequireKnownAffectedFiles: false
     })
   })
 
@@ -315,7 +346,9 @@ describe('repos repository', () => {
       autoPublishMaxIssuesPerRun: 1,
       autoPublishDefaultLabel: 'triaged-by-pilog',
       autoPublishDryRun: false,
-      autoPublishRequireConfirmation: true
+      autoPublishRequireConfirmation: true,
+      autoPublishMinimumConfidence: 'high',
+      autoPublishRequireKnownAffectedFiles: true
     })
 
     expect(updated).toBeNull()

@@ -34,6 +34,16 @@ export const repos = sqliteTable('repos', {
   autoPublishRequireConfirmation: integer('auto_publish_require_confirmation', { mode: 'boolean' })
     .notNull()
     .default(true),
+  autoPublishMinimumConfidence: text('auto_publish_minimum_confidence', {
+    enum: ['medium', 'high']
+  })
+    .notNull()
+    .default('high'),
+  autoPublishRequireKnownAffectedFiles: integer('auto_publish_require_known_affected_files', {
+    mode: 'boolean'
+  })
+    .notNull()
+    .default(true),
   issueStyleDepth: text('issue_style_depth', { enum: ['concise', 'balanced', 'detailed'] })
     .notNull()
     .default('balanced'),

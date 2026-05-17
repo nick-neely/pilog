@@ -32,6 +32,8 @@ export function runMigrations(db: PilogDatabase): void {
       auto_publish_default_label TEXT NOT NULL DEFAULT 'triaged-by-pilog',
       auto_publish_dry_run INTEGER NOT NULL DEFAULT 0,
       auto_publish_require_confirmation INTEGER NOT NULL DEFAULT 1,
+      auto_publish_minimum_confidence TEXT NOT NULL DEFAULT 'high',
+      auto_publish_require_known_affected_files INTEGER NOT NULL DEFAULT 1,
       issue_style_depth TEXT NOT NULL DEFAULT 'balanced',
       issue_style_audience TEXT NOT NULL DEFAULT 'internal',
       draft_content_toggles TEXT NOT NULL DEFAULT '{"includeImplementationNotes":true,"includeAffectedFiles":true,"includeSourceNotes":true,"includeAcceptanceCriteria":true,"includeConfidenceRationale":true,"includeReproductionSteps":true}',
@@ -112,6 +114,13 @@ export function runMigrations(db: PilogDatabase): void {
   )
   addColumnIfMissing(db, 'repos', 'auto_publish_dry_run', 'INTEGER NOT NULL DEFAULT 0')
   addColumnIfMissing(db, 'repos', 'auto_publish_require_confirmation', 'INTEGER NOT NULL DEFAULT 1')
+  addColumnIfMissing(db, 'repos', 'auto_publish_minimum_confidence', "TEXT NOT NULL DEFAULT 'high'")
+  addColumnIfMissing(
+    db,
+    'repos',
+    'auto_publish_require_known_affected_files',
+    'INTEGER NOT NULL DEFAULT 1'
+  )
   addColumnIfMissing(db, 'repos', 'issue_style_depth', "TEXT NOT NULL DEFAULT 'balanced'")
   addColumnIfMissing(db, 'repos', 'issue_style_audience', "TEXT NOT NULL DEFAULT 'internal'")
   addColumnIfMissing(

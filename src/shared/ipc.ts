@@ -114,6 +114,8 @@ export type Repo = {
   autoPublishDefaultLabel: string
   autoPublishDryRun: boolean
   autoPublishRequireConfirmation: boolean
+  autoPublishMinimumConfidence: AutoPublishMinimumConfidence
+  autoPublishRequireKnownAffectedFiles: boolean
   issueStyleDepth: IssueStyleDepth
   issueStyleAudience: IssueStyleAudience
   draftContentToggles: DraftContentToggles
@@ -180,8 +182,11 @@ export type RepoAutoPublishSettings = Pick<
   | 'autoPublishDefaultLabel'
   | 'autoPublishDryRun'
   | 'autoPublishRequireConfirmation'
+  | 'autoPublishMinimumConfidence'
+  | 'autoPublishRequireKnownAffectedFiles'
 >
 
+export type AutoPublishMinimumConfidence = 'medium' | 'high'
 export type IssueStyleDepth = 'concise' | 'balanced' | 'detailed'
 export type IssueStyleAudience = 'internal' | 'open_source'
 
@@ -214,25 +219,54 @@ export const DEFAULT_REPO_AUTO_PUBLISH_SETTINGS = {
   autoPublishMaxIssuesPerRun: 5,
   autoPublishDefaultLabel: 'triaged-by-pilog',
   autoPublishDryRun: false,
-  autoPublishRequireConfirmation: true
+  autoPublishRequireConfirmation: true,
+  autoPublishMinimumConfidence: 'high',
+  autoPublishRequireKnownAffectedFiles: true
 } as const satisfies RepoAutoPublishSettings
 
 export function normalizeRepoAutoPublishSettings(
-  input: RepoAutoPublishSettings
+  input: RepoAutoPublishSettings | Record<string, unknown>
 ): RepoAutoPublishSettings {
-  const maxIssuesPerRun = Number.isFinite(input.autoPublishMaxIssuesPerRun)
-    ? Math.max(1, Math.floor(input.autoPublishMaxIssuesPerRun))
-    : 1
+  const rawMaxIssuesPerRun = input.autoPublishMaxIssuesPerRun
+  const maxIssuesPerRun =
+    typeof rawMaxIssuesPerRun === 'number' && Number.isFinite(rawMaxIssuesPerRun)
+      ? Math.max(1, Math.floor(rawMaxIssuesPerRun))
+      : 1
+  const rawDefaultLabel = input.autoPublishDefaultLabel
+  const defaultLabel =
+    typeof rawDefaultLabel === 'string'
+      ? rawDefaultLabel.trim() || DEFAULT_REPO_AUTO_PUBLISH_SETTINGS.autoPublishDefaultLabel
+      : DEFAULT_REPO_AUTO_PUBLISH_SETTINGS.autoPublishDefaultLabel
 
   return {
-    autoPublishEnabled: input.autoPublishEnabled,
+    autoPublishEnabled:
+      typeof input.autoPublishEnabled === 'boolean'
+        ? input.autoPublishEnabled
+        : DEFAULT_REPO_AUTO_PUBLISH_SETTINGS.autoPublishEnabled,
     autoPublishMaxIssuesPerRun: maxIssuesPerRun,
-    autoPublishDefaultLabel:
-      input.autoPublishDefaultLabel.trim() ||
-      DEFAULT_REPO_AUTO_PUBLISH_SETTINGS.autoPublishDefaultLabel,
-    autoPublishDryRun: input.autoPublishDryRun,
-    autoPublishRequireConfirmation: input.autoPublishRequireConfirmation
+    autoPublishDefaultLabel: defaultLabel,
+    autoPublishDryRun:
+      typeof input.autoPublishDryRun === 'boolean'
+        ? input.autoPublishDryRun
+        : DEFAULT_REPO_AUTO_PUBLISH_SETTINGS.autoPublishDryRun,
+    autoPublishRequireConfirmation:
+      typeof input.autoPublishRequireConfirmation === 'boolean'
+        ? input.autoPublishRequireConfirmation
+        : DEFAULT_REPO_AUTO_PUBLISH_SETTINGS.autoPublishRequireConfirmation,
+    autoPublishMinimumConfidence: isAutoPublishMinimumConfidence(input.autoPublishMinimumConfidence)
+      ? input.autoPublishMinimumConfidence
+      : DEFAULT_REPO_AUTO_PUBLISH_SETTINGS.autoPublishMinimumConfidence,
+    autoPublishRequireKnownAffectedFiles:
+      typeof input.autoPublishRequireKnownAffectedFiles === 'boolean'
+        ? input.autoPublishRequireKnownAffectedFiles
+        : DEFAULT_REPO_AUTO_PUBLISH_SETTINGS.autoPublishRequireKnownAffectedFiles
   }
+}
+
+export function isAutoPublishMinimumConfidence(
+  value: unknown
+): value is AutoPublishMinimumConfidence {
+  return value === 'medium' || value === 'high'
 }
 
 export type UpdateRepoAutoPublishSettingsRequest = {

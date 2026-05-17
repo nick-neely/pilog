@@ -67,6 +67,8 @@ const promptRepo: Repo = {
   autoPublishDefaultLabel: 'triaged-by-pilog',
   autoPublishDryRun: false,
   autoPublishRequireConfirmation: true,
+  autoPublishMinimumConfidence: 'high',
+  autoPublishRequireKnownAffectedFiles: true,
   ...DEFAULT_REPO_DRAFT_SETTINGS,
   allowDiffSummaryCapture: false,
   githubLabels: [],
@@ -874,7 +876,9 @@ describe('issue generation', () => {
         autoPublishMaxIssuesPerRun: 2,
         autoPublishDefaultLabel: 'triaged-by-pilog',
         autoPublishDryRun: true,
-        autoPublishRequireConfirmation: true
+        autoPublishRequireConfirmation: true,
+        autoPublishMinimumConfidence: 'high',
+        autoPublishRequireKnownAffectedFiles: true
       },
       drafts: generatedDrafts
     })
@@ -926,7 +930,9 @@ describe('issue generation', () => {
         autoPublishMaxIssuesPerRun: 5,
         autoPublishDefaultLabel: 'triaged-by-pilog',
         autoPublishDryRun: true,
-        autoPublishRequireConfirmation: true
+        autoPublishRequireConfirmation: true,
+        autoPublishMinimumConfidence: 'high',
+        autoPublishRequireKnownAffectedFiles: true
       },
       repoLabels: [{ name: 'ready-for-agent' }, { name: 'triaged-by-pilog' }],
       drafts: [
@@ -1025,7 +1031,9 @@ describe('issue generation', () => {
         autoPublishMaxIssuesPerRun: 5,
         autoPublishDefaultLabel: 'triaged-by-pilog',
         autoPublishDryRun: false,
-        autoPublishRequireConfirmation: true
+        autoPublishRequireConfirmation: true,
+        autoPublishMinimumConfidence: 'high',
+        autoPublishRequireKnownAffectedFiles: true
       },
       drafts: [
         {

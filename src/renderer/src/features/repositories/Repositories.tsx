@@ -51,6 +51,7 @@ import type {
   CreateIssueRequest,
   GitHubIssueTemplate,
   GitHubLabel,
+  AutoPublishMinimumConfidence,
   IssueStyleAudience,
   IssueStyleDepth,
   Repo,
@@ -73,6 +74,7 @@ import { Fragment, useEffect, useRef, useState } from 'react'
 import { getErrorMessage } from '../recovery-state'
 import { RepoLinkFlow } from '../setup/RepoLinkFlow'
 import { DRAFT_CONTENT_TOGGLE_LABELS, draftSettingsSummary } from './repo-draft-defaults'
+import { autoPublishSettingsSummary } from './repo-auto-publish-settings'
 import { REPO_INDEX_PRIVACY_COPY, getRepoIndexStatusLabel } from './repo-index-status'
 import { DIFF_SUMMARY_PRIVACY_COPY, repoPrivacySummary } from './repo-privacy-settings'
 import { useRepos } from './useRepos'
@@ -447,6 +449,12 @@ function AutoPublishSettings({
   const [requireConfirmation, setRequireConfirmation] = useState(
     repo.autoPublishRequireConfirmation
   )
+  const [minimumConfidence, setMinimumConfidence] = useState<AutoPublishMinimumConfidence>(
+    repo.autoPublishMinimumConfidence
+  )
+  const [requireKnownAffectedFiles, setRequireKnownAffectedFiles] = useState(
+    repo.autoPublishRequireKnownAffectedFiles
+  )
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
 
@@ -455,14 +463,18 @@ function AutoPublishSettings({
     autoPublishMaxIssuesPerRun: Number.parseInt(maxIssues, 10),
     autoPublishDefaultLabel: defaultLabel,
     autoPublishDryRun: dryRun,
-    autoPublishRequireConfirmation: requireConfirmation
+    autoPublishRequireConfirmation: requireConfirmation,
+    autoPublishMinimumConfidence: minimumConfidence,
+    autoPublishRequireKnownAffectedFiles: requireKnownAffectedFiles
   })
   const isDirty =
     formSettings.autoPublishEnabled !== repo.autoPublishEnabled ||
     formSettings.autoPublishMaxIssuesPerRun !== repo.autoPublishMaxIssuesPerRun ||
     formSettings.autoPublishDefaultLabel !== repo.autoPublishDefaultLabel ||
     formSettings.autoPublishDryRun !== repo.autoPublishDryRun ||
-    formSettings.autoPublishRequireConfirmation !== repo.autoPublishRequireConfirmation
+    formSettings.autoPublishRequireConfirmation !== repo.autoPublishRequireConfirmation ||
+    formSettings.autoPublishMinimumConfidence !== repo.autoPublishMinimumConfidence ||
+    formSettings.autoPublishRequireKnownAffectedFiles !== repo.autoPublishRequireKnownAffectedFiles
 
   const handleSave = async (): Promise<void> => {
     setSaving(true)
@@ -530,6 +542,26 @@ function AutoPublishSettings({
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">
+        <div className="flex flex-col gap-2">
+          <Label htmlFor={`auto-publish-confidence-${repo.id}`}>Minimum confidence</Label>
+          <Select
+            value={minimumConfidence}
+            onValueChange={(value) => setMinimumConfidence(value as AutoPublishMinimumConfidence)}
+          >
+            <SelectTrigger id={`auto-publish-confidence-${repo.id}`}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                <SelectItem value="high">High only</SelectItem>
+                <SelectItem value="medium">Medium and high</SelectItem>
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+          <p className="text-xs leading-5 text-muted-foreground">
+            Low-confidence drafts are never eligible.
+          </p>
+        </div>
         <label
           htmlFor={`auto-publish-dry-run-${repo.id}`}
           className="flex cursor-pointer items-start justify-between gap-3 rounded-md bg-muted/40 p-3"
@@ -544,6 +576,26 @@ function AutoPublishSettings({
             id={`auto-publish-dry-run-${repo.id}`}
             checked={dryRun}
             onCheckedChange={setDryRun}
+            size="sm"
+          />
+        </label>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label
+          htmlFor={`auto-publish-known-files-${repo.id}`}
+          className="flex cursor-pointer items-start justify-between gap-3 rounded-md bg-muted/40 p-3"
+        >
+          <span className="flex flex-col gap-1">
+            <span className="text-sm font-medium">Require known affected files</span>
+            <span className="text-xs leading-5 text-muted-foreground">
+              Skip drafts when Pilog cannot name supported affected paths.
+            </span>
+          </span>
+          <Switch
+            id={`auto-publish-known-files-${repo.id}`}
+            checked={requireKnownAffectedFiles}
+            onCheckedChange={setRequireKnownAffectedFiles}
             size="sm"
           />
         </label>
@@ -570,7 +622,7 @@ function AutoPublishSettings({
       <div className="flex items-center justify-between gap-3">
         <p className="text-xs text-muted-foreground" aria-live="polite">
           {message ??
-            `Defaults are disabled, ${DEFAULT_REPO_AUTO_PUBLISH_SETTINGS.autoPublishMaxIssuesPerRun} issues, ${DEFAULT_REPO_AUTO_PUBLISH_SETTINGS.autoPublishDefaultLabel}, confirmation on.`}
+            `${autoPublishSettingsSummary(DEFAULT_REPO_AUTO_PUBLISH_SETTINGS)} Defaults are ${DEFAULT_REPO_AUTO_PUBLISH_SETTINGS.autoPublishMaxIssuesPerRun} issues, ${DEFAULT_REPO_AUTO_PUBLISH_SETTINGS.autoPublishDefaultLabel}, confirmation on.`}
         </p>
         <Button size="sm" variant="outline" onClick={handleSave} disabled={!isDirty || saving}>
           {saving ? 'Saving…' : 'Save guardrails'}
@@ -814,13 +866,18 @@ function RepoRow({
       DEFAULT_REPO_AUTO_PUBLISH_SETTINGS.autoPublishMaxIssuesPerRun ||
     repo.autoPublishDefaultLabel !== DEFAULT_REPO_AUTO_PUBLISH_SETTINGS.autoPublishDefaultLabel ||
     repo.autoPublishDryRun ||
-    !repo.autoPublishRequireConfirmation
+    !repo.autoPublishRequireConfirmation ||
+    repo.autoPublishMinimumConfidence !==
+      DEFAULT_REPO_AUTO_PUBLISH_SETTINGS.autoPublishMinimumConfidence ||
+    repo.autoPublishRequireKnownAffectedFiles !==
+      DEFAULT_REPO_AUTO_PUBLISH_SETTINGS.autoPublishRequireKnownAffectedFiles
   const repoLocation = formatRepoLocation(repo)
   const repoIndexStatus = getRepoIndexStatusLabel(repo.repoIndex ?? null, {
     refreshing: refreshingIndex
   })
   const draftSummary = draftSettingsSummary(repo)
   const privacySummary = repoPrivacySummary(repo)
+  const autoPublishSummary = autoPublishSettingsSummary(repo)
 
   const handleRefreshIndex = async (): Promise<void> => {
     if (!repoIndexStatus.canRefresh) return
@@ -906,7 +963,7 @@ function RepoRow({
                 Privacy, draft defaults, and auto-publish guardrails
               </span>
               <span className="min-w-0 flex-1 truncate text-left font-mono text-[11px]">
-                {privacySummary} {draftSummary}
+                {privacySummary} {draftSummary} {autoPublishSummary}
               </span>
               <HugeiconsIcon
                 icon={settingsOpen ? ArrowUp01Icon : ArrowDown01Icon}

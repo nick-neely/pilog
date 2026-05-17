@@ -121,7 +121,9 @@ test('Generate and Publish dry run previews planned drafts without publish write
         autoPublishMaxIssuesPerRun: 2,
         autoPublishDefaultLabel: 'ready-for-agent',
         autoPublishDryRun: true,
-        autoPublishRequireConfirmation: true
+        autoPublishRequireConfirmation: true,
+        autoPublishMinimumConfidence: 'high',
+        autoPublishRequireKnownAffectedFiles: true
       })
     }, seed)
     await page.reload()

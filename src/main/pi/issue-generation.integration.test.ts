@@ -29,6 +29,8 @@ runIfEnabled('issue generation integration', () => {
       autoPublishDefaultLabel: 'triaged-by-pilog',
       autoPublishDryRun: false,
       autoPublishRequireConfirmation: true,
+      autoPublishMinimumConfidence: 'high',
+      autoPublishRequireKnownAffectedFiles: true,
       ...DEFAULT_REPO_DRAFT_SETTINGS,
       allowDiffSummaryCapture: false,
       createdAt: new Date().toISOString(),

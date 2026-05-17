@@ -59,6 +59,8 @@ function baseInput(overrides: Partial<IssueGenerationInput> = {}): IssueGenerati
       autoPublishDefaultLabel: 'triaged-by-pilog',
       autoPublishDryRun: false,
       autoPublishRequireConfirmation: true,
+      autoPublishMinimumConfidence: 'high',
+      autoPublishRequireKnownAffectedFiles: true,
       ...DEFAULT_REPO_DRAFT_SETTINGS,
       allowDiffSummaryCapture: false,
       createdAt: '2026-05-08T00:00:00.000Z',

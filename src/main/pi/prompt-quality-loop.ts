@@ -147,6 +147,8 @@ async function exerciseGenerationTools(
         autoPublishDefaultLabel: 'triaged-by-pilog',
         autoPublishDryRun: false,
         autoPublishRequireConfirmation: true,
+        autoPublishMinimumConfidence: 'high',
+        autoPublishRequireKnownAffectedFiles: true,
         ...DEFAULT_REPO_DRAFT_SETTINGS,
         allowDiffSummaryCapture: false,
         createdAt: FIXTURE_REPO_TIMESTAMP,

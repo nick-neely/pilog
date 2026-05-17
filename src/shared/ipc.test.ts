@@ -14,14 +14,18 @@ describe('normalizeRepoAutoPublishSettings', () => {
         autoPublishMaxIssuesPerRun: 2.8,
         autoPublishDefaultLabel: ' needs-triage ',
         autoPublishDryRun: true,
-        autoPublishRequireConfirmation: false
+        autoPublishRequireConfirmation: false,
+        autoPublishMinimumConfidence: 'medium',
+        autoPublishRequireKnownAffectedFiles: false
       })
     ).toEqual({
       autoPublishEnabled: true,
       autoPublishMaxIssuesPerRun: 2,
       autoPublishDefaultLabel: 'needs-triage',
       autoPublishDryRun: true,
-      autoPublishRequireConfirmation: false
+      autoPublishRequireConfirmation: false,
+      autoPublishMinimumConfidence: 'medium',
+      autoPublishRequireKnownAffectedFiles: false
     })
   })
 
@@ -32,11 +36,15 @@ describe('normalizeRepoAutoPublishSettings', () => {
         autoPublishMaxIssuesPerRun: Number.NaN,
         autoPublishDefaultLabel: '   ',
         autoPublishDryRun: false,
-        autoPublishRequireConfirmation: true
+        autoPublishRequireConfirmation: true,
+        autoPublishMinimumConfidence: 'low',
+        autoPublishRequireKnownAffectedFiles: 'yes'
       })
     ).toMatchObject({
       autoPublishMaxIssuesPerRun: 1,
-      autoPublishDefaultLabel: 'triaged-by-pilog'
+      autoPublishDefaultLabel: 'triaged-by-pilog',
+      autoPublishMinimumConfidence: 'high',
+      autoPublishRequireKnownAffectedFiles: true
     })
   })
 })
@@ -67,6 +75,8 @@ describe('applyRepoDraftSettingsOverride', () => {
         autoPublishDefaultLabel: 'triaged-by-pilog',
         autoPublishDryRun: false,
         autoPublishRequireConfirmation: true,
+        autoPublishMinimumConfidence: 'high',
+        autoPublishRequireKnownAffectedFiles: true,
         allowDiffSummaryCapture: false,
         ...repo,
         repoIndex: null,
