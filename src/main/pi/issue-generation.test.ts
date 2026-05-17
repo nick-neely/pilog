@@ -1077,7 +1077,9 @@ describe('issue generation', () => {
     expect(plan.summary.skippedDrafts).toEqual([
       {
         title: 'Repair settings spacing',
-        reason: 'Repo requires saved draft content sections for auto-publish: implementation notes.'
+        reason: 'Repo requires saved draft content sections for auto-publish: implementation notes.',
+        sourceNoteIds: [noteIds[0]!.id],
+        labels: draft.suggestedLabels
       }
     ])
   })
