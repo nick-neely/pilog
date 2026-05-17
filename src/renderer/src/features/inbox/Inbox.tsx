@@ -188,6 +188,12 @@ function formatNoteTimestamp(iso: string): string {
   return (sameYear ? SHORT_NOTE_TIMESTAMP_FORMATTER : YEAR_NOTE_TIMESTAMP_FORMATTER).format(date)
 }
 
+function formatDateTime(iso: string): string {
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return iso
+  return YEAR_NOTE_TIMESTAMP_FORMATTER.format(date)
+}
+
 function formatCaptureContext(note: Note): string | null {
   const context = note.captureContext
   if (!context) return null
@@ -1680,7 +1686,7 @@ function getAutoPublishDialogDescription(
   report: AutoPublishPublishReport | null
 ): string {
   if (report) {
-    return `${report.successCount} published, ${report.failureCount} failed.`
+    return `${report.successCount} published, ${report.skippedCount} skipped, ${report.failureCount} failed.`
   }
 
   return summary?.message ?? 'Pilog planned these drafts for review before any GitHub writes.'
@@ -1696,6 +1702,13 @@ function AutoPublishReport({
   return (
     <ScrollArea className="min-h-0 flex-1 pe-3">
       <div className="flex flex-col gap-5" role="status" aria-live="polite">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
+          <span>
+            Repo {report.repo.owner}/{report.repo.name}
+          </span>
+          <span>Run {report.runId}</span>
+          <span>{formatDateTime(report.publishedAt)}</span>
+        </div>
         {report.successes.length > 0 ? (
           <section className="flex flex-col gap-2">
             <h3 className="text-sm font-semibold">Published</h3>
@@ -1715,6 +1728,39 @@ function AutoPublishReport({
                     >
                       {item.githubIssueUrl}
                     </a>
+                    <ReportLabels labels={item.labels} />
+                    <SourceNoteList
+                      noteIds={item.sourceNoteIds}
+                      sourceNotesById={sourceNotesById}
+                      itemClassName="line-clamp-2 text-xs leading-relaxed text-muted-foreground"
+                    />
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
+        {report.skippedDrafts.length > 0 ? (
+          <section className="flex flex-col gap-2">
+            <h3 className="text-sm font-semibold">Skipped before GitHub</h3>
+            <ul className="flex flex-col gap-2">
+              {report.skippedDrafts.map((item) => (
+                <li
+                  key={`${item.title}:${item.reason}`}
+                  className="rounded-md border bg-muted/30 p-3"
+                >
+                  <div className="flex flex-col gap-2">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <p className="max-w-[52ch] text-sm font-medium leading-snug">{item.title}</p>
+                      <Badge variant="outline">Skipped</Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground">{item.reason}</p>
+                    <ReportLabels labels={item.labels} />
+                    <SourceNoteList
+                      noteIds={item.sourceNoteIds}
+                      sourceNotesById={sourceNotesById}
+                      itemClassName="line-clamp-2 text-xs leading-relaxed text-muted-foreground"
+                    />
                   </div>
                 </li>
               ))}
@@ -1737,6 +1783,7 @@ function AutoPublishReport({
                       <p className="font-mono text-xs text-muted-foreground">
                         Draft {item.draftId}
                       </p>
+                      <ReportLabels labels={item.labels} />
                       <SourceNoteList
                         noteIds={item.sourceNoteIds}
                         sourceNotesById={sourceNotesById}
@@ -1751,6 +1798,20 @@ function AutoPublishReport({
         ) : null}
       </div>
     </ScrollArea>
+  )
+}
+
+function ReportLabels({ labels }: { labels: string[] }): React.JSX.Element | null {
+  if (labels.length === 0) return null
+
+  return (
+    <div className="flex flex-wrap gap-1.5" aria-label="Labels applied">
+      {labels.map((label) => (
+        <Badge key={label} variant="secondary" className="max-w-full font-mono text-[0.7rem]">
+          {label}
+        </Badge>
+      ))}
+    </div>
   )
 }
 

@@ -643,7 +643,12 @@ function partitionAutoPublishEligibleDrafts(
     const reason = getAutoPublishEligibilitySkipReason(draft, repo)
 
     if (reason) {
-      skippedDrafts.push({ title: draft.title, reason })
+      skippedDrafts.push({
+        title: draft.title,
+        reason,
+        sourceNoteIds: draft.sourceNoteIds,
+        labels: draft.suggestedLabels
+      })
       continue
     }
 
