@@ -677,6 +677,8 @@ describe('undoAutoPublishRun', () => {
         })
       ]
     })
+    expect(commentIssue).toHaveBeenCalledTimes(1)
+    expect(closeIssue).toHaveBeenCalledTimes(1)
     expect(commentIssue.mock.invocationCallOrder[0]).toBeLessThan(
       closeIssue.mock.invocationCallOrder[0]!
     )

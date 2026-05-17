@@ -1045,23 +1045,24 @@ describe('issue generation', () => {
       'publishable source'
     ].map((content) => createNote(db, { content, repoId: repo.id }).id)
     const run = createAgentRun(db, { repoId: repo.id, inputNoteIds: noteIds })
+    const saferAutoPublishRepo: Repo = {
+      ...repo,
+      autoPublishEnabled: true,
+      autoPublishMaxIssuesPerRun: 5,
+      autoPublishDefaultLabel: 'triaged-by-pilog',
+      autoPublishDryRun: false,
+      autoPublishRequireConfirmation: true,
+      autoPublishMinimumConfidence: 'high',
+      autoPublishRequireKnownAffectedFiles: true,
+      draftContentToggles: {
+        ...repo.draftContentToggles,
+        includeImplementationNotes: true
+      }
+    }
 
     const plan = planAutoPublishPreviewDrafts({
       runId: run.id,
-      repo: {
-        ...repo,
-        autoPublishEnabled: true,
-        autoPublishMaxIssuesPerRun: 5,
-        autoPublishDefaultLabel: 'triaged-by-pilog',
-        autoPublishDryRun: false,
-        autoPublishRequireConfirmation: true,
-        autoPublishMinimumConfidence: 'high',
-        autoPublishRequireKnownAffectedFiles: true,
-        draftContentToggles: {
-          ...repo.draftContentToggles,
-          includeImplementationNotes: true
-        }
-      },
+      repo: saferAutoPublishRepo,
       drafts: [
         {
           ...draft,
