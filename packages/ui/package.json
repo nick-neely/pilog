@@ -11,6 +11,7 @@
     "./card": "./src/card.tsx",
     "./scroll-area": "./src/scroll-area.tsx",
     "./separator": "./src/separator.tsx",
+    "./sheet": "./src/sheet.tsx",
     "./tabs": "./src/tabs.tsx",
     "./utils": "./src/utils.ts"
   },

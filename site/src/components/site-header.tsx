@@ -1,5 +1,6 @@
 import Image from 'next/image'
 import Link from 'next/link'
+import { MobileNav } from '@/components/mobile-nav'
 import { ThemeSelector } from '@/components/theme-selector'
 
 const navItems = [
@@ -40,7 +41,10 @@ export function SiteHeader() {
           </span>
         </Link>
         <nav aria-label="Main">
-          <ul className="flex items-center gap-5 sm:gap-7">
+          <ul className="flex items-center gap-3 sm:gap-5 md:gap-7">
+            <li className="md:hidden">
+              <MobileNav items={navItems} />
+            </li>
             {navItems.map((item) => (
               <li key={item.href} className="hidden md:block">
                 <Link
