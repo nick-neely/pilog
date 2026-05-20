@@ -36,7 +36,7 @@ const nav: DocsNavItem[] = [
     id: 'pi-deeper',
     label: 'Pi, in depth',
     children: [
-      { id: 'providers', label: 'Supported providers' },
+      { id: 'providers', label: 'Model catalog' },
       { id: 'api-keys', label: 'Getting an API key' },
       { id: 'switch-model', label: 'Switching models' }
     ]
@@ -230,9 +230,9 @@ export default async function DocsPage() {
             <Callout>
               <strong className="text-foreground font-medium">Recommended:</strong>{' '}
               <span className="text-foreground">Anthropic</span> as the provider and{' '}
-              <span className="text-foreground font-mono">claude-sonnet-4-5</span> as the model.
-              Sonnet 4.5 reasons well over rough developer prose, follows the issue-draft schema
-              reliably, and stays well inside the latency budget for an interactive review session.
+              <span className="text-foreground font-mono">claude-sonnet-4-6</span> as the model.
+              Sonnet 4.6 reasons well over rough developer prose, follows the issue-draft schema
+              reliably, and stays inside the latency budget for an interactive review session.
             </Callout>
 
             <p className="mt-5">In Pilog, open Settings → Provider &amp; Model and:</p>
@@ -242,7 +242,7 @@ export default async function DocsPage() {
                 provider dropdown.
               </Step>
               <Step n="02">
-                Pick <span className="text-foreground font-mono">claude-sonnet-4-5</span> from the
+                Pick <span className="text-foreground font-mono">claude-sonnet-4-6</span> from the
                 model dropdown.
               </Step>
               <Step n="03">
@@ -350,45 +350,65 @@ export default async function DocsPage() {
           {/* ───── Pi in depth ─────────────────────────────────────────── */}
           <Section id="pi-deeper" title="Pi, in depth" topSpacing>
             <p>
-              Anthropic + Claude Sonnet 4.5 is the recommended setup, but Pi is a model-agnostic
+              Anthropic + Claude Sonnet 4.6 is the recommended setup, but Pi is a model-agnostic
               harness. You can switch providers at any time from Settings without re-onboarding.
             </p>
           </Section>
 
-          <Section id="providers" title="Supported providers" subsection>
-            <ul className="text-foreground/90 space-y-2 text-base leading-relaxed">
+          <Section id="providers" title="Model catalog" subsection>
+            <p>
+              Settings exposes the full Pi model registry bundled with Pilog. Browse pricing and
+              context windows at{' '}
+              <Link
+                href="https://pi.dev/models"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary hover:text-primary/80 underline underline-offset-4"
+              >
+                pi.dev/models
+              </Link>
+              , then use the same provider and model id here. Default for drafts: Anthropic{' '}
+              <span className="font-mono">claude-sonnet-4-6</span>.
+            </p>
+            <ul className="text-foreground/90 mt-4 space-y-2 text-base leading-relaxed">
               <li>
-                <span className="text-foreground font-medium">Anthropic.</span>{' '}
-                <span className="font-mono">claude-sonnet-4-5</span>,{' '}
-                <span className="font-mono">claude-opus-4</span>,{' '}
-                <span className="font-mono">claude-haiku-4-5</span>. Recommended default.
+                <span className="text-foreground font-medium">Direct APIs:</span> Anthropic, OpenAI,
+                Google (Gemini), DeepSeek, xAI, Mistral, Groq, and others.
               </li>
               <li>
-                <span className="text-foreground font-medium">OpenAI.</span> The GPT-5 family is a
-                solid non-Anthropic option.
+                <span className="text-foreground font-medium">Gateways:</span> OpenRouter, Vercel AI
+                Gateway, Amazon Bedrock, Google Vertex, Azure OpenAI, Cloudflare AI Gateway.
               </li>
               <li>
-                <span className="text-foreground font-medium">OpenRouter.</span> A single key routes
-                to many providers. Useful if you already pay for OpenRouter or want to experiment
-                with non-frontier models.
+                <span className="text-foreground font-medium">Coding-agent sign-in:</span> GitHub
+                Copilot, OpenAI Codex, OpenCode, Kimi Coding (OAuth where supported).
               </li>
               <li>
-                <span className="text-foreground font-medium">DeepSeek.</span> Supported for
-                cost-sensitive workflows.
-              </li>
-              <li>
-                <span className="text-foreground font-medium">Local and custom.</span> Ollama, LM
-                Studio, vLLM, or any OpenAI-compatible endpoint can be added by editing{' '}
-                <span className="font-mono">~/.pi/agent/models.json</span>. Note that local models
-                vary widely in their ability to follow the draft schema; results may be uneven.
+                <span className="text-foreground font-medium">Custom &amp; local:</span> Ollama, LM
+                Studio, vLLM, or OpenAI-compatible endpoints via{' '}
+                <span className="font-mono">~/.pi/agent/models.json</span>. Results vary with
+                smaller models.
               </li>
             </ul>
           </Section>
 
-          <Section id="api-keys" title="Getting an API key" subsection>
-            <ul className="text-foreground/90 space-y-2.5 text-base leading-relaxed">
+          <Section id="api-keys" title="Getting credentials" subsection>
+            <p className="text-foreground/90 text-base leading-relaxed">
+              Which key or sign-in you need depends on the provider you pick. The onboarding path
+              below uses Anthropic; for any other provider, open{' '}
+              <Link
+                href="https://pi.dev/models"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary hover:text-primary/80 underline underline-offset-4"
+              >
+                pi.dev/models
+              </Link>{' '}
+              and use that vendor&apos;s console (or OAuth, for coding-agent providers).
+            </p>
+            <ul className="text-foreground/90 mt-4 space-y-2.5 text-base leading-relaxed">
               <li>
-                <span className="text-foreground font-medium">Anthropic:</span>{' '}
+                <span className="text-foreground font-medium">Anthropic (recommended):</span>{' '}
                 <Link
                   href="https://console.anthropic.com/settings/keys"
                   target="_blank"
@@ -421,6 +441,18 @@ export default async function DocsPage() {
                 → <em>Create new secret key</em>.
               </li>
               <li>
+                <span className="text-foreground font-medium">Google (Gemini):</span>{' '}
+                <Link
+                  href="https://aistudio.google.com/apikey"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary hover:text-primary/80 underline underline-offset-4"
+                >
+                  aistudio.google.com/apikey
+                </Link>
+                .
+              </li>
+              <li>
                 <span className="text-foreground font-medium">OpenRouter:</span>{' '}
                 <Link
                   href="https://openrouter.ai/keys"
@@ -430,7 +462,7 @@ export default async function DocsPage() {
                 >
                   openrouter.ai/keys
                 </Link>
-                .
+                . One key reaches many catalog models.
               </li>
             </ul>
             <p className="text-muted-foreground mt-4 text-sm leading-relaxed">

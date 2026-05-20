@@ -55,7 +55,7 @@ runIfEnabled('issue generation integration', () => {
       repo,
       notes,
       provider: process.env.PILOG_INTEGRATION_PROVIDER ?? 'anthropic',
-      model: process.env.PILOG_INTEGRATION_MODEL ?? 'claude-sonnet-4-5',
+      model: process.env.PILOG_INTEGRATION_MODEL ?? 'claude-sonnet-4-6',
       turnBudget: 20
     })
 
