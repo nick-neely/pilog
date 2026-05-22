@@ -1,8 +1,8 @@
+import { spawnSync } from 'node:child_process'
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { spawnSync } from 'node:child_process'
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const repoRoot = resolve(scriptDir, '..')
@@ -72,8 +72,10 @@ function main() {
 }
 
 function writeElectronBuilderConfig(sourceConfigPath) {
-  const baseConfig = readFileSync(join(repoRoot, 'electron-builder.yml'), 'utf8')
-  const sourceConfig = readFileSync(sourceConfigPath, 'utf8')
+  const baseConfig = normalizeConfigLineEndings(
+    readFileSync(join(repoRoot, 'electron-builder.yml'), 'utf8')
+  )
+  const sourceConfig = normalizeConfigLineEndings(readFileSync(sourceConfigPath, 'utf8'))
   const isExtendedConfig = /^extends:\s+electron-builder\.yml/m.test(sourceConfig)
   const publishBlock = isExtendedConfig ? extractTopLevelBlock(sourceConfig, 'publish') : null
   const electronVersion = resolveElectronVersion()
@@ -151,12 +153,16 @@ function extractTopLevelBlock(contents, key) {
   return match?.[0].trimEnd() ?? null
 }
 
-function replaceTopLevelBlock(contents, key, replacement) {
+export function replaceTopLevelBlock(contents, key, replacement) {
   const expression = new RegExp(`^${key}:\\n(?:^[ \\t].*\\n?)+`, 'm')
   if (!expression.test(contents)) {
     throw new Error(`Could not find top-level ${key} block in electron-builder config`)
   }
   return contents.replace(expression, `${replacement}\n`)
+}
+
+export function normalizeConfigLineEndings(contents) {
+  return contents.replace(/\r\n/g, '\n')
 }
 
 function resolveElectronVersion() {
@@ -174,6 +180,13 @@ function isSameFile(left, right) {
   return resolve(left) === resolve(right)
 }
 
+/**
+ * @param {{
+ *   envStagingDir?: string | undefined,
+ *   repoRoot: string,
+ *   path?: { dirname: (path: string) => string, join: (...paths: string[]) => string, resolve: (...paths: string[]) => string }
+ * }} options
+ */
 export function resolveStagingRoot({ envStagingDir, repoRoot, path = { dirname, join, resolve } }) {
   if (envStagingDir?.trim()) {
     return path.resolve(repoRoot, envStagingDir)
