@@ -44,6 +44,7 @@ Use skills to keep implementation aligned with PiLog’s design system and shadc
 - Prefer incremental polish over a full UI redesign when feedback is localized to one surface (for example the Repositories New Issue dialog).
 - For sidebar and status-filter polish across Inbox, Runs, and Drafts, treat Inbox as the default visual standard unless the user specifies otherwise.
 - Status filters across Inbox, Runs, and Drafts should be clearable; the cleared state shows all statuses instead of forcing a default selection.
+- For contextual help or secondary detail in dialogs and sidebars, prefer a compact info-icon hover card (like the Inbox Generate Drafts footer) over large inline disclosures.
 
 ## Learned Workspace Facts
 
@@ -57,3 +58,5 @@ Use skills to keep implementation aligned with PiLog’s design system and shadc
 - In renderer UI, prefer shadcn/Radix `Tooltip` over native `title` attributes for controls so the app avoids double tooltips and keeps styled accessible hints.
 - Renderer TypeScript can flag `for...of` over `Set`/`Map` iterators; prefer `Array.from(...)` or `.forEach(...)` when touching iterator-heavy code.
 - `scripts/site-metadata.test.ts` (and similar) should derive expected download `softwareVersion` / `releaseNotes` from `site/src/data/release-manifest.json` using the same `stable ?? preview` rule as `site/src/lib/metadata.ts`, not hardcoded preview version strings.
+- Root `pnpm run verify` runs typecheck, lint, and test in parallel via `concurrently`.
+- Preview release Git tags must use the `v` prefix and match `vX.Y.Z-preview.N` (e.g. `v0.0.1-preview.10`); the Release — Preview workflow validates this format.
