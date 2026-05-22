@@ -170,10 +170,16 @@ function buildFilesBlock(stagingRoot) {
 
 export function resolveExplicitRuntimePackageJsonFileSets(stagingRoot) {
   return resolveRuntimePackageJsonNames(stagingRoot).flatMap((packageName) => {
-    const packageJson = join(stagingRoot, 'node_modules', ...packageName.split('/'), 'package.json')
+    const packageDir = join(stagingRoot, 'node_modules', ...packageName.split('/'))
+    const packageJson = join(packageDir, 'package.json')
     if (!existsSync(packageJson)) return []
 
-    return [`  - from: ${packageJson}`, `    to: node_modules/${packageName}/package.json`]
+    return [
+      `  - from: ${packageDir}`,
+      `    to: node_modules/${packageName}`,
+      '    filter:',
+      '      - package.json'
+    ]
   })
 }
 

@@ -122,18 +122,14 @@ describe('electron app packaging staging path', () => {
 
       expect(resolveExplicitRuntimePackageJsonFileSets(stagingRoot)).toEqual(
         expect.arrayContaining([
-          `  - from: ${path.join(
-            stagingRoot,
-            'node_modules',
-            '@earendil-works',
-            'pi-ai',
-            'package.json'
-          )}`,
-          '    to: node_modules/@earendil-works/pi-ai/package.json',
-          `  - from: ${path.join(stagingRoot, 'node_modules', 'openai', 'package.json')}`,
-          '    to: node_modules/openai/package.json',
-          `  - from: ${path.join(stagingRoot, 'node_modules', '@google', 'genai', 'package.json')}`,
-          '    to: node_modules/@google/genai/package.json'
+          `  - from: ${path.join(stagingRoot, 'node_modules', '@earendil-works', 'pi-ai')}`,
+          '    to: node_modules/@earendil-works/pi-ai',
+          '    filter:',
+          '      - package.json',
+          `  - from: ${path.join(stagingRoot, 'node_modules', 'openai')}`,
+          '    to: node_modules/openai',
+          `  - from: ${path.join(stagingRoot, 'node_modules', '@google', 'genai')}`,
+          '    to: node_modules/@google/genai'
         ])
       )
     } finally {
