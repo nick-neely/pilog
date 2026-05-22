@@ -1,6 +1,7 @@
 import { spawnSync } from 'node:child_process'
 import {
   cpSync,
+  existsSync,
   lstatSync,
   mkdtempSync,
   readFileSync,
@@ -16,6 +17,11 @@ import { fileURLToPath } from 'node:url'
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const repoRoot = resolve(scriptDir, '..')
 const isMain = process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false
+const REQUIRED_RUNTIME_PACKAGE_JSONS = [
+  '@earendil-works/pi-agent-core',
+  '@earendil-works/pi-ai',
+  '@earendil-works/pi-coding-agent'
+]
 
 if (isMain) {
   main()
@@ -72,7 +78,7 @@ function main() {
     console.log(`[package-electron-app] materialized ${materializedLinks} node_modules links`)
   }
 
-  const generatedConfig = writeElectronBuilderConfig(configPath)
+  const generatedConfig = writeElectronBuilderConfig(configPath, stagingRoot)
   run('pnpm', [
     'exec',
     'electron-builder',
@@ -84,7 +90,7 @@ function main() {
   ])
 }
 
-function writeElectronBuilderConfig(sourceConfigPath) {
+function writeElectronBuilderConfig(sourceConfigPath, stagingRoot) {
   const baseConfig = normalizeConfigLineEndings(
     readFileSync(join(repoRoot, 'electron-builder.yml'), 'utf8')
   )
@@ -102,7 +108,7 @@ function writeElectronBuilderConfig(sourceConfigPath) {
     ].join('\n')
   )
 
-  config = replaceTopLevelBlock(config, 'files', buildFilesBlock())
+  config = replaceTopLevelBlock(config, 'files', buildFilesBlock(stagingRoot))
   config = config
     .replaceAll('from: resources/icon.png', `from: ${join(repoRoot, 'resources', 'icon.png')}`)
     .replaceAll(
@@ -134,7 +140,7 @@ function writeElectronBuilderConfig(sourceConfigPath) {
   return outputPath
 }
 
-function buildFilesBlock() {
+function buildFilesBlock(stagingRoot) {
   return [
     'files:',
     '  - out/**',
@@ -157,8 +163,40 @@ function buildFilesBlock() {
     "  - '!**/.DS_Store'",
     "  - '!**/Thumbs.db'",
     "  - '!**/{test,tests,__tests__,fixtures,__fixtures__,coverage,.nyc_output,.cache,.vite,.turbo}/**'",
-    "  - '!**/*.{test,spec}.{js,jsx,cjs,mjs,ts,tsx,cts,mts}'"
+    "  - '!**/*.{test,spec}.{js,jsx,cjs,mjs,ts,tsx,cts,mts}'",
+    ...resolveExplicitRuntimePackageJsonFileSets(stagingRoot)
   ].join('\n')
+}
+
+export function resolveExplicitRuntimePackageJsonFileSets(stagingRoot) {
+  return resolveRuntimePackageJsonNames(stagingRoot).flatMap((packageName) => {
+    const packageJson = join(stagingRoot, 'node_modules', ...packageName.split('/'), 'package.json')
+    if (!existsSync(packageJson)) return []
+
+    return [`  - from: ${packageJson}`, `    to: node_modules/${packageName}/package.json`]
+  })
+}
+
+function resolveRuntimePackageJsonNames(stagingRoot) {
+  const names = new Set(REQUIRED_RUNTIME_PACKAGE_JSONS)
+  const piAiPackageJsonPath = join(
+    stagingRoot,
+    'node_modules',
+    '@earendil-works',
+    'pi-ai',
+    'package.json'
+  )
+
+  try {
+    const piAiPackageJson = JSON.parse(readFileSync(piAiPackageJsonPath, 'utf8'))
+    for (const dependencyName of Object.keys(piAiPackageJson.dependencies ?? {})) {
+      names.add(dependencyName)
+    }
+  } catch (error) {
+    if (error?.code !== 'ENOENT') throw error
+  }
+
+  return Array.from(names).sort()
 }
 
 function extractTopLevelBlock(contents, key) {

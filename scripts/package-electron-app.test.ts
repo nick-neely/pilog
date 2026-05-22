@@ -8,6 +8,7 @@ import {
   normalizeConfigLineEndings,
   replaceTopLevelBlock,
   resolveDeployTarget,
+  resolveExplicitRuntimePackageJsonFileSets,
   resolveStagingRoot
 } from './package-electron-app.mjs'
 
@@ -97,4 +98,61 @@ describe('electron app packaging staging path', () => {
       await rm(tmpDir, { recursive: true, force: true })
     }
   })
+
+  it('adds explicit runtime package manifests to the electron-builder file set', async () => {
+    const tmpDir = await mkdtemp(path.join(tmpdir(), 'pilog-package-electron-app-'))
+    const stagingRoot = path.join(tmpDir, 'staged-app')
+
+    try {
+      await writePackageJson(stagingRoot, '@earendil-works/pi-agent-core', {
+        name: '@earendil-works/pi-agent-core'
+      })
+      await writePackageJson(stagingRoot, '@earendil-works/pi-coding-agent', {
+        name: '@earendil-works/pi-coding-agent'
+      })
+      await writePackageJson(stagingRoot, '@earendil-works/pi-ai', {
+        name: '@earendil-works/pi-ai',
+        dependencies: {
+          openai: '6.26.0',
+          '@google/genai': '^1.52.0'
+        }
+      })
+      await writePackageJson(stagingRoot, 'openai', { name: 'openai' })
+      await writePackageJson(stagingRoot, '@google/genai', { name: '@google/genai' })
+
+      expect(resolveExplicitRuntimePackageJsonFileSets(stagingRoot)).toEqual(
+        expect.arrayContaining([
+          `  - from: ${path.join(
+            stagingRoot,
+            'node_modules',
+            '@earendil-works',
+            'pi-ai',
+            'package.json'
+          )}`,
+          '    to: node_modules/@earendil-works/pi-ai/package.json',
+          `  - from: ${path.join(stagingRoot, 'node_modules', 'openai', 'package.json')}`,
+          '    to: node_modules/openai/package.json',
+          `  - from: ${path.join(stagingRoot, 'node_modules', '@google', 'genai', 'package.json')}`,
+          '    to: node_modules/@google/genai/package.json'
+        ])
+      )
+    } finally {
+      await rm(tmpDir, { recursive: true, force: true })
+    }
+  })
 })
+
+async function writePackageJson(
+  stagingRoot: string,
+  packageName: string,
+  contents: Record<string, unknown>
+) {
+  const packageJsonPath = path.join(
+    stagingRoot,
+    'node_modules',
+    ...packageName.split('/'),
+    'package.json'
+  )
+  await mkdir(path.dirname(packageJsonPath), { recursive: true })
+  await writeFile(packageJsonPath, JSON.stringify(contents))
+}
