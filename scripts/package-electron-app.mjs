@@ -1,54 +1,75 @@
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { homedir, tmpdir } from 'node:os'
-import { dirname, join, resolve } from 'node:path'
+import { tmpdir } from 'node:os'
+import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { spawnSync } from 'node:child_process'
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const repoRoot = resolve(scriptDir, '..')
-const stagingRoot =
-  process.env.PILOG_ELECTRON_STAGING_DIR || join(homedir(), '.cache', 'pilog-electron-app')
-const configArgIndex = process.argv.indexOf('--config')
-const configPath =
-  configArgIndex >= 0 && process.argv[configArgIndex + 1]
-    ? resolve(repoRoot, process.argv[configArgIndex + 1])
-    : join(repoRoot, 'electron-builder.yml')
-const electronBuilderArgs = process.argv.slice(2).filter((arg, index, args) => {
-  if (arg === '--config') return false
-  if (index > 0 && args[index - 1] === '--config') return false
-  return true
-})
+const isMain = process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false
 
-rmSync(stagingRoot, { recursive: true, force: true })
-run('pnpm', ['--filter', 'pilog-app', 'deploy', '--legacy', '--prod', stagingRoot], {
-  cwd: repoRoot,
-  ci: true
-})
-rmSync(join(stagingRoot, 'node_modules'), { recursive: true, force: true })
-run(
-  'pnpm',
-  [
-    'install',
-    '--prod',
-    '--ignore-scripts',
-    '--no-frozen-lockfile',
-    '--config.auto-install-peers=true',
-    '--config.node-linker=hoisted',
-    '--config.package-import-method=copy'
-  ],
-  { cwd: stagingRoot, ci: true }
-)
+if (isMain) {
+  main()
+}
 
-const generatedConfig = writeElectronBuilderConfig(configPath)
-run('pnpm', [
-  'exec',
-  'electron-builder',
-  '--projectDir',
-  stagingRoot,
-  '--config',
-  generatedConfig,
-  ...electronBuilderArgs
-])
+function main() {
+  const stagingRoot = resolveStagingRoot({
+    envStagingDir: process.env.PILOG_ELECTRON_STAGING_DIR,
+    repoRoot
+  })
+  const configArgIndex = process.argv.indexOf('--config')
+  const configPath =
+    configArgIndex >= 0 && process.argv[configArgIndex + 1]
+      ? resolve(repoRoot, process.argv[configArgIndex + 1])
+      : join(repoRoot, 'electron-builder.yml')
+  const electronBuilderArgs = process.argv.slice(2).filter((arg, index, args) => {
+    if (arg === '--config') return false
+    if (index > 0 && args[index - 1] === '--config') return false
+    return true
+  })
+
+  rmSync(stagingRoot, { recursive: true, force: true })
+  run(
+    'pnpm',
+    [
+      '--filter',
+      'pilog-app',
+      'deploy',
+      '--legacy',
+      '--prod',
+      resolveDeployTarget(repoRoot, stagingRoot)
+    ],
+    {
+      cwd: repoRoot,
+      ci: true
+    }
+  )
+  rmSync(join(stagingRoot, 'node_modules'), { recursive: true, force: true })
+  run(
+    'pnpm',
+    [
+      'install',
+      '--prod',
+      '--ignore-scripts',
+      '--no-frozen-lockfile',
+      '--config.auto-install-peers=true',
+      '--config.node-linker=hoisted',
+      '--config.package-import-method=copy'
+    ],
+    { cwd: stagingRoot, ci: true }
+  )
+
+  const generatedConfig = writeElectronBuilderConfig(configPath)
+  run('pnpm', [
+    'exec',
+    'electron-builder',
+    '--projectDir',
+    stagingRoot,
+    '--config',
+    generatedConfig,
+    ...electronBuilderArgs
+  ])
+}
 
 function writeElectronBuilderConfig(sourceConfigPath) {
   const baseConfig = readFileSync(join(repoRoot, 'electron-builder.yml'), 'utf8')
@@ -151,6 +172,20 @@ function resolveElectronVersion() {
 
 function isSameFile(left, right) {
   return resolve(left) === resolve(right)
+}
+
+export function resolveStagingRoot({ envStagingDir, repoRoot, path = { dirname, join, resolve } }) {
+  if (envStagingDir?.trim()) {
+    return path.resolve(repoRoot, envStagingDir)
+  }
+  return path.join(path.dirname(repoRoot), '.pilog-electron-app')
+}
+
+export function resolveDeployTarget(repoRoot, stagingRoot, path = { relative }) {
+  const relativeTarget = path.relative?.(repoRoot, stagingRoot)
+  return relativeTarget && !relativeTarget.startsWith('..')
+    ? relativeTarget
+    : relativeTarget || stagingRoot
 }
 
 function run(command, args, options = {}) {
