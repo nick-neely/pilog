@@ -168,7 +168,7 @@ jobs:
           if ! gh release view "$TAG" >/dev/null 2>&1; then
             gh release create "$TAG" --verify-tag --title "$TAG" --prerelease --generate-notes || gh release view "$TAG" >/dev/null
           fi
-          timeout 10m gh release upload "$TAG" "${release_files[@]}" --clobber
+          node scripts/upload-release-assets.mjs "$TAG" "${release_files[@]}"
 
       - name: Generate checksums
         run: pnpm run build:checksums
@@ -179,11 +179,11 @@ jobs:
           TAG: ${{ needs.validate.outputs.tag }}
         run: |
           find dist -maxdepth 1 -name "*.sha256" | while read -r f; do
-            timeout 10m gh release upload "$TAG" "$f" --clobber
+            node scripts/upload-release-assets.mjs "$TAG" "$f"
           done
           if [[ -f dist/checksums.txt ]]; then
             cp dist/checksums.txt dist/checksums-preview-mac.txt
-            timeout 10m gh release upload "$TAG" dist/checksums-preview-mac.txt --clobber
+            node scripts/upload-release-assets.mjs "$TAG" dist/checksums-preview-mac.txt
           fi
 
   # ── Stage 3: Build & Publish — Windows ────────────────────────────────────
@@ -252,7 +252,7 @@ jobs:
           if ! gh release view "$TAG" >/dev/null 2>&1; then
             gh release create "$TAG" --verify-tag --title "$TAG" --prerelease --generate-notes || gh release view "$TAG" >/dev/null
           fi
-          timeout 10m gh release upload "$TAG" "${release_files[@]}" --clobber
+          node scripts/upload-release-assets.mjs "$TAG" "${release_files[@]}"
 
       - name: Generate checksums
         run: pnpm run build:checksums
@@ -263,11 +263,11 @@ jobs:
           TAG: ${{ needs.validate.outputs.tag }}
         run: |
           find dist -maxdepth 1 -name "*.sha256" | while read -r f; do
-            timeout 10m gh release upload "$TAG" "$f" --clobber
+            node scripts/upload-release-assets.mjs "$TAG" "$f"
           done
           if [[ -f dist/checksums.txt ]]; then
             cp dist/checksums.txt dist/checksums-preview-win.txt
-            timeout 10m gh release upload "$TAG" dist/checksums-preview-win.txt --clobber
+            node scripts/upload-release-assets.mjs "$TAG" dist/checksums-preview-win.txt
           fi
 
   # ── Stage 3: Build & Publish — Linux ──────────────────────────────────────
@@ -337,7 +337,7 @@ jobs:
           if ! gh release view "$TAG" >/dev/null 2>&1; then
             gh release create "$TAG" --verify-tag --title "$TAG" --prerelease --generate-notes || gh release view "$TAG" >/dev/null
           fi
-          timeout 10m gh release upload "$TAG" "${release_files[@]}" --clobber
+          node scripts/upload-release-assets.mjs "$TAG" "${release_files[@]}"
 
       - name: Generate checksums
         run: pnpm run build:checksums
@@ -348,11 +348,11 @@ jobs:
           TAG: ${{ needs.validate.outputs.tag }}
         run: |
           find dist -maxdepth 1 -name "*.sha256" | while read -r f; do
-            timeout 10m gh release upload "$TAG" "$f" --clobber
+            node scripts/upload-release-assets.mjs "$TAG" "$f"
           done
           if [[ -f dist/checksums.txt ]]; then
             cp dist/checksums.txt dist/checksums-preview-linux.txt
-            timeout 10m gh release upload "$TAG" dist/checksums-preview-linux.txt --clobber
+            node scripts/upload-release-assets.mjs "$TAG" dist/checksums-preview-linux.txt
           fi
 
   # ── Stage 4: Generate & Commit Release Manifest ───────────────────────────

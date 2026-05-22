@@ -256,6 +256,69 @@ describe('packaged runtime file hygiene', () => {
       /node_modules\/openai\/package\.json/
     )
   })
+
+  it('reads dependency metadata from required packages unpacked beside app.asar', async () => {
+    const appOutDir = join(tmpDir, 'win-unpacked')
+    const resourcesDir = join(appOutDir, 'resources')
+    const asarSource = join(tmpDir, 'asar-source')
+
+    await writeFixtureFile(asarSource, 'out/main/index.js', 'main')
+    await writeFixtureFile(asarSource, 'package.json', '{"name":"pilog-app"}')
+    await writeFixtureFile(
+      asarSource,
+      'node_modules/better-sqlite3/package.json',
+      '{"name":"better-sqlite3"}'
+    )
+    await writeFixtureFile(
+      asarSource,
+      'node_modules/better-sqlite3/lib/index.js',
+      'module.exports = {}'
+    )
+    await writeFixtureFile(
+      asarSource,
+      'node_modules/drizzle-orm/better-sqlite3/index.js',
+      'module.exports = {}'
+    )
+    await writeFixtureFile(
+      asarSource,
+      'node_modules/@earendil-works/pi-agent-core/package.json',
+      '{"name":"@earendil-works/pi-agent-core"}'
+    )
+    await writeFixtureFile(
+      asarSource,
+      'node_modules/@earendil-works/pi-ai/package.json',
+      '{"name":"@earendil-works/pi-ai","dependencies":{"openai":"6.26.0"}}'
+    )
+    await writeFixtureFile(
+      asarSource,
+      'node_modules/@earendil-works/pi-coding-agent/package.json',
+      '{"name":"@earendil-works/pi-coding-agent"}'
+    )
+    await writeFixtureFile(asarSource, 'node_modules/openai/package.json', '{"name":"openai"}')
+    await writeFixtureFile(
+      asarSource,
+      'node_modules/@vscode/ripgrep/lib/index.js',
+      'module.exports = {}'
+    )
+    await mkdir(resourcesDir, { recursive: true })
+    await asar.createPackageWithOptions(asarSource, join(resourcesDir, 'app.asar'), {
+      unpackDir: 'node_modules/@earendil-works/pi-ai'
+    })
+    await writeFixtureFile(
+      resourcesDir,
+      'app.asar.unpacked/node_modules/better-sqlite3/build/Release/better_sqlite3.node',
+      'native'
+    )
+    await writeFixtureFile(
+      resourcesDir,
+      'app.asar.unpacked/node_modules/@vscode/ripgrep-win32-x64/bin/rg.exe',
+      'rg'
+    )
+
+    expect(() =>
+      verifyPackagedRuntimeFiles(appOutDir, { platform: 'win32', arch: 'x64' })
+    ).not.toThrow()
+  })
 })
 
 describe('packaged runtime pruning', () => {

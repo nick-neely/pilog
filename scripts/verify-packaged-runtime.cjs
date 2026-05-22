@@ -171,6 +171,10 @@ function extractRequiredAsarFile(appAsar, path) {
   try {
     return asar.extractFile(appAsar, path)
   } catch {
+    const unpackedPath = join(dirname(appAsar), 'app.asar.unpacked', path)
+    if (existsSync(unpackedPath)) {
+      return readFileSync(unpackedPath)
+    }
     return null
   }
 }

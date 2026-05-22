@@ -76,7 +76,7 @@ describe('release workflow size reports', () => {
       expect(workflow).toContain('pnpm inventory:packaged')
       expect(workflow).toContain('pnpm budget:packaged')
       expect(workflow).toContain('actions/upload-artifact@v4')
-      expect(workflow).toContain('timeout 10m gh release upload')
+      expect(workflow).toContain('node scripts/upload-release-assets.mjs')
       expect(workflow).toContain(
         `gh release create "$TAG" --verify-tag --title "$TAG" ${releaseCreateFlag}`
       )
