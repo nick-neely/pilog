@@ -174,9 +174,10 @@ export function resolveExplicitRuntimePackageJsonFileSets(stagingRoot) {
     const packageJson = join(packageDir, 'package.json')
     if (!existsSync(packageJson)) return []
 
+    const packageRelativePath = `node_modules/${packageName}`
     return [
-      `  - from: ${packageDir}`,
-      `    to: node_modules/${packageName}`,
+      `  - from: ${packageRelativePath}`,
+      `    to: ${packageRelativePath}`,
       '    filter:',
       '      - package.json'
     ]
