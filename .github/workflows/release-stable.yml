@@ -127,7 +127,7 @@ jobs:
 
       - name: Package macOS artifacts
         # Build release files first so size reports run before publishing.
-        run: pnpm exec electron-builder --mac --publish never
+        run: node scripts/package-electron-app.mjs --mac --publish never
 
       - name: Generate macOS size reports
         shell: bash
@@ -214,7 +214,7 @@ jobs:
           pnpm exec electron-vite build
 
       - name: Package Windows artifacts
-        run: pnpm exec electron-builder --win --publish never
+        run: node scripts/package-electron-app.mjs --win --publish never
 
       - name: Generate Windows size reports
         shell: bash
@@ -298,7 +298,7 @@ jobs:
           pnpm exec electron-vite build
 
       - name: Package Linux artifacts
-        run: pnpm exec electron-builder --linux --publish never
+        run: node scripts/package-electron-app.mjs --linux --publish never
 
       - name: Generate Linux size reports
         shell: bash

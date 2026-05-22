@@ -130,7 +130,7 @@ jobs:
       - name: Package macOS preview artifacts
         # Uses electron-builder.preview.yml: channel=preview, releaseType=prerelease.
         # Build release files first so size reports run before publishing.
-        run: pnpm exec electron-builder --mac --config electron-builder.preview.yml --publish never
+        run: node scripts/package-electron-app.mjs --mac --config electron-builder.preview.yml --publish never
 
       - name: Generate macOS preview size reports
         shell: bash
@@ -216,7 +216,7 @@ jobs:
           pnpm exec electron-vite build
 
       - name: Package Windows preview artifacts
-        run: pnpm exec electron-builder --win --config electron-builder.preview.yml --publish never
+        run: node scripts/package-electron-app.mjs --win --config electron-builder.preview.yml --publish never
 
       - name: Generate Windows preview size reports
         shell: bash
@@ -300,7 +300,7 @@ jobs:
           pnpm exec electron-vite build
 
       - name: Package Linux preview artifacts
-        run: pnpm exec electron-builder --linux --config electron-builder.preview.yml --publish never
+        run: node scripts/package-electron-app.mjs --linux --config electron-builder.preview.yml --publish never
 
       - name: Generate Linux preview size reports
         shell: bash

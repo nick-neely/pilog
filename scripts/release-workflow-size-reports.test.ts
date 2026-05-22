@@ -5,6 +5,7 @@ interface WorkflowExpectation {
   path: string
   channel: 'stable' | 'preview'
   publishLabel: string
+  packageCommand: string
   packageArgs: string
   updaterMetadata: string[]
   releaseCreateFlag: string
@@ -35,6 +36,7 @@ const workflows: readonly WorkflowExpectation[] = [
     path: '.github/workflows/release-stable.yml',
     channel: 'stable',
     publishLabel: 'Publish macOS artifacts',
+    packageCommand: 'node scripts/package-electron-app.mjs',
     packageArgs: '--publish never',
     updaterMetadata: ['dist/latest-mac.yml', 'dist/latest.yml', 'dist/latest-linux.yml'],
     releaseCreateFlag: '--generate-notes'
@@ -43,6 +45,7 @@ const workflows: readonly WorkflowExpectation[] = [
     path: '.github/workflows/release-preview.yml',
     channel: 'preview',
     publishLabel: 'Publish macOS preview artifacts',
+    packageCommand: 'node scripts/package-electron-app.mjs',
     packageArgs: '--config electron-builder.preview.yml --publish never',
     updaterMetadata: ['dist/preview-mac.yml', 'dist/preview.yml', 'dist/preview-linux.yml'],
     releaseCreateFlag: '--prerelease --generate-notes'
@@ -52,13 +55,21 @@ const workflows: readonly WorkflowExpectation[] = [
 describe('release workflow size reports', () => {
   it.each(workflows)(
     '$channel workflow generates inspectable reports after packaging and before publishing',
-    async ({ path, channel, publishLabel, packageArgs, updaterMetadata, releaseCreateFlag }) => {
+    async ({
+      path,
+      channel,
+      publishLabel,
+      packageCommand,
+      packageArgs,
+      updaterMetadata,
+      releaseCreateFlag
+    }) => {
       const workflow = await readFile(path, 'utf8')
       const macReportDirectory = `dist/reports/${channel}-mac`
       const macReportArtifactName = `packaged-size-reports-${channel}-mac`
 
       for (const { packageTarget, platform } of platforms) {
-        expect(workflow).toContain(`pnpm exec electron-builder ${packageTarget} ${packageArgs}`)
+        expect(workflow).toContain(`${packageCommand} ${packageTarget} ${packageArgs}`)
         expect(workflow).toContain(`REPORT_DIR=dist/reports/${channel}-${platform}`)
         expect(workflow).toContain(`name: packaged-size-reports-${channel}-${platform}`)
       }
