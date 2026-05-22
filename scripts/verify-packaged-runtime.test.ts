@@ -18,6 +18,7 @@ const {
   findPackagedFileHygieneViolations,
   enforcePackagedFileHygiene,
   verifyPackagedImports,
+  verifyPackagedRuntimeFiles,
   prunePackagedRuntimeBloat
 }: {
   findPackagedFileHygieneViolations: (
@@ -28,6 +29,10 @@ const {
   verifyPackagedImports: (
     appAsar: string,
     options?: { resourcesDir?: string; requiredImports?: string[] }
+  ) => void
+  verifyPackagedRuntimeFiles: (
+    appOutDir: string,
+    options?: { platform?: string; arch?: string }
   ) => void
   prunePackagedRuntimeBloat: (
     appOutDir: string,
@@ -190,6 +195,66 @@ describe('packaged runtime file hygiene', () => {
         requiredImports: ['@scope/linked-package']
       })
     ).not.toThrow()
+  })
+
+  it('rejects missing dependencies declared by the packaged Pi AI package', async () => {
+    const appOutDir = join(tmpDir, 'linux-unpacked')
+    const resourcesDir = join(appOutDir, 'resources')
+    const asarSource = join(tmpDir, 'asar-source')
+
+    await writeFixtureFile(asarSource, 'out/main/index.js', 'main')
+    await writeFixtureFile(asarSource, 'package.json', '{"name":"pilog-app"}')
+    await writeFixtureFile(
+      asarSource,
+      'node_modules/better-sqlite3/package.json',
+      '{"name":"better-sqlite3"}'
+    )
+    await writeFixtureFile(
+      asarSource,
+      'node_modules/better-sqlite3/lib/index.js',
+      'module.exports = {}'
+    )
+    await writeFixtureFile(
+      asarSource,
+      'node_modules/drizzle-orm/better-sqlite3/index.js',
+      'module.exports = {}'
+    )
+    await writeFixtureFile(
+      asarSource,
+      'node_modules/@earendil-works/pi-agent-core/package.json',
+      '{"name":"@earendil-works/pi-agent-core"}'
+    )
+    await writeFixtureFile(
+      asarSource,
+      'node_modules/@earendil-works/pi-ai/package.json',
+      '{"name":"@earendil-works/pi-ai","dependencies":{"openai":"6.26.0"}}'
+    )
+    await writeFixtureFile(
+      asarSource,
+      'node_modules/@earendil-works/pi-coding-agent/package.json',
+      '{"name":"@earendil-works/pi-coding-agent"}'
+    )
+    await writeFixtureFile(
+      asarSource,
+      'node_modules/@vscode/ripgrep/lib/index.js',
+      'module.exports = {}'
+    )
+    await mkdir(resourcesDir, { recursive: true })
+    await asar.createPackage(asarSource, join(resourcesDir, 'app.asar'))
+    await writeFixtureFile(
+      resourcesDir,
+      'app.asar.unpacked/node_modules/better-sqlite3/build/Release/better_sqlite3.node',
+      'native'
+    )
+    await writeFixtureFile(
+      resourcesDir,
+      'app.asar.unpacked/node_modules/@vscode/ripgrep/bin/rg',
+      'rg'
+    )
+
+    expect(() => verifyPackagedRuntimeFiles(appOutDir, { platform: 'linux', arch: 'x64' })).toThrow(
+      /node_modules\/openai\/package\.json/
+    )
   })
 })
 

@@ -138,6 +138,10 @@ function verifyPackagedRuntimeFiles(appOutDir, options = {}) {
     missingEntries.push(koffiNative)
   }
 
+  missingEntries.push(
+    ...resolvePackagedPackageDependencyEntries(appAsar, entries, '@earendil-works/pi-ai')
+  )
+
   if (missingEntries.length > 0) {
     throw new Error(
       `Packaged runtime is missing required files:\n${missingEntries
@@ -145,6 +149,19 @@ function verifyPackagedRuntimeFiles(appOutDir, options = {}) {
         .join('\n')}`
     )
   }
+}
+
+function resolvePackagedPackageDependencyEntries(appAsar, entries, packageName) {
+  const packageJsonPath = `node_modules/${packageName}/package.json`
+  const packageJsonEntry = `/${packageJsonPath}`
+  if (!entries.has(packageJsonEntry)) return [packageJsonEntry]
+
+  const packageJson = JSON.parse(asar.extractFile(appAsar, packageJsonPath).toString('utf8'))
+  const dependencyNames = Object.keys(packageJson.dependencies ?? {})
+
+  return dependencyNames
+    .map((dependencyName) => `/node_modules/${dependencyName}/package.json`)
+    .filter((entry) => !entries.has(entry))
 }
 
 function prunePackagedRuntimeBloat(appOutDir, options = {}) {
