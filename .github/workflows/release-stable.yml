@@ -166,7 +166,7 @@ jobs:
           if ! gh release view "$TAG" >/dev/null 2>&1; then
             gh release create "$TAG" --verify-tag --title "$TAG" --generate-notes || gh release view "$TAG" >/dev/null
           fi
-          gh release upload "$TAG" "${release_files[@]}" --clobber
+          timeout 10m gh release upload "$TAG" "${release_files[@]}" --clobber
 
       - name: Generate checksums
         run: pnpm run build:checksums
@@ -177,11 +177,11 @@ jobs:
           TAG: ${{ needs.validate.outputs.tag }}
         run: |
           find dist -maxdepth 1 -name "*.sha256" | while read -r f; do
-            gh release upload "$TAG" "$f" --clobber
+            timeout 10m gh release upload "$TAG" "$f" --clobber
           done
           if [[ -f dist/checksums.txt ]]; then
             cp dist/checksums.txt dist/checksums-mac.txt
-            gh release upload "$TAG" dist/checksums-mac.txt --clobber
+            timeout 10m gh release upload "$TAG" dist/checksums-mac.txt --clobber
           fi
 
   # ── Stage 3: Build & Publish — Windows ────────────────────────────────────
@@ -250,7 +250,7 @@ jobs:
           if ! gh release view "$TAG" >/dev/null 2>&1; then
             gh release create "$TAG" --verify-tag --title "$TAG" --generate-notes || gh release view "$TAG" >/dev/null
           fi
-          gh release upload "$TAG" "${release_files[@]}" --clobber
+          timeout 10m gh release upload "$TAG" "${release_files[@]}" --clobber
 
       - name: Generate checksums
         run: pnpm run build:checksums
@@ -261,11 +261,11 @@ jobs:
           TAG: ${{ needs.validate.outputs.tag }}
         run: |
           find dist -maxdepth 1 -name "*.sha256" | while read -r f; do
-            gh release upload "$TAG" "$f" --clobber
+            timeout 10m gh release upload "$TAG" "$f" --clobber
           done
           if [[ -f dist/checksums.txt ]]; then
             cp dist/checksums.txt dist/checksums-win.txt
-            gh release upload "$TAG" dist/checksums-win.txt --clobber
+            timeout 10m gh release upload "$TAG" dist/checksums-win.txt --clobber
           fi
 
   # ── Stage 3: Build & Publish — Linux ──────────────────────────────────────
@@ -335,7 +335,7 @@ jobs:
           if ! gh release view "$TAG" >/dev/null 2>&1; then
             gh release create "$TAG" --verify-tag --title "$TAG" --generate-notes || gh release view "$TAG" >/dev/null
           fi
-          gh release upload "$TAG" "${release_files[@]}" --clobber
+          timeout 10m gh release upload "$TAG" "${release_files[@]}" --clobber
 
       - name: Generate checksums
         run: pnpm run build:checksums
@@ -346,11 +346,11 @@ jobs:
           TAG: ${{ needs.validate.outputs.tag }}
         run: |
           find dist -maxdepth 1 -name "*.sha256" | while read -r f; do
-            gh release upload "$TAG" "$f" --clobber
+            timeout 10m gh release upload "$TAG" "$f" --clobber
           done
           if [[ -f dist/checksums.txt ]]; then
             cp dist/checksums.txt dist/checksums-linux.txt
-            gh release upload "$TAG" dist/checksums-linux.txt --clobber
+            timeout 10m gh release upload "$TAG" dist/checksums-linux.txt --clobber
           fi
 
   # ── Stage 4: Generate & Commit Release Manifest ───────────────────────────

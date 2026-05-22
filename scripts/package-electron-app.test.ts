@@ -1,7 +1,10 @@
+import { lstat, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 import {
+  materializeNodeModuleLinks,
   normalizeConfigLineEndings,
   replaceTopLevelBlock,
   resolveDeployTarget,
@@ -55,5 +58,42 @@ describe('electron app packaging staging path', () => {
     ).toContain(
       'directories:\n  buildResources: D:\\a\\pilog\\pilog\\build\n  output: D:\\a\\pilog\\pilog\\dist\nfiles:'
     )
+  })
+
+  it('materializes pnpm package links before electron-builder packages node_modules', async () => {
+    const tmpDir = await mkdtemp(path.join(tmpdir(), 'pilog-package-electron-app-'))
+    const nodeModulesDir = path.join(tmpDir, 'node_modules')
+    const storePackageDir = path.join(
+      nodeModulesDir,
+      '.pnpm',
+      '@earendil-works+pi-ai@0.74.0',
+      'node_modules',
+      '@earendil-works',
+      'pi-ai'
+    )
+    const packageLinkDir = path.join(nodeModulesDir, '@earendil-works', 'pi-ai')
+    const binLinkPath = path.join(nodeModulesDir, '.bin', 'pi-ai')
+
+    try {
+      await mkdir(storePackageDir, { recursive: true })
+      await mkdir(path.dirname(packageLinkDir), { recursive: true })
+      await mkdir(path.dirname(binLinkPath), { recursive: true })
+      await writeFile(
+        path.join(storePackageDir, 'package.json'),
+        '{"name":"@earendil-works/pi-ai"}'
+      )
+      await writeFile(path.join(storePackageDir, 'cli.js'), 'console.log("ok")')
+      await symlink(storePackageDir, packageLinkDir, 'dir')
+      await symlink(path.join(storePackageDir, 'cli.js'), binLinkPath, 'file')
+
+      materializeNodeModuleLinks(nodeModulesDir)
+
+      expect(await readFile(path.join(packageLinkDir, 'package.json'), 'utf8')).toBe(
+        '{"name":"@earendil-works/pi-ai"}'
+      )
+      expect((await lstat(binLinkPath)).isSymbolicLink()).toBe(true)
+    } finally {
+      await rm(tmpDir, { recursive: true, force: true })
+    }
   })
 })

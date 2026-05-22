@@ -1,5 +1,14 @@
 import { spawnSync } from 'node:child_process'
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  cpSync,
+  lstatSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  realpathSync,
+  rmSync,
+  writeFileSync
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -58,6 +67,7 @@ function main() {
     ],
     { cwd: stagingRoot, ci: true }
   )
+  materializeNodeModuleLinks(join(stagingRoot, 'node_modules'))
 
   const generatedConfig = writeElectronBuilderConfig(configPath)
   run('pnpm', [
@@ -163,6 +173,44 @@ export function replaceTopLevelBlock(contents, key, replacement) {
 
 export function normalizeConfigLineEndings(contents) {
   return contents.replace(/\r\n/g, '\n')
+}
+
+export function materializeNodeModuleLinks(nodeModulesDir) {
+  materializeDirectoryLinks(nodeModulesDir, new Set([join(nodeModulesDir, '.pnpm')]))
+}
+
+function materializeDirectoryLinks(directory, skippedDirectories) {
+  let entries
+  try {
+    entries = readdirSync(directory)
+  } catch (error) {
+    if (error?.code === 'ENOENT') return
+    throw error
+  }
+
+  for (const entry of entries) {
+    const entryPath = join(directory, entry)
+    if (skippedDirectories.has(entryPath)) continue
+    if (entry === '.bin') continue
+
+    const info = lstatSync(entryPath)
+    if (info.isSymbolicLink()) {
+      const realPath = realpathSync(entryPath)
+      rmSync(entryPath, { recursive: true, force: true })
+      cpSync(realPath, entryPath, {
+        dereference: true,
+        recursive: true
+      })
+      if (lstatSync(entryPath).isDirectory()) {
+        materializeDirectoryLinks(entryPath, skippedDirectories)
+      }
+      continue
+    }
+
+    if (info.isDirectory()) {
+      materializeDirectoryLinks(entryPath, skippedDirectories)
+    }
+  }
 }
 
 function resolveElectronVersion() {

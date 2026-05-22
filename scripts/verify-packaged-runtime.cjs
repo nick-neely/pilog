@@ -156,12 +156,23 @@ function resolvePackagedPackageDependencyEntries(appAsar, entries, packageName) 
   const packageJsonEntry = `/${packageJsonPath}`
   if (!entries.has(packageJsonEntry)) return [packageJsonEntry]
 
-  const packageJson = JSON.parse(asar.extractFile(appAsar, packageJsonPath).toString('utf8'))
+  const packageJsonBuffer = extractRequiredAsarFile(appAsar, packageJsonPath)
+  if (!packageJsonBuffer) return [packageJsonEntry]
+
+  const packageJson = JSON.parse(packageJsonBuffer.toString('utf8'))
   const dependencyNames = Object.keys(packageJson.dependencies ?? {})
 
   return dependencyNames
     .map((dependencyName) => `/node_modules/${dependencyName}/package.json`)
     .filter((entry) => !entries.has(entry))
+}
+
+function extractRequiredAsarFile(appAsar, path) {
+  try {
+    return asar.extractFile(appAsar, path)
+  } catch {
+    return null
+  }
 }
 
 function prunePackagedRuntimeBloat(appOutDir, options = {}) {
