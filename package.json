@@ -1,6 +1,6 @@
 {
   "name": "pilog",
-  "version": "0.1.0-preview.4",
+  "version": "0.1.0-preview.5",
   "description": "A local-first developer journal for turning rough notes into GitHub-ready issues.",
   "main": "./app/out/main/index.js",
   "author": "Nick Neely",
