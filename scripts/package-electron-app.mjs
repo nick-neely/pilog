@@ -10,7 +10,7 @@ import {
   writeFileSync
 } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { dirname, join, relative, resolve } from 'node:path'
+import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
@@ -67,7 +67,10 @@ function main() {
     ],
     { cwd: stagingRoot, ci: true }
   )
-  materializeNodeModuleLinks(join(stagingRoot, 'node_modules'))
+  const materializedLinks = materializeNodeModuleLinks(join(stagingRoot, 'node_modules'))
+  if (materializedLinks > 0) {
+    console.log(`[package-electron-app] materialized ${materializedLinks} node_modules links`)
+  }
 
   const generatedConfig = writeElectronBuilderConfig(configPath)
   run('pnpm', [
@@ -176,10 +179,13 @@ export function normalizeConfigLineEndings(contents) {
 }
 
 export function materializeNodeModuleLinks(nodeModulesDir) {
-  materializeDirectoryLinks(nodeModulesDir, new Set([join(nodeModulesDir, '.pnpm')]))
+  return materializeDirectoryLinks(nodeModulesDir, {
+    nodeModulesDir,
+    skippedDirectories: new Set([join(nodeModulesDir, '.pnpm')])
+  })
 }
 
-function materializeDirectoryLinks(directory, skippedDirectories) {
+function materializeDirectoryLinks(directory, options) {
   let entries
   try {
     entries = readdirSync(directory)
@@ -188,13 +194,14 @@ function materializeDirectoryLinks(directory, skippedDirectories) {
     throw error
   }
 
+  let materializedCount = 0
   for (const entry of entries) {
     const entryPath = join(directory, entry)
-    if (skippedDirectories.has(entryPath)) continue
+    if (options.skippedDirectories.has(entryPath)) continue
     if (entry === '.bin') continue
 
     const info = lstatSync(entryPath)
-    if (info.isSymbolicLink()) {
+    if (isNodeModuleLink(entryPath, info, options.nodeModulesDir)) {
       const realPath = realpathSync(entryPath)
       rmSync(entryPath, { recursive: true, force: true })
       cpSync(realPath, entryPath, {
@@ -202,15 +209,31 @@ function materializeDirectoryLinks(directory, skippedDirectories) {
         recursive: true
       })
       if (lstatSync(entryPath).isDirectory()) {
-        materializeDirectoryLinks(entryPath, skippedDirectories)
+        materializedCount += 1 + materializeDirectoryLinks(entryPath, options)
+        continue
       }
+      materializedCount += 1
       continue
     }
 
     if (info.isDirectory()) {
-      materializeDirectoryLinks(entryPath, skippedDirectories)
+      materializedCount += materializeDirectoryLinks(entryPath, options)
     }
   }
+  return materializedCount
+}
+
+function isNodeModuleLink(entryPath, info, nodeModulesDir) {
+  if (info.isSymbolicLink()) return true
+  if (!info.isDirectory()) return false
+
+  const realPath = realpathSync(entryPath)
+  return isPathInside(realPath, join(nodeModulesDir, '.pnpm'))
+}
+
+function isPathInside(path, parentPath) {
+  const relativePath = relative(parentPath, path)
+  return relativePath !== '' && !relativePath.startsWith('..') && !isAbsolute(relativePath)
 }
 
 function resolveElectronVersion() {

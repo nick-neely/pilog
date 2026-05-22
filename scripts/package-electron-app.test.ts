@@ -86,8 +86,9 @@ describe('electron app packaging staging path', () => {
       await symlink(storePackageDir, packageLinkDir, 'dir')
       await symlink(path.join(storePackageDir, 'cli.js'), binLinkPath, 'file')
 
-      materializeNodeModuleLinks(nodeModulesDir)
+      const materializedCount = materializeNodeModuleLinks(nodeModulesDir)
 
+      expect(materializedCount).toBe(1)
       expect(await readFile(path.join(packageLinkDir, 'package.json'), 'utf8')).toBe(
         '{"name":"@earendil-works/pi-ai"}'
       )
