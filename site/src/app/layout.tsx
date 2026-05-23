@@ -1,8 +1,9 @@
 import { SiteFooter } from '@/components/site-footer'
 import { SiteHeader } from '@/components/site-header'
 import { ThemeProvider } from '@/components/theme-provider'
-import type { Metadata } from 'next'
 import { rootMetadata } from '@/lib/metadata'
+import { Analytics } from '@vercel/analytics/next'
+import type { Metadata } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = rootMetadata
@@ -21,6 +22,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <main className="flex-1">{children}</main>
           <SiteFooter />
         </ThemeProvider>
+        <Analytics />
       </body>
     </html>
   )
