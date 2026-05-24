@@ -21,7 +21,7 @@ const principles: Principle[] = [
   {
     num: '03',
     title: 'Local-first is a stance, not a fallback.',
-    body: 'Notes, drafts, repo metadata, and agent run history live in local SQLite. Secrets live in OS credential storage. The product makes obvious what leaves the machine and when.',
+    body: 'Notes, drafts, repo metadata, and agent run history live in local SQLite. Secrets live in OS credential storage. Draft generation only stays on your machine when Pi uses a local model (Ollama, LM Studio, and the like); cloud APIs see what you send on Generate. The product makes both boundaries obvious.',
     indent: 'md:pl-[16%]'
   }
 ]

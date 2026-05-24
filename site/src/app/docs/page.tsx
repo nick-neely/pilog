@@ -1,13 +1,14 @@
-import type { Metadata } from 'next'
-import Link from 'next/link'
-import { Kbd, KbdGroup } from '@pilog/ui/kbd'
+import { DocsCodeBlock, DocsCommand } from '@/components/docs/docs-copyable'
 import { DocsDownloadCard } from '@/components/docs/docs-download-card'
 import { DocsSidebar, type DocsNavItem } from '@/components/docs/docs-sidebar'
+import rawManifest from '@/data/release-manifest.json'
 import { docsMetadata, docsStructuredData, JsonLdScript } from '@/lib/metadata'
 import { modKeyLabel, type SiteModKeyGlyph } from '@/lib/platform'
-import { getServerDetectedPlatform } from '@/lib/server-detected-platform'
 import type { ReleaseManifest } from '@/lib/release-manifest'
-import rawManifest from '@/data/release-manifest.json'
+import { getServerDetectedPlatform } from '@/lib/server-detected-platform'
+import { Kbd, KbdGroup } from '@pilog/ui/kbd'
+import type { Metadata } from 'next'
+import Link from 'next/link'
 
 export const metadata: Metadata = docsMetadata
 
@@ -37,6 +38,7 @@ const nav: DocsNavItem[] = [
     label: 'Pi, in depth',
     children: [
       { id: 'providers', label: 'Model catalog' },
+      { id: 'local-models', label: 'Local models (Ollama)' },
       { id: 'api-keys', label: 'Getting an API key' },
       { id: 'switch-model', label: 'Switching models' }
     ]
@@ -223,8 +225,16 @@ export default async function DocsPage() {
             <p>
               <span className="text-foreground font-medium">Pi</span> is the local agent harness
               that reads your selected notes alongside the active repository and produces structured
-              issue drafts. Pilog bundles the Pi runtime; you bring your own API key so credentials,
-              spend, and rate limits stay with you.
+              issue drafts. Pilog bundles the Pi runtime; you choose the provider and model. A cloud
+              API is the default path; for inference that never leaves your machine, use a local
+              model via{' '}
+              <Link
+                href="#local-models"
+                className="text-primary hover:text-primary/80 underline underline-offset-4"
+              >
+                Ollama
+              </Link>{' '}
+              (recommended) or another OpenAI-compatible local server.
             </p>
 
             <Callout>
@@ -308,8 +318,9 @@ export default async function DocsPage() {
             <Aside title="What gets sent">
               When you generate drafts, Pilog sends the <em>selected notes</em> and a bounded slice
               of repository context (file tree, README excerpts, language signals) to your
-              configured Pi provider. Drafts and the full run transcript are saved locally. Nothing
-              is sent until you click Generate.
+              configured Pi provider (your machine with Ollama or similar, otherwise the
+              vendor&apos;s API). Drafts and the full run transcript are saved locally. Nothing is
+              sent until you click Generate.
             </Aside>
           </Section>
 
@@ -386,10 +397,93 @@ export default async function DocsPage() {
               <li>
                 <span className="text-foreground font-medium">Custom &amp; local:</span> Ollama, LM
                 Studio, vLLM, or OpenAI-compatible endpoints via{' '}
-                <span className="font-mono">~/.pi/agent/models.json</span>. Results vary with
-                smaller models.
+                <span className="font-mono">~/.pi/agent/models.json</span>. See{' '}
+                <Link
+                  href="#local-models"
+                  className="text-primary hover:text-primary/80 underline underline-offset-4"
+                >
+                  Local models (Ollama)
+                </Link>{' '}
+                below. Results vary with smaller models.
               </li>
             </ul>
+          </Section>
+
+          <Section id="local-models" title="Local models (Ollama)" subsection>
+            <p>
+              Pilog is local-first for your journal: notes, drafts, and run history stay in SQLite
+              on your machine. <span className="text-foreground font-medium">Generate Drafts</span>{' '}
+              is the step that can leave it, unless Pi talks to a model running locally.{' '}
+              <Link
+                href="https://ollama.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary hover:text-primary/80 underline underline-offset-4"
+              >
+                Ollama
+              </Link>{' '}
+              is the recommended path; LM Studio and other OpenAI-compatible servers use the same{' '}
+              <span className="font-mono">models.json</span> pattern with a different{' '}
+              <span className="font-mono">baseUrl</span>.
+            </p>
+
+            <ol className="mt-4 space-y-3">
+              <Step n="01">
+                Install Ollama and confirm it is running (the menu-bar app on macOS, or{' '}
+                <span className="font-mono">ollama serve</span> on Linux).
+              </Step>
+              <Step n="02">
+                Pull a coding-oriented model. For example:
+                <DocsCommand>ollama pull qwen2.5-coder:7b</DocsCommand>
+                Larger models draft more reliably; smaller ones are faster on modest hardware.
+              </Step>
+              <Step n="03">
+                Create or edit <span className="font-mono">~/.pi/agent/models.json</span> so Pi can
+                reach Ollama (use the model tag you pulled):
+                <DocsCodeBlock>
+                  {`{
+  "providers": {
+    "ollama": {
+      "baseUrl": "http://localhost:11434/v1",
+      "api": "openai-completions",
+      "apiKey": "ollama",
+      "models": [{ "id": "qwen2.5-coder:7b" }]
+    }
+  }
+}`}
+                </DocsCodeBlock>
+                Ollama ignores <span className="font-mono">apiKey</span>; Pi requires the field.
+                Full options are in{' '}
+                <Link
+                  href="https://pi.dev/docs/latest/models"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary hover:text-primary/80 underline underline-offset-4"
+                >
+                  Pi&apos;s custom-models docs
+                </Link>
+                .
+              </Step>
+              <Step n="04">
+                In Pilog, open Settings → Provider &amp; Model. Choose{' '}
+                <span className="text-foreground font-medium">ollama</span> and your model. Paste{' '}
+                <span className="font-mono">ollama</span> (or any placeholder) into the API key
+                field and click <span className="text-foreground font-medium">Configure Pi</span>.
+                Pilog stores it in OS-backed safe storage; Ollama does not validate it.
+              </Step>
+              <Step n="05">
+                Generate a test draft. Traffic stays on <span className="font-mono">localhost</span>
+                . Publishing to GitHub still requires network access and remains a separate,
+                explicit step.
+              </Step>
+            </ol>
+
+            <Aside title="If Ollama does not appear">
+              Quit and reopen Pilog after editing <span className="font-mono">models.json</span>, or
+              use <span className="text-foreground font-medium">Import existing Pi config</span> if
+              you already use the <span className="font-mono">pi</span> CLI with Ollama on this
+              machine.
+            </Aside>
           </Section>
 
           <Section id="api-keys" title="Getting credentials" subsection>
@@ -500,17 +594,31 @@ export default async function DocsPage() {
           {/* ───── Privacy ────────────────────────────────────────────── */}
           <Section id="privacy" title="Privacy & local-first" topSpacing>
             <p>
-              Pilog is local-first by stance, not as a fallback. Notes, drafts, repo metadata, and
-              the full agent run history live in local SQLite on your machine. Secrets (GitHub OAuth
+              Pilog is local-first by stance, not as a fallback. Your journal (notes, drafts, repo
+              metadata, and the full agent run history) lives in local SQLite. Secrets (GitHub OAuth
               tokens and Pi provider keys) live in OS credential storage: Keychain on macOS, DPAPI
               on Windows, the desktop keyring on Linux.
             </p>
-            <p>The product sends data out in exactly two situations, both explicit:</p>
+            <p>
+              <span className="text-foreground font-medium">Fully local</span> means two things:
+              journal data on disk (always), and draft inference on your machine (only when Pi uses
+              a local model such as Ollama. See{' '}
+              <Link
+                href="#local-models"
+                className="text-primary hover:text-primary/80 underline underline-offset-4"
+              >
+                Local models (Ollama)
+              </Link>
+              ). The default onboarding path uses a cloud API; that is still BYOK and explicit, but
+              Generate sends context to the vendor.
+            </p>
+            <p>Data leaves your machine in exactly two situations, both under your control:</p>
             <ul className="text-foreground/90 mt-2 space-y-2 text-base leading-relaxed">
               <li>
                 <span className="text-foreground font-medium">Generate Drafts</span> sends the
                 selected notes and a bounded slice of repository context to your configured Pi
-                provider. Drafts and run history are saved locally.
+                provider (<span className="text-foreground">localhost</span> with Ollama, otherwise
+                the provider&apos;s API. Drafts and run history are saved locally either way.
               </li>
               <li>
                 <span className="text-foreground font-medium">Publish</span> sends the specific
@@ -519,8 +627,8 @@ export default async function DocsPage() {
               </li>
             </ul>
             <p>
-              Nothing else leaves your machine. There is no telemetry, no usage analytics, no
-              automatic crash reporting. The publish log makes it auditable.
+              There is no telemetry, no usage analytics, and no automatic crash reporting. The
+              publish log makes GitHub writes auditable.
             </p>
           </Section>
 
@@ -632,7 +740,7 @@ function Step({ n, children }: { n: string; children: React.ReactNode }) {
       >
         {n}
       </span>
-      <span className="flex-1">{children}</span>
+      <div className="text-foreground/90 min-w-0 flex-1 text-base leading-relaxed">{children}</div>
     </li>
   )
 }

@@ -1,7 +1,7 @@
-import Link from 'next/link'
-import type { Metadata } from 'next'
-import { Button } from '@pilog/ui/button'
 import { aboutMetadata, aboutStructuredData, JsonLdScript } from '@/lib/metadata'
+import { Button } from '@pilog/ui/button'
+import type { Metadata } from 'next'
+import Link from 'next/link'
 
 export const metadata: Metadata = aboutMetadata
 
@@ -21,7 +21,7 @@ const principles = [
   {
     num: '03',
     title: 'Local-first is a stance, not a fallback.',
-    body: 'Notes, drafts, repo metadata, and agent run history live in local SQLite. Secrets live in your OS keychain. The product makes it obvious what leaves your machine and when. The answer, by default, is nothing.',
+    body: 'Notes, drafts, repo metadata, and agent run history live in local SQLite. Secrets live in your OS keychain. Draft generation stays local only when you configure a local Pi model; otherwise Generate sends bounded context to your chosen API. Publishing is always explicit. The product makes each boundary obvious.',
     indent: 'md:pl-[10%]'
   },
   {
@@ -109,8 +109,9 @@ export default function AboutPage() {
                 you can review before anything is published.
               </p>
               <p className="text-muted-foreground">
-                Nothing leaves your machine until you explicitly publish a specific draft. That is
-                not a setting you enable. It is how the product works by default.
+                Your journal stays on your machine. Draft generation follows your Pi provider: local
+                with Ollama, remote with a cloud API. Only the draft you publish goes to GitHub, and
+                only when you say so.
               </p>
             </div>
           </div>

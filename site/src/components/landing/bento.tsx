@@ -1,6 +1,6 @@
-import { Kbd, KbdGroup } from '@pilog/ui/kbd'
-import { Badge } from '@pilog/ui/badge'
 import type { SiteModKeyGlyph } from '@/lib/platform'
+import { Badge } from '@pilog/ui/badge'
+import { Kbd, KbdGroup } from '@pilog/ui/kbd'
 
 /**
  * Bento — four cells, deliberately varied sizes; not an identical-card grid.
@@ -68,20 +68,20 @@ same root as <SettingsRow/>`}
             </div>
           </article>
 
-          {/* Drafts — tall right */}
-          <article className="border-border bg-popover relative flex flex-col overflow-hidden rounded-2xl border p-7 md:col-span-4 md:row-span-2 md:p-8">
-            <div className="mb-6 flex items-center gap-3">
+          {/* Drafts — right column, content-height (no row-span stretch) */}
+          <article className="border-border bg-popover relative overflow-hidden rounded-2xl border p-7 md:col-span-4 md:self-start md:p-8">
+            <div className="mb-5 flex items-center gap-3">
               <span className="text-muted-foreground font-mono text-xs">02</span>
               <h3 className="font-heading text-foreground text-2xl font-medium tracking-tight">
                 Drafts you can audit
               </h3>
             </div>
-            <p className="text-muted-foreground mb-8 text-base leading-relaxed">
+            <p className="text-muted-foreground mb-6 max-w-[36ch] text-base leading-relaxed">
               Every issue draft is anchored visibly to its source notes and a short reasoning
               summary. Confidence is named. Nothing is hidden behind an expander.
             </p>
 
-            <div className="space-y-4">
+            <div className="bg-secondary/40 space-y-0 rounded-xl p-4">
               <FauxDraft
                 title="Save button needs a loading state"
                 confidence="high"
@@ -96,10 +96,11 @@ same root as <SettingsRow/>`}
               />
             </div>
 
-            <div className="text-muted-foreground mt-auto pt-6 font-mono text-xs">
-              <span className="text-foreground">Nothing leaves your machine</span> until you press
-              publish on a specific draft.
-            </div>
+            <p className="text-muted-foreground border-border/60 mt-5 border-t border-dashed pt-5 font-mono text-xs leading-relaxed">
+              <span className="text-foreground">Generate</span> sends notes to your Pi provider, on
+              your machine with Ollama or to a cloud API.{' '}
+              <span className="text-foreground">Publish</span> is the only GitHub write.
+            </p>
           </article>
 
           {/* Local-first */}
@@ -111,13 +112,20 @@ same root as <SettingsRow/>`}
               </h3>
             </div>
             <p className="text-muted-foreground mb-5 text-sm leading-relaxed">
-              Notes, drafts, agent run history live in local SQLite. Secrets live in your OS
-              keychain. There is no Pilog server.
+              Notes, drafts, and run history live in local SQLite. No Pilog server. For draft
+              generation that never leaves your machine, point Pi at a local model. See{' '}
+              <a
+                href="/docs#local-models"
+                className="text-foreground/90 hover:text-primary underline underline-offset-4"
+              >
+                local models in the docs
+              </a>
+              .
             </p>
             <ul className="text-foreground/80 space-y-1 font-mono text-[0.78rem]">
               <li>~/.pilog/journal.sqlite</li>
               <li>os-keychain://pilog.gh.token</li>
-              <li>provider keys → byok via pi</li>
+              <li>ollama → localhost:11434</li>
             </ul>
           </article>
 
@@ -130,8 +138,8 @@ same root as <SettingsRow/>`}
               </h3>
             </div>
             <p className="text-muted-foreground mb-5 text-sm leading-relaxed">
-              The agent reads the active repository alongside your notes — affected files, labels,
-              owners, prior issues — and proposes drafts that actually fit.
+              The agent reads the active repository alongside your notes: affected files, labels,
+              owners, prior issues. It proposes drafts that actually fit.
             </p>
             <pre className="bg-secondary/50 text-foreground/90 overflow-x-auto rounded-md p-3 font-mono text-[0.75rem] leading-[1.6]">
               {`repo: nick-neely/pilog

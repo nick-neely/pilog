@@ -142,7 +142,7 @@ async function writePackageJson(
   stagingRoot: string,
   packageName: string,
   contents: Record<string, unknown>
-) {
+): Promise<void> {
   const packageJsonPath = path.join(
     stagingRoot,
     'node_modules',

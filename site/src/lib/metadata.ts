@@ -1,8 +1,8 @@
 import type { Metadata, MetadataRoute } from 'next'
-import { createElement } from 'react'
 import type { ReactElement } from 'react'
-import type { ReleaseManifest } from './release-manifest'
+import { createElement } from 'react'
 import rawManifest from '../data/release-manifest.json'
+import type { ReleaseManifest } from './release-manifest'
 
 const SITE_URL = 'https://pilog.dev'
 const SITE_NAME = 'Pilog'
@@ -259,7 +259,7 @@ export const downloadMetadata: Metadata = createPageMetadata({
 export const docsMetadata: Metadata = createPageMetadata({
   title: 'Docs',
   description:
-    'Install Pilog, connect GitHub, configure the Pi draft agent, and turn rough notes into clean GitHub issues without leaving flow.',
+    'Install Pilog, connect GitHub, configure Pi (cloud API or local Ollama), and turn rough notes into clean GitHub issues without leaving flow.',
   canonical: '/docs',
   openGraphTitle: 'Pilog Docs',
   openGraphDescription:
@@ -269,7 +269,7 @@ export const docsMetadata: Metadata = createPageMetadata({
 export const aboutMetadata: Metadata = createPageMetadata({
   title: 'About',
   description:
-    'Learn why Pilog is local-first by default, how capture stays separate from triage, and how the open source project is maintained.',
+    'Learn why Pilog is local-first for your journal, when draft generation needs a local Pi model, and how the open source project is maintained.',
   canonical: '/about',
   openGraphTitle: 'About Pilog'
 })
@@ -368,7 +368,7 @@ export const aboutStructuredData: JsonLdGraph = jsonLdGraph([
     'AboutPage',
     '/about',
     'About Pilog',
-    'Learn why Pilog is local-first by default and how the open source project is maintained.'
+    'Learn why Pilog is local-first for your journal, when to use a local Pi model, and how the open source project is maintained.'
   ),
   breadcrumb('About', '/about')
 ])
