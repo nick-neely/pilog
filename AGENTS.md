@@ -45,10 +45,12 @@ Use skills to keep implementation aligned with PiLog’s design system and shadc
 - For sidebar and status-filter polish across Inbox, Runs, and Drafts, treat Inbox as the default visual standard unless the user specifies otherwise.
 - Status filters across Inbox, Runs, and Drafts should be clearable; the cleared state shows all statuses instead of forcing a default selection.
 - For contextual help or secondary detail in dialogs and sidebars, prefer a compact info-icon hover card (like the Inbox Generate Drafts footer) over large inline disclosures.
+- Avoid em dashes in marketing site copy.
 
 ## Learned Workspace Facts
 
-- The impeccable loader at `.agents/skills/impeccable/scripts/load-context.mjs` is not present in this repo; read `PRODUCT.md` and `DESIGN.md` at the repo root when you need design context without that script.
+- For impeccable design context, run `node .claude/skills/impeccable/scripts/context.mjs` (or the equivalent under `.agents/` / `.cursor/`); if context is missing, read `PRODUCT.md` and `DESIGN.md` at the repo root.
+- ESLint and Prettier exclude `.agents/`, `.claude/`, and `.cursor/` harness skill trees from lint/format checks (`eslint.config.mjs` ignores, `.prettierignore`).
 - `.cursor/hooks/state/` is listed in `.gitignore`; hook state and continual-learning index files stay local and are not committed by default.
 - The shared `Note` type includes `runId: string | null`; main-process mapping from SQLite and test fixtures that construct `Note` values must include `runId` (from `run_id` or `null`).
 - The `.sandcastle/Dockerfile` image is a long-lived sandbox (`sleep infinity`); typical workflow is build, run with the repo mounted at `/home/agent/workspace`, then use `docker exec` for a shell (unless Sandcastle CLI drives mounts for you). Sandcastle’s ready hook runs `CI=true PILOG_SANDBOX=1 pnpm install`, which skips `app:rebuild` (avoids flaky `electronjs.org` fetches during `electron-rebuild`). Normal install on the host or for e2e should not rely on `PILOG_SANDBOX` alone: run a full install/rebuild (`pnpm install` without that flag or `pnpm run app:install` / `app:rebuild`) so `better-sqlite3` matches Electron’s ABI. Vitest uses Node’s native module ABI; if `better-sqlite3` was built only for Electron, local tests can fail with a `NODE_MODULE_VERSION` mismatch until you rebuild under the same Node that runs Vitest.
@@ -56,7 +58,6 @@ Use skills to keep implementation aligned with PiLog’s design system and shadc
 - `PILOG_BUNDLED_GITHUB_CLIENT_ID` is the GitHub OAuth app Client ID for packaged device-flow builds; local dev can use `GITHUB_CLIENT_ID`, and client secrets only belong to the optional loopback flow.
 - `SANDCASTLE_MAX_PARALLEL_ISSUES` caps the number of issues emitted by one planner result; if the planner returns one issue, Sandcastle runs one issue even when the cap is higher. Sandcastle dependency ordering is inferred from issue body text returned by `gh issue list`; use explicit sections like `Blocked by` / `Blocks` because GitHub native parent relationships are not validated by the runner.
 - In renderer UI, prefer shadcn/Radix `Tooltip` over native `title` attributes for controls so the app avoids double tooltips and keeps styled accessible hints.
-- Renderer TypeScript can flag `for...of` over `Set`/`Map` iterators; prefer `Array.from(...)` or `.forEach(...)` when touching iterator-heavy code.
 - `scripts/site-metadata.test.ts` (and similar) should derive expected download `softwareVersion` / `releaseNotes` from `site/src/data/release-manifest.json` using the same `stable ?? preview` rule as `site/src/lib/metadata.ts`, not hardcoded preview version strings.
 - Root `pnpm run verify` runs typecheck, lint, and test in parallel via `concurrently`.
 - Preview release Git tags must use the `v` prefix and match `vX.Y.Z-preview.N` (e.g. `v0.0.1-preview.10`); the Release — Preview workflow validates this format.

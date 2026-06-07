@@ -1,4 +1,5 @@
 import { Hero } from '@/components/landing/hero'
+import { ProductScreenshot } from '@/components/landing/product-screenshot'
 import { Transformation } from '@/components/landing/transformation'
 import { Bento } from '@/components/landing/bento'
 import { KeyboardFirst } from '@/components/landing/keyboard'
@@ -27,6 +28,7 @@ export default async function LandingPage() {
     <>
       <JsonLdScript data={homeStructuredData} />
       <Hero />
+      <ProductScreenshot />
       <Transformation />
       <Bento modKey={modKey} />
       <KeyboardFirst modKey={modKey} />

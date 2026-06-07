@@ -84,9 +84,12 @@ export default function AboutPage() {
       {/* Story */}
       <section aria-labelledby="story-title" className="border-border/60 border-t">
         <div className="mx-auto max-w-6xl px-6 py-16 md:py-24">
-          <p id="story-title" className="text-muted-foreground mb-10 font-mono text-xs">
+          <h2
+            id="story-title"
+            className="text-muted-foreground mb-10 font-mono text-xs font-normal"
+          >
             01 — the story
-          </p>
+          </h2>
           <div className="grid grid-cols-1 gap-8 md:grid-cols-2 md:gap-20">
             <div className="space-y-5 text-base leading-relaxed">
               <p className="text-foreground/90">
@@ -124,9 +127,12 @@ export default function AboutPage() {
         className="bg-secondary/40 border-border/60 border-t"
       >
         <div className="mx-auto max-w-6xl px-6 py-16 md:py-28">
-          <p id="principles-title" className="text-muted-foreground mb-12 font-mono text-xs">
+          <h2
+            id="principles-title"
+            className="text-muted-foreground mb-12 font-mono text-xs font-normal"
+          >
             02 — principles
-          </p>
+          </h2>
           <ol className="space-y-14 md:space-y-16">
             {principles.map((p) => (
               <li key={p.num} className={p.indent}>

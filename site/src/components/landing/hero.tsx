@@ -29,13 +29,13 @@ export function Hero() {
         </p>
         <h1
           id="hero-title"
-          className="font-heading text-foreground text-[clamp(2.5rem,6vw,4.75rem)] leading-[1.04] font-normal tracking-tight"
+          className="font-heading text-foreground text-[clamp(2.45rem,5.9vw,4.7rem)] leading-[1.05] font-normal tracking-[-0.013em] [font-feature-settings:'kern'_1,'liga'_1]"
         >
-          Capture before
-          <br />
-          you forget.
-          <br />
-          <span className="text-muted-foreground">Triage when you&#8217;re ready.</span>
+          <span className="block">Capture before</span>
+          <span className="mt-[0.08em] block">you forget.</span>
+          <span className="text-muted-foreground mt-[0.08em] block text-[0.6em] tracking-[0.028em] [font-variant-numeric:proportional-nums]">
+            Triage when you&#8217;re ready.
+          </span>
         </h1>
         <p className="text-foreground/80 mt-8 max-w-[58ch] text-base leading-relaxed md:text-lg">
           Pilog is a quiet markdown scratchpad on a global hotkey and an inbox that turns the pile
