@@ -1,6 +1,9 @@
 out
 dist
 **/.next
+.agents
+.claude
+.cursor
 pnpm-lock.yaml
 LICENSE.md
 tsconfig.json

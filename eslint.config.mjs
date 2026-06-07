@@ -12,6 +12,10 @@ export default defineConfig(
       '**/dist',
       '**/out',
       '**/.next',
+      // Agent harness skill trees — vendored/copied tooling, not app source.
+      '**/.agents/**',
+      '**/.claude/**',
+      '**/.cursor/**',
       // Next.js emits this file; triple-slash refs are required for route types.
       '**/next-env.d.ts'
     ]
