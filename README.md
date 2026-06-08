@@ -4,6 +4,10 @@
 
 Pilog is a local-first Electron app for capturing rough developer notes and turning them into GitHub-ready issue drafts. Use the global scratchpad to jot something down without leaving your current flow, then triage those notes later from the inbox.
 
+<p align="center">
+  <img src="site/public/landing/pilog-app-screenshot-option-02-editorial-flat.png" alt="PiLog inbox with note triage, editing, and draft generation" width="900" />
+</p>
+
 The app currently supports:
 
 - Global hotkey scratchpad with markdown editing
