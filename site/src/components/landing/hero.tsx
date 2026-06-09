@@ -20,7 +20,7 @@ export function Hero() {
   return (
     <section
       aria-labelledby="hero-title"
-      className="relative mx-auto grid w-full max-w-6xl grid-cols-1 gap-12 px-6 pt-20 pb-24 md:grid-cols-12 md:gap-8 md:pt-28 md:pb-32"
+      className="relative mx-auto grid w-full max-w-6xl grid-cols-1 gap-12 px-6 pt-20 pb-14 md:grid-cols-12 md:gap-8 md:pt-28 md:pb-32"
     >
       <div className="md:col-span-7 md:pt-6">
         <p className="text-muted-foreground mb-6 inline-flex items-center gap-2 font-mono text-xs">
@@ -61,7 +61,7 @@ export function Hero() {
         </a>
       </div>
 
-      <div className="relative md:col-span-5 md:pt-2">
+      <div className="relative hidden md:col-span-5 md:block md:pt-2">
         <div className="relative mx-auto w-full max-w-[440px]">
           {/* Page-corner curl shadow — the ONE documented hero-only lift. */}
           <div
@@ -76,7 +76,7 @@ export function Hero() {
 
       <div
         aria-hidden
-        className="text-muted-foreground/50 absolute bottom-6 left-1/2 -translate-x-1/2 motion-safe:animate-bounce"
+        className="text-muted-foreground/50 absolute bottom-6 left-1/2 hidden -translate-x-1/2 motion-safe:animate-bounce md:block"
       >
         <svg
           width="18"
